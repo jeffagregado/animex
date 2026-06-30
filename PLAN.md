@@ -1,0 +1,134 @@
+# AnimeX MVP Implementation Plan
+
+## Summary
+
+Build AnimeX as phased MVP on TanStack Start, React, Tailwind v4, Convex, Better Auth, shadcn/ui, and Resend. Implementation must stop after each phase for review; no one-shot multi-phase execution.
+
+Approved new production dependencies:
+- `@convex-dev/better-auth`
+- `resend`
+
+If any other production package is needed, pause and request approval first.
+
+## Key Routes And Interfaces
+
+- `/` redirects to `/home`.
+- `/home` public/signed-in feed.
+- `/discover` cached AniList browse page.
+- `/anime/$anilistId/$slug` anime detail page.
+  - Example: `/anime/182255/Frieren-Beyond-Journeys-End-Season-2`
+  - `anilistId` is canonical.
+  - `slug` is generated from AniList metadata title.
+  - If slug is missing or stale, route redirects to canonical slug URL.
+- `/u/$username` user profile.
+- `/reviews/$reviewId` review detail.
+- Auth routes:
+  - `/auth/sign-in`
+  - `/auth/sign-up`
+  - `/auth/verify-email`
+  - `/auth/forgot-password`
+  - `/auth/reset-password`
+  - `/auth/oauth-username`
+- Settings routes:
+  - `/settings/account`
+  - `/settings/privacy`
+- `/notifications` notification history.
+
+Convex env already available:
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `RESEND_TEST_MODE`
+- `RESEND_TEST_RECIPIENT`
+- `RESEND_WEBHOOK_SECRET`
+- `SITE_URL`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+
+## Phase Plan
+
+### Phase 1: Foundation
+
+- Fix current TypeScript unused-import errors.
+- Initialize Fallow.
+- Install approved dependencies only.
+- Add needed shadcn/ui components.
+- Replace starter route/CSS with AnimeX app shell and Tailwind v4 dark theme.
+- Build desktop top nav and mobile bottom nav.
+- Stop after validation and wait for approval.
+
+### Phase 2: Auth And User Records
+
+- Wire Better Auth to Convex using `@convex-dev/better-auth`.
+- Configure Google OAuth from Convex env.
+- Configure Resend SDK email sender from Convex env.
+- Implement sign-up, sign-in, email OTP verification, password reset, and pending OAuth username completion.
+- Keep Better Auth identity separate from AnimeX `users` profile record.
+- Stop after validation and wait for approval.
+
+### Phase 3: AniList And Discover
+
+- Add AniList GraphQL action helpers.
+- Add metadata normalization and canonical `anilistId`.
+- Add slug generation from AniList title metadata.
+- Add Discover section caches for Trending, Seasonal, Recommendations, and local Genres.
+- Discover stores lightweight summaries only.
+- Stop after validation and wait for approval.
+
+### Phase 4: Anime Detail
+
+- Build `/anime/$anilistId/$slug`.
+- Hydrate full anime metadata by AniList `id` on first page open.
+- Redirect stale/missing slug to canonical slug.
+- Add Overview, Reviews, Characters, Staff tabs.
+- Add Status, Score, Favorite, Review button, and owner-only Rewatch History.
+- Stop after validation and wait for approval.
+
+### Phase 5: Feed, Posts, Reviews
+
+- Build Home, Following, Global feed views.
+- Add Post Composer.
+- Support one optional attached anime per Post.
+- Support up to four compressed images, max 5MB each after compression.
+- Add Review creation from anime detail only.
+- Generate Review activity cards with current Review Rating and Review Summary.
+- Stop after validation and wait for approval.
+
+### Phase 6: Profile And Social
+
+- Build User Profile from locked design.
+- Add Review tab, latest favorites, anime stats, visible profile activity.
+- Add Follow/Unfollow.
+- Add likes for posts, reviews, activity cards, comments.
+- Add comments and flat comment replies.
+- Stop after validation and wait for approval.
+
+### Phase 7: Notifications, Privacy, Moderation
+
+- Add notification preview and notification page.
+- Add account default visibility and bulk visibility tools under Privacy Settings.
+- Add block/unblock.
+- Add reports for posts, reviews, comments, and comment replies.
+- Do not allow reports for generated anime status activity cards.
+- Stop after validation and wait for approval.
+
+## Test Plan
+
+Each phase must run only relevant checks, then stop:
+- `pnpm exec tsc --noEmit`
+- `pnpm test`
+- `pnpm build`
+- `pnpm exec fallow --format compact`
+- Browser QA for changed UI paths, desktop and mobile.
+- Console check for UI phases.
+- Convex validation for schema/function phases.
+- `pnpm dlx convex deploy` only after Convex changes are validated and deployment is needed.
+
+## Assumptions
+
+- AniList `id` is canonical anime identity.
+- Slug is display/SEO only and can be regenerated from AniList metadata.
+- Resend env and Google OAuth env are stored in Convex dashboard, not `.env.local`.
+- AniList image URLs may be stored as external URLs in MVP.
+- User uploads use Convex storage.
+- Manga remains future placeholder.
+- No phase continues automatically into the next phase.
