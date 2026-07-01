@@ -31,11 +31,15 @@ export const assertAuthResponse = async <TResponse,>(
   return response
 }
 
+export const getAuthCallbackUrl = (path: string): string => {
+  return new URL(path, window.location.origin).href
+}
+
 export const sendGoogleSignIn = async (): Promise<void> => {
   await assertAuthResponse(
     await authClient.signIn.social({
       provider: 'google',
-      callbackURL: '/auth/username',
+      callbackURL: getAuthCallbackUrl('/auth/username'),
     }),
     'Google sign-in failed.',
   )

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, test } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { ForgotPasswordPage } from './forgot-password-page'
 import { ResetPasswordPage } from './reset-password-page'
@@ -10,12 +10,33 @@ import { SignUpPage } from './sign-up-page'
 import { UsernamePage } from './username-page'
 import { VerifyEmailPage } from './verify-email-page'
 
+const mockSignedOutState = (): void => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      return {
+        ok: true,
+        json: async () => ({
+          status: 'signedOut',
+          email: null,
+          emailVerified: false,
+          profile: null,
+        }),
+      } as Response
+    }),
+  )
+}
+
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
+  window.history.replaceState(null, '', '/')
 })
 
 describe('auth pages', () => {
   test('renders sign-in form with Google entry and forgot-password link', () => {
+    mockSignedOutState()
+
     render(<SignInPage />)
 
     expect(screen.getAllByRole('link', { name: 'AnimeX home' }).length).toBeGreaterThan(1)
@@ -26,10 +47,13 @@ describe('auth pages', () => {
     expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeTruthy()
     expect(screen.getByLabelText('Account Email')).toBeTruthy()
     expect(screen.getByLabelText('Password')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Show password' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Forgot password?' })).toBeTruthy()
   })
 
   test('renders create account form without username', () => {
+    mockSignedOutState()
+
     render(<SignUpPage />)
 
     expect(screen.getByRole('heading', { name: 'Create Account' })).toBeTruthy()
@@ -37,12 +61,32 @@ describe('auth pages', () => {
     expect(screen.getByLabelText('Account Email')).toBeTruthy()
     expect(screen.getByLabelText('Password')).toBeTruthy()
     expect(screen.getByLabelText('Confirm Password')).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'Show password' })).toHaveLength(2)
+  })
+
+  test('toggles password visibility in sign-in', () => {
+    mockSignedOutState()
+
+    render(<SignInPage />)
+
+    const passwordInput = screen.getByLabelText('Password')
+    expect(passwordInput).toHaveProperty('type', 'password')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show password' }))
+
+    expect(passwordInput).toHaveProperty('type', 'text')
+    expect(screen.getByRole('button', { name: 'Hide password' })).toBeTruthy()
   })
 
   test('renders verification and recovery forms', () => {
+    mockSignedOutState()
+
     render(<VerifyEmailPage />)
     expect(screen.getByRole('heading', { name: 'Verify Email' })).toBeTruthy()
     expect(screen.getByLabelText('Verification Code')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Verify Email' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Resend code' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Go back' })).toBeTruthy()
 
     render(<ForgotPasswordPage />)
     expect(screen.getByRole('heading', { name: 'Reset Password' })).toBeTruthy()
@@ -50,7 +94,19 @@ describe('auth pages', () => {
 
     render(<ResetPasswordPage />)
     expect(screen.getByRole('heading', { name: 'Set New Password' })).toBeTruthy()
-    expect(screen.getByText('Reset link is invalid or expired.')).toBeTruthy()
+    expect(screen.getByText('Reset link is invalid or expired. Request a new one.')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Request a new reset link' })).toBeTruthy()
+  })
+
+  test('prefills verification email from query params', async () => {
+    mockSignedOutState()
+    window.history.replaceState(null, '', '/auth/verify-email?email=Mika%40Example.com')
+
+    render(<VerifyEmailPage />)
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Account Email')).toHaveProperty('value', 'mika@example.com')
+    })
   })
 
   test('renders username completion form', () => {

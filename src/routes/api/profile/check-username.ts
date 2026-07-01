@@ -1,22 +1,8 @@
-import { convexBetterAuthReactStart } from '@convex-dev/better-auth/react-start'
-
 import { api } from '../../../../convex/_generated/api'
+import { getAuthProxy } from '../../../lib/server-auth-proxy'
 import { createStartServerRoute } from '../../../lib/server-route'
 
-const requireServerEnv = (name: string): string => {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(`${name} is required for AnimeX username checks.`)
-  }
-  return value
-}
-
-const getAuthProxy = () => {
-  return convexBetterAuthReactStart({
-    convexUrl: requireServerEnv('VITE_CONVEX_URL'),
-    convexSiteUrl: requireServerEnv('CONVEX_SITE_URL'),
-  })
-}
+const USERNAME_CHECK_SCOPE = 'AnimeX username checks'
 
 const isRecordBody = (body: unknown): body is Record<string, unknown> => {
   return Boolean(body) && typeof body === 'object'
@@ -38,7 +24,7 @@ export const Route = createStartServerRoute('/api/profile/check-username', {
       POST: async ({ request }) => {
         try {
           const username = await readUsername(request)
-          const result = await getAuthProxy().fetchAuthQuery(api.users.checkUsername, { username })
+          const result = await getAuthProxy(USERNAME_CHECK_SCOPE).fetchAuthQuery(api.users.checkUsername, { username })
           return Response.json(result)
         } catch (error) {
           console.error('Username check failed.', error)

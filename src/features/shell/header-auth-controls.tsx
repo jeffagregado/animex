@@ -1,64 +1,38 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { LogIn, LogOut } from 'lucide-react'
 
 import { authClient } from '../../lib/auth-client'
 import { assertAuthResponse } from '../auth/auth-actions'
-import { type AuthState, readAuthState } from '../auth/profile-actions'
+import { isCompleteAuthState, useAuthState } from '../auth/use-auth-state'
 import { headerActionItems } from './navigation'
 
-type HeaderAuthState =
-  | {
-      status: 'loading'
-    }
-  | {
-      status: 'signedOut'
-    }
-  | {
-      status: 'signedIn'
-    }
-  | {
-      status: 'error'
-      message: string
-    }
+type HeaderAuthView = 'loading' | 'signedOut' | 'pending' | 'complete' | 'error'
 
-const getHeaderAuthState = (state: AuthState): HeaderAuthState => {
-  if (state.status === 'signedOut') {
-    return { status: 'signedOut' }
+const getHeaderAuthView = (state: ReturnType<typeof useAuthState>): HeaderAuthView => {
+  if (state.status === 'loading') {
+    return 'loading'
   }
-  return { status: 'signedIn' }
+  if (state.status === 'error') {
+    return 'error'
+  }
+  if (state.authState.status === 'signedOut') {
+    return 'signedOut'
+  }
+  return isCompleteAuthState(state.authState) ? 'complete' : 'pending'
 }
 
-const isHeaderActionVisible = (label: string, state: HeaderAuthState): boolean => {
+const isHeaderActionVisible = (label: string, view: HeaderAuthView): boolean => {
   if (label === 'Search') {
     return true
   }
-  return state.status === 'signedIn'
+  return view === 'complete'
 }
 
 export function HeaderAuthControls() {
-  const [state, setState] = useState<HeaderAuthState>({ status: 'loading' })
-  const visibleActions = headerActionItems.filter((item) => isHeaderActionVisible(item.label, state))
-
-  useEffect(() => {
-    let active = true
-
-    void readAuthState()
-      .then((authState) => {
-        if (active) {
-          setState(getHeaderAuthState(authState))
-        }
-      })
-      .catch((error: unknown) => {
-        if (active) {
-          const message = error instanceof Error ? error.message : 'Auth state check failed.'
-          setState({ status: 'error', message })
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
+  const authState = useAuthState()
+  const [signOutError, setSignOutError] = useState<string | null>(null)
+  const view = getHeaderAuthView(authState)
+  const visibleActions = headerActionItems.filter((item) => isHeaderActionVisible(item.label, view))
 
   const handleSignOut = async () => {
     try {
@@ -66,9 +40,11 @@ export function HeaderAuthControls() {
       window.location.assign('/home')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Sign out failed.'
-      setState({ status: 'error', message })
+      setSignOutError(message)
     }
   }
+
+  const errorMessage = signOutError ?? (authState.status === 'error' ? authState.message : null)
 
   return (
     <>
@@ -83,19 +59,19 @@ export function HeaderAuthControls() {
           <item.icon aria-hidden="true" className="size-5" />
         </button>
       ))}
-      {state.status === 'loading' ? <span className="header-auth-placeholder" aria-hidden="true" /> : null}
-      {state.status === 'error' ? (
-        <button className="header-auth-button" type="button" disabled title={state.message}>
+      {view === 'loading' ? <span className="header-auth-placeholder" aria-hidden="true" /> : null}
+      {view === 'error' || signOutError ? (
+        <button className="header-auth-button" type="button" disabled title={errorMessage ?? 'Auth error'}>
           Auth error
         </button>
       ) : null}
-      {state.status === 'signedOut' ? (
+      {view === 'signedOut' ? (
         <a className="header-auth-button" href="/auth/sign-in">
           <LogIn aria-hidden="true" className="size-4" />
           <span>Sign in</span>
         </a>
       ) : null}
-      {state.status === 'signedIn' ? (
+      {view === 'complete' || view === 'pending' ? (
         <button className="header-auth-button" type="button" onClick={() => void handleSignOut()}>
           <LogOut aria-hidden="true" className="size-4" />
           <span>Sign out</span>

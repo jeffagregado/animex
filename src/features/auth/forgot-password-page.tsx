@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { Mail } from 'lucide-react'
 
-import { getAuthErrorMessage, postAuthEndpoint, readAuthFormData } from './auth-actions'
+import { getAuthCallbackUrl, getAuthErrorMessage, postAuthEndpoint, readAuthFormData } from './auth-actions'
 import {
   AuthField,
   AuthMessage,
@@ -8,9 +9,12 @@ import {
   getFormValue,
 } from './auth-page-shell'
 import { normalizeAccountEmail } from './auth-validation'
+import { useRedirectSignedInAuthPage } from './use-auth-state'
 
 export function ForgotPasswordPage() {
   const [message, setMessage] = useState<string | null>(null)
+  const authState = useRedirectSignedInAuthPage()
+  const authMessage = authState.status === 'error' ? authState.message : null
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     const formData = readAuthFormData(event, setMessage)
@@ -19,7 +23,7 @@ export function ForgotPasswordPage() {
     try {
       await postAuthEndpoint('/request-password-reset', {
         email,
-        redirectTo: '/auth/reset-password',
+        redirectTo: getAuthCallbackUrl('/auth/reset-password'),
       })
       setMessage('If an account exists, reset instructions were sent.')
     } catch (error) {
@@ -28,14 +32,14 @@ export function ForgotPasswordPage() {
   }
 
   return (
-    <AuthPageShell eyebrow="Account recovery" title="Reset Password">
+    <AuthPageShell eyebrow="Account recovery" subtitle={null} title="Reset Password">
       <form className="auth-form" onSubmit={handleSubmit}>
-        <AuthField autoComplete="email" label="Account Email" name="email" type="email" />
+        <AuthField autoComplete="email" icon={Mail} label="Account Email" name="email" type="email" />
         <button className="auth-submit auth-submit-coral" type="submit">
           Send Reset Link
         </button>
       </form>
-      <AuthMessage message={message} />
+      <AuthMessage message={message ?? authMessage} />
       <p className="auth-switch">
         Remembered it? <a href="/auth/sign-in">Sign in</a>
       </p>

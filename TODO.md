@@ -26,9 +26,23 @@
 - [x] Replace password reset OTP UI with reset-link flow.
 - [x] Keep auth pages on the shared AnimeX header.
 - [x] Add AnimeX logo asset and use it in header/auth surfaces.
+- [x] Generate missing auth page proposal refs.
 - [x] Split home shell sections into focused React files.
 - [x] Remove visible auth-loading label from the header.
 - [x] Run Phase 2 validation and pause for review.
+
+## Phase 2 Auth Closure
+
+- [x] Update `PLAN.md` to include the Phase 2 Auth Closure plan.
+- [x] Align missing auth pages to the Verify Email container reference.
+- [x] Add password visibility toggles to sign-in, sign-up, and reset-password forms.
+- [x] Add verification resend and mistyped-email change flow.
+- [x] Add reset-password invalid and success states with locked copy.
+- [x] Redirect auth pages by auth/profile state.
+- [x] Hide private Home/header/mobile surfaces from signed-out and pending users.
+- [x] Extract repeated Convex Better Auth proxy helpers.
+- [x] Push Convex auth config changes to dev with `pnpm exec convex dev --once`.
+- [x] Run TypeScript, test, build, Fallow, and browser QA.
 
 ## Implementation Planning
 

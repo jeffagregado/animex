@@ -1,22 +1,8 @@
-import { convexBetterAuthReactStart } from '@convex-dev/better-auth/react-start'
-
 import { api } from '../../../../convex/_generated/api'
+import { getAuthProxy } from '../../../lib/server-auth-proxy'
 import { createStartServerRoute } from '../../../lib/server-route'
 
-const requireServerEnv = (name: string): string => {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(`${name} is required for AnimeX profile completion.`)
-  }
-  return value
-}
-
-const getAuthProxy = () => {
-  return convexBetterAuthReactStart({
-    convexUrl: requireServerEnv('VITE_CONVEX_URL'),
-    convexSiteUrl: requireServerEnv('CONVEX_SITE_URL'),
-  })
-}
+const PROFILE_COMPLETION_SCOPE = 'AnimeX profile completion'
 
 type CompleteProfileBody = {
   username: string
@@ -101,7 +87,7 @@ export const Route = createStartServerRoute('/api/profile/complete', {
       POST: async ({ request }) => {
         try {
           const body = await parseCompleteProfileBody(request)
-          await getAuthProxy().fetchAuthMutation(api.users.completeProfile, {
+          await getAuthProxy(PROFILE_COMPLETION_SCOPE).fetchAuthMutation(api.users.completeProfile, {
             username: body.username,
           })
           return Response.json({ ok: true })

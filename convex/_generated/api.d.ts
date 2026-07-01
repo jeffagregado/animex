@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as authEmails from "../authEmails.js";
 import type * as http from "../http.js";
 import type * as passwordResets from "../passwordResets.js";
 import type * as todos from "../todos.js";
@@ -22,6 +23,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  authEmails: typeof authEmails;
   http: typeof http;
   passwordResets: typeof passwordResets;
   todos: typeof todos;

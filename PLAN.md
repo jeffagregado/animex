@@ -70,6 +70,18 @@ Convex env already available:
 - Add header auth action: signed-out users see `Sign in`; signed-in and pending users see `Sign out`.
 - Keep Better Auth identity separate from AnimeX `users` profile record.
 - Keep `/home` public; gate private account surfaces and signed-in-only actions through auth/profile guards.
+- Phase 2 Auth Closure:
+  - Use the Verify Email reference as the shared container for missing auth pages.
+  - Keep the shared AnimeX header with Home and Discover only.
+  - Add password visibility toggles to sign-in, sign-up, and set-new-password forms.
+  - Add verification resend and mistyped-email change flow for email-unverified users.
+  - Use generic forgot-password success copy and absolute reset redirect URL.
+  - Add set-new-password valid, invalid, and reset-success states with the locked copy.
+  - Redirect signed-in auth-page users by state: complete to `/home`, unverified to `/auth/verify-email`, and profile-pending to `/auth/username`.
+  - Hide private Home surfaces from signed-out, email-unverified, and username-pending users.
+  - Header rules: complete users see Search, Notifications, Profile, and Sign out; pending users see Search and Sign out; signed-out users see Search and Sign in.
+  - Keep TanStack devtools adapter present but hidden.
+  - Extract repeated Convex Better Auth proxy/env helpers from API routes.
 - Stop after validation and wait for approval.
 
 ### Phase 3: AniList And Discover

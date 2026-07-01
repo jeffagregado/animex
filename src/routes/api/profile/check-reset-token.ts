@@ -1,23 +1,9 @@
-import { convexBetterAuthReactStart } from '@convex-dev/better-auth/react-start'
-
 import { api } from '../../../../convex/_generated/api'
 import { toResetTokenKey } from '../../../lib/reset-token'
+import { getAuthProxy } from '../../../lib/server-auth-proxy'
 import { createStartServerRoute } from '../../../lib/server-route'
 
-const requireServerEnv = (name: string): string => {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(`${name} is required for AnimeX reset token checks.`)
-  }
-  return value
-}
-
-const getAuthProxy = () => {
-  return convexBetterAuthReactStart({
-    convexUrl: requireServerEnv('VITE_CONVEX_URL'),
-    convexSiteUrl: requireServerEnv('CONVEX_SITE_URL'),
-  })
-}
+const RESET_TOKEN_SCOPE = 'AnimeX reset token checks'
 
 const readToken = async (request: Request): Promise<string> => {
   const body: unknown = await request.json()
@@ -34,7 +20,7 @@ export const Route = createStartServerRoute('/api/profile/check-reset-token', {
         try {
           const token = await readToken(request)
           const tokenKey = await toResetTokenKey(token)
-          const valid = await getAuthProxy().fetchAuthQuery(api.passwordResets.isCurrent, {
+          const valid = await getAuthProxy(RESET_TOKEN_SCOPE).fetchAuthQuery(api.passwordResets.isCurrent, {
             tokenKey,
           })
           return Response.json({ valid })

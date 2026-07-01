@@ -48,8 +48,12 @@ describe('HomePage', () => {
     expect(screen.queryByRole('link', { name: 'Community' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Stats' })).toBeNull()
     expect(screen.getByRole('heading', { name: 'Seasonal Anime' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'My Anime' })).toBeTruthy()
-    expect(screen.getByText('What are you watching?')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'My Anime' })).toBeNull()
+    expect(screen.queryByText('What are you watching?')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Following' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Global' })).toBeNull()
+    expect(screen.queryByText('Create')).toBeNull()
+    expect(screen.queryByText('Profile')).toBeNull()
   })
 
   it('shows sign-in action for signed-out users', async () => {
@@ -92,5 +96,30 @@ describe('HomePage', () => {
     expect(header.getByRole('button', { name: 'Search' })).toBeTruthy()
     expect(header.getByRole('button', { name: 'Notifications' })).toBeTruthy()
     expect(header.getByRole('button', { name: 'Profile' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'My Anime' })).toBeTruthy()
+    expect(screen.getByText('What are you watching?')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Following' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Global' })).toBeTruthy()
+  })
+
+  it('keeps pending users signed in but hides private actions', async () => {
+    mockAuthState({
+      status: 'needsProfile',
+      email: 'mika@example.com',
+      emailVerified: true,
+      profile: null,
+    })
+
+    render(<HomePage />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
+    })
+
+    const header = getHeaderQueries()
+    expect(header.getByRole('button', { name: 'Search' })).toBeTruthy()
+    expect(header.queryByRole('button', { name: 'Notifications' })).toBeNull()
+    expect(header.queryByRole('button', { name: 'Profile' })).toBeNull()
+    expect(screen.queryByText('What are you watching?')).toBeNull()
   })
 })

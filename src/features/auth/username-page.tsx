@@ -67,7 +67,7 @@ export function UsernamePage() {
   }
 
   return (
-    <AuthPageShell eyebrow="Complete profile" title="Choose Username">
+    <AuthPageShell eyebrow="Complete profile" subtitle={null} title="Choose Username">
       {email ? <p className="auth-readonly">Signed in with {email}</p> : null}
       <form className="auth-form" onSubmit={handleSubmit}>
         <UsernameField label="Username" value={usernameValue} onChange={setUsernameValue} />

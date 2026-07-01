@@ -1,23 +1,9 @@
-import { convexBetterAuthReactStart } from '@convex-dev/better-auth/react-start'
-
 import { api } from '../../../../convex/_generated/api'
 import { toResetTokenKey } from '../../../lib/reset-token'
+import { getAuthProxy } from '../../../lib/server-auth-proxy'
 import { createStartServerRoute } from '../../../lib/server-route'
 
-const requireServerEnv = (name: string): string => {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(`${name} is required for AnimeX auth proxy.`)
-  }
-  return value
-}
-
-const getAuthProxy = () => {
-  return convexBetterAuthReactStart({
-    convexUrl: requireServerEnv('VITE_CONVEX_URL'),
-    convexSiteUrl: requireServerEnv('CONVEX_SITE_URL'),
-  })
-}
+const AUTH_PROXY_SCOPE = 'AnimeX auth proxy'
 
 const readResetToken = async (request: Request): Promise<string> => {
   const body: unknown = await request.clone().json()
@@ -33,12 +19,13 @@ const isResetPasswordRequest = (request: Request): boolean => {
 
 const handlePost = async (request: Request): Promise<Response> => {
   if (!isResetPasswordRequest(request)) {
-    return await getAuthProxy().handler(request)
+    return await getAuthProxy(AUTH_PROXY_SCOPE).handler(request)
   }
 
   const token = await readResetToken(request)
   const tokenKey = await toResetTokenKey(token)
-  const isCurrent = await getAuthProxy().fetchAuthQuery(api.passwordResets.isCurrent, {
+  const authProxy = getAuthProxy(AUTH_PROXY_SCOPE)
+  const isCurrent = await authProxy.fetchAuthQuery(api.passwordResets.isCurrent, {
     tokenKey,
   })
 
@@ -46,9 +33,9 @@ const handlePost = async (request: Request): Promise<Response> => {
     return new Response('Reset link is invalid or expired.', { status: 400 })
   }
 
-  const response = await getAuthProxy().handler(request)
+  const response = await authProxy.handler(request)
   if (response.ok) {
-    await getAuthProxy().fetchAuthMutation(api.passwordResets.clear, { tokenKey })
+    await authProxy.fetchAuthMutation(api.passwordResets.clear, { tokenKey })
   }
   return response
 }
@@ -57,7 +44,7 @@ export const Route = createStartServerRoute('/api/auth/$', {
   server: {
     handlers: {
       GET: async ({ request }) => {
-        return await getAuthProxy().handler(request)
+        return await getAuthProxy(AUTH_PROXY_SCOPE).handler(request)
       },
       POST: async ({ request }) => {
         return await handlePost(request)
