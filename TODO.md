@@ -1,5 +1,14 @@
 # TODO
 
+## Phase 1 Foundation
+
+- [x] Fix current TypeScript unused-import errors.
+- [x] Initialize Fallow if absent.
+- [x] Install approved production dependencies from `PLAN.md`.
+- [x] Replace starter route and CSS with AnimeX app shell.
+- [x] Build desktop top nav and mobile bottom nav.
+- [x] Run Phase 1 validation and pause for review.
+
 ## Implementation Planning
 
 - [x] Save AnimeX MVP implementation plan to `PLAN.md`.

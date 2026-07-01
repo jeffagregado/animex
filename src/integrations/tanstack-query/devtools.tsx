@@ -1,6 +1,10 @@
+// fallow-ignore-file unused-file
+
 import { ReactQueryDevtoolsPanel } from '@tanstack/react-query-devtools'
 
-export default {
+const TanStackQueryDevtools = {
   name: 'Tanstack Query',
   render: <ReactQueryDevtoolsPanel />,
 }
+
+export default TanStackQueryDevtools
