@@ -1,5 +1,3 @@
-// fallow-ignore-file unused-file
-
 import { ReactQueryDevtoolsPanel } from '@tanstack/react-query-devtools'
 
 const TanStackQueryDevtools = {
