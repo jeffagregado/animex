@@ -11,6 +11,18 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthVerifyEmailRouteImport } from './routes/auth/verify-email'
+import { Route as AuthUsernameRouteImport } from './routes/auth/username'
+import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
+import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
+import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
+import { Route as AuthOauthUsernameRouteImport } from './routes/auth/oauth-username'
+import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
+import { Route as ApiProfileStateRouteImport } from './routes/api/profile/state'
+import { Route as ApiProfileCompleteRouteImport } from './routes/api/profile/complete'
+import { Route as ApiProfileCheckUsernameRouteImport } from './routes/api/profile/check-username'
+import { Route as ApiProfileCheckResetTokenRouteImport } from './routes/api/profile/check-reset-token'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const HomeRoute = HomeRouteImport.update({
   id: '/home',
@@ -22,31 +34,183 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthVerifyEmailRoute = AuthVerifyEmailRouteImport.update({
+  id: '/auth/verify-email',
+  path: '/auth/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthUsernameRoute = AuthUsernameRouteImport.update({
+  id: '/auth/username',
+  path: '/auth/username',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthSignUpRoute = AuthSignUpRouteImport.update({
+  id: '/auth/sign-up',
+  path: '/auth/sign-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthSignInRoute = AuthSignInRouteImport.update({
+  id: '/auth/sign-in',
+  path: '/auth/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
+  id: '/auth/reset-password',
+  path: '/auth/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthOauthUsernameRoute = AuthOauthUsernameRouteImport.update({
+  id: '/auth/oauth-username',
+  path: '/auth/oauth-username',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
+  id: '/auth/forgot-password',
+  path: '/auth/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProfileStateRoute = ApiProfileStateRouteImport.update({
+  id: '/api/profile/state',
+  path: '/api/profile/state',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProfileCompleteRoute = ApiProfileCompleteRouteImport.update({
+  id: '/api/profile/complete',
+  path: '/api/profile/complete',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProfileCheckUsernameRoute = ApiProfileCheckUsernameRouteImport.update({
+  id: '/api/profile/check-username',
+  path: '/api/profile/check-username',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProfileCheckResetTokenRoute =
+  ApiProfileCheckResetTokenRouteImport.update({
+    id: '/api/profile/check-reset-token',
+    path: '/api/profile/check-reset-token',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/home': typeof HomeRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/oauth-username': typeof AuthOauthUsernameRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/sign-in': typeof AuthSignInRoute
+  '/auth/sign-up': typeof AuthSignUpRoute
+  '/auth/username': typeof AuthUsernameRoute
+  '/auth/verify-email': typeof AuthVerifyEmailRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/profile/check-reset-token': typeof ApiProfileCheckResetTokenRoute
+  '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
+  '/api/profile/complete': typeof ApiProfileCompleteRoute
+  '/api/profile/state': typeof ApiProfileStateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/home': typeof HomeRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/oauth-username': typeof AuthOauthUsernameRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/sign-in': typeof AuthSignInRoute
+  '/auth/sign-up': typeof AuthSignUpRoute
+  '/auth/username': typeof AuthUsernameRoute
+  '/auth/verify-email': typeof AuthVerifyEmailRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/profile/check-reset-token': typeof ApiProfileCheckResetTokenRoute
+  '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
+  '/api/profile/complete': typeof ApiProfileCompleteRoute
+  '/api/profile/state': typeof ApiProfileStateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/home': typeof HomeRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/oauth-username': typeof AuthOauthUsernameRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/sign-in': typeof AuthSignInRoute
+  '/auth/sign-up': typeof AuthSignUpRoute
+  '/auth/username': typeof AuthUsernameRoute
+  '/auth/verify-email': typeof AuthVerifyEmailRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/profile/check-reset-token': typeof ApiProfileCheckResetTokenRoute
+  '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
+  '/api/profile/complete': typeof ApiProfileCompleteRoute
+  '/api/profile/state': typeof ApiProfileStateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/home'
+  fullPaths:
+    | '/'
+    | '/home'
+    | '/auth/forgot-password'
+    | '/auth/oauth-username'
+    | '/auth/reset-password'
+    | '/auth/sign-in'
+    | '/auth/sign-up'
+    | '/auth/username'
+    | '/auth/verify-email'
+    | '/api/auth/$'
+    | '/api/profile/check-reset-token'
+    | '/api/profile/check-username'
+    | '/api/profile/complete'
+    | '/api/profile/state'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/home'
-  id: '__root__' | '/' | '/home'
+  to:
+    | '/'
+    | '/home'
+    | '/auth/forgot-password'
+    | '/auth/oauth-username'
+    | '/auth/reset-password'
+    | '/auth/sign-in'
+    | '/auth/sign-up'
+    | '/auth/username'
+    | '/auth/verify-email'
+    | '/api/auth/$'
+    | '/api/profile/check-reset-token'
+    | '/api/profile/check-username'
+    | '/api/profile/complete'
+    | '/api/profile/state'
+  id:
+    | '__root__'
+    | '/'
+    | '/home'
+    | '/auth/forgot-password'
+    | '/auth/oauth-username'
+    | '/auth/reset-password'
+    | '/auth/sign-in'
+    | '/auth/sign-up'
+    | '/auth/username'
+    | '/auth/verify-email'
+    | '/api/auth/$'
+    | '/api/profile/check-reset-token'
+    | '/api/profile/check-username'
+    | '/api/profile/complete'
+    | '/api/profile/state'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HomeRoute: typeof HomeRoute
+  AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
+  AuthOauthUsernameRoute: typeof AuthOauthUsernameRoute
+  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
+  AuthSignInRoute: typeof AuthSignInRoute
+  AuthSignUpRoute: typeof AuthSignUpRoute
+  AuthUsernameRoute: typeof AuthUsernameRoute
+  AuthVerifyEmailRoute: typeof AuthVerifyEmailRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiProfileCheckResetTokenRoute: typeof ApiProfileCheckResetTokenRoute
+  ApiProfileCheckUsernameRoute: typeof ApiProfileCheckUsernameRoute
+  ApiProfileCompleteRoute: typeof ApiProfileCompleteRoute
+  ApiProfileStateRoute: typeof ApiProfileStateRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +229,108 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/verify-email': {
+      id: '/auth/verify-email'
+      path: '/auth/verify-email'
+      fullPath: '/auth/verify-email'
+      preLoaderRoute: typeof AuthVerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/username': {
+      id: '/auth/username'
+      path: '/auth/username'
+      fullPath: '/auth/username'
+      preLoaderRoute: typeof AuthUsernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/sign-up': {
+      id: '/auth/sign-up'
+      path: '/auth/sign-up'
+      fullPath: '/auth/sign-up'
+      preLoaderRoute: typeof AuthSignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/sign-in': {
+      id: '/auth/sign-in'
+      path: '/auth/sign-in'
+      fullPath: '/auth/sign-in'
+      preLoaderRoute: typeof AuthSignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/reset-password': {
+      id: '/auth/reset-password'
+      path: '/auth/reset-password'
+      fullPath: '/auth/reset-password'
+      preLoaderRoute: typeof AuthResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/oauth-username': {
+      id: '/auth/oauth-username'
+      path: '/auth/oauth-username'
+      fullPath: '/auth/oauth-username'
+      preLoaderRoute: typeof AuthOauthUsernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/forgot-password': {
+      id: '/auth/forgot-password'
+      path: '/auth/forgot-password'
+      fullPath: '/auth/forgot-password'
+      preLoaderRoute: typeof AuthForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profile/state': {
+      id: '/api/profile/state'
+      path: '/api/profile/state'
+      fullPath: '/api/profile/state'
+      preLoaderRoute: typeof ApiProfileStateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profile/complete': {
+      id: '/api/profile/complete'
+      path: '/api/profile/complete'
+      fullPath: '/api/profile/complete'
+      preLoaderRoute: typeof ApiProfileCompleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profile/check-username': {
+      id: '/api/profile/check-username'
+      path: '/api/profile/check-username'
+      fullPath: '/api/profile/check-username'
+      preLoaderRoute: typeof ApiProfileCheckUsernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profile/check-reset-token': {
+      id: '/api/profile/check-reset-token'
+      path: '/api/profile/check-reset-token'
+      fullPath: '/api/profile/check-reset-token'
+      preLoaderRoute: typeof ApiProfileCheckResetTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HomeRoute: HomeRoute,
+  AuthForgotPasswordRoute: AuthForgotPasswordRoute,
+  AuthOauthUsernameRoute: AuthOauthUsernameRoute,
+  AuthResetPasswordRoute: AuthResetPasswordRoute,
+  AuthSignInRoute: AuthSignInRoute,
+  AuthSignUpRoute: AuthSignUpRoute,
+  AuthUsernameRoute: AuthUsernameRoute,
+  AuthVerifyEmailRoute: AuthVerifyEmailRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiProfileCheckResetTokenRoute: ApiProfileCheckResetTokenRoute,
+  ApiProfileCheckUsernameRoute: ApiProfileCheckUsernameRoute,
+  ApiProfileCompleteRoute: ApiProfileCompleteRoute,
+  ApiProfileStateRoute: ApiProfileStateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

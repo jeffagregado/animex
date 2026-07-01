@@ -9,6 +9,27 @@
 - [x] Build desktop top nav and mobile bottom nav.
 - [x] Run Phase 1 validation and pause for review.
 
+## Phase 2 Auth And User Records
+
+- [x] Wire Better Auth to Convex using `@convex-dev/better-auth`.
+- [x] Configure Google OAuth from Convex env.
+- [x] Configure Resend SDK email sender from Convex env.
+- [x] Implement sign-up, sign-in, email OTP verification, password reset, and OAuth username completion routes.
+- [x] Keep Better Auth identity separate from AnimeX `users` profile record.
+- [x] Rename Convex user fields and functions to concise auth/profile naming.
+- [x] Enforce case-insensitive username uniqueness while preserving typed display capitalization.
+- [x] Remove username from password sign-up.
+- [x] Send verified password users without profile to username completion.
+- [x] Remove pre-verification username reservation.
+- [x] Add auth state and guard helpers for private pages/features.
+- [x] Add header sign-in/sign-out action.
+- [x] Replace password reset OTP UI with reset-link flow.
+- [x] Keep auth pages on the shared AnimeX header.
+- [x] Add AnimeX logo asset and use it in header/auth surfaces.
+- [x] Split home shell sections into focused React files.
+- [x] Remove visible auth-loading label from the header.
+- [x] Run Phase 2 validation and pause for review.
+
 ## Implementation Planning
 
 - [x] Save AnimeX MVP implementation plan to `PLAN.md`.
@@ -350,7 +371,7 @@
 - [x] Decide that after an OAuth-created account creates a password through Password Reset, OAuth sign-in still works; Password Reset adds Password Sign-In access and does not replace or unlink OAuth.
 - [x] Decide that MVP has no user-facing sign-in method management; users cannot unlink OAuth or remove Password Sign-In after both methods exist.
 - [x] Decide that self-service Account Deletion is non-MVP; users cannot delete their own account from Account Settings in MVP.
-- [x] Decide that password-based new user sign-up form includes username, email, password, and confirm password fields, then sends Email OTP and opens the Email OTP Verification Page.
+- [x] Decide that password-based new user sign-up form includes Account Email, password, and confirm password only, then sends Email OTP and opens the Email OTP Verification Page.
 - [x] Decide that Password Rules are 8-24 characters, no forced symbol/number requirement, no common-password blocking in MVP, and confirm password must match.
 - [x] Decide that Account Email is unique per account with case-insensitive matching.
 - [x] Decide that verified users can change Account Email later in Account Settings, with inline Account Email availability validation to prevent Account Emails already active, held, or reserved by another account state.
@@ -379,24 +400,25 @@
 - [x] Decide that Sign-Up Abuse Limit also blocks Verification Email Change because it would send a new signup OTP and could bypass resend protection; current Account Email and current OTP stay unchanged.
 - [x] Decide that if the current signup OTP expires while Sign-Up Abuse Limit is active, AnimeX shows the expired OTP message but keeps resend and Verification Email Change blocked by Sign-Up Abuse Limit without a countdown.
 - [x] Decide that Verification Email Change cannot use an Account Email already used by another account; it shows `Email already in use. Sign in instead.` and keeps current Account Email and current OTP unchanged.
-- [x] Decide that Simplified Sign-Up username becomes the initial display name, the default avatar uses username initials, and new account default visibility is Private.
+- [x] Decide that Simplified Sign-Up does not ask for Username until after Email OTP Verification.
+- [x] Decide that Username Completion creates the initial display name, default avatar initials, and Private default visibility.
 - [x] Decide that sign-up does not show an Account-Level Default Visibility control; users change it later in Privacy Settings.
 - [x] Decide that email verification uses Email OTP Verification.
-- [x] Decide that Home Feed opens only after Email OTP Verification completes.
-- [x] Decide that successful Email OTP Verification redirects to the Home Feed.
+- [x] Decide that Home Feed opens only after Email OTP Verification and Username Completion both complete.
+- [x] Decide that successful Email OTP Verification redirects to Username Completion when the account has no AnimeX User Record.
 - [x] Decide that Email-Unverified Users are signed in but redirected to the Email OTP Verification Page, where they can request a new OTP if needed.
-- [x] Decide that after Simplified Sign-Up submits, Email-Unverified User account exists and keeps Username and Account Email reserved until verified or future cleanup removes abandoned unverified accounts.
+- [x] Decide that after Simplified Sign-Up submits, Email-Unverified User account exists and keeps Account Email reserved but does not reserve Username before verification.
 - [x] Decide that Email-Unverified Users can change a mistyped email from the Email OTP Verification Page, which sends a new OTP and invalidates the old OTP immediately.
 - [x] Decide that Email-Unverified Users cannot access normal signed-in surfaces or create user-authored content until verified.
 - [x] Decide Email OTP expires after 10 minutes, resend cooldown is 60 seconds, and 5 wrong attempts invalidate the current OTP and require a new OTP.
 - [x] Decide that 5 wrong OTP attempts clear the OTP field and show an inline message.
 - [x] Decide that expired OTP keeps the user on the Email OTP Verification Page with an inline expired message and resend enabled when cooldown allows.
 - [x] Decide that every new OTP invalidates older OTPs immediately, so only the latest OTP works.
-- [x] Decide that usernames are unique with case-sensitive matching and checked with inline availability validation during sign-up.
+- [x] Decide that usernames are unique with case-insensitive matching and checked with inline availability validation during Username Completion.
 - [x] Decide that Username format is 3-30 characters, letters/numbers/underscore only, no spaces, no leading/trailing underscore, and preserves typed case for display.
 - [x] Decide that Inline Username Availability checks after about 400ms of typing pause and validates again on submit.
-- [x] Decide that `Mika` and `mika` can be separate usernames, while user search and autocomplete match case-insensitively and can show both.
-- [x] Decide that OAuth Sign-Up still requires a unique case-sensitive username before entering the Home Feed, without password fields.
+- [x] Decide that `Mika` and `mika` cannot be separate usernames, while typed capitalization is preserved for display.
+- [x] Decide that OAuth Sign-Up still requires a unique case-insensitive username before entering the Home Feed, without password fields.
 - [x] Decide that OAuth Sign-Up uses OAuth Username Autofill when the provider supplies a username, shows the provider username as-is, keeps the field editable, does not generate username suggestions or silently sanitize it, and subjects it to normal Username validation.
 - [x] Decide that OAuth Sign-Up still uses Username as the initial display name, uses provider profile picture as the initial User Avatar when available, and falls back to initials-based Default Avatar when provider picture is unavailable.
 - [x] Decide that OAuth provider profile picture changes after sign-up do not automatically update User Avatar; provider picture is only an initial OAuth Sign-Up seed.
@@ -410,7 +432,7 @@
 - [x] Decide that OAuth Sign-Up follows OAuth Provider Email Requirement: provider-verified email is required, and AnimeX has no user-entered email step during OAuth Sign-Up.
 - [x] Decide that unverified provider email blocks OAuth Sign-Up before account creation, so AnimeX does not create an OAuth-created Email-Unverified User.
 - [x] Decide that OAuth Sign-Up signs in a provider-verified user as Pending OAuth Sign-Up after Account Email Conflict checks pass, keeps them on Username completion, lets them sign out, and creates AnimeX User Record plus Auth-Profile Link only after final Username passes validation.
-- [x] Decide that OAuth Username Completion shows the provider-verified Account Email read-only as `Signed in with {Account Email}`, lets the user edit only Username, continue after valid Username, or sign out, and requires sign-out plus restarted OAuth to use another OAuth account.
+- [x] Decide that Username Completion shows the Account Email read-only as `Signed in with {Account Email}`, lets the user edit only Username, continue after valid Username, or sign out, and requires sign-out plus restarted OAuth to use another OAuth account when the user is completing OAuth Sign-Up.
 - [x] Decide that Pending OAuth Sign-Up holds its Account Email unavailable to other sign-ups and Account Email Change until Username completion or Pending OAuth Sign-Up Cleanup.
 - [x] Decide that closing the tab keeps a Pending OAuth Sign-Up session within its normal session lifetime, while signing out ends the current session; a later OAuth attempt with the same provider account ID resumes Pending OAuth Sign-Up instead of creating a duplicate account.
 - [x] Decide that Pending OAuth Sign-Up Cleanup runs weekly, not daily, and removes only pending auth identities with no Auth-Profile Link, no active pending session, and a last pending session expiry older than 24 hours.

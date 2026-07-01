@@ -97,7 +97,7 @@ The one-to-one relationship between a completed Authentication Identity and an A
 _Avoid_: Duplicate profile, email-based profile link, many profiles per account
 
 **Password Sign-In**:
-A sign-in flow for existing password accounts that uses Account Email and password only. Account Email matching is case-insensitive. Username is not a sign-in identifier in MVP because Username is case-sensitive and public-facing. Password Sign-In shows a `Forgot password?` link under the password field and before the submit button; the link opens the Password Reset request page.
+A sign-in flow for existing password accounts that uses Account Email and password only. Account Email matching is case-insensitive. Username is not a sign-in identifier in MVP because Username is public-facing. Password Sign-In shows a `Forgot password?` link under the password field and before the submit button; the link opens the Password Reset request page.
 _Avoid_: Username sign-in, display-name login, OAuth sign-in, hidden password reset link
 
 **OAuth Entry Button**:
@@ -105,7 +105,7 @@ A provider-specific auth button shown on both Sign-In and Sign-Up screens with c
 _Avoid_: Separate Google sign-in copy, separate Google sign-up copy, provider email auto-linking
 
 **Auth Form Visual Direction**:
-The locked visual direction for AnimeX authentication screens. Desktop Sign-In follows `docs/visual/auth/auth-desktop-sign-in.png`: dark AnimeX shell, top desktop navigation, consistent AnimeX `A/X` logo, centered auth panel, `Continue with Google` above the `or` divider, Account Email and password fields, `Forgot password?`, coral Sign-In button, and create-account switch. Mobile Sign-Up follows `docs/visual/auth/auth-mobile-create-account.png`: compact logo header, single large Create Account panel, `Continue with Google` above the `or` divider, Username with availability feedback, Account Email, password, confirm password, teal Create Account button, and sign-in switch. Both references exclude mascot art, notebook/notepad, pen imagery, Japanese characters, and Japanese typography.
+The locked visual direction for AnimeX authentication screens. Desktop Sign-In follows `docs/visual/auth/auth-desktop-sign-in.png`: dark AnimeX shell, top desktop navigation, consistent AnimeX `A/X` logo, centered auth panel, `Continue with Google` above the `or` divider, Account Email and password fields, `Forgot password?`, coral Sign-In button, and create-account switch. Mobile Sign-Up follows `docs/visual/auth/auth-mobile-create-account.png`: compact logo header, single large Create Account panel, `Continue with Google` above the `or` divider, Account Email, password, confirm password, teal Create Account button, and sign-in switch. Username availability feedback appears on the post-verification Username Completion page. Both references exclude mascot art, notebook/notepad, pen imagery, Japanese characters, and Japanese typography.
 _Avoid_: Mascot auth art, notebook auth art, pen auth art, Japanese auth text, inconsistent auth logo
 
 **OAuth Sign-In**:
@@ -209,8 +209,8 @@ A failed Account Password Change state caused by entering the wrong current pass
 _Avoid_: Password Sign-In Failure, password reset, account email change
 
 **Simplified Sign-Up**:
-A password-based new-account flow whose sign-up form includes Username, email, password, and confirm password fields. The password follows Password Rules. The email becomes the Account Email. The Username must be unique with case-sensitive matching, uses Inline Username Availability, becomes the initial display name, sets the Default Avatar from Username initials, starts Account-Level Default Visibility as Private, does not show an Account-Level Default Visibility control during sign-up, sends an Email OTP after form submission, redirects to the Email OTP Verification Page, and opens the Home Feed only after Email OTP Verification completes; repeated submissions or signup OTP sends can trigger Sign-Up Abuse Limit. Custom avatar and privacy changes happen later from the User Profile or Privacy Settings.
-_Avoid_: Required onboarding wizard, required avatar selection, separate display name setup
+A password-based new-account flow whose sign-up form includes Account Email, password, and confirm password only. The password follows Password Rules. The email becomes the Account Email. Simplified Sign-Up sends an Email OTP after form submission, redirects to the Email OTP Verification Page, and after successful Email OTP Verification sends the verified user to Username Completion before private access. Username, initial display name, Default Avatar initials, and Account-Level Default Visibility are created only when Username Completion succeeds. Repeated submissions or signup OTP sends can trigger Sign-Up Abuse Limit. Custom avatar and privacy changes happen later from the User Profile or Privacy Settings.
+_Avoid_: Pre-verification username, required avatar selection, separate display name setup
 
 **Password Rules**:
 The password requirements for Simplified Sign-Up, Password Reset, and Account Password Change. Password must be 8-24 characters, has no forced symbol or number requirement, does not block common passwords in MVP, and confirm password must match password.
@@ -237,7 +237,7 @@ An Account Email input validation behavior that checks whether the entered Accou
 _Avoid_: Email OTP Verification, username availability, password reset
 
 **Email OTP Verification**:
-A required account verification flow where AnimeX sends a one-time passcode to the user's email address. Completing Email OTP Verification changes the user from Email-Unverified User to verified, redirects to the Home Feed, and allows normal signed-in app access; OTP behavior follows Email OTP Limits. Sign-Up Abuse Limit can block requesting a new signup OTP, but it does not block submitting the current OTP.
+A required account verification flow where AnimeX sends a one-time passcode to the user's email address. Completing Email OTP Verification changes the user from Email-Unverified User to verified, redirects to Username Completion when the account has no AnimeX User Record, and allows normal signed-in app access only after Username Completion succeeds; OTP behavior follows Email OTP Limits. Sign-Up Abuse Limit can block requesting a new signup OTP, but it does not block submitting the current OTP.
 _Avoid_: Email link verification, optional email check
 
 **Email OTP Limits**:
@@ -245,7 +245,7 @@ The shared validation limits for Email OTP Verification and Account Email Change
 _Avoid_: Password lockout, account ban
 
 **Email OTP Verification Page**:
-A signed-in verification page where an Email-Unverified User can enter the OTP sent after Simplified Sign-Up, request a new OTP after signing in with an unverified email, or use Verification Email Change after a mistyped email. It is the redirect target for Email-Unverified Users until Email OTP Verification completes, then redirects to the Home Feed. If Sign-Up Abuse Limit is active, the page still accepts the current OTP when it is valid but blocks requesting a new signup OTP and blocks Verification Email Change until the limit clears. If the current OTP expires while Sign-Up Abuse Limit is active, the page shows the expired OTP message and keeps resend plus Verification Email Change blocked with Sign-Up Abuse Limit messaging.
+A signed-in verification page where an Email-Unverified User can enter the OTP sent after Simplified Sign-Up, request a new OTP after signing in with an unverified email, or use Verification Email Change after a mistyped email. It is the redirect target for Email-Unverified Users until Email OTP Verification completes, then redirects to Username Completion when no AnimeX User Record exists. If Sign-Up Abuse Limit is active, the page still accepts the current OTP when it is valid but blocks requesting a new signup OTP and blocks Verification Email Change until the limit clears. If the current OTP expires while Sign-Up Abuse Limit is active, the page shows the expired OTP message and keeps resend plus Verification Email Change blocked with Sign-Up Abuse Limit messaging.
 _Avoid_: Home Feed verification banner, soft creation gate
 
 **Verification Email Change**:
@@ -289,28 +289,28 @@ A mandatory transactional account-safety email that is separate from In-App Noti
 _Avoid_: In-app notification, marketing email, notification preference
 
 **Email-Unverified User**:
-A signed-in user who has not completed Email OTP Verification. Email-Unverified Users are redirected to the Email OTP Verification Page when signing in or trying to enter the normal signed-in app, cannot access normal signed-in surfaces or create user-authored content until verification completes, and keep Username and Account Email reserved through Unverified Account Reservation.
+A signed-in user who has not completed Email OTP Verification. Email-Unverified Users are redirected to the Email OTP Verification Page when signing in or trying to enter the normal signed-in app, cannot access normal signed-in surfaces or create user-authored content until verification completes, and hold only Account Email through Unverified Account Reservation.
 _Avoid_: Signed-out user, banned user
 
 **Unverified Account Reservation**:
-A reservation state created after Simplified Sign-Up submits and before Email OTP Verification completes. The Email-Unverified User account exists, so its Username and Account Email remain unavailable to other accounts; future cleanup may remove abandoned unverified accounts if AnimeX later adds that policy.
+A reservation state created after Simplified Sign-Up submits and before Email OTP Verification completes. The Email-Unverified User account exists, so its Account Email remains unavailable to other accounts. No Username is reserved before Email OTP Verification; Username is created only during Username Completion.
 _Avoid_: Soft hold without account, temporary username claim, verified account
 
 **Username**:
-A unique case-sensitive account name used as the user's MVP display name. Username is required during Simplified Sign-Up and OAuth Sign-Up, must be 3-30 characters, may contain letters, numbers, and underscores only, cannot contain spaces, cannot start or end with an underscore, preserves typed case for display, must not exactly collide with an existing Username, allows distinct accounts such as `Mika` and `mika`, and can generate the Default Avatar initials.
+A unique account name used as the user's MVP display name. Username is required during Username Completion after Email OTP Verification or provider-verified OAuth Sign-Up, must be 3-30 characters, may contain letters, numbers, and underscores only, cannot contain spaces, cannot start or end with an underscore, preserves typed case for display, must not collide with an existing Username case-insensitively, does not allow distinct accounts such as `Mika` and `mika`, and can generate the Default Avatar initials.
 _Avoid_: Optional nickname, separate display name
 
 **Inline Username Availability**:
-A sign-up validation behavior that checks whether the entered Username already exists before account creation. AnimeX checks availability after a short typing pause, about 400ms, and validates again on submit. If the Username is taken, AnimeX shows the problem inline and does not create the account until the user chooses an available Username.
+A Username Completion validation behavior that checks whether the entered Username already exists before creating the AnimeX User Record. AnimeX checks availability after a short typing pause, about 400ms, and validates again on submit. If the Username is taken, AnimeX shows the problem inline and does not create the AnimeX User Record until the user chooses an available Username.
 _Avoid_: Submit-only collision surprise, duplicate username
 
 **OAuth Username Autofill**:
 An OAuth Sign-Up behavior where AnimeX pre-fills the Username field from a provider-supplied username when one is available. The pre-filled Username is shown as-is, remains editable, does not get sanitized into a generated suggestion, still uses Inline Username Availability, and must pass normal Username format and uniqueness validation before OAuth Sign-Up can finish. If the provider-supplied username is invalid or already taken, AnimeX shows the normal inline validation problem on that field until the user edits it.
 _Avoid_: Locked provider username, automatic account creation, display name autofill, generated username suggestion, silent username sanitization
 
-**OAuth Username Completion**:
-The Pending OAuth Sign-Up page where the user finishes account creation by choosing a valid Username. It shows the provider-verified Account Email read-only as `Signed in with {Account Email}`, shows one editable Username field with normal Username validation, and offers `Continue` plus `Sign out`. It does not allow Account Email editing; to use another OAuth account, the user signs out and starts OAuth again. Submitting a valid Username creates the AnimeX User Record and Auth-Profile Link, uses Username as the initial display name, applies the initial User Avatar rule, applies Private default visibility, and sends the user to the signed-in Home Feed.
-_Avoid_: OAuth email edit, hidden pending Account Email, private access before Username, auto-created User Profile without Username
+**Username Completion**:
+The signed-in page where a verified password user or Pending OAuth Sign-Up finishes account creation by choosing a valid Username. It shows the Account Email read-only as `Signed in with {Account Email}`, shows one editable Username field with normal Username validation, and offers `Continue` plus `Sign out`. It does not allow Account Email editing from this step. Submitting a valid Username creates the AnimeX User Record and Auth-Profile Link, uses Username as the initial display name, applies the initial User Avatar rule, applies Private default visibility, and sends the user to the signed-in Home Feed.
+_Avoid_: Email edit, hidden pending Account Email, private access before Username, auto-created User Profile without Username
 
 **Pending OAuth Sign-Up**:
 A signed-in but incomplete OAuth Sign-Up state after AnimeX accepts a provider account ID and provider-verified email but before the user submits a final valid Username. Pending OAuth Sign-Up has an Authentication Identity and holds its Account Email unavailable to other sign-ups or email changes until Username completion or Pending OAuth Sign-Up Cleanup. It may sign out, but has no AnimeX User Record, Auth-Profile Link, Username reservation, User Profile, feed/social owner, private-page access, or private actions until Username completion. Closing the tab does not end the pending session within its normal session lifetime; opening AnimeX again returns the user to Username completion, while signing out ends the current session and a later OAuth attempt with the same provider account ID resumes Pending OAuth Sign-Up.
@@ -321,7 +321,7 @@ A weekly cleanup policy for abandoned Pending OAuth Sign-Up records. Cleanup app
 _Avoid_: Daily pending cleanup, deleting completed accounts, cleanup by creation date, active pending session removal, stale pending resume after cleanup
 
 **OAuth Sign-Up**:
-A possible future new-account flow that uses an external identity provider instead of password and password confirmation. OAuth Sign-Up follows OAuth Provider Email Requirement, enters Pending OAuth Sign-Up after provider-verified email passes Account Email Conflict checks, still requires a unique case-sensitive Username before the user enters the Home Feed, uses OAuth Username Autofill when a provider-supplied username is available, and the final valid Username becomes the initial display name. OAuth Sign-Up does not use AnimeX Email OTP Verification; missing provider email or unverified provider email blocks OAuth Sign-Up in MVP. If the OAuth provider email triggers Account Email Conflict, AnimeX blocks OAuth Sign-Up with `Email already in use. Sign in instead.` and does not automatically link the OAuth identity to the existing AnimeX account. If the OAuth provider supplies a profile picture, AnimeX copies and stores it as the user's AnimeX-owned initial User Avatar; if provider avatar import fails or no profile picture is supplied, AnimeX uses the initials-based Default Avatar. Provider profile pictures are an initial seed only, are not hotlinked long term, and do not create ongoing avatar sync. Completing OAuth Sign-Up creates the AnimeX User Record and Auth-Profile Link, enables normal signed-in access, and keeps the OAuth provider account ID linked for later OAuth Sign-In. An OAuth-created account can later create a password through Password Reset if the user requests it.
+A possible future new-account flow that uses an external identity provider instead of password and password confirmation. OAuth Sign-Up follows OAuth Provider Email Requirement, enters Pending OAuth Sign-Up after provider-verified email passes Account Email Conflict checks, still requires a unique case-insensitive Username before the user enters the Home Feed, uses OAuth Username Autofill when a provider-supplied username is available, and the final valid Username becomes the initial display name with typed capitalization preserved. OAuth Sign-Up does not use AnimeX Email OTP Verification; missing provider email or unverified provider email blocks OAuth Sign-Up in MVP. If the OAuth provider email triggers Account Email Conflict, AnimeX blocks OAuth Sign-Up with `Email already in use. Sign in instead.` and does not automatically link the OAuth identity to the existing AnimeX account. If the OAuth provider supplies a profile picture, AnimeX copies and stores it as the user's AnimeX-owned initial User Avatar; if provider avatar import fails or no profile picture is supplied, AnimeX uses the initials-based Default Avatar. Provider profile pictures are an initial seed only, are not hotlinked long term, and do not create ongoing avatar sync. Completing OAuth Sign-Up creates the AnimeX User Record and Auth-Profile Link, enables normal signed-in access, and keeps the OAuth provider account ID linked for later OAuth Sign-In. An OAuth-created account can later create a password through Password Reset if the user requests it.
 _Avoid_: Required MVP auth method, password sign-up
 
 **Post-Sign-Out Landing**:
@@ -497,7 +497,7 @@ A search behavior where users in a Block still appear in each other's user searc
 _Avoid_: Search hide, autocomplete suppression
 
 **User Search Matching**:
-A search behavior for user search and autocomplete. Username uniqueness uses case-sensitive matching, but user search and autocomplete match typed queries case-insensitively, so searching `mika` can return both `Mika` and `mika` when both accounts exist.
+A search behavior for user search and autocomplete. Username uniqueness uses case-insensitive matching, and user search and autocomplete match typed queries case-insensitively while showing preserved username capitalization.
 _Avoid_: Username uniqueness, exact-case-only search
 
 **Edited Indicator**:
@@ -1597,7 +1597,7 @@ Developer: What happens if an already signed-in user opens the sign-in page dire
 Domain Expert: Signed-In Auth Redirect sends a complete signed-in user to the signed-in Home Feed, and sends a Pending OAuth Sign-Up user to Username completion.
 
 Developer: What does Password Sign-In use as the sign-in identifier?
-Domain Expert: Account Email and password only. Account Email matching is case-insensitive. Username sign-in is not supported in MVP because Username is case-sensitive and public-facing.
+Domain Expert: Account Email and password only. Account Email matching is case-insensitive. Username sign-in is not supported in MVP because Username is public-facing.
 
 Developer: What message appears when Password Sign-In fails?
 Domain Expert: AnimeX shows `Invalid email or password.` for wrong Account Email, wrong password, or both, and does not reveal whether the Account Email exists.
@@ -1750,7 +1750,7 @@ Developer: Should MVP support self-service Account Deletion?
 Domain Expert: No. Account Deletion is non-MVP. Users cannot delete their own account from Account Settings in MVP; moderation/admin account enforcement and future cleanup for abandoned Unverified Account Reservations are separate policies.
 
 Developer: What does new user sign-up require?
-Domain Expert: Simplified Sign-Up form includes Username, email, password, and confirm password fields. Email becomes the Account Email. Password follows Password Rules. Username is unique with case-sensitive matching, checks availability inline, becomes the initial display name, drives Username-initial Default Avatar, privacy starts with Private default visibility, sends an Email OTP after form submission, and redirects to the Email OTP Verification Page.
+Domain Expert: Simplified Sign-Up form includes Account Email, password, and confirm password only. Email becomes the Account Email. Password follows Password Rules. It sends an Email OTP after form submission and redirects to the Email OTP Verification Page. After verification, Username Completion collects the unique case-insensitive Username, preserves typed capitalization for display, creates the Username-initial Default Avatar, and starts privacy at Private.
 
 Developer: Should Simplified Sign-Up have abuse protection after repeated submits or OTP sends?
 Domain Expert: Yes. Sign-Up Abuse Limit temporarily blocks more Simplified Sign-Up submissions or signup Email OTP send/resend attempts after too many attempts and shows `Too many attempts. Try again later.` It is separate from Account Email Conflict, so real Account Email conflicts still show `Email already in use. Sign in instead.`
@@ -1873,7 +1873,7 @@ Developer: Does signup require email verification before content creation?
 Domain Expert: Yes. AnimeX uses Email OTP Verification before normal signed-in app access. After signup, the user verifies on the Email OTP Verification Page; if they sign in later with an unverified email, they are signed in but redirected to request a new OTP and verify.
 
 Developer: Are Username and Account Email reserved before Email OTP Verification completes?
-Domain Expert: Yes. After Simplified Sign-Up submits, the account exists as an Email-Unverified User, so Unverified Account Reservation keeps Username and Account Email unavailable to other accounts; future cleanup may remove abandoned unverified accounts later if needed.
+Domain Expert: Account Email is reserved because the Email-Unverified User account exists. Username is not reserved before Email OTP Verification; the verified user chooses Username during Username Completion.
 
 Developer: Can Email-Unverified Users fix a mistyped email on the Email OTP Verification Page?
 Domain Expert: Yes. Verification Email Change lets them change the email from the Email OTP Verification Page; AnimeX sends a new OTP to the new email and invalidates the old OTP immediately.
@@ -1894,10 +1894,10 @@ Developer: Does resending OTP keep old OTPs valid?
 Domain Expert: No. Every new OTP invalidates older OTPs immediately, so only the latest OTP works.
 
 Developer: Where does successful Email OTP Verification redirect?
-Domain Expert: Successful Email OTP Verification redirects to the Home Feed.
+Domain Expert: Successful Email OTP Verification redirects to Username Completion when the account has no AnimeX User Record, then Home Feed opens after Username Completion succeeds.
 
 Developer: Does OAuth Sign-Up still need a Username?
-Domain Expert: Yes. OAuth Sign-Up supplies external identity and may supply email, but the user still chooses a unique case-sensitive Username before entering the Home Feed; OAuth Sign-Up has no password or password confirmation fields.
+Domain Expert: Yes. OAuth Sign-Up supplies external identity and may supply email, but the user still chooses a unique case-insensitive Username before entering the Home Feed; OAuth Sign-Up has no password or password confirmation fields.
 
 Developer: Does OAuth Sign-Up skip Email OTP Verification?
 Domain Expert: Yes. OAuth Sign-Up requires provider-verified email and has no AnimeX Email OTP Verification path. If the provider email is missing or unverified, OAuth Sign-Up cannot continue in MVP.
@@ -1953,8 +1953,8 @@ Domain Expert: Yes. OAuth Username Autofill pre-fills the Username field from th
 Developer: If the provider username is invalid or already taken, should AnimeX sanitize it into a suggestion?
 Domain Expert: No. Show the provider username as-is in the Username field and show the normal inline validation problem. AnimeX does not generate username suggestions or silently sanitize the provider username.
 
-Developer: Should OAuth Username Completion show the pending Account Email?
-Domain Expert: Yes. OAuth Username Completion shows the provider-verified Account Email read-only as `Signed in with {Account Email}`. The page lets the user edit only Username, continue after valid Username, or sign out. It does not allow Account Email editing; using another OAuth account requires signing out and starting OAuth again.
+Developer: Should Username Completion show the pending Account Email?
+Domain Expert: Yes. Username Completion shows the Account Email read-only as `Signed in with {Account Email}`. The page lets the user edit only Username, continue after valid Username, or sign out. It does not allow Account Email editing from this step; using another OAuth account requires signing out and starting OAuth again.
 
 Developer: If the OAuth provider profile picture changes later, should AnimeX auto-update User Avatar?
 Domain Expert: No. Provider profile picture is an initial OAuth Sign-Up seed only. After sign-up, User Avatar is AnimeX-owned and changes only through user profile avatar actions.
@@ -1966,7 +1966,7 @@ Developer: If copying or storing the OAuth provider profile picture fails during
 Domain Expert: No. OAuth Avatar Import Failure is not account-critical. OAuth Sign-Up continues with the initials-based Default Avatar, shows no avatar-specific user-facing error, and lets the user change User Avatar later from the User Profile.
 
 Developer: If `Mika` already exists, can another user register `mika`?
-Domain Expert: Yes. Username uniqueness uses case-sensitive matching. User Search Matching still lets a `mika` search show both `Mika` and `mika`.
+Domain Expert: No. Username uniqueness uses case-insensitive matching, so `Mika` and `mika` collide. User Search Matching still preserves display capitalization.
 
 Developer: What Username format does AnimeX allow?
 Domain Expert: Username must be 3-30 characters, use letters, numbers, and underscores only, have no spaces, cannot start or end with an underscore, and preserves typed case for display.

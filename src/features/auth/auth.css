@@ -1,0 +1,200 @@
+@layer components {
+  .auth-page {
+    position: relative;
+    min-height: 100vh;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 18% 16%, oklch(0.32 0.12 196 / 0.26), transparent 24rem),
+      radial-gradient(circle at 88% 24%, oklch(0.34 0.13 27 / 0.22), transparent 25rem),
+      linear-gradient(180deg, oklch(0.12 0.026 242), var(--background));
+    color: var(--foreground);
+  }
+
+  .auth-page::before,
+  .auth-page::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .auth-page::before {
+    top: 8rem;
+    left: max(-7rem, calc(50% - 44rem));
+    width: 18rem;
+    height: 26rem;
+    border: 1px solid oklch(1 0 0 / 0.08);
+    border-radius: var(--radius);
+    background:
+      linear-gradient(135deg, oklch(1 0 0 / 0.05), transparent 42%),
+      oklch(0.18 0.03 242 / 0.5);
+    transform: rotate(-8deg);
+  }
+
+  .auth-page::after {
+    right: max(-8rem, calc(50% - 45rem));
+    bottom: -9rem;
+    width: 28rem;
+    height: 28rem;
+    border-right: 1.1rem solid oklch(0.82 0.15 196 / 0.18);
+    border-left: 1.1rem solid oklch(0.72 0.18 27 / 0.2);
+    transform: rotate(42deg);
+  }
+
+  .auth-page > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .auth-panel {
+    display: grid;
+    width: min(100% - 2rem, 31rem);
+    gap: 1.1rem;
+    margin: clamp(2.5rem, 7vh, 4.5rem) auto 2rem;
+    border: 1px solid oklch(1 0 0 / 0.14);
+    border-radius: var(--radius);
+    background:
+      linear-gradient(160deg, oklch(1 0 0 / 0.07), transparent 48%),
+      oklch(0.18 0.032 242 / 0.94);
+    padding: clamp(1.5rem, 4vw, 2.6rem);
+    box-shadow: 0 1.5rem 4rem oklch(0 0 0 / 0.32);
+  }
+
+  .auth-panel h1 {
+    text-align: center;
+    font-size: clamp(2.15rem, 7vw, 3.25rem);
+    font-weight: 950;
+    line-height: 0.96;
+  }
+
+  .auth-form {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .auth-field {
+    display: grid;
+    gap: 0.4rem;
+    color: var(--muted-foreground);
+    font-size: 0.86rem;
+    font-weight: 800;
+  }
+
+  .auth-field input {
+    width: 100%;
+    border: 1px solid oklch(1 0 0 / 0.14);
+    border-radius: var(--radius);
+    background: oklch(1 0 0 / 0.055);
+    padding: 0.85rem 0.95rem;
+    color: var(--foreground);
+    outline: none;
+  }
+
+  .auth-field input:focus {
+    border-color: var(--cyan-300);
+  }
+
+  .auth-field-hint {
+    color: var(--muted-foreground);
+    font-size: 0.78rem;
+    font-weight: 750;
+  }
+
+  .auth-field-hint-error {
+    color: var(--coral-400);
+  }
+
+  .auth-field-hint-ok {
+    color: var(--cyan-300);
+  }
+
+  .auth-readonly {
+    border: 1px solid oklch(1 0 0 / 0.1);
+    border-radius: var(--radius);
+    background: oklch(1 0 0 / 0.04);
+    padding: 0.75rem 0.85rem;
+    color: var(--muted-foreground);
+    font-size: 0.86rem;
+    font-weight: 800;
+  }
+
+  .auth-oauth,
+  .auth-submit,
+  .auth-secondary-action {
+    min-height: 2.9rem;
+    border: 0;
+    border-radius: var(--radius);
+    font-weight: 950;
+  }
+
+  .auth-oauth {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    background: oklch(1 0 0 / 0.92);
+    color: oklch(0.16 0.02 270);
+  }
+
+  .auth-google-mark {
+    display: inline-grid;
+    width: 1.5rem;
+    height: 1.5rem;
+    place-items: center;
+    border-radius: 999px;
+    background: conic-gradient(from 45deg, #4285f4, #34a853, #fbbc05, #ea4335, #4285f4);
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 950;
+  }
+
+  .auth-submit-coral {
+    background: var(--coral-400);
+    color: oklch(0.13 0.02 270);
+  }
+
+  .auth-submit-teal {
+    background: var(--cyan-300);
+    color: oklch(0.13 0.02 270);
+  }
+
+  .auth-secondary-action {
+    border: 1px solid oklch(1 0 0 / 0.14);
+    background: transparent;
+    color: var(--muted-foreground);
+  }
+
+  .auth-divider {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--muted-foreground);
+    font-size: 0.8rem;
+    font-weight: 800;
+  }
+
+  .auth-divider span {
+    height: 1px;
+    background: oklch(1 0 0 / 0.12);
+  }
+
+  .auth-inline-link,
+  .auth-switch a {
+    color: var(--cyan-300);
+    font-weight: 900;
+  }
+
+  .auth-message {
+    border-left: 3px solid var(--coral-400);
+    border-radius: var(--radius);
+    background: oklch(1 0 0 / 0.045);
+    padding: 0.75rem 0.9rem;
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+  }
+
+  .auth-switch {
+    color: var(--muted-foreground);
+    font-size: 0.9rem;
+  }
+}

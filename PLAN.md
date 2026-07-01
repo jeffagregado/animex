@@ -26,9 +26,9 @@ If any other production package is needed, pause and request approval first.
   - `/auth/sign-in`
   - `/auth/sign-up`
   - `/auth/verify-email`
+  - `/auth/username`
   - `/auth/forgot-password`
   - `/auth/reset-password`
-  - `/auth/oauth-username`
 - Settings routes:
   - `/settings/account`
   - `/settings/privacy`
@@ -61,8 +61,15 @@ Convex env already available:
 - Wire Better Auth to Convex using `@convex-dev/better-auth`.
 - Configure Google OAuth from Convex env.
 - Configure Resend SDK email sender from Convex env.
-- Implement sign-up, sign-in, email OTP verification, password reset, and pending OAuth username completion.
+- Implement sign-up, sign-in, email OTP verification, verified-account username completion, link-based password reset, and pending OAuth username completion.
+- Preserve typed username capitalization for display while enforcing case-insensitive uniqueness.
+- Keep password sign-up to Account Email, password, and confirm password only.
+- Require verified password users and provider-verified OAuth users to complete a unique username before private access.
+- Use concise Convex user field names: `authId`, `username`, `usernameKey`, `name`, `avatar`, and `visibility`.
+- Add shared helpers for auth state, verified-user checks, profile checks, and private route/feature redirects.
+- Add header auth action: signed-out users see `Sign in`; signed-in and pending users see `Sign out`.
 - Keep Better Auth identity separate from AnimeX `users` profile record.
+- Keep `/home` public; gate private account surfaces and signed-in-only actions through auth/profile guards.
 - Stop after validation and wait for approval.
 
 ### Phase 3: AniList And Discover
@@ -121,13 +128,13 @@ Each phase must run only relevant checks, then stop:
 - Browser QA for changed UI paths, desktop and mobile.
 - Console check for UI phases.
 - Convex validation for schema/function phases.
-- `pnpm dlx convex deploy` only after Convex changes are validated and deployment is needed.
+- `pnpm exec convex dev --once` after Convex changes to push to the Convex dev deployment.
 
 ## Assumptions
 
 - AniList `id` is canonical anime identity.
 - Slug is display/SEO only and can be regenerated from AniList metadata.
-- Resend env and Google OAuth env are stored in Convex dashboard, not `.env.local`.
+- Local app env is stored in `.env.local`; Convex server env such as `SITE_URL`, Resend, and Google OAuth stays in Convex dashboard.
 - AniList image URLs may be stored as external URLs in MVP.
 - User uploads use Convex storage.
 - Manga remains future placeholder.

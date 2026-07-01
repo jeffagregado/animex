@@ -1,21 +1,3 @@
-import type { LucideIcon } from 'lucide-react'
-import {
-  BarChart3,
-  Bell,
-  Compass,
-  Home,
-  Search,
-  SquarePlus,
-  UserRound,
-  UsersRound,
-} from 'lucide-react'
-
-export interface NavigationItem {
-  label: string
-  icon: LucideIcon
-  active: boolean
-}
-
 export interface AnimePoster {
   title: string
   detail: string
@@ -40,21 +22,6 @@ export interface AnimeListMetric {
   label: string
   count: number
 }
-
-export const desktopNavigationItems: NavigationItem[] = [
-  { label: 'Home', icon: Home, active: true },
-  { label: 'Discover', icon: Compass, active: false },
-  { label: 'Community', icon: UsersRound, active: false },
-  { label: 'Stats', icon: BarChart3, active: false },
-]
-
-export const mobileNavigationItems: NavigationItem[] = [
-  { label: 'Home', icon: Home, active: true },
-  { label: 'Discover', icon: Compass, active: false },
-  { label: 'Search', icon: Search, active: false },
-  { label: 'Create', icon: SquarePlus, active: false },
-  { label: 'Profile', icon: UserRound, active: false },
-]
 
 export const seasonalAnime: AnimePoster[] = [
   {
@@ -159,10 +126,4 @@ export const utilityPosters: AnimePoster[] = [
     imageUrl:
       'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx20954-sYRfE5jQRtSB.jpg',
   },
-]
-
-export const headerActions: NavigationItem[] = [
-  { label: 'Search', icon: Search, active: false },
-  { label: 'Notifications', icon: Bell, active: false },
-  { label: 'Profile', icon: UserRound, active: false },
 ]
