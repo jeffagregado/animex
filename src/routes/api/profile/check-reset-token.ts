@@ -1,16 +1,15 @@
 import { api } from '../../../../convex/_generated/api'
+import { resetTokenBodySchema } from '../../../lib/auth-schemas'
 import { toResetTokenKey } from '../../../lib/reset-token'
 import { getAuthProxy } from '../../../lib/server-auth-proxy'
+import { parseJsonBody } from '../../../lib/server-json'
 import { createStartServerRoute } from '../../../lib/server-route'
 
 const RESET_TOKEN_SCOPE = 'AnimeX reset token checks'
 
 const readToken = async (request: Request): Promise<string> => {
-  const body: unknown = await request.json()
-  if (!body || typeof body !== 'object' || typeof (body as Record<string, unknown>).token !== 'string') {
-    throw new Error('Reset token check requires a token.')
-  }
-  return (body as Record<string, string>).token
+  const body = await parseJsonBody(request, resetTokenBodySchema, 'Reset token check requires a token.')
+  return body.token
 }
 
 export const Route = createStartServerRoute('/api/profile/check-reset-token', {

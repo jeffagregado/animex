@@ -1,23 +1,23 @@
 import { useState } from 'react'
+import { useForm } from '@tanstack/react-form'
 import { Mail } from 'lucide-react'
 
 import { authClient } from '../../lib/auth-client'
+import { signInSchema } from '../../lib/auth-schemas'
 import {
   assertAuthResponse,
   getAuthCallbackUrl,
   getAuthErrorMessage,
-  readAuthFormData,
   sendGoogleSignIn,
 } from './auth-actions'
+import { parseAuthInput, submitAuthForm } from './auth-form'
 import {
-  AuthField,
+  AuthControlledField,
   AuthMessage,
   AuthPageShell,
   Divider,
   GoogleButton,
-  getFormValue,
 } from './auth-page-shell'
-import { normalizeAccountEmail } from './auth-validation'
 import { PasswordField } from './password-field'
 import { useRedirectSignedInAuthPage } from './use-auth-state'
 
@@ -26,33 +26,68 @@ export function SignInPage() {
   const authState = useRedirectSignedInAuthPage()
   const authMessage = authState.status === 'error' ? authState.message : null
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    const formData = readAuthFormData(event, setMessage)
-    const email = normalizeAccountEmail(getFormValue(formData, 'email'))
-    const password = getFormValue(formData, 'password')
+  const form = useForm({
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+    onSubmit: async ({ value }) => {
+      setMessage(null)
+      const input = parseAuthInput(signInSchema, value, 'Invalid email or password.')
+      if (!input.ok) {
+        setMessage(input.message)
+        return
+      }
 
-    try {
-      await assertAuthResponse(
-        await authClient.signIn.email({
-          email,
-          password,
-          callbackURL: getAuthCallbackUrl('/home'),
-        }),
-        'Invalid email or password.',
-      )
-      window.location.assign('/home')
-    } catch (error) {
-      setMessage(getAuthErrorMessage(error, 'Invalid email or password.'))
-    }
-  }
+      try {
+        await assertAuthResponse(
+          await authClient.signIn.email({
+            email: input.data.email,
+            password: input.data.password,
+            callbackURL: getAuthCallbackUrl('/home'),
+          }),
+          'Invalid email or password.',
+        )
+        window.location.assign('/home')
+      } catch (error) {
+        setMessage(getAuthErrorMessage(error, 'Invalid email or password.'))
+      }
+    },
+  })
 
   return (
     <AuthPageShell eyebrow="Welcome back" subtitle={null} title="Sign in">
       <GoogleButton onClick={() => void sendGoogleSignIn()} />
       <Divider />
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <AuthField autoComplete="email" icon={Mail} label="Account Email" name="email" type="email" />
-        <PasswordField autoComplete="current-password" label="Password" name="password" />
+      <form className="auth-form" onSubmit={(event) => submitAuthForm(event, form.handleSubmit)}>
+        <form.Field
+          name="email"
+          children={(field) => (
+            <AuthControlledField
+              autoComplete="email"
+              icon={Mail}
+              label="Account Email"
+              name={field.name}
+              type="email"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={field.handleChange}
+            />
+          )}
+        />
+        <form.Field
+          name="password"
+          children={(field) => (
+            <PasswordField
+              autoComplete="current-password"
+              label="Password"
+              name={field.name}
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={field.handleChange}
+            />
+          )}
+        />
         <a href="/auth/forgot-password" className="auth-inline-link">
           Forgot password?
         </a>

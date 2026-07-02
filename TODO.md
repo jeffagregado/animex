@@ -46,6 +46,28 @@
 - [x] Prevent OAuth users with completed profiles from seeing username completion.
 - [x] Keep browser autofill from repainting auth fields white.
 
+## Phase 2 Auth Form Refactor
+
+- [ ] Migrate auth forms to installed TanStack Form.
+- [ ] Move auth input validation to Zod-backed schemas.
+- [ ] Validate app-owned auth/profile API request bodies only where it improves security without changing Better Auth proxy behavior.
+- [ ] Preserve current auth UI, copy, redirects, and security behavior.
+- [ ] Run TypeScript, test, build, Fallow, browser QA, and review.
+
+## Reset Password Submit Validation Fix
+
+- [x] Render set-new-password fields whenever a reset token is present.
+- [x] Move reset token validity enforcement to reset-password submit.
+- [x] Keep missing-token and Better Auth invalid-token errors clear.
+- [x] Run focused tests, TypeScript, Fallow, and browser QA.
+
+## Reset Password SSR Console Fix
+
+- [x] Reproduce reset-password SSR `window is not defined` failure with a regression test.
+- [x] Move reset token lookup out of render-time browser APIs.
+- [x] Scan related auth browser API usage for SSR risk.
+- [x] Run full validation and browser console QA.
+
 ## Implementation Planning
 
 - [x] Save AnimeX MVP implementation plan to `PLAN.md`.

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useForm } from '@tanstack/react-form'
 
 import { authClient } from '../../lib/auth-client'
+import { usernameFormSchema } from '../../lib/auth-schemas'
 import { assertAuthResponse } from './auth-actions'
+import { parseAuthInput, submitAuthForm } from './auth-form'
 import { redirectForAuthError, requireAuthState } from './auth-guards'
-import { AuthMessage, AuthPageShell, getFormValue } from './auth-page-shell'
-import { validateUsername } from './auth-validation'
+import { AuthMessage, AuthPageShell } from './auth-page-shell'
 import { checkUsername, completeAuthProfile } from './profile-actions'
 import { UsernameField } from './username-field'
 
@@ -12,7 +14,33 @@ export function UsernamePage() {
   const [message, setMessage] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
-  const [usernameValue, setUsernameValue] = useState('')
+
+  const form = useForm({
+    defaultValues: {
+      username: '',
+    },
+    onSubmit: async ({ value }) => {
+      setMessage(null)
+      const input = parseAuthInput(usernameFormSchema, value, 'Username is invalid.')
+      if (!input.ok) {
+        setMessage(input.message)
+        return
+      }
+
+      try {
+        const usernameCheck = await checkUsername(input.data.username)
+        if (!usernameCheck.available) {
+          setMessage(usernameCheck.message ?? 'Username is unavailable.')
+          return
+        }
+
+        await completeAuthProfile(input.data.username)
+        window.location.assign('/home')
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : 'Profile completion failed.')
+      }
+    },
+  })
 
   useEffect(() => {
     void requireAuthState('verified')
@@ -32,33 +60,6 @@ export function UsernamePage() {
       })
   }, [])
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setMessage(null)
-
-    const formData = new FormData(event.currentTarget)
-    const username = getFormValue(formData, 'username').trim()
-    const usernameResult = validateUsername(username)
-
-    if (!usernameResult.valid) {
-      setMessage(usernameResult.message)
-      return
-    }
-
-    try {
-      const usernameCheck = await checkUsername(username)
-      if (!usernameCheck.available) {
-        setMessage(usernameCheck.message ?? 'Username is unavailable.')
-        return
-      }
-
-      await completeAuthProfile(username)
-      window.location.assign('/home')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Profile completion failed.')
-    }
-  }
-
   const handleSignOut = async () => {
     try {
       await assertAuthResponse(await authClient.signOut(), 'Sign out failed.')
@@ -73,8 +74,18 @@ export function UsernamePage() {
       {ready ? (
         <>
           {email ? <p className="auth-readonly">Signed in with {email}</p> : null}
-          <form className="auth-form" onSubmit={handleSubmit}>
-            <UsernameField label="Username" value={usernameValue} onChange={setUsernameValue} />
+          <form className="auth-form" onSubmit={(event) => submitAuthForm(event, form.handleSubmit)}>
+            <form.Field
+              name="username"
+              children={(field) => (
+                <UsernameField
+                  label="Username"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={field.handleChange}
+                />
+              )}
+            />
             <button className="auth-submit auth-submit-teal" type="submit">
               Continue
             </button>

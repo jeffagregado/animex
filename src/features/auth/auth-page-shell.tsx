@@ -37,35 +37,12 @@ export function AuthPageShell({
   )
 }
 
-export function AuthField({
-  autoComplete,
-  icon: Icon,
-  label,
-  name,
-  type,
-}: {
-  autoComplete: string
-  icon: LucideIcon | null
-  label: string
-  name: string
-  type: string
-}) {
-  return (
-    <label className="auth-field">
-      <span>{label}</span>
-      <span className="auth-input-shell">
-        {Icon ? <Icon aria-hidden="true" className="auth-input-icon" /> : null}
-        <input autoComplete={autoComplete} name={name} type={type} />
-      </span>
-    </label>
-  )
-}
-
 export function AuthControlledField({
   autoComplete,
   icon: Icon,
   label,
   name,
+  onBlur,
   onChange,
   type,
   value,
@@ -74,6 +51,7 @@ export function AuthControlledField({
   icon: LucideIcon | null
   label: string
   name: string
+  onBlur: () => void
   onChange: (value: string) => void
   type: string
   value: string
@@ -88,6 +66,7 @@ export function AuthControlledField({
           name={name}
           type={type}
           value={value}
+          onBlur={onBlur}
           onChange={(event) => onChange(event.target.value)}
         />
       </span>
@@ -119,12 +98,4 @@ export function Divider() {
       <span />
     </div>
   )
-}
-
-export const getFormValue = (formData: FormData, name: string): string => {
-  const value = formData.get(name)
-  if (typeof value !== 'string') {
-    throw new Error(`${name} is required.`)
-  }
-  return value
 }

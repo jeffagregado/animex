@@ -1,3 +1,18 @@
+import {
+  accountEmailSchema,
+  confirmPasswordSchema,
+  otpSchema,
+  passwordSchema,
+  resetTokenSchema,
+  usernameSchema,
+} from '../../lib/auth-schemas'
+
+export {
+  confirmPasswordSchema,
+  otpSchema,
+  resetTokenSchema,
+}
+
 export type ValidationResult =
   | {
       valid: true
@@ -7,40 +22,32 @@ export type ValidationResult =
       message: string
     }
 
-const USERNAME_PATTERN = /^[A-Za-z0-9_]+$/
-
 export const validateUsername = (username: string): ValidationResult => {
-  if (username.length < 3 || username.length > 30) {
+  const result = usernameSchema.safeParse(username)
+  if (!result.success) {
     return {
       valid: false,
-      message: 'Username must be 3-30 characters.',
-    }
-  }
-  if (!USERNAME_PATTERN.test(username)) {
-    return {
-      valid: false,
-      message: 'Use letters, numbers, and underscores only.',
-    }
-  }
-  if (username.startsWith('_') || username.endsWith('_')) {
-    return {
-      valid: false,
-      message: 'Username cannot start or end with underscore.',
+      message: result.error.issues[0]?.message ?? 'Username is invalid.',
     }
   }
   return { valid: true }
 }
 
 export const validatePassword = (password: string): ValidationResult => {
-  if (password.length < 8 || password.length > 24) {
+  const result = passwordSchema.safeParse(password)
+  if (!result.success) {
     return {
       valid: false,
-      message: 'Password must be 8-24 characters.',
+      message: result.error.issues[0]?.message ?? 'Password is invalid.',
     }
   }
   return { valid: true }
 }
 
 export const normalizeAccountEmail = (email: string): string => {
-  return email.trim().toLowerCase()
+  const result = accountEmailSchema.safeParse(email)
+  if (!result.success) {
+    throw new Error(result.error.issues[0]?.message ?? 'Enter a valid email address.')
+  }
+  return result.data
 }

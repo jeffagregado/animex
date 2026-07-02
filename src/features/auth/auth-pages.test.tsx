@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { ForgotPasswordPage } from './forgot-password-page'
@@ -117,10 +118,29 @@ describe('auth pages', () => {
     expect(screen.getByRole('heading', { name: 'Reset Password' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Send Reset Link' })).toBeTruthy()
 
-    render(<ResetPasswordPage />)
+    render(<ResetPasswordPage token={null} />)
     expect(screen.getByRole('heading', { name: 'Set New Password' })).toBeTruthy()
     expect(screen.getByText('Reset link is invalid or expired. Request a new one.')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Request a new reset link' })).toBeTruthy()
+  })
+
+  test('renders reset password fields before submit token validation', () => {
+    mockPendingAuthState()
+    window.history.replaceState(null, '', '/auth/reset-password?token=reset-token')
+
+    render(<ResetPasswordPage token="reset-token" />)
+
+    expect(screen.getByRole('heading', { name: 'Set New Password' })).toBeTruthy()
+    expect(screen.getByLabelText('Password')).toBeTruthy()
+    expect(screen.getByLabelText('Confirm Password')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Set New Password' })).toBeTruthy()
+    expect(screen.queryByText('Checking reset link.')).toBeNull()
+  })
+
+  test('renders reset password page without browser globals during SSR', () => {
+    vi.stubGlobal('window', undefined)
+
+    expect(() => renderToString(<ResetPasswordPage token={null} />)).not.toThrow()
   })
 
   test('prefills verification email from query params', async () => {

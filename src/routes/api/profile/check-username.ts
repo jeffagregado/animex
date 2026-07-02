@@ -1,20 +1,13 @@
 import { api } from '../../../../convex/_generated/api'
+import { usernameFormSchema } from '../../../lib/auth-schemas'
 import { getAuthProxy } from '../../../lib/server-auth-proxy'
+import { parseJsonBody } from '../../../lib/server-json'
 import { createStartServerRoute } from '../../../lib/server-route'
 
 const USERNAME_CHECK_SCOPE = 'AnimeX username checks'
 
-const isRecordBody = (body: unknown): body is Record<string, unknown> => {
-  return Boolean(body) && typeof body === 'object'
-}
-
 const readUsername = async (request: Request): Promise<string> => {
-  const body: unknown = await request.json()
-
-  if (!isRecordBody(body) || typeof body.username !== 'string') {
-    throw new Error('Username check requires a username.')
-  }
-
+  const body = await parseJsonBody(request, usernameFormSchema, 'Username check requires a username.')
   return body.username
 }
 
