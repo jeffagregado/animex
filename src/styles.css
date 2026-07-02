@@ -99,6 +99,14 @@ button {
   font: inherit;
 }
 
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 img {
   max-width: 100%;
 }
@@ -184,11 +192,31 @@ img {
     flex-shrink: 0;
   }
 
-  .header-auth-placeholder {
+  .header-auth-skeleton {
     display: inline-flex;
     width: 5.8rem;
     min-height: 2.5rem;
     flex: 0 0 auto;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid oklch(1 0 0 / 0.1);
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, oklch(1 0 0 / 0.05), oklch(1 0 0 / 0.1));
+  }
+
+  .header-auth-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.18), transparent);
+    animation: header-auth-skeleton 1.35s ease-in-out infinite;
+  }
+
+  @keyframes header-auth-skeleton {
+    to {
+      transform: translateX(100%);
+    }
   }
 
   .header-auth-button {
@@ -245,7 +273,7 @@ img {
       font-size: 0.8rem;
     }
 
-    .header-auth-placeholder {
+    .header-auth-skeleton {
       width: 5rem;
       min-height: 2.25rem;
     }

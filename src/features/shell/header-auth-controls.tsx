@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { LogIn, LogOut } from 'lucide-react'
 
+import { AsyncButton } from '../../components/async-button'
 import { authClient } from '../../lib/auth-client'
 import { assertAuthResponse } from '../auth/auth-actions'
 import { isCompleteAuthState, useAuthState } from '../auth/use-auth-state'
@@ -30,15 +31,18 @@ const isHeaderActionVisible = (label: string, view: HeaderAuthView): boolean => 
 
 export function HeaderAuthControls() {
   const authState = useAuthState()
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
   const view = getHeaderAuthView(authState)
   const visibleActions = headerActionItems.filter((item) => isHeaderActionVisible(item.label, view))
 
   const handleSignOut = async () => {
+    setIsSigningOut(true)
     try {
       await assertAuthResponse(await authClient.signOut(), 'Sign out failed.')
       window.location.assign('/home')
     } catch (error: unknown) {
+      setIsSigningOut(false)
       const message = error instanceof Error ? error.message : 'Sign out failed.'
       setSignOutError(message)
     }
@@ -59,7 +63,9 @@ export function HeaderAuthControls() {
           <item.icon aria-hidden="true" className="size-5" />
         </button>
       ))}
-      {view === 'loading' ? <span className="header-auth-placeholder" aria-hidden="true" /> : null}
+      {view === 'loading' ? (
+        <span className="header-auth-skeleton" data-testid="header-auth-skeleton" aria-hidden="true" />
+      ) : null}
       {view === 'error' || signOutError ? (
         <button className="header-auth-button" type="button" disabled title={errorMessage ?? 'Auth error'}>
           Auth error
@@ -72,10 +78,15 @@ export function HeaderAuthControls() {
         </a>
       ) : null}
       {view === 'complete' || view === 'pending' ? (
-        <button className="header-auth-button" type="button" onClick={() => void handleSignOut()}>
+        <AsyncButton
+          className="header-auth-button"
+          isLoading={isSigningOut}
+          type="button"
+          onClick={() => void handleSignOut()}
+        >
           <LogOut aria-hidden="true" className="size-4" />
           <span>Sign out</span>
-        </button>
+        </AsyncButton>
       ) : null}
     </>
   )

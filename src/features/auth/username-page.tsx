@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 
+import { AsyncButton } from '../../components/async-button'
 import { authClient } from '../../lib/auth-client'
 import { usernameFormSchema } from '../../lib/auth-schemas'
 import { assertAuthResponse } from './auth-actions'
@@ -13,6 +14,7 @@ import { UsernameField } from './username-field'
 export function UsernamePage() {
   const [message, setMessage] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const [ready, setReady] = useState(false)
 
   const form = useForm({
@@ -61,10 +63,12 @@ export function UsernamePage() {
   }, [])
 
   const handleSignOut = async () => {
+    setIsSigningOut(true)
     try {
       await assertAuthResponse(await authClient.signOut(), 'Sign out failed.')
       window.location.assign('/home')
     } catch (error) {
+      setIsSigningOut(false)
       setMessage(error instanceof Error ? error.message : 'Sign out failed.')
     }
   }
@@ -86,12 +90,27 @@ export function UsernamePage() {
                 />
               )}
             />
-            <button className="auth-submit auth-submit-teal" type="submit">
-              Continue
-            </button>
-            <button className="auth-secondary-action" type="button" onClick={() => void handleSignOut()}>
+            <form.Subscribe
+              selector={(state) => [state.canSubmit, state.isSubmitting]}
+              children={([canSubmit, isSubmitting]) => (
+                <AsyncButton
+                  className="auth-submit auth-submit-teal"
+                  disabled={!canSubmit}
+                  isLoading={isSubmitting}
+                  type="submit"
+                >
+                  Continue
+                </AsyncButton>
+              )}
+            />
+            <AsyncButton
+              className="auth-secondary-action"
+              isLoading={isSigningOut}
+              type="button"
+              onClick={() => void handleSignOut()}
+            >
               Sign out
-            </button>
+            </AsyncButton>
           </form>
         </>
       ) : null}

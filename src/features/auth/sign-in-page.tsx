@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { Mail } from 'lucide-react'
 
+import { AsyncButton } from '../../components/async-button'
 import { authClient } from '../../lib/auth-client'
 import { signInSchema } from '../../lib/auth-schemas'
 import {
@@ -57,7 +58,7 @@ export function SignInPage() {
 
   return (
     <AuthPageShell eyebrow="Welcome back" subtitle={null} title="Sign in">
-      <GoogleButton onClick={() => void sendGoogleSignIn()} />
+      <GoogleButton onClick={sendGoogleSignIn} />
       <Divider />
       <form className="auth-form" onSubmit={(event) => submitAuthForm(event, form.handleSubmit)}>
         <form.Field
@@ -91,9 +92,19 @@ export function SignInPage() {
         <a href="/auth/forgot-password" className="auth-inline-link">
           Forgot password?
         </a>
-        <button className="auth-submit auth-submit-coral" type="submit">
-          Sign in
-        </button>
+        <form.Subscribe
+          selector={(state) => [state.canSubmit, state.isSubmitting]}
+          children={([canSubmit, isSubmitting]) => (
+            <AsyncButton
+              className="auth-submit auth-submit-coral"
+              disabled={!canSubmit}
+              isLoading={isSubmitting}
+              type="submit"
+            >
+              Sign in
+            </AsyncButton>
+          )}
+        />
       </form>
       <AuthMessage message={message ?? authMessage} />
       <p className="auth-switch">

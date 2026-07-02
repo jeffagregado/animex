@@ -18,6 +18,13 @@ const mockAuthState = (state: AuthState): void => {
   )
 }
 
+const mockPendingAuthState = (): void => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => new Promise(() => {})),
+  )
+}
+
 const getHeaderQueries = () => {
   const header = document.querySelector('header')
   if (header === null) {
@@ -76,6 +83,16 @@ describe('HomePage', () => {
     expect(header.getByRole('button', { name: 'Search' })).toBeTruthy()
     expect(header.queryByRole('button', { name: 'Notifications' })).toBeNull()
     expect(header.queryByRole('button', { name: 'Profile' })).toBeNull()
+  })
+
+  it('shows a header auth skeleton while auth state loads', () => {
+    mockPendingAuthState()
+
+    render(<HomePage />)
+
+    const header = getHeaderQueries()
+    expect(header.queryByRole('link', { name: 'Sign in' })).toBeNull()
+    expect(document.querySelector('[data-testid="header-auth-skeleton"]')).toBeTruthy()
   })
 
   it('shows sign-out action for signed-in users', async () => {
