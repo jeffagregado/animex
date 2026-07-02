@@ -17,6 +17,7 @@ import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
 import { Route as AuthOauthUsernameRouteImport } from './routes/auth/oauth-username'
+import { Route as AuthOauthCallbackRouteImport } from './routes/auth/oauth-callback'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as ApiProfileStateRouteImport } from './routes/api/profile/state'
 import { Route as ApiProfileCompleteRouteImport } from './routes/api/profile/complete'
@@ -64,6 +65,11 @@ const AuthOauthUsernameRoute = AuthOauthUsernameRouteImport.update({
   path: '/auth/oauth-username',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthOauthCallbackRoute = AuthOauthCallbackRouteImport.update({
+  id: '/auth/oauth-callback',
+  path: '/auth/oauth-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
   id: '/auth/forgot-password',
   path: '/auth/forgot-password',
@@ -100,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/home': typeof HomeRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/oauth-callback': typeof AuthOauthCallbackRoute
   '/auth/oauth-username': typeof AuthOauthUsernameRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/sign-in': typeof AuthSignInRoute
@@ -116,6 +123,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/home': typeof HomeRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/oauth-callback': typeof AuthOauthCallbackRoute
   '/auth/oauth-username': typeof AuthOauthUsernameRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/sign-in': typeof AuthSignInRoute
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/home': typeof HomeRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/oauth-callback': typeof AuthOauthCallbackRoute
   '/auth/oauth-username': typeof AuthOauthUsernameRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/sign-in': typeof AuthSignInRoute
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/'
     | '/home'
     | '/auth/forgot-password'
+    | '/auth/oauth-callback'
     | '/auth/oauth-username'
     | '/auth/reset-password'
     | '/auth/sign-in'
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/'
     | '/home'
     | '/auth/forgot-password'
+    | '/auth/oauth-callback'
     | '/auth/oauth-username'
     | '/auth/reset-password'
     | '/auth/sign-in'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/'
     | '/home'
     | '/auth/forgot-password'
+    | '/auth/oauth-callback'
     | '/auth/oauth-username'
     | '/auth/reset-password'
     | '/auth/sign-in'
@@ -200,6 +212,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HomeRoute: typeof HomeRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
+  AuthOauthCallbackRoute: typeof AuthOauthCallbackRoute
   AuthOauthUsernameRoute: typeof AuthOauthUsernameRoute
   AuthResetPasswordRoute: typeof AuthResetPasswordRoute
   AuthSignInRoute: typeof AuthSignInRoute
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthOauthUsernameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/oauth-callback': {
+      id: '/auth/oauth-callback'
+      path: '/auth/oauth-callback'
+      fullPath: '/auth/oauth-callback'
+      preLoaderRoute: typeof AuthOauthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/forgot-password': {
       id: '/auth/forgot-password'
       path: '/auth/forgot-password'
@@ -320,6 +340,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HomeRoute: HomeRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
+  AuthOauthCallbackRoute: AuthOauthCallbackRoute,
   AuthOauthUsernameRoute: AuthOauthUsernameRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,
   AuthSignInRoute: AuthSignInRoute,

@@ -43,6 +43,7 @@
 - [x] Extract repeated Convex Better Auth proxy helpers.
 - [x] Push Convex auth config changes to dev with `pnpm exec convex dev --once`.
 - [x] Run TypeScript, test, build, Fallow, and browser QA.
+- [x] Prevent OAuth users with completed profiles from seeing username completion.
 
 ## Implementation Planning
 

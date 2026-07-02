@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { User } from 'lucide-react'
 
 import { validateUsername } from './auth-validation'
 import { checkUsername } from './profile-actions'
@@ -102,13 +103,16 @@ export function UsernameField({
   return (
     <label className="auth-field">
       <span>{label}</span>
-      <input
-        autoComplete="username"
-        name="username"
-        type="text"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      <span className="auth-input-shell">
+        <User aria-hidden="true" className="auth-input-icon" />
+        <input
+          autoComplete="username"
+          name="username"
+          type="text"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </span>
       {status.message ? (
         <small className={getStatusClass(status.state)}>{status.message}</small>
       ) : null}

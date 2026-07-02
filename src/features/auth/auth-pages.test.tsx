@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { ForgotPasswordPage } from './forgot-password-page'
+import { getOAuthRedirectPath } from './oauth-callback-page'
 import { ResetPasswordPage } from './reset-password-page'
 import { SignInPage } from './sign-in-page'
 import { SignUpPage } from './sign-up-page'
@@ -24,6 +25,30 @@ const mockSignedOutState = (): void => {
         }),
       } as Response
     }),
+  )
+}
+
+const mockNeedsProfileState = (): void => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      return {
+        ok: true,
+        json: async () => ({
+          status: 'needsProfile',
+          email: 'user@example.com',
+          emailVerified: true,
+          profile: null,
+        }),
+      } as Response
+    }),
+  )
+}
+
+const mockPendingAuthState = (): void => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => new Promise(() => {})),
   )
 }
 
@@ -109,11 +134,51 @@ describe('auth pages', () => {
     })
   })
 
-  test('renders username completion form', () => {
+  test('does not render username form before auth gate resolves', () => {
+    mockPendingAuthState()
+
     render(<UsernamePage />)
 
     expect(screen.getByRole('heading', { name: 'Choose Username' })).toBeTruthy()
-    expect(screen.getByLabelText('Username')).toBeTruthy()
+    expect(screen.queryByLabelText('Username')).toBeNull()
+  })
+
+  test('renders username completion form for profile-pending users', async () => {
+    mockNeedsProfileState()
+
+    render(<UsernamePage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Signed in with user@example.com')).toBeTruthy()
+    })
+    expect(screen.getByLabelText('Username').closest('.auth-input-shell')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy()
+  })
+
+  test('maps OAuth callback state to the correct destination', () => {
+    expect(getOAuthRedirectPath({
+      status: 'complete',
+      email: 'user@example.com',
+      emailVerified: true,
+      profile: {},
+    })).toBe('/home')
+    expect(getOAuthRedirectPath({
+      status: 'needsProfile',
+      email: 'user@example.com',
+      emailVerified: true,
+      profile: null,
+    })).toBe('/auth/username')
+    expect(getOAuthRedirectPath({
+      status: 'emailUnverified',
+      email: 'Mika@example.com',
+      emailVerified: false,
+      profile: null,
+    })).toBe('/auth/verify-email?email=Mika%40example.com')
+    expect(getOAuthRedirectPath({
+      status: 'signedOut',
+      email: null,
+      emailVerified: false,
+      profile: null,
+    })).toBe('/auth/sign-in')
   })
 })

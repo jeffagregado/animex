@@ -39,7 +39,7 @@ export const sendGoogleSignIn = async (): Promise<void> => {
   await assertAuthResponse(
     await authClient.signIn.social({
       provider: 'google',
-      callbackURL: getAuthCallbackUrl('/auth/username'),
+      callbackURL: getAuthCallbackUrl('/auth/oauth-callback'),
     }),
     'Google sign-in failed.',
   )

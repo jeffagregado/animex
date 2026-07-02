@@ -11,6 +11,7 @@ import { UsernameField } from './username-field'
 export function UsernamePage() {
   const [message, setMessage] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
+  const [ready, setReady] = useState(false)
   const [usernameValue, setUsernameValue] = useState('')
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export function UsernamePage() {
           return
         }
         setEmail(state.email)
+        setReady(true)
       })
       .catch((error: unknown) => {
         if (redirectForAuthError(error)) {
@@ -68,16 +70,20 @@ export function UsernamePage() {
 
   return (
     <AuthPageShell eyebrow="Complete profile" subtitle={null} title="Choose Username">
-      {email ? <p className="auth-readonly">Signed in with {email}</p> : null}
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <UsernameField label="Username" value={usernameValue} onChange={setUsernameValue} />
-        <button className="auth-submit auth-submit-teal" type="submit">
-          Continue
-        </button>
-        <button className="auth-secondary-action" type="button" onClick={() => void handleSignOut()}>
-          Sign out
-        </button>
-      </form>
+      {ready ? (
+        <>
+          {email ? <p className="auth-readonly">Signed in with {email}</p> : null}
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <UsernameField label="Username" value={usernameValue} onChange={setUsernameValue} />
+            <button className="auth-submit auth-submit-teal" type="submit">
+              Continue
+            </button>
+            <button className="auth-secondary-action" type="button" onClick={() => void handleSignOut()}>
+              Sign out
+            </button>
+          </form>
+        </>
+      ) : null}
       <AuthMessage message={message} />
     </AuthPageShell>
   )
