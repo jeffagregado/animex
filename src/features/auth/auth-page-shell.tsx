@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 
+import { AsyncButton } from '../../components/async-button'
 import { AnimeXLogo } from '../shell/animex-logo'
 import { authNavigationItems } from '../shell/navigation'
 import { SiteHeader } from '../shell/site-header'
@@ -81,12 +82,24 @@ export function AuthMessage({ message }: { message: string | null }) {
   return <p className="auth-message">{message}</p>
 }
 
-export function GoogleButton({ onClick }: { onClick: () => void }) {
+export function GoogleButton({ onClick }: { onClick: () => Promise<void> }) {
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleClick = async () => {
+    setIsLoading(true)
+    try {
+      await onClick()
+    } catch (error) {
+      setIsLoading(false)
+      throw error
+    }
+  }
+
   return (
-    <button className="auth-oauth" type="button" onClick={onClick}>
+    <AsyncButton className="auth-oauth" type="button" isLoading={isLoading} onClick={() => void handleClick()}>
       <span className="auth-google-mark" aria-hidden="true">G</span>
       Continue with Google
-    </button>
+    </AsyncButton>
   )
 }
 

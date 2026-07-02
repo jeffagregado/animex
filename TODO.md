@@ -68,6 +68,13 @@
 - [x] Scan related auth browser API usage for SSR risk.
 - [x] Run full validation and browser console QA.
 
+## Async Button Loading Polish
+
+- [x] Add reusable async button loading UI for auth/header async actions.
+- [x] Add header sign-in skeleton while auth state loads.
+- [x] Add pointer cursor for enabled buttons.
+- [x] Run TypeScript, tests, build, Fallow, and browser QA.
+
 ## Implementation Planning
 
 - [x] Save AnimeX MVP implementation plan to `PLAN.md`.

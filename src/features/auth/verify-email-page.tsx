@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { Mail, ShieldCheck } from 'lucide-react'
 
+import { AsyncButton } from '../../components/async-button'
 import {
   accountEmailSchema,
   emailChangeConfirmSchema,
@@ -27,9 +28,12 @@ const readEmailQuery = (search: string): string => {
   return normalizeAccountEmail(email)
 }
 
+type VerifyPendingAction = 'resend' | 'requestEmail' | 'confirmEmail' | null
+
 export function VerifyEmailPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [changingEmail, setChangingEmail] = useState(false)
+  const [pendingAction, setPendingAction] = useState<VerifyPendingAction>(null)
 
   const verifyForm = useForm({
     defaultValues: {
@@ -97,6 +101,7 @@ export function VerifyEmailPage() {
       return
     }
 
+    setPendingAction('resend')
     try {
       await postAuthEndpoint('/email-otp/send-verification-otp', {
         email: input.data,
@@ -105,6 +110,8 @@ export function VerifyEmailPage() {
       setMessage('Verification code sent.')
     } catch (error) {
       setMessage(getAuthErrorMessage(error, 'Resend code failed.'))
+    } finally {
+      setPendingAction(null)
     }
   }
 
@@ -116,12 +123,15 @@ export function VerifyEmailPage() {
       return
     }
 
+    setPendingAction('requestEmail')
     try {
       await postAuthEndpoint('/email-otp/request-email-change', { newEmail: input.data.newEmail })
       emailChangeForm.setFieldValue('newEmail', input.data.newEmail)
       setMessage('Enter the code sent to the new email.')
     } catch (error) {
       setMessage(getAuthErrorMessage(error, 'Email change request failed.'))
+    } finally {
+      setPendingAction(null)
     }
   }
 
@@ -133,6 +143,7 @@ export function VerifyEmailPage() {
       return
     }
 
+    setPendingAction('confirmEmail')
     try {
       await postAuthEndpoint('/email-otp/change-email', {
         newEmail: input.data.newEmail,
@@ -145,6 +156,8 @@ export function VerifyEmailPage() {
       setMessage('Account email changed. Enter the new verification code.')
     } catch (error) {
       setMessage(getAuthErrorMessage(error, 'Email change failed.'))
+    } finally {
+      setPendingAction(null)
     }
   }
 
@@ -186,12 +199,22 @@ export function VerifyEmailPage() {
               />
             )}
           />
-          <button className="auth-submit auth-submit-coral" type="button" onClick={() => void handleRequestEmailChange()}>
+          <AsyncButton
+            className="auth-submit auth-submit-coral"
+            isLoading={pendingAction === 'requestEmail'}
+            type="button"
+            onClick={() => void handleRequestEmailChange()}
+          >
             Send code
-          </button>
-          <button className="auth-submit auth-submit-teal" type="button" onClick={() => void handleConfirmEmailChange()}>
+          </AsyncButton>
+          <AsyncButton
+            className="auth-submit auth-submit-teal"
+            isLoading={pendingAction === 'confirmEmail'}
+            type="button"
+            onClick={() => void handleConfirmEmailChange()}
+          >
             Confirm email
-          </button>
+          </AsyncButton>
           <button className="auth-secondary-action" type="button" onClick={() => setChangingEmail(false)}>
             Back to verification
           </button>
@@ -228,18 +251,33 @@ export function VerifyEmailPage() {
               />
             )}
           />
-          <button className="auth-submit auth-submit-teal" type="submit">
-            Verify Email
-          </button>
+          <verifyForm.Subscribe
+            selector={(state) => [state.canSubmit, state.isSubmitting]}
+            children={([canSubmit, isSubmitting]) => (
+              <AsyncButton
+                className="auth-submit auth-submit-teal"
+                disabled={!canSubmit}
+                isLoading={isSubmitting}
+                type="submit"
+              >
+                Verify Email
+              </AsyncButton>
+            )}
+          />
         </form>
       )}
       <AuthMessage message={message} />
       {!changingEmail ? (
         <div className="auth-actions-row">
           <span>Didn&apos;t receive the code?</span>
-          <button className="auth-inline-button" type="button" onClick={() => void handleResend()}>
+          <AsyncButton
+            className="auth-inline-button"
+            isLoading={pendingAction === 'resend'}
+            type="button"
+            onClick={() => void handleResend()}
+          >
             Resend code
-          </button>
+          </AsyncButton>
           <span>Wrong email?</span>
           <button className="auth-inline-button auth-inline-link-coral" type="button" onClick={() => setChangingEmail(true)}>
             Go back

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { Mail } from 'lucide-react'
 
+import { AsyncButton } from '../../components/async-button'
 import { authClient } from '../../lib/auth-client'
 import { signUpSchema } from '../../lib/auth-schemas'
 import {
@@ -67,7 +68,7 @@ export function SignUpPage() {
 
   return (
     <AuthPageShell eyebrow="Join AnimeX" subtitle={null} title="Create Account">
-      <GoogleButton onClick={() => void sendGoogleSignIn()} />
+      <GoogleButton onClick={sendGoogleSignIn} />
       <Divider />
       <form className="auth-form" onSubmit={(event) => submitAuthForm(event, form.handleSubmit)}>
         <form.Field
@@ -111,9 +112,19 @@ export function SignUpPage() {
             />
           )}
         />
-        <button className="auth-submit auth-submit-teal" type="submit">
-          Create Account
-        </button>
+        <form.Subscribe
+          selector={(state) => [state.canSubmit, state.isSubmitting]}
+          children={([canSubmit, isSubmitting]) => (
+            <AsyncButton
+              className="auth-submit auth-submit-teal"
+              disabled={!canSubmit}
+              isLoading={isSubmitting}
+              type="submit"
+            >
+              Create Account
+            </AsyncButton>
+          )}
+        />
       </form>
       <AuthMessage message={message ?? authMessage} />
       <p className="auth-switch">

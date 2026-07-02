@@ -2,6 +2,7 @@ import { useState, type Dispatch, type SetStateAction } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { Check } from 'lucide-react'
 
+import { AsyncButton } from '../../components/async-button'
 import { resetPasswordSchema } from '../../lib/auth-schemas'
 import { getAuthErrorMessage, postAuthEndpoint } from './auth-actions'
 import { parseAuthInput, submitAuthForm } from './auth-form'
@@ -127,9 +128,19 @@ export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
               />
             )}
           />
-          <button className="auth-submit auth-submit-teal" type="submit">
-            Set New Password
-          </button>
+          <form.Subscribe
+            selector={(state) => [state.canSubmit, state.isSubmitting]}
+            children={([canSubmit, isSubmitting]) => (
+              <AsyncButton
+                className="auth-submit auth-submit-teal"
+                disabled={!canSubmit}
+                isLoading={isSubmitting}
+                type="submit"
+              >
+                Set New Password
+              </AsyncButton>
+            )}
+          />
         </form>
       ) : null}
       <AuthMessage message={resetMessage} />

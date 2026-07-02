@@ -202,6 +202,10 @@
   .auth-oauth,
   .auth-submit,
   .auth-secondary-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
     min-height: 4rem;
     border: 0;
     border-radius: var(--radius);
@@ -209,9 +213,6 @@
   }
 
   .auth-oauth {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     gap: 0.75rem;
     background: oklch(1 0 0 / 0.92);
     color: oklch(0.16 0.02 270);

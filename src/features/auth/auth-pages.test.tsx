@@ -4,6 +4,22 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { renderToString } from 'react-dom/server'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
+const authClientMock = vi.hoisted(() => ({
+  $fetch: vi.fn(),
+  signIn: {
+    email: vi.fn(),
+    social: vi.fn(),
+  },
+  signOut: vi.fn(),
+  signUp: {
+    email: vi.fn(),
+  },
+}))
+
+vi.mock('../../lib/auth-client', () => ({
+  authClient: authClientMock,
+}))
+
 import { ForgotPasswordPage } from './forgot-password-page'
 import { getOAuthRedirectPath } from './oauth-callback-page'
 import { ResetPasswordPage } from './reset-password-page'
@@ -55,6 +71,7 @@ const mockPendingAuthState = (): void => {
 
 afterEach(() => {
   cleanup()
+  vi.clearAllMocks()
   vi.unstubAllGlobals()
   window.history.replaceState(null, '', '/')
 })
@@ -102,6 +119,38 @@ describe('auth pages', () => {
 
     expect(passwordInput).toHaveProperty('type', 'text')
     expect(screen.getByRole('button', { name: 'Hide password' })).toBeTruthy()
+  })
+
+  test('shows loading state while sign-in submit is pending', async () => {
+    mockSignedOutState()
+    authClientMock.signIn.email.mockReturnValue(new Promise(() => {}))
+
+    render(<SignInPage />)
+
+    fireEvent.change(screen.getByLabelText('Account Email'), { target: { value: 'mika@example.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    await waitFor(() => {
+      const button = screen.getByRole('button', { name: 'Sign in' })
+      expect(button).toHaveProperty('disabled', true)
+      expect(button.getAttribute('aria-busy')).toBe('true')
+    })
+  })
+
+  test('shows loading state while Google sign-in is pending', async () => {
+    mockSignedOutState()
+    authClientMock.signIn.social.mockReturnValue(new Promise(() => {}))
+
+    render(<SignInPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with Google' }))
+
+    await waitFor(() => {
+      const button = screen.getByRole('button', { name: 'Continue with Google' })
+      expect(button).toHaveProperty('disabled', true)
+      expect(button.getAttribute('aria-busy')).toBe('true')
+    })
   })
 
   test('renders verification and recovery forms', () => {

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { Mail } from 'lucide-react'
 
+import { AsyncButton } from '../../components/async-button'
 import { forgotPasswordSchema } from '../../lib/auth-schemas'
 import { getAuthCallbackUrl, getAuthErrorMessage, postAuthEndpoint } from './auth-actions'
 import { parseAuthInput, submitAuthForm } from './auth-form'
@@ -59,9 +60,19 @@ export function ForgotPasswordPage() {
             />
           )}
         />
-        <button className="auth-submit auth-submit-coral" type="submit">
-          Send Reset Link
-        </button>
+        <form.Subscribe
+          selector={(state) => [state.canSubmit, state.isSubmitting]}
+          children={([canSubmit, isSubmitting]) => (
+            <AsyncButton
+              className="auth-submit auth-submit-coral"
+              disabled={!canSubmit}
+              isLoading={isSubmitting}
+              type="submit"
+            >
+              Send Reset Link
+            </AsyncButton>
+          )}
+        />
       </form>
       <AuthMessage message={message ?? authMessage} />
       <p className="auth-switch">
