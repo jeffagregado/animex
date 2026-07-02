@@ -1,4 +1,5 @@
 import { api } from '../../../../convex/_generated/api'
+import { usernameSchema } from '../../../lib/auth-schemas'
 import { getAuthProxy } from '../../../lib/server-auth-proxy'
 import { createStartServerRoute } from '../../../lib/server-route'
 
@@ -58,7 +59,11 @@ const readBodyUsername = (body: Record<string, unknown>): string => {
   if (typeof username !== 'string') {
     throw new Error('Profile completion username must be a string.')
   }
-  return username
+  const result = usernameSchema.safeParse(username)
+  if (!result.success) {
+    throw new Error('INVALID_USERNAME')
+  }
+  return result.data
 }
 
 const parseCompleteProfileBody = async (request: Request): Promise<CompleteProfileBody> => {

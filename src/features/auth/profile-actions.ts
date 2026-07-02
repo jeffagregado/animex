@@ -12,10 +12,6 @@ export type UsernameCheck = {
   message: string | null
 }
 
-export type ResetTokenCheck = {
-  valid: boolean
-}
-
 export const readAuthState = async (): Promise<AuthState> => {
   const response = await fetch('/api/profile/state')
   if (!response.ok) {
@@ -38,21 +34,6 @@ export const checkUsername = async (username: string): Promise<UsernameCheck> =>
   }
 
   return await response.json() as UsernameCheck
-}
-
-export const checkResetToken = async (token: string): Promise<ResetTokenCheck> => {
-  const response = await fetch('/api/profile/check-reset-token', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ token }),
-  })
-
-  if (!response.ok) {
-    const message = await response.text()
-    throw new Error(message || 'Reset token check failed.')
-  }
-
-  return await response.json() as ResetTokenCheck
 }
 
 export const completeAuthProfile = async (username: string): Promise<void> => {

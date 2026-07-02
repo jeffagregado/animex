@@ -1,14 +1,5 @@
 import { authClient } from '../../lib/auth-client'
 
-export const readAuthFormData = (
-  event: React.FormEvent<HTMLFormElement>,
-  setMessage: (message: string | null) => void,
-): FormData => {
-  event.preventDefault()
-  setMessage(null)
-  return new FormData(event.currentTarget)
-}
-
 export const getAuthErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof Error && error.message) {
     return error.message

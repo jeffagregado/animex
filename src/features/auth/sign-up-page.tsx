@@ -1,23 +1,23 @@
 import { useState } from 'react'
+import { useForm } from '@tanstack/react-form'
 import { Mail } from 'lucide-react'
 
 import { authClient } from '../../lib/auth-client'
+import { signUpSchema } from '../../lib/auth-schemas'
 import {
   assertAuthResponse,
   getAuthCallbackUrl,
   getAuthErrorMessage,
-  readAuthFormData,
   sendGoogleSignIn,
 } from './auth-actions'
+import { parseAuthInput, submitAuthForm } from './auth-form'
 import {
-  AuthField,
+  AuthControlledField,
   AuthMessage,
   AuthPageShell,
   Divider,
   GoogleButton,
-  getFormValue,
 } from './auth-page-shell'
-import { normalizeAccountEmail, validatePassword } from './auth-validation'
 import { PasswordField } from './password-field'
 import { useRedirectSignedInAuthPage } from './use-auth-state'
 
@@ -33,47 +33,84 @@ export function SignUpPage() {
   const authState = useRedirectSignedInAuthPage()
   const authMessage = authState.status === 'error' ? authState.message : null
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    const formData = readAuthFormData(event, setMessage)
-    const email = normalizeAccountEmail(getFormValue(formData, 'email'))
-    const password = getFormValue(formData, 'password')
-    const confirmPassword = getFormValue(formData, 'confirmPassword')
-    const passwordResult = validatePassword(password)
+  const form = useForm({
+    defaultValues: {
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+    onSubmit: async ({ value }) => {
+      setMessage(null)
+      const input = parseAuthInput(signUpSchema, value, 'Create account failed.')
+      if (!input.ok) {
+        setMessage(input.message)
+        return
+      }
 
-    if (!passwordResult.valid) {
-      setMessage(passwordResult.message)
-      return
-    }
-    if (password !== confirmPassword) {
-      setMessage('Passwords must match.')
-      return
-    }
-
-    try {
-      const verifyEmailPath = getVerifyEmailPath(email)
-      await assertAuthResponse(
-        await authClient.signUp.email({
-          email,
-          password,
-          name: PENDING_PROFILE_NAME,
-          callbackURL: getAuthCallbackUrl(verifyEmailPath),
-        }),
-        'Create account failed.',
-      )
-      window.location.assign(verifyEmailPath)
-    } catch (error) {
-      setMessage(getAuthErrorMessage(error, 'Create account failed.'))
-    }
-  }
+      try {
+        const verifyEmailPath = getVerifyEmailPath(input.data.email)
+        await assertAuthResponse(
+          await authClient.signUp.email({
+            email: input.data.email,
+            password: input.data.password,
+            name: PENDING_PROFILE_NAME,
+            callbackURL: getAuthCallbackUrl(verifyEmailPath),
+          }),
+          'Create account failed.',
+        )
+        window.location.assign(verifyEmailPath)
+      } catch (error) {
+        setMessage(getAuthErrorMessage(error, 'Create account failed.'))
+      }
+    },
+  })
 
   return (
     <AuthPageShell eyebrow="Join AnimeX" subtitle={null} title="Create Account">
       <GoogleButton onClick={() => void sendGoogleSignIn()} />
       <Divider />
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <AuthField autoComplete="email" icon={Mail} label="Account Email" name="email" type="email" />
-        <PasswordField autoComplete="new-password" label="Password" name="password" />
-        <PasswordField autoComplete="new-password" label="Confirm Password" name="confirmPassword" />
+      <form className="auth-form" onSubmit={(event) => submitAuthForm(event, form.handleSubmit)}>
+        <form.Field
+          name="email"
+          children={(field) => (
+            <AuthControlledField
+              autoComplete="email"
+              icon={Mail}
+              label="Account Email"
+              name={field.name}
+              type="email"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={field.handleChange}
+            />
+          )}
+        />
+        <form.Field
+          name="password"
+          children={(field) => (
+            <PasswordField
+              autoComplete="new-password"
+              label="Password"
+              name={field.name}
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={field.handleChange}
+            />
+          )}
+        />
+        <form.Field
+          name="confirmPassword"
+          children={(field) => (
+            <PasswordField
+              autoComplete="new-password"
+              label="Confirm Password"
+              name={field.name}
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={field.handleChange}
+            />
+          )}
+        />
         <button className="auth-submit auth-submit-teal" type="submit">
           Create Account
         </button>

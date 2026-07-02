@@ -82,6 +82,12 @@ Convex env already available:
   - Header rules: complete users see Search, Notifications, Profile, and Sign out; pending users see Search and Sign out; signed-out users see Search and Sign in.
   - Keep TanStack devtools adapter present but hidden.
   - Extract repeated Convex Better Auth proxy/env helpers from API routes.
+- Phase 2 Auth Form Refactor:
+  - Migrate auth forms to installed `@tanstack/react-form`.
+  - Back auth input validation with installed `zod`.
+  - Preserve current auth UI, copy, route redirects, and security behavior.
+  - Use Zod in app-owned server/API request parsing only where it reduces malformed-input risk without complicating Better Auth proxy behavior.
+  - Keep Convex validators and auth/profile checks as final authority.
 - Stop after validation and wait for approval.
 
 ### Phase 3: AniList And Discover

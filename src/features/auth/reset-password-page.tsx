@@ -1,87 +1,86 @@
-import { useEffect, useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
+import { useForm } from '@tanstack/react-form'
 import { Check } from 'lucide-react'
 
-import { getAuthErrorMessage, postAuthEndpoint, readAuthFormData } from './auth-actions'
-import { AuthMessage, AuthPageShell, getFormValue } from './auth-page-shell'
-import { validatePassword } from './auth-validation'
+import { resetPasswordSchema } from '../../lib/auth-schemas'
+import { getAuthErrorMessage, postAuthEndpoint } from './auth-actions'
+import { parseAuthInput, submitAuthForm } from './auth-form'
+import { AuthMessage, AuthPageShell } from './auth-page-shell'
 import { PasswordField } from './password-field'
-import { checkResetToken } from './profile-actions'
 
 const RESET_SUCCESS_SECONDS = 5
 
-const readResetToken = (): string | null => {
-  const params = new URLSearchParams(window.location.search)
-  const error = params.get('error')
-  if (error) {
-    return null
-  }
-  return params.get('token')
+type ResetFormOptions = {
+  setMessage: (message: string | null) => void
+  setSecondsRemaining: Dispatch<SetStateAction<number>>
+  setSuccess: (success: boolean) => void
+  token: string | null
 }
 
-export function ResetPasswordPage() {
+type ResetPasswordPageProps = {
+  token: string | null
+}
+
+const startResetSuccessTimer = (
+  setSecondsRemaining: Dispatch<SetStateAction<number>>,
+): void => {
+  setSecondsRemaining(RESET_SUCCESS_SECONDS)
+  const intervalId = window.setInterval(() => {
+    setSecondsRemaining((current) => Math.max(current - 1, 0))
+  }, 1000)
+  window.setTimeout(() => {
+    window.clearInterval(intervalId)
+    window.location.assign('/auth/sign-in')
+  }, RESET_SUCCESS_SECONDS * 1000)
+}
+
+const useResetPasswordForm = ({
+  setMessage,
+  setSecondsRemaining,
+  setSuccess,
+  token,
+}: ResetFormOptions) => {
+  return useForm({
+    defaultValues: {
+      password: '',
+      confirmPassword: '',
+    },
+    onSubmit: async ({ value }) => {
+      setMessage(null)
+      const input = parseAuthInput(resetPasswordSchema, value, 'Password reset failed.')
+      if (!input.ok) {
+        setMessage(input.message)
+        return
+      }
+      if (!token) {
+        setMessage('Reset link is invalid or expired. Request a new one.')
+        return
+      }
+
+      try {
+        await postAuthEndpoint('/reset-password', { token, newPassword: input.data.password })
+        setSuccess(true)
+        startResetSuccessTimer(setSecondsRemaining)
+      } catch (error) {
+        setMessage(getAuthErrorMessage(error, 'Password reset failed.'))
+      }
+    },
+  })
+}
+
+export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
   const [message, setMessage] = useState<string | null>(null)
-  const [token, setToken] = useState<string | null>(null)
-  const [tokenReady, setTokenReady] = useState(false)
   const [success, setSuccess] = useState(false)
   const [secondsRemaining, setSecondsRemaining] = useState(RESET_SUCCESS_SECONDS)
 
-  useEffect(() => {
-    const nextToken = readResetToken()
-    if (!nextToken) {
-      setToken(null)
-      setTokenReady(true)
-      return
-    }
-
-    void checkResetToken(nextToken)
-      .then((result) => {
-        setToken(result.valid ? nextToken : null)
-        setTokenReady(true)
-      })
-      .catch((error: unknown) => {
-        setMessage(error instanceof Error ? error.message : 'Reset token check failed.')
-        setToken(null)
-        setTokenReady(true)
-      })
-  }, [])
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    const formData = readAuthFormData(event, setMessage)
-    const password = getFormValue(formData, 'password')
-    const confirmPassword = getFormValue(formData, 'confirmPassword')
-    const passwordResult = validatePassword(password)
-
-    if (!passwordResult.valid) {
-      setMessage(passwordResult.message)
-      return
-    }
-    if (password !== confirmPassword) {
-      setMessage('Passwords must match.')
-      return
-    }
-    if (!token) {
-      setMessage('Reset link is invalid or expired. Request a new one.')
-      return
-    }
-
-    try {
-      await postAuthEndpoint('/reset-password', { token, newPassword: password })
-      setSuccess(true)
-      setSecondsRemaining(RESET_SUCCESS_SECONDS)
-      const intervalId = window.setInterval(() => {
-        setSecondsRemaining((current) => Math.max(current - 1, 0))
-      }, 1000)
-      window.setTimeout(() => {
-        window.clearInterval(intervalId)
-        window.location.assign('/auth/sign-in')
-      }, RESET_SUCCESS_SECONDS * 1000)
-    } catch (error) {
-      setMessage(getAuthErrorMessage(error, 'Password reset failed.'))
-    }
-  }
+  const form = useResetPasswordForm({
+    setMessage,
+    setSecondsRemaining,
+    setSuccess,
+    token,
+  })
 
   const resetMessage = message
-    ?? (!tokenReady ? 'Checking reset link.' : null)
     ?? (!token ? 'Reset link is invalid or expired. Request a new one.' : null)
 
   return (
@@ -101,16 +100,40 @@ export function ResetPasswordPage() {
         </section>
       ) : null}
       {token && !success ? (
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <PasswordField autoComplete="new-password" label="Password" name="password" />
-          <PasswordField autoComplete="new-password" label="Confirm Password" name="confirmPassword" />
+        <form className="auth-form" onSubmit={(event) => submitAuthForm(event, form.handleSubmit)}>
+          <form.Field
+            name="password"
+            children={(field) => (
+              <PasswordField
+                autoComplete="new-password"
+                label="Password"
+                name={field.name}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={field.handleChange}
+              />
+            )}
+          />
+          <form.Field
+            name="confirmPassword"
+            children={(field) => (
+              <PasswordField
+                autoComplete="new-password"
+                label="Confirm Password"
+                name={field.name}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={field.handleChange}
+              />
+            )}
+          />
           <button className="auth-submit auth-submit-teal" type="submit">
             Set New Password
           </button>
         </form>
       ) : null}
       <AuthMessage message={resetMessage} />
-      {!token && tokenReady && !success ? (
+      {!token && !success ? (
         <a className="auth-inline-link" href="/auth/forgot-password">
           Request a new reset link
         </a>

@@ -1,16 +1,15 @@
 import { api } from '../../../../convex/_generated/api'
+import { resetTokenBodySchema } from '../../../lib/auth-schemas'
 import { toResetTokenKey } from '../../../lib/reset-token'
 import { getAuthProxy } from '../../../lib/server-auth-proxy'
+import { parseJsonBody } from '../../../lib/server-json'
 import { createStartServerRoute } from '../../../lib/server-route'
 
 const AUTH_PROXY_SCOPE = 'AnimeX auth proxy'
 
 const readResetToken = async (request: Request): Promise<string> => {
-  const body: unknown = await request.clone().json()
-  if (!body || typeof body !== 'object' || typeof (body as Record<string, unknown>).token !== 'string') {
-    throw new Error('Password reset token is required.')
-  }
-  return (body as Record<string, string>).token
+  const body = await parseJsonBody(request.clone(), resetTokenBodySchema, 'Password reset token is required.')
+  return body.token
 }
 
 const isResetPasswordRequest = (request: Request): boolean => {

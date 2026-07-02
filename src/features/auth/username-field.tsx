@@ -91,12 +91,14 @@ const useUsernameCheck = (username: string): UsernameStatus => {
 
 export function UsernameField({
   label,
-  value,
+  onBlur,
   onChange,
+  value,
 }: {
   label: string
-  value: string
+  onBlur: () => void
   onChange: (value: string) => void
+  value: string
 }) {
   const status = useUsernameCheck(value)
 
@@ -110,6 +112,7 @@ export function UsernameField({
           name="username"
           type="text"
           value={value}
+          onBlur={onBlur}
           onChange={(event) => onChange(event.target.value)}
         />
       </span>

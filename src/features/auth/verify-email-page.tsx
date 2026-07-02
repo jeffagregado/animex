@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react'
+import { useForm } from '@tanstack/react-form'
 import { Mail, ShieldCheck } from 'lucide-react'
 
-import { getAuthErrorMessage, postAuthEndpoint, readAuthFormData } from './auth-actions'
+import {
+  accountEmailSchema,
+  emailChangeConfirmSchema,
+  emailChangeRequestSchema,
+  verifyEmailSchema,
+} from '../../lib/auth-schemas'
+import { getAuthErrorMessage, postAuthEndpoint } from './auth-actions'
+import { parseAuthInput, submitAuthForm } from './auth-form'
 import {
   AuthControlledField,
-  AuthField,
   AuthMessage,
   AuthPageShell,
-  getFormValue,
 } from './auth-page-shell'
 import { normalizeAccountEmail } from './auth-validation'
 import { readAuthState } from './profile-actions'
@@ -23,15 +29,45 @@ const readEmailQuery = (search: string): string => {
 
 export function VerifyEmailPage() {
   const [message, setMessage] = useState<string | null>(null)
-  const [email, setEmail] = useState('')
-  const [newEmail, setNewEmail] = useState('')
-  const [changeOtp, setChangeOtp] = useState('')
   const [changingEmail, setChangingEmail] = useState(false)
+
+  const verifyForm = useForm({
+    defaultValues: {
+      email: '',
+      otp: '',
+    },
+    onSubmit: async ({ value }) => {
+      setMessage(null)
+      const input = parseAuthInput(verifyEmailSchema, value, 'Verification failed.')
+      if (!input.ok) {
+        setMessage(input.message)
+        return
+      }
+
+      try {
+        await postAuthEndpoint('/email-otp/verify-email', {
+          email: input.data.email,
+          otp: input.data.otp,
+        })
+        window.location.assign('/auth/username')
+      } catch (error) {
+        setMessage(getAuthErrorMessage(error, 'Verification failed.'))
+      }
+    },
+  })
+
+  const emailChangeForm = useForm({
+    defaultValues: {
+      newEmail: '',
+      otp: '',
+    },
+    onSubmit: async () => undefined,
+  })
 
   useEffect(() => {
     const queryEmail = readEmailQuery(window.location.search)
     if (queryEmail) {
-      setEmail(queryEmail)
+      verifyForm.setFieldValue('email', queryEmail)
     }
 
     void readAuthState()
@@ -45,32 +81,25 @@ export function VerifyEmailPage() {
           return
         }
         if (state.email) {
-          setEmail(state.email)
+          verifyForm.setFieldValue('email', state.email)
         }
       })
       .catch((error: unknown) => {
         setMessage(error instanceof Error ? error.message : 'Auth state check failed.')
       })
-  }, [])
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    const formData = readAuthFormData(event, setMessage)
-    const accountEmail = normalizeAccountEmail(getFormValue(formData, 'email'))
-    const otp = getFormValue(formData, 'otp').trim()
-
-    try {
-      await postAuthEndpoint('/email-otp/verify-email', { email: accountEmail, otp })
-      window.location.assign('/auth/username')
-    } catch (error) {
-      setMessage(getAuthErrorMessage(error, 'Verification failed.'))
-    }
-  }
+  }, [verifyForm])
 
   const handleResend = async () => {
+    setMessage(null)
+    const input = parseAuthInput(accountEmailSchema, verifyForm.state.values.email, 'Resend code failed.')
+    if (!input.ok) {
+      setMessage(input.message)
+      return
+    }
+
     try {
-      const accountEmail = normalizeAccountEmail(email)
       await postAuthEndpoint('/email-otp/send-verification-otp', {
-        email: accountEmail,
+        email: input.data,
         type: 'email-verification',
       })
       setMessage('Verification code sent.')
@@ -80,10 +109,16 @@ export function VerifyEmailPage() {
   }
 
   const handleRequestEmailChange = async () => {
+    setMessage(null)
+    const input = parseAuthInput(emailChangeRequestSchema, emailChangeForm.state.values, 'Email change request failed.')
+    if (!input.ok) {
+      setMessage(input.message)
+      return
+    }
+
     try {
-      const accountEmail = normalizeAccountEmail(newEmail)
-      await postAuthEndpoint('/email-otp/request-email-change', { newEmail: accountEmail })
-      setNewEmail(accountEmail)
+      await postAuthEndpoint('/email-otp/request-email-change', { newEmail: input.data.newEmail })
+      emailChangeForm.setFieldValue('newEmail', input.data.newEmail)
       setMessage('Enter the code sent to the new email.')
     } catch (error) {
       setMessage(getAuthErrorMessage(error, 'Email change request failed.'))
@@ -91,15 +126,21 @@ export function VerifyEmailPage() {
   }
 
   const handleConfirmEmailChange = async () => {
+    setMessage(null)
+    const input = parseAuthInput(emailChangeConfirmSchema, emailChangeForm.state.values, 'Email change failed.')
+    if (!input.ok) {
+      setMessage(input.message)
+      return
+    }
+
     try {
-      const accountEmail = normalizeAccountEmail(newEmail)
       await postAuthEndpoint('/email-otp/change-email', {
-        newEmail: accountEmail,
-        otp: changeOtp.trim(),
+        newEmail: input.data.newEmail,
+        otp: input.data.otp,
       })
-      setEmail(accountEmail)
-      setNewEmail('')
-      setChangeOtp('')
+      verifyForm.setFieldValue('email', input.data.newEmail)
+      emailChangeForm.setFieldValue('newEmail', '')
+      emailChangeForm.setFieldValue('otp', '')
       setChangingEmail(false)
       setMessage('Account email changed. Enter the new verification code.')
     } catch (error) {
@@ -115,23 +156,35 @@ export function VerifyEmailPage() {
     >
       {changingEmail ? (
         <form className="auth-form" onSubmit={(event) => event.preventDefault()}>
-          <AuthControlledField
-            autoComplete="email"
-            icon={Mail}
-            label="New Account Email"
+          <emailChangeForm.Field
             name="newEmail"
-            onChange={setNewEmail}
-            type="email"
-            value={newEmail}
+            children={(field) => (
+              <AuthControlledField
+                autoComplete="email"
+                icon={Mail}
+                label="New Account Email"
+                name={field.name}
+                type="email"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={field.handleChange}
+              />
+            )}
           />
-          <AuthControlledField
-            autoComplete="one-time-code"
-            icon={ShieldCheck}
-            label="New Email Code"
-            name="changeOtp"
-            onChange={setChangeOtp}
-            type="text"
-            value={changeOtp}
+          <emailChangeForm.Field
+            name="otp"
+            children={(field) => (
+              <AuthControlledField
+                autoComplete="one-time-code"
+                icon={ShieldCheck}
+                label="New Email Code"
+                name={field.name}
+                type="text"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={field.handleChange}
+              />
+            )}
           />
           <button className="auth-submit auth-submit-coral" type="button" onClick={() => void handleRequestEmailChange()}>
             Send code
@@ -144,22 +197,36 @@ export function VerifyEmailPage() {
           </button>
         </form>
       ) : (
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <AuthControlledField
-            autoComplete="email"
-            icon={Mail}
-            label="Account Email"
+        <form className="auth-form" onSubmit={(event) => submitAuthForm(event, verifyForm.handleSubmit)}>
+          <verifyForm.Field
             name="email"
-            onChange={setEmail}
-            type="email"
-            value={email}
+            children={(field) => (
+              <AuthControlledField
+                autoComplete="email"
+                icon={Mail}
+                label="Account Email"
+                name={field.name}
+                type="email"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={field.handleChange}
+              />
+            )}
           />
-          <AuthField
-            autoComplete="one-time-code"
-            icon={ShieldCheck}
-            label="Verification Code"
+          <verifyForm.Field
             name="otp"
-            type="text"
+            children={(field) => (
+              <AuthControlledField
+                autoComplete="one-time-code"
+                icon={ShieldCheck}
+                label="Verification Code"
+                name={field.name}
+                type="text"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={field.handleChange}
+              />
+            )}
           />
           <button className="auth-submit auth-submit-teal" type="submit">
             Verify Email
