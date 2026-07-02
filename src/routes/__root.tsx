@@ -18,6 +18,8 @@ interface MyRouterContext {
   queryClient: QueryClient
 }
 
+const SHOW_TANSTACK_DEVTOOLS = false
+
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   head: () => ({
     meta: [
@@ -51,7 +53,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         <ConvexProvider>
           {children}
-          <div hidden>
+          {SHOW_TANSTACK_DEVTOOLS ? (
             <TanStackDevtools
               config={{
                 position: 'bottom-right',
@@ -64,7 +66,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 TanStackQueryDevtools,
               ]}
             />
-          </div>
+          ) : null}
         </ConvexProvider>
         <Scripts />
       </body>

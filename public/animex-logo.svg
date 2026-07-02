@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 160" role="img" aria-labelledby="title">
+  <title id="title">AnimeX</title>
+  <defs>
+    <filter id="cyan-glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <linearGradient id="cyan-fill" x1="32" x2="110" y1="116" y2="35" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16d9e8" />
+      <stop offset="1" stop-color="#32f3ff" />
+    </linearGradient>
+    <linearGradient id="coral-fill" x1="96" x2="143" y1="122" y2="33" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff5a57" />
+      <stop offset="1" stop-color="#ff7670" />
+    </linearGradient>
+  </defs>
+  <g fill="none" filter="url(#cyan-glow)" stroke="#22e6f0" stroke-width="7">
+    <circle cx="80" cy="80" r="63" />
+  </g>
+  <path fill="url(#cyan-fill)" d="M30 118 68 36l44 83-29-25-21 37 4-38-35 25Z" />
+  <path fill="url(#coral-fill)" d="M72 128 108 75 91 54l39-16-28 38 35 47h-27L88 95l-16 33Z" />
+  <g font-family="Inter, Arial, Helvetica, sans-serif" font-size="86" font-weight="900" letter-spacing="-3">
+    <text x="178" y="111" fill="#f8fafc">Anime</text>
+    <text x="470" y="111" fill="#ff625d">X</text>
+  </g>
+</svg>
