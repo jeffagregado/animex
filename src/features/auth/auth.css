@@ -159,6 +159,18 @@
     font-weight: 700;
   }
 
+  .auth-field input:-webkit-autofill,
+  .auth-field input:-webkit-autofill:hover,
+  .auth-field input:-webkit-autofill:focus,
+  .auth-field input:-webkit-autofill:active {
+    border: 0;
+    -webkit-box-shadow: 0 0 0 1000px oklch(0.08 0.025 242 / 0.62) inset;
+    box-shadow: 0 0 0 1000px oklch(0.08 0.025 242 / 0.62) inset;
+    caret-color: var(--foreground);
+    -webkit-text-fill-color: var(--foreground);
+    transition: background-color 9999s ease-out;
+  }
+
   .auth-field input::placeholder {
     color: oklch(0.72 0.035 245 / 0.72);
   }
