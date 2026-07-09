@@ -48,11 +48,11 @@
 
 ## Phase 2 Auth Form Refactor
 
-- [ ] Migrate auth forms to installed TanStack Form.
-- [ ] Move auth input validation to Zod-backed schemas.
-- [ ] Validate app-owned auth/profile API request bodies only where it improves security without changing Better Auth proxy behavior.
-- [ ] Preserve current auth UI, copy, redirects, and security behavior.
-- [ ] Run TypeScript, test, build, Fallow, browser QA, and review.
+- [x] Migrate auth forms to installed TanStack Form.
+- [x] Move auth input validation to Zod-backed schemas.
+- [x] Validate app-owned auth/profile API request bodies only where it improves security without changing Better Auth proxy behavior.
+- [x] Preserve current auth UI, copy, redirects, and security behavior.
+- [x] Run TypeScript, test, build, Fallow, browser QA, and review.
 
 ## Reset Password Submit Validation Fix
 
