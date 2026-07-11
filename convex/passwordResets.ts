@@ -69,3 +69,13 @@ export const clear = mutation({
     return null
   },
 })
+
+export const clearInternal = internalMutation({
+  args: { tokenKey: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const reset = await readByTokenKey(ctx, args.tokenKey)
+    if (reset) await ctx.db.delete(reset._id)
+    return null
+  },
+})

@@ -2,7 +2,7 @@
 
 ## Audit Target
 
-AnimeX Phase 2 auth and shell UI work.
+AnimeX agent instructions and Phase 2 auth work.
 
 ## Evidence
 
@@ -12,6 +12,7 @@ AnimeX Phase 2 auth and shell UI work.
 - User reported the header auth action showed `Auth` before `Sign in`.
 - User reported React maintainability drift from too many local components.
 - User reported `Community` and `Stats` returned to the header despite MVP navigation specs excluding them.
+- User requested lower token usage without reducing performance or quality after long multi-agent QA runs.
 
 ## Fixes Applied
 
@@ -24,4 +25,6 @@ AnimeX Phase 2 auth and shell UI work.
 
 ## Instruction Changes
 
-None. No `AGENTS.md` or skill source files were edited.
+- `AGENTS.md` now preserves configured role models, reasoning, and quality gates while reducing repeated discovery, oversized context forks, duplicate agent passes, and redundant validation.
+- Delegation prompts now require bounded ownership, interfaces, expected output, and validation.
+- Long-run pauses now require a durable checkpoint with its exact path and resume state.

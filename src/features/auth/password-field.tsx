@@ -3,6 +3,7 @@ import { Eye, EyeOff, KeyRound } from 'lucide-react'
 
 export function PasswordField({
   autoComplete,
+  error,
   label,
   name,
   onBlur,
@@ -10,6 +11,7 @@ export function PasswordField({
   value,
 }: {
   autoComplete: string
+  error?: string | null
   label: string
   name: string
   onBlur: () => void
@@ -19,6 +21,7 @@ export function PasswordField({
   const [visible, setVisible] = useState(false)
   const inputType = visible ? 'text' : 'password'
   const Icon = visible ? EyeOff : Eye
+  const errorId = `${name}-error`
 
   return (
     <label className="auth-field">
@@ -26,6 +29,9 @@ export function PasswordField({
       <span className="auth-input-shell">
         <KeyRound aria-hidden="true" className="auth-input-icon" />
         <input
+          aria-label={label}
+          aria-describedby={error ? errorId : undefined}
+          aria-invalid={error ? true : undefined}
           autoComplete={autoComplete}
           name={name}
           type={inputType}
@@ -42,6 +48,7 @@ export function PasswordField({
           <Icon aria-hidden="true" className="size-5" />
         </button>
       </span>
+      {error ? <small className="auth-field-hint auth-field-hint-error" id={errorId}>{error}</small> : null}
     </label>
   )
 }

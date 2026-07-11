@@ -75,9 +75,18 @@ export const emailChangeRequestSchema = z.object({
   newEmail: accountEmailSchema,
 })
 
+const getEmailChangeOtpSchema = (required: boolean): z.ZodType<string, string> => {
+  return required ? otpSchema : z.string()
+}
+
+export const emailChangeSendSchema = z.object({
+  newEmail: accountEmailSchema,
+  otp: getEmailChangeOtpSchema(false),
+})
+
 export const emailChangeConfirmSchema = z.object({
   newEmail: accountEmailSchema,
-  otp: otpSchema,
+  otp: getEmailChangeOtpSchema(true),
 })
 
 export const resetPasswordSchema = z.object({

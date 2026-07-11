@@ -141,6 +141,10 @@
     box-shadow: 0 0 1.1rem oklch(0.82 0.15 196 / 0.16);
   }
 
+  .auth-input-shell:has(input[aria-invalid='true']) {
+    border-color: var(--coral);
+  }
+
   .auth-input-icon {
     flex: 0 0 auto;
     width: 1.25rem;

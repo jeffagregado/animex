@@ -1,12 +1,19 @@
-import { ConvexError, v } from 'convex/values'
+import { ConvexError, type Infer, v } from 'convex/values'
 
 import { authComponent } from './auth'
+import { internal } from './_generated/api'
+import { type Doc, type Id } from './_generated/dataModel'
 import {
+  action,
+  internalMutation,
+  internalQuery,
   type MutationCtx,
-  mutation,
   type QueryCtx,
   query,
 } from './_generated/server'
+import { fetchProviderAvatar, storeAvatarForProfile } from './avatarImport'
+import { logSafeFailure } from './authFailureLog'
+import { completePendingProfile } from './oauthLifecycle'
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_]+$/
 
@@ -45,23 +52,38 @@ const userValidator = v.object({
   username: v.string(),
   usernameKey: v.string(),
   name: v.string(),
-  avatar: v.optional(v.string()),
+  avatarStorageId: v.optional(v.id('_storage')),
   visibility: visibilityValidator,
   createdAt: v.number(),
   updatedAt: v.number(),
 })
 
-const authStateValidator = v.object({
-  status: v.union(
-    v.literal('signedOut'),
-    v.literal('emailUnverified'),
-    v.literal('needsProfile'),
-    v.literal('complete'),
-  ),
-  email: v.union(v.string(), v.null()),
-  emailVerified: v.boolean(),
-  profile: v.union(userValidator, v.null()),
-})
+const authStateValidator = v.union(
+  v.object({ status: v.literal('signedOut') }),
+  v.object({
+    status: v.literal('emailUnverified'),
+    email: v.string(),
+  }),
+  v.object({
+    status: v.literal('needsProfile'),
+    email: v.string(),
+    signupMethod: v.union(v.literal('password'), v.literal('oauth')),
+    suggestedUsername: v.union(v.string(), v.null()),
+  }),
+  v.object({
+    status: v.literal('complete'),
+    email: v.string(),
+    profile: v.object({
+      id: v.string(),
+      username: v.string(),
+      name: v.string(),
+      avatarUrl: v.union(v.string(), v.null()),
+      visibility: visibilityValidator,
+    }),
+  }),
+)
+type AuthState = Infer<typeof authStateValidator>
+type PendingOauthSignup = Doc<'pendingOauthSignups'>
 
 export const toUsernameKey = (username: string): string => username.toLowerCase()
 
@@ -81,6 +103,12 @@ const readProfileByAuthId = async (ctx: UserCtx, authId: string) => {
     .withIndex('by_auth_id', (q) => q.eq('authId', authId))
     .unique()
 }
+
+export const hasProfile = internalQuery({
+  args: { authId: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, args) => Boolean(await readProfileByAuthId(ctx, args.authId)),
+})
 
 const readProfileByUsername = async (ctx: UserCtx, username: string) => {
   return await ctx.db
@@ -151,68 +179,72 @@ const isOwnedByOtherAuthUser = (
   currentAuthId: string | undefined,
 ): boolean => Boolean(owner && owner.authId !== currentAuthId)
 
-const insertProfile = async (
-  ctx: MutationCtx,
-  args: {
-    authId: string
-    username: string
-    avatar: string | undefined
-  },
-) => {
-  await assertUsernameAvailable(ctx, args.username, args.authId)
+const readPendingOauthSignup = async (
+  ctx: UserCtx,
+  authId: string,
+): Promise<PendingOauthSignup | null> => await ctx.db
+  .query('pendingOauthSignups')
+  .withIndex('by_auth_id', (q) => q.eq('authId', authId))
+  .unique()
 
-  const now = Date.now()
-  return await ctx.db.insert('users', {
-    authId: args.authId,
-    username: args.username,
-    usernameKey: toUsernameKey(args.username),
-    name: args.username,
-    avatar: args.avatar,
-    visibility: 'private',
-    createdAt: now,
-    updatedAt: now,
-  })
+const buildNeedsProfileState = async (
+  ctx: UserCtx,
+  authUser: { email: string; _id: string },
+): Promise<Extract<AuthState, { status: 'needsProfile' }>> => {
+  const pending = await readPendingOauthSignup(ctx, authUser._id)
+  return {
+    status: 'needsProfile',
+    email: authUser.email,
+    signupMethod: pending ? 'oauth' : 'password',
+    suggestedUsername: pending?.suggestedUsername ?? null,
+  }
+}
+
+const buildCompleteProfileState = async (
+  ctx: UserCtx,
+  authUser: { email: string },
+  profile: Doc<'users'>,
+): Promise<Extract<AuthState, { status: 'complete' }>> => {
+  const avatarUrl = profile.avatarStorageId
+    ? await ctx.storage.getUrl(profile.avatarStorageId)
+    : null
+  return {
+    status: 'complete',
+    email: authUser.email,
+    profile: {
+      id: profile._id,
+      username: profile.username,
+      name: profile.name,
+      avatarUrl,
+      visibility: profile.visibility,
+    },
+  }
 }
 
 export const getAuthState = query({
   args: {},
   returns: authStateValidator,
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<AuthState> => {
     const authUser = await authComponent.safeGetAuthUser(ctx)
     if (!authUser) {
       return {
         status: 'signedOut' as const,
-        email: null,
-        emailVerified: false,
-        profile: null,
       }
     }
 
-    const profile = await readProfileByAuthId(ctx, authUser._id)
     if (!authUser.emailVerified) {
       return {
         status: 'emailUnverified' as const,
         email: authUser.email,
-        emailVerified: false,
-        profile,
       }
     }
 
+    const profile = await readProfileByAuthId(ctx, authUser._id)
     if (!profile) {
-      return {
-        status: 'needsProfile' as const,
-        email: authUser.email,
-        emailVerified: true,
-        profile: null,
-      }
+      return await buildNeedsProfileState(ctx, authUser)
     }
 
-    return {
-      status: 'complete' as const,
-      email: authUser.email,
-      emailVerified: true,
-      profile,
-    }
+    return await buildCompleteProfileState(ctx, authUser, profile)
   },
 })
 
@@ -256,22 +288,141 @@ export const checkUsername = query({
   },
 })
 
-export const completeProfile = mutation({
-  args: { username: v.string() },
+export const prepareProfileCompletion = internalQuery({
+  args: {},
+  returns: v.object({
+    existingProfileId: v.union(v.id('users'), v.null()),
+    providerImage: v.union(v.string(), v.null()),
+  }),
+  handler: async (ctx): Promise<{
+    existingProfileId: Id<'users'> | null
+    providerImage: string | null
+  }> => {
+    const authUser = await requireVerifiedUser(ctx)
+    const profile = await readProfileByAuthId(ctx, authUser._id)
+    const pending = await readPendingOauthSignup(ctx, authUser._id)
+    return {
+      existingProfileId: profile?._id ?? null,
+      providerImage: getProviderImage(pending, authUser.image),
+    }
+  },
+})
+
+const getProviderImage = (
+  pending: PendingOauthSignup | null,
+  image: unknown,
+): string | null => {
+  if (!pending || typeof image !== 'string') return null
+  return image
+}
+
+const hasActivePendingCleanup = (
+  pending: PendingOauthSignup,
+  now: number,
+): boolean => {
+  if (pending.cleanupPhase === 'deleting') return true
+  return Boolean(pending.cleanupLeaseUntil && pending.cleanupLeaseUntil > now)
+}
+
+const assertPendingProfileState = (
+  pending: PendingOauthSignup | null,
+  email: string,
+  now: number,
+): void => {
+  if (!pending) return
+  if (hasActivePendingCleanup(pending, now)) {
+    throw new ConvexError({
+      code: 'OAUTH_CLEANUP_ACTIVE',
+      message: 'Google sign-in cleanup is active. Sign in again and retry.',
+    })
+  }
+  if (pending.email !== email.toLowerCase()) {
+    throw new ConvexError({
+      code: 'OAUTH_IDENTITY_MISMATCH',
+      message: 'Google identity email no longer matches this session.',
+    })
+  }
+}
+
+export const completeProfileInternal = internalMutation({
+  args: {
+    avatarStorageId: v.optional(v.id('_storage')),
+    username: v.string(),
+  },
   returns: v.id('users'),
   handler: async (ctx, args) => {
     const authUser = await requireVerifiedUser(ctx)
     const username = requireProfileUsername(args.username)
     const existingProfile = await readProfileByAuthId(ctx, authUser._id)
-
     if (existingProfile) {
-      return existingProfile._id
+      throw new ConvexError({
+        code: 'PROFILE_ALREADY_COMPLETED',
+        message: 'Profile was completed by another request.',
+      })
     }
+    const now = Date.now()
+    const pending = await readPendingOauthSignup(ctx, authUser._id)
+    assertPendingProfileState(pending, authUser.email, now)
 
-    return await insertProfile(ctx, {
-      authId: authUser._id,
-      username,
-      avatar: authUser.image ?? undefined,
+    return await completePendingProfile({
+      insert: async () => {
+        await assertUsernameAvailable(ctx, username, authUser._id)
+        const profileId = await ctx.db.insert('users', {
+          authId: authUser._id,
+          avatarStorageId: args.avatarStorageId,
+          createdAt: now,
+          name: username,
+          updatedAt: now,
+          username,
+          usernameKey: toUsernameKey(username),
+          visibility: 'private',
+        })
+        return profileId
+      },
+      removePending: async () => {
+        if (pending) await ctx.db.delete(pending._id)
+      },
     })
   },
 })
+
+export const completeProfile = action({
+  args: { username: v.string() },
+  returns: v.id('users'),
+  handler: async (ctx, args): Promise<Id<'users'>> => {
+    const prepared = await ctx.runQuery(internal.users.prepareProfileCompletion, {})
+    if (prepared.existingProfileId) return prepared.existingProfileId
+
+    const providerAvatar = await importProviderAvatar(prepared.providerImage)
+
+    if (!providerAvatar) {
+      return await ctx.runMutation(internal.users.completeProfileInternal, {
+        username: args.username,
+      })
+    }
+
+    return await storeAvatarForProfile<Id<'_storage'>, Id<'users'>>({
+      blob: providerAvatar,
+      complete: async (avatarStorageId) => await ctx.runMutation(
+        internal.users.completeProfileInternal,
+        { avatarStorageId, username: args.username },
+      ),
+      remove: async (avatarStorageId) => await ctx.storage.delete(avatarStorageId),
+      store: async (blob) => await ctx.storage.store(blob),
+    })
+  },
+})
+
+const importProviderAvatar = async (image: string | null): Promise<Blob | null> => {
+  if (!image) return null
+  try {
+    return await fetchProviderAvatar(fetch, image, 5_000, 5 * 1024 * 1024)
+  } catch (error) {
+    logSafeFailure(
+      'Google avatar import failed; initials avatar will be used.',
+      error,
+      console.warn,
+    )
+    return null
+  }
+}

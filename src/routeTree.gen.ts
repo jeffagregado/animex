@@ -22,7 +22,6 @@ import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-pas
 import { Route as ApiProfileStateRouteImport } from './routes/api/profile/state'
 import { Route as ApiProfileCompleteRouteImport } from './routes/api/profile/complete'
 import { Route as ApiProfileCheckUsernameRouteImport } from './routes/api/profile/check-username'
-import { Route as ApiProfileCheckResetTokenRouteImport } from './routes/api/profile/check-reset-token'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const HomeRoute = HomeRouteImport.update({
@@ -90,12 +89,6 @@ const ApiProfileCheckUsernameRoute = ApiProfileCheckUsernameRouteImport.update({
   path: '/api/profile/check-username',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiProfileCheckResetTokenRoute =
-  ApiProfileCheckResetTokenRouteImport.update({
-    id: '/api/profile/check-reset-token',
-    path: '/api/profile/check-reset-token',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -114,7 +107,6 @@ export interface FileRoutesByFullPath {
   '/auth/username': typeof AuthUsernameRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/profile/check-reset-token': typeof ApiProfileCheckResetTokenRoute
   '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
@@ -131,7 +123,6 @@ export interface FileRoutesByTo {
   '/auth/username': typeof AuthUsernameRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/profile/check-reset-token': typeof ApiProfileCheckResetTokenRoute
   '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
@@ -149,7 +140,6 @@ export interface FileRoutesById {
   '/auth/username': typeof AuthUsernameRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/profile/check-reset-token': typeof ApiProfileCheckResetTokenRoute
   '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
@@ -168,7 +158,6 @@ export interface FileRouteTypes {
     | '/auth/username'
     | '/auth/verify-email'
     | '/api/auth/$'
-    | '/api/profile/check-reset-token'
     | '/api/profile/check-username'
     | '/api/profile/complete'
     | '/api/profile/state'
@@ -185,7 +174,6 @@ export interface FileRouteTypes {
     | '/auth/username'
     | '/auth/verify-email'
     | '/api/auth/$'
-    | '/api/profile/check-reset-token'
     | '/api/profile/check-username'
     | '/api/profile/complete'
     | '/api/profile/state'
@@ -202,7 +190,6 @@ export interface FileRouteTypes {
     | '/auth/username'
     | '/auth/verify-email'
     | '/api/auth/$'
-    | '/api/profile/check-reset-token'
     | '/api/profile/check-username'
     | '/api/profile/complete'
     | '/api/profile/state'
@@ -220,7 +207,6 @@ export interface RootRouteChildren {
   AuthUsernameRoute: typeof AuthUsernameRoute
   AuthVerifyEmailRoute: typeof AuthVerifyEmailRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
-  ApiProfileCheckResetTokenRoute: typeof ApiProfileCheckResetTokenRoute
   ApiProfileCheckUsernameRoute: typeof ApiProfileCheckUsernameRoute
   ApiProfileCompleteRoute: typeof ApiProfileCompleteRoute
   ApiProfileStateRoute: typeof ApiProfileStateRoute
@@ -319,13 +305,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProfileCheckUsernameRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/profile/check-reset-token': {
-      id: '/api/profile/check-reset-token'
-      path: '/api/profile/check-reset-token'
-      fullPath: '/api/profile/check-reset-token'
-      preLoaderRoute: typeof ApiProfileCheckResetTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -348,7 +327,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthUsernameRoute: AuthUsernameRoute,
   AuthVerifyEmailRoute: AuthVerifyEmailRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
-  ApiProfileCheckResetTokenRoute: ApiProfileCheckResetTokenRoute,
   ApiProfileCheckUsernameRoute: ApiProfileCheckUsernameRoute,
   ApiProfileCompleteRoute: ApiProfileCompleteRoute,
   ApiProfileStateRoute: ApiProfileStateRoute,

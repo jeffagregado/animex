@@ -42,9 +42,6 @@ describe('HomePage', () => {
   it('renders the AnimeX shell navigation and feed preview', () => {
     mockAuthState({
       status: 'signedOut',
-      email: null,
-      emailVerified: false,
-      profile: null,
     })
 
     render(<HomePage />)
@@ -66,9 +63,6 @@ describe('HomePage', () => {
   it('shows sign-in action for signed-out users', async () => {
     mockAuthState({
       status: 'signedOut',
-      email: null,
-      emailVerified: false,
-      profile: null,
     })
 
     render(<HomePage />)
@@ -99,8 +93,13 @@ describe('HomePage', () => {
     mockAuthState({
       status: 'complete',
       email: 'mika@example.com',
-      emailVerified: true,
-      profile: {},
+      profile: {
+        id: 'profile-1',
+        username: 'mika',
+        name: 'Mika',
+        avatarUrl: null,
+        visibility: 'private',
+      },
     })
 
     render(<HomePage />)
@@ -123,8 +122,8 @@ describe('HomePage', () => {
     mockAuthState({
       status: 'needsProfile',
       email: 'mika@example.com',
-      emailVerified: true,
-      profile: null,
+      signupMethod: 'password',
+      suggestedUsername: null,
     })
 
     render(<HomePage />)

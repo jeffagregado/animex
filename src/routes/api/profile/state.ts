@@ -1,10 +1,11 @@
 import { api } from '../../../../convex/_generated/api'
+import { createFileRoute } from '@tanstack/react-router'
+import type {} from '@tanstack/react-start'
 import { getAuthProxy } from '../../../lib/server-auth-proxy'
-import { createStartServerRoute } from '../../../lib/server-route'
 
 const AUTH_STATE_SCOPE = 'AnimeX auth state'
 
-export const Route = createStartServerRoute('/api/profile/state', {
+export const Route = createFileRoute('/api/profile/state')({
   server: {
     handlers: {
       GET: async () => {

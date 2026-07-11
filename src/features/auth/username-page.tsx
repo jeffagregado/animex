@@ -1,18 +1,22 @@
-import { useEffect, useState } from 'react'
-import { useForm } from '@tanstack/react-form'
+import { useEffect, useRef, useState } from 'react'
+import { revalidateLogic, useForm } from '@tanstack/react-form'
 
 import { AsyncButton } from '../../components/async-button'
 import { authClient } from '../../lib/auth-client'
 import { usernameFormSchema } from '../../lib/auth-schemas'
 import { assertAuthResponse } from './auth-actions'
-import { parseAuthInput, submitAuthForm } from './auth-form'
+import { focusFirstInvalidAuthField, getAuthFieldError, getAuthSchemaErrors, submitAuthForm } from './auth-form'
 import { redirectForAuthError, requireAuthState } from './auth-guards'
 import { AuthMessage, AuthPageShell } from './auth-page-shell'
-import { checkUsername, completeAuthProfile } from './profile-actions'
+import { checkUsername, completeAuthProfile, isUsernameUnavailableError } from './profile-actions'
 import { UsernameField } from './username-field'
 
 export function UsernamePage() {
   const [message, setMessage] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+  const [submitErrors, setSubmitErrors] = useState<Readonly<Record<string, string>>>({})
+  const [usernameServerError, setUsernameServerError] = useState<string | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
   const [email, setEmail] = useState<string | null>(null)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [ready, setReady] = useState(false)
@@ -21,24 +25,32 @@ export function UsernamePage() {
     defaultValues: {
       username: '',
     },
+    validationLogic: revalidateLogic({ mode: 'blur', modeAfterSubmission: 'change' }),
+    validators: { onDynamic: usernameFormSchema },
     onSubmit: async ({ value }) => {
       setMessage(null)
-      const input = parseAuthInput(usernameFormSchema, value, 'Username is invalid.')
-      if (!input.ok) {
-        setMessage(input.message)
+      setUsernameServerError(null)
+      const input = usernameFormSchema.safeParse(value)
+      if (!input.success) {
         return
       }
 
       try {
         const usernameCheck = await checkUsername(input.data.username)
         if (!usernameCheck.available) {
-          setMessage(usernameCheck.message ?? 'Username is unavailable.')
+          setUsernameServerError(usernameCheck.message ?? 'Username is unavailable.')
+          window.setTimeout(() => focusFirstInvalidAuthField(formRef.current, ['username']), 0)
           return
         }
 
         await completeAuthProfile(input.data.username)
         window.location.assign('/home')
       } catch (error) {
+        if (isUsernameUnavailableError(error)) {
+          setUsernameServerError('Username is already taken.')
+          window.setTimeout(() => focusFirstInvalidAuthField(formRef.current, ['username']), 0)
+          return
+        }
         setMessage(error instanceof Error ? error.message : 'Profile completion failed.')
       }
     },
@@ -78,24 +90,45 @@ export function UsernamePage() {
       {ready ? (
         <>
           {email ? <p className="auth-readonly">Signed in with {email}</p> : null}
-          <form className="auth-form" onSubmit={(event) => submitAuthForm(event, form.handleSubmit)}>
+          <form
+            ref={formRef}
+            className="auth-form"
+            method="post"
+            noValidate
+            onSubmit={(event) => submitAuthForm(event, () => {
+              setSubmitted(true)
+              const errors = getAuthSchemaErrors(usernameFormSchema, form.state.values)
+              setSubmitErrors(errors)
+              if (Object.keys(errors).length > 0) {
+                window.setTimeout(() => focusFirstInvalidAuthField(formRef.current, ['username']), 0)
+                return
+              }
+              void form.handleSubmit()
+            })}
+          >
             <form.Field
               name="username"
               children={(field) => (
                 <UsernameField
+                  error={usernameServerError ?? (submitted ? submitErrors.username ?? null : getAuthFieldError(field.state.meta.errors as Array<string | { message?: string }>))}
                   label="Username"
+                  onCheckError={setMessage}
                   value={field.state.value}
                   onBlur={field.handleBlur}
-                  onChange={field.handleChange}
+                  onChange={(value) => {
+                    setUsernameServerError(null)
+                    field.handleChange(value)
+                    if (submitted) setSubmitErrors(getAuthSchemaErrors(usernameFormSchema, { username: value }))
+                  }}
                 />
               )}
             />
             <form.Subscribe
               selector={(state) => [state.canSubmit, state.isSubmitting]}
-              children={([canSubmit, isSubmitting]) => (
+              children={([, isSubmitting]) => (
                 <AsyncButton
                   className="auth-submit auth-submit-teal"
-                  disabled={!canSubmit}
+                  disabled={isSubmitting}
                   isLoading={isSubmitting}
                   type="submit"
                 >

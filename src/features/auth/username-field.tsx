@@ -32,7 +32,10 @@ const getStatusClass = (state: UsernameStatus['state']): string => {
   return 'auth-field-hint auth-field-hint-error'
 }
 
-const useUsernameCheck = (username: string): UsernameStatus => {
+const useUsernameCheck = (
+  username: string,
+  onCheckError: (message: string) => void,
+): UsernameStatus => {
   const [status, setStatus] = useState<UsernameStatus>({
     state: 'idle',
     message: null,
@@ -73,10 +76,8 @@ const useUsernameCheck = (username: string): UsernameStatus => {
           if (!active) {
             return
           }
-          setStatus({
-            state: 'invalid',
-            message: error instanceof Error ? error.message : 'Username check failed.',
-          })
+          onCheckError(error instanceof Error ? error.message : 'Username check failed.')
+          setStatus({ state: 'idle', message: null })
         })
     }, 400)
 
@@ -84,23 +85,29 @@ const useUsernameCheck = (username: string): UsernameStatus => {
       active = false
       window.clearTimeout(timer)
     }
-  }, [username])
+  }, [onCheckError, username])
 
   return status
 }
 
 export function UsernameField({
+  error,
   label,
+  onCheckError,
   onBlur,
   onChange,
   value,
 }: {
+  error?: string | null
   label: string
+  onCheckError: (message: string) => void
   onBlur: () => void
   onChange: (value: string) => void
   value: string
 }) {
-  const status = useUsernameCheck(value)
+  const status = useUsernameCheck(value, onCheckError)
+  const message = error ?? status.message
+  const messageId = 'username-message'
 
   return (
     <label className="auth-field">
@@ -108,6 +115,9 @@ export function UsernameField({
       <span className="auth-input-shell">
         <User aria-hidden="true" className="auth-input-icon" />
         <input
+          aria-label={label}
+          aria-describedby={message ? messageId : undefined}
+          aria-invalid={error ? true : undefined}
           autoComplete="username"
           name="username"
           type="text"
@@ -116,8 +126,8 @@ export function UsernameField({
           onChange={(event) => onChange(event.target.value)}
         />
       </span>
-      {status.message ? (
-        <small className={getStatusClass(status.state)}>{status.message}</small>
+      {message ? (
+        <small className={error ? 'auth-field-hint auth-field-hint-error' : getStatusClass(status.state)} id={messageId}>{message}</small>
       ) : null}
     </label>
   )

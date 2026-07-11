@@ -1,9 +1,10 @@
 import { api } from '../../../../convex/_generated/api'
+import { createFileRoute } from '@tanstack/react-router'
+import type {} from '@tanstack/react-start'
 import { resetTokenBodySchema } from '../../../lib/auth-schemas'
 import { toResetTokenKey } from '../../../lib/reset-token'
 import { getAuthProxy } from '../../../lib/server-auth-proxy'
 import { parseJsonBody } from '../../../lib/server-json'
-import { createStartServerRoute } from '../../../lib/server-route'
 
 const AUTH_PROXY_SCOPE = 'AnimeX auth proxy'
 
@@ -39,7 +40,7 @@ const handlePost = async (request: Request): Promise<Response> => {
   return response
 }
 
-export const Route = createStartServerRoute('/api/auth/$', {
+export const Route = createFileRoute('/api/auth/$')({
   server: {
     handlers: {
       GET: async ({ request }) => {

@@ -1,7 +1,8 @@
 import { api } from '../../../../convex/_generated/api'
+import { createFileRoute } from '@tanstack/react-router'
+import type {} from '@tanstack/react-start'
 import { usernameSchema } from '../../../lib/auth-schemas'
 import { getAuthProxy } from '../../../lib/server-auth-proxy'
-import { createStartServerRoute } from '../../../lib/server-route'
 
 const PROFILE_COMPLETION_SCOPE = 'AnimeX profile completion'
 
@@ -86,13 +87,13 @@ const getClientError = (error: unknown): { message: string; status: number } => 
   return { message: 'Profile completion failed.', status: 500 }
 }
 
-export const Route = createStartServerRoute('/api/profile/complete', {
+export const Route = createFileRoute('/api/profile/complete')({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
           const body = await parseCompleteProfileBody(request)
-          await getAuthProxy(PROFILE_COMPLETION_SCOPE).fetchAuthMutation(api.users.completeProfile, {
+          await getAuthProxy(PROFILE_COMPLETION_SCOPE).fetchAuthAction(api.users.completeProfile, {
             username: body.username,
           })
           return Response.json({ ok: true })

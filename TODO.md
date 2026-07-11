@@ -1,5 +1,61 @@
 # TODO
 
+## Auth Form Field Errors
+
+- [x] Add integration coverage for validation timing, focus, ARIA, roles, server mapping, intent handling, and transformed values. Owner: controller.
+- [x] Implement shared auth validation, focus, notice, and safe error-classification contract. Owner: controller + shared worker.
+- [x] Migrate standard auth pages. Owner: standard worker + controller.
+- [x] Migrate verification and username flows. Owner: controller.
+- [x] Complete spec review, mandatory auth thermo review, full validation, responsive browser QA, and current-state publication. Owner: controller + reviewer + QA.
+
+Status: PASS. 18 files / 138 tests; TypeScript; client + SSR build; `git diff --check`; browser QA at 390/768/1280; reviewer spec + thermo PASS. Fallow retains known `react-dom` test-only false positive. Existing 514.27 kB client chunk warning unchanged.
+
+## Phase 2 Formal Closure Validation
+
+- [x] Trace Phase 2 requirements to implementation and tests.
+- [x] Review auth security, state transitions, and edge cases.
+- [x] Run maintainability and TanStack Start boundary review.
+- [x] Rerun root gates: 17 files / 132 tests, TypeScript, client + SSR build, Convex dev push, `git diff --check`, Fallow, and duplicate scan.
+- [x] Complete desktop, mobile, tablet, native-form, auth/email, OAuth, responsive, network, and console QA.
+- [x] Record formal Phase 2 closure verdict: PASS. Final branch review PASS; formal QA PASS; no P1/P2 blockers.
+
+## Phase 2 Formal Closure Status
+
+Implementation branch: `jeff-cx/phase-2-auth-closure`
+
+- [x] Lock shared auth/error/return contracts. Owner: controller + worker.
+- [x] Implement durable Convex auth security and lifecycle. Owner: worker.
+- [x] Integrate auth UX and migrations. Owner: controller + worker.
+- [x] Complete independent review, browser, Google, and Resend QA. Owner: reviewer + QA.
+- [x] Publish closure verdict and current auth-flow UX summary. Owner: controller.
+
+Root gates: 17 files / 132 tests pass; TypeScript; client + SSR build; Convex dev push after temporary harness removal; `git diff --check`; Fallow complexity 0; duplicate scan 0. Known `react-dom` test-only Fallow false-positive warning remains.
+
+Live UX: desktop, mobile, and tablet clean; sanitized OAuth callback; JavaScript-disabled native auth forms submit by POST without email/password in URL; hydrated password sign-in returns Home; current Resend sandbox verification OTP delivered and previewed; verify/profile complete; email correction old → new uses one delivered and previewed OTP then profile; reset link delivered and previewed; password-change security notice delivered; old password rejected and new password accepted; returning Google sign-in returns Home; console clean.
+
+P1 regression: all seven named-input auth forms enforce `method="post"`; regression test red then green; reviewer spec + quality PASS.
+
+QA cleanup: two smoke identities inspected and cleaned; post-inspect counts are zero; temporary QA env gate unset; harness removed; regenerated/deployed API has no harness references.
+
+Non-blocking QA note: in-app browser keyboard Tab command did not advance focus; semantics, roles, labels, and native controls reviewed, and QA marked this non-blocking.
+
+Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified production domain; abrupt avatar store termination can leave an orphan window; intentionally dirty unstaged branch carries integration risk.
+
+- [x] [P1] Make Better Fetch auth endpoint failures block caller success paths.
+- [x] [P1] Keep password-reset session revocation independent from security-notice email delivery.
+- [x] [P1] Route password users with unverified email back to Email OTP Verification.
+- [x] [P1] Block implicit OAuth email linking and reject missing or unverified provider email before identity creation.
+- [x] [P2] Exclude Pending OAuth Sign-Up identities from Password Reset eligibility.
+- [x] [P2] Finish Verification Email Change after its verified change-email OTP without requesting a nonexistent second OTP.
+- [x] [P2] Handle malformed verification-email query input without crashing the route.
+- [x] [P2] Apply durable auth abuse limits and the required 60-second OTP resend cooldown.
+- [x] [P2] Copy provider avatars into AnimeX-owned storage before profile creation.
+- [x] [P2] Add weekly abandoned Pending OAuth Sign-Up cleanup.
+- [x] [P2] Preserve safe same-origin public-page return after sign-in.
+- [x] [P2] Enforce Account Email Conflict behavior and copy during sign-up.
+- [x] [P3] Remove the unused reset-token check route and regenerate the route tree.
+- [x] [P3] Replace unchecked auth-state response casts and the generic server-route type erasure.
+
 ## Phase 1 Foundation
 
 - [x] Fix current TypeScript unused-import errors.

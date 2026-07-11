@@ -1,20 +1,13 @@
 import { useEffect, useState } from 'react'
 
 import { AuthMessage, AuthPageShell } from './auth-page-shell'
+import { readAuthSearchParam, resolveOAuthCallback } from './auth-flow'
+import { navigateToAuthPath } from './auth-navigation'
 import { type AuthState, readAuthState } from './profile-actions'
 
-export const getOAuthRedirectPath = (state: AuthState): string => {
-  if (state.status === 'complete') {
-    return '/home'
-  }
-  if (state.status === 'needsProfile') {
-    return '/auth/username'
-  }
-  if (state.status === 'emailUnverified') {
-    const emailQuery = state.email ? `?email=${encodeURIComponent(state.email)}` : ''
-    return `/auth/verify-email${emailQuery}`
-  }
-  return '/auth/sign-in'
+export const getOAuthRedirectPath = (state: AuthState): string | null => {
+  const result = resolveOAuthCallback(state, null, null)
+  return result.kind === 'redirect' ? result.path : null
 }
 
 export function OAuthCallbackPage() {
@@ -22,16 +15,32 @@ export function OAuthCallbackPage() {
 
   useEffect(() => {
     let active = true
+    const errorCode = readAuthSearchParam(window.location.search, 'error')
+    const returnTo = readAuthSearchParam(window.location.search, 'returnTo')
+
+    const applyResult = (result: ReturnType<typeof resolveOAuthCallback>) => {
+      if (!active) return
+      if (result.kind === 'redirect') {
+        navigateToAuthPath(result.path)
+        return
+      }
+      setMessage(result.message)
+    }
+
+    if (errorCode) {
+      applyResult(resolveOAuthCallback({ status: 'signedOut' }, errorCode, returnTo))
+      return () => {
+        active = false
+      }
+    }
 
     void readAuthState()
       .then((state) => {
-        if (active) {
-          window.location.assign(getOAuthRedirectPath(state))
-        }
+        applyResult(resolveOAuthCallback(state, null, returnTo))
       })
-      .catch((error: unknown) => {
+      .catch(() => {
         if (active) {
-          setMessage(error instanceof Error ? error.message : 'Google sign-in check failed.')
+          setMessage('Google sign-in couldn’t continue. Try another sign-in method.')
         }
       })
 

@@ -1,24 +1,40 @@
-export type AuthStatus = 'signedOut' | 'emailUnverified' | 'needsProfile' | 'complete'
+import { z } from 'zod'
 
-export type AuthState = {
-  status: AuthStatus
-  email: string | null
-  emailVerified: boolean
-  profile: unknown
+import { authStateSchema, type AuthState } from './auth-contracts'
+
+export { type AuthState } from './auth-contracts'
+
+const usernameCheckSchema = z.object({
+  available: z.boolean(),
+  message: z.string().nullable(),
+}).strict()
+
+export type UsernameCheck = z.infer<typeof usernameCheckSchema>
+
+class ProfileActionError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ProfileActionError'
+    this.status = status
+  }
 }
 
-export type UsernameCheck = {
-  available: boolean
-  message: string | null
+export const isUsernameUnavailableError = (error: unknown): boolean => {
+  return error instanceof ProfileActionError && error.status === 409
 }
 
 export const readAuthState = async (): Promise<AuthState> => {
   const response = await fetch('/api/profile/state')
   if (!response.ok) {
-    const message = await response.text()
-    throw new Error(message || 'Auth state check failed.')
+    throw new Error('Auth state check failed.')
   }
-  return await response.json() as AuthState
+  const result = authStateSchema.safeParse(await response.json())
+  if (!result.success) {
+    throw new Error('Invalid auth state response.')
+  }
+  return result.data
 }
 
 export const checkUsername = async (username: string): Promise<UsernameCheck> => {
@@ -29,11 +45,14 @@ export const checkUsername = async (username: string): Promise<UsernameCheck> =>
   })
 
   if (!response.ok) {
-    const message = await response.text()
-    throw new Error(message || 'Username check failed.')
+    throw new Error('Username check failed.')
   }
 
-  return await response.json() as UsernameCheck
+  const result = usernameCheckSchema.safeParse(await response.json())
+  if (!result.success) {
+    throw new Error('Invalid username check response.')
+  }
+  return result.data
 }
 
 export const completeAuthProfile = async (username: string): Promise<void> => {
@@ -45,6 +64,6 @@ export const completeAuthProfile = async (username: string): Promise<void> => {
 
   if (!response.ok) {
     const message = await response.text()
-    throw new Error(message || 'Profile completion failed.')
+    throw new ProfileActionError(message || 'Profile completion failed.', response.status)
   }
 }

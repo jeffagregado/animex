@@ -1,6 +1,8 @@
 import { type AuthState, readAuthState } from './profile-actions'
 
 export type PrivateAuthMode = 'verified' | 'profile'
+type VerifiedAuthState = Extract<AuthState, { status: 'needsProfile' | 'complete' }>
+type CompleteAuthState = Extract<AuthState, { status: 'complete' }>
 
 class AuthRedirectError extends Error {
   redirectTo: string
@@ -28,7 +30,9 @@ const getAuthRedirect = (
   return null
 }
 
-export const requireAuthState = async (mode: PrivateAuthMode): Promise<AuthState> => {
+export function requireAuthState(mode: 'verified'): Promise<VerifiedAuthState>
+export function requireAuthState(mode: 'profile'): Promise<CompleteAuthState>
+export async function requireAuthState(mode: PrivateAuthMode): Promise<AuthState> {
   const state = await readAuthState()
   const redirectTo = getAuthRedirect(state, mode)
   if (redirectTo) {

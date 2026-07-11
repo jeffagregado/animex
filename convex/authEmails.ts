@@ -11,6 +11,7 @@ export type AuthEmailInput = {
   code: string | null
   intro: string
   meta: string
+  preheader: string
   title: string
   tone: AuthEmailTone
 }
@@ -50,12 +51,16 @@ export const renderAuthEmail = (input: AuthEmailInput): AuthEmailTemplate => {
   const buttonMarkup = input.actionHref
     ? `<a href="${escapeHtml(input.actionHref)}" style="display:block;margin:28px 0;padding:17px 20px;border-radius:8px;background:${accent};color:#ffffff;font-size:16px;font-weight:900;text-align:center;text-decoration:none;">${escapeHtml(input.actionLabel ?? 'Open link')}</a>`
     : ''
+  const fallbackMarkup = input.actionHref
+    ? `<p style="margin:16px 0 0;color:#8ea0b8;font-size:12px;line-height:1.55;overflow-wrap:anywhere;">Or open this URL: <a href="${escapeHtml(input.actionHref)}" style="color:${accent};">${escapeHtml(input.actionHref)}</a></p>`
+    : ''
 
   return {
     html: [
       '<!doctype html>',
       '<html>',
       '<body style="margin:0;background:#050b14;padding:32px 16px;font-family:Inter,Arial,sans-serif;color:#f4f8ff;">',
+      `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(input.preheader)}</div>`,
       '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;margin:0 auto;border-collapse:collapse;">',
       '<tr><td>',
       '<div style="border:1px solid #37506b;border-radius:8px;background:#0b1728;padding:34px 30px;box-shadow:0 24px 64px rgba(0,0,0,.32);">',
@@ -64,6 +69,7 @@ export const renderAuthEmail = (input: AuthEmailInput): AuthEmailTemplate => {
       `<p style="margin:0;color:#b8c5d8;font-size:16px;line-height:1.65;">${escapeHtml(input.intro)}</p>`,
       codeMarkup,
       buttonMarkup,
+      fallbackMarkup,
       `<p style="margin:22px 0 0;color:#8ea0b8;font-size:14px;line-height:1.55;">${escapeHtml(input.meta)}</p>`,
       '<p style="margin:28px 0 0;color:#64748b;font-size:12px;line-height:1.5;">If you did not request this, you can ignore this email.</p>',
       '</div>',
@@ -78,6 +84,8 @@ export const renderAuthEmail = (input: AuthEmailInput): AuthEmailTemplate => {
       input.title,
       '',
       input.intro,
+      '',
+      input.preheader,
       '',
       ...actionText,
       '',

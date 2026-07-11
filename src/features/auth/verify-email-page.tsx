@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useForm } from '@tanstack/react-form'
+import { useEffect, useRef, useState } from 'react'
+import { revalidateLogic, useForm } from '@tanstack/react-form'
 import { Mail, ShieldCheck } from 'lucide-react'
 
 import { AsyncButton } from '../../components/async-button'
@@ -7,31 +7,34 @@ import {
   accountEmailSchema,
   emailChangeConfirmSchema,
   emailChangeRequestSchema,
+  emailChangeSendSchema,
   verifyEmailSchema,
 } from '../../lib/auth-schemas'
-import { getAuthErrorMessage, postAuthEndpoint } from './auth-actions'
-import { parseAuthInput, submitAuthForm } from './auth-form'
+import { getAuthErrorMessage, getAuthFieldErrorMessage, postAuthEndpoint } from './auth-actions'
+import { focusFirstInvalidAuthField, getAuthFieldError, getAuthSchemaErrors, parseAuthInput, submitAuthForm } from './auth-form'
+import { navigateToAuthPath } from './auth-navigation'
 import {
   AuthControlledField,
   AuthMessage,
   AuthPageShell,
 } from './auth-page-shell'
-import { normalizeAccountEmail } from './auth-validation'
 import { readAuthState } from './profile-actions'
 
-const readEmailQuery = (search: string): string => {
-  const params = new URLSearchParams(search)
-  const email = params.get('email')
-  if (!email) {
-    return ''
-  }
-  return normalizeAccountEmail(email)
-}
-
 type VerifyPendingAction = 'resend' | 'requestEmail' | 'confirmEmail' | null
+type EmailChangeIntent = 'request' | 'confirm'
 
 export function VerifyEmailPage() {
   const [message, setMessage] = useState<string | null>(null)
+  const [messageKind, setMessageKind] = useState<'error' | 'status'>('error')
+  const [verifySubmitted, setVerifySubmitted] = useState(false)
+  const [verifyReady, setVerifyReady] = useState(false)
+  const [changeIntent, setChangeIntent] = useState<EmailChangeIntent>('confirm')
+  const [verifyErrors, setVerifyErrors] = useState<Readonly<Record<string, string>>>({})
+  const [changeErrors, setChangeErrors] = useState<Readonly<Record<string, string>>>({})
+  const [otpServerError, setOtpServerError] = useState<string | null>(null)
+  const [newEmailServerError, setNewEmailServerError] = useState<string | null>(null)
+  const verifyFormRef = useRef<HTMLFormElement>(null)
+  const changeFormRef = useRef<HTMLFormElement>(null)
   const [changingEmail, setChangingEmail] = useState(false)
   const [pendingAction, setPendingAction] = useState<VerifyPendingAction>(null)
 
@@ -40,8 +43,12 @@ export function VerifyEmailPage() {
       email: '',
       otp: '',
     },
+    validationLogic: revalidateLogic({ mode: 'blur', modeAfterSubmission: 'change' }),
+    validators: { onDynamic: verifyEmailSchema },
     onSubmit: async ({ value }) => {
       setMessage(null)
+      setMessageKind('error')
+      setOtpServerError(null)
       const input = parseAuthInput(verifyEmailSchema, value, 'Verification failed.')
       if (!input.ok) {
         setMessage(input.message)
@@ -53,8 +60,14 @@ export function VerifyEmailPage() {
           email: input.data.email,
           otp: input.data.otp,
         })
-        window.location.assign('/auth/username')
+        navigateToAuthPath('/auth/username')
       } catch (error) {
+        const mappedError = getAuthFieldErrorMessage(error, 'otp')
+        if (mappedError) {
+          setOtpServerError(mappedError)
+          window.setTimeout(() => focusFirstInvalidAuthField(verifyFormRef.current, ['otp']), 0)
+          return
+        }
         setMessage(getAuthErrorMessage(error, 'Verification failed.'))
       }
     },
@@ -65,36 +78,43 @@ export function VerifyEmailPage() {
       newEmail: '',
       otp: '',
     },
+    validationLogic: revalidateLogic({ mode: 'blur', modeAfterSubmission: 'change' }),
+    validators: {
+      onDynamic: changeIntent === 'request' ? emailChangeSendSchema : emailChangeConfirmSchema,
+    },
     onSubmit: async () => undefined,
   })
 
   useEffect(() => {
-    const queryEmail = readEmailQuery(window.location.search)
-    if (queryEmail) {
-      verifyForm.setFieldValue('email', queryEmail)
-    }
-
     void readAuthState()
       .then((state) => {
+        if (state.status === 'signedOut') {
+          navigateToAuthPath('/auth/sign-in')
+          return
+        }
         if (state.status === 'complete') {
-          window.location.assign('/home')
+          navigateToAuthPath('/home')
           return
         }
         if (state.status === 'needsProfile') {
-          window.location.assign('/auth/username')
+          navigateToAuthPath('/auth/username')
           return
         }
-        if (state.email) {
+        if (state.status === 'emailUnverified') {
           verifyForm.setFieldValue('email', state.email)
+          setVerifyErrors({})
+          setVerifyReady(true)
         }
       })
       .catch((error: unknown) => {
-        setMessage(error instanceof Error ? error.message : 'Auth state check failed.')
+        console.error('Verification auth state check failed.', error)
+        setMessage('Verification status couldn’t be checked. Try again.')
       })
   }, [verifyForm])
 
   const handleResend = async () => {
     setMessage(null)
+    setMessageKind('error')
     const input = parseAuthInput(accountEmailSchema, verifyForm.state.values.email, 'Resend code failed.')
     if (!input.ok) {
       setMessage(input.message)
@@ -107,9 +127,10 @@ export function VerifyEmailPage() {
         email: input.data,
         type: 'email-verification',
       })
+      setMessageKind('status')
       setMessage('Verification code sent.')
     } catch (error) {
-      setMessage(getAuthErrorMessage(error, 'Resend code failed.'))
+      setMessage(getAuthErrorMessage(error, 'Verification email couldn’t be sent. Try again.'))
     } finally {
       setPendingAction(null)
     }
@@ -117,6 +138,16 @@ export function VerifyEmailPage() {
 
   const handleRequestEmailChange = async () => {
     setMessage(null)
+    setMessageKind('error')
+    setNewEmailServerError(null)
+    setChangeIntent('request')
+    window.setTimeout(() => void emailChangeForm.handleSubmit(), 0)
+    const errors = getAuthSchemaErrors(emailChangeRequestSchema, emailChangeForm.state.values)
+    setChangeErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      window.setTimeout(() => focusFirstInvalidAuthField(changeFormRef.current, ['newEmail']), 0)
+      return
+    }
     const input = parseAuthInput(emailChangeRequestSchema, emailChangeForm.state.values, 'Email change request failed.')
     if (!input.ok) {
       setMessage(input.message)
@@ -127,9 +158,16 @@ export function VerifyEmailPage() {
     try {
       await postAuthEndpoint('/email-otp/request-email-change', { newEmail: input.data.newEmail })
       emailChangeForm.setFieldValue('newEmail', input.data.newEmail)
+      setMessageKind('status')
       setMessage('Enter the code sent to the new email.')
     } catch (error) {
-      setMessage(getAuthErrorMessage(error, 'Email change request failed.'))
+      const mappedError = getAuthFieldErrorMessage(error, 'newEmail')
+      if (mappedError) {
+        setNewEmailServerError(mappedError)
+        window.setTimeout(() => focusFirstInvalidAuthField(changeFormRef.current, ['newEmail']), 0)
+        return
+      }
+      setMessage(getAuthErrorMessage(error, 'Verification email couldn’t be sent. Try again.'))
     } finally {
       setPendingAction(null)
     }
@@ -137,6 +175,17 @@ export function VerifyEmailPage() {
 
   const handleConfirmEmailChange = async () => {
     setMessage(null)
+    setMessageKind('error')
+    setNewEmailServerError(null)
+    setOtpServerError(null)
+    setChangeIntent('confirm')
+    window.setTimeout(() => void emailChangeForm.handleSubmit(), 0)
+    const errors = getAuthSchemaErrors(emailChangeConfirmSchema, emailChangeForm.state.values)
+    setChangeErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      window.setTimeout(() => focusFirstInvalidAuthField(changeFormRef.current, ['newEmail', 'otp']), 0)
+      return
+    }
     const input = parseAuthInput(emailChangeConfirmSchema, emailChangeForm.state.values, 'Email change failed.')
     if (!input.ok) {
       setMessage(input.message)
@@ -149,12 +198,16 @@ export function VerifyEmailPage() {
         newEmail: input.data.newEmail,
         otp: input.data.otp,
       })
-      verifyForm.setFieldValue('email', input.data.newEmail)
-      emailChangeForm.setFieldValue('newEmail', '')
-      emailChangeForm.setFieldValue('otp', '')
-      setChangingEmail(false)
-      setMessage('Account email changed. Enter the new verification code.')
+      navigateToAuthPath('/auth/username')
     } catch (error) {
+      const emailError = getAuthFieldErrorMessage(error, 'newEmail')
+      const otpError = getAuthFieldErrorMessage(error, 'otp')
+      if (emailError || otpError) {
+        setNewEmailServerError(emailError)
+        setOtpServerError(otpError)
+        window.setTimeout(() => focusFirstInvalidAuthField(changeFormRef.current, ['newEmail', 'otp']), 0)
+        return
+      }
       setMessage(getAuthErrorMessage(error, 'Email change failed.'))
     } finally {
       setPendingAction(null)
@@ -168,7 +221,7 @@ export function VerifyEmailPage() {
       title="Verify Email"
     >
       {changingEmail ? (
-        <form className="auth-form" onSubmit={(event) => event.preventDefault()}>
+        <form ref={changeFormRef} className="auth-form" method="post" noValidate onSubmit={(event) => event.preventDefault()}>
           <emailChangeForm.Field
             name="newEmail"
             children={(field) => (
@@ -179,8 +232,14 @@ export function VerifyEmailPage() {
                 name={field.name}
                 type="email"
                 value={field.state.value}
+                error={newEmailServerError ?? changeErrors.newEmail ?? getAuthFieldError(field.state.meta.errors)}
                 onBlur={field.handleBlur}
-                onChange={field.handleChange}
+                onChange={(value) => {
+                  setNewEmailServerError(null)
+                  field.handleChange(value)
+                  const schema = changeIntent === 'request' ? emailChangeRequestSchema : emailChangeConfirmSchema
+                  setChangeErrors(getAuthSchemaErrors(schema, { ...emailChangeForm.state.values, newEmail: value }))
+                }}
               />
             )}
           />
@@ -194,8 +253,15 @@ export function VerifyEmailPage() {
                 name={field.name}
                 type="text"
                 value={field.state.value}
+                error={otpServerError ?? changeErrors.otp ?? (changeIntent === 'confirm' ? getAuthFieldError(field.state.meta.errors) : null)}
                 onBlur={field.handleBlur}
-                onChange={field.handleChange}
+                onChange={(value) => {
+                  setOtpServerError(null)
+                  field.handleChange(value)
+                  if (changeIntent === 'confirm') {
+                    setChangeErrors(getAuthSchemaErrors(emailChangeConfirmSchema, { ...emailChangeForm.state.values, otp: value }))
+                  }
+                }}
               />
             )}
           />
@@ -220,7 +286,22 @@ export function VerifyEmailPage() {
           </button>
         </form>
       ) : (
-        <form className="auth-form" onSubmit={(event) => submitAuthForm(event, verifyForm.handleSubmit)}>
+        <form
+          ref={verifyFormRef}
+          className="auth-form"
+          method="post"
+          noValidate
+          onSubmit={(event) => submitAuthForm(event, () => {
+            setVerifySubmitted(true)
+            const errors = getAuthSchemaErrors(verifyEmailSchema, verifyForm.state.values)
+            setVerifyErrors(errors)
+            if (Object.keys(errors).length > 0) {
+              window.setTimeout(() => focusFirstInvalidAuthField(verifyFormRef.current, ['otp']), 0)
+              return
+            }
+            void verifyForm.handleSubmit()
+          })}
+        >
           <verifyForm.Field
             name="email"
             children={(field) => (
@@ -229,8 +310,10 @@ export function VerifyEmailPage() {
                 icon={Mail}
                 label="Account Email"
                 name={field.name}
+                readOnly
                 type="email"
                 value={field.state.value}
+                error={verifySubmitted ? verifyErrors.email ?? null : getAuthFieldError(field.state.meta.errors as Array<string | { message?: string }>)}
                 onBlur={field.handleBlur}
                 onChange={field.handleChange}
               />
@@ -246,17 +329,22 @@ export function VerifyEmailPage() {
                 name={field.name}
                 type="text"
                 value={field.state.value}
+                error={otpServerError ?? (verifySubmitted ? verifyErrors.otp ?? null : getAuthFieldError(field.state.meta.errors as Array<string | { message?: string }>))}
                 onBlur={field.handleBlur}
-                onChange={field.handleChange}
+                onChange={(value) => {
+                  setOtpServerError(null)
+                  field.handleChange(value)
+                  if (verifySubmitted) setVerifyErrors(getAuthSchemaErrors(verifyEmailSchema, { ...verifyForm.state.values, otp: value }))
+                }}
               />
             )}
           />
           <verifyForm.Subscribe
             selector={(state) => [state.canSubmit, state.isSubmitting]}
-            children={([canSubmit, isSubmitting]) => (
+            children={([, isSubmitting]) => (
               <AsyncButton
                 className="auth-submit auth-submit-teal"
-                disabled={!canSubmit}
+                disabled={isSubmitting || !verifyReady}
                 isLoading={isSubmitting}
                 type="submit"
               >
@@ -266,7 +354,7 @@ export function VerifyEmailPage() {
           />
         </form>
       )}
-      <AuthMessage message={message} />
+      <AuthMessage kind={messageKind} message={message} />
       {!changingEmail ? (
         <div className="auth-actions-row">
           <span>Didn&apos;t receive the code?</span>

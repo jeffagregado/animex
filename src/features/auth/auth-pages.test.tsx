@@ -16,12 +16,18 @@ const authClientMock = vi.hoisted(() => ({
   },
 }))
 
+const navigateToAuthPathMock = vi.hoisted(() => vi.fn())
+
 vi.mock('../../lib/auth-client', () => ({
   authClient: authClientMock,
 }))
 
+vi.mock('./auth-navigation', () => ({
+  navigateToAuthPath: navigateToAuthPathMock,
+}))
+
 import { ForgotPasswordPage } from './forgot-password-page'
-import { getOAuthRedirectPath } from './oauth-callback-page'
+import { getOAuthRedirectPath, OAuthCallbackPage } from './oauth-callback-page'
 import { ResetPasswordPage } from './reset-password-page'
 import { SignInPage } from './sign-in-page'
 import { SignUpPage } from './sign-up-page'
@@ -36,9 +42,6 @@ const mockSignedOutState = (): void => {
         ok: true,
         json: async () => ({
           status: 'signedOut',
-          email: null,
-          emailVerified: false,
-          profile: null,
         }),
       } as Response
     }),
@@ -54,11 +57,21 @@ const mockNeedsProfileState = (): void => {
         json: async () => ({
           status: 'needsProfile',
           email: 'user@example.com',
-          emailVerified: true,
-          profile: null,
+          signupMethod: 'password',
+          suggestedUsername: null,
         }),
       } as Response
     }),
+  )
+}
+
+const mockEmailUnverifiedState = (email: string): void => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ status: 'emailUnverified', email }),
+    } as Response)),
   )
 }
 
@@ -105,6 +118,50 @@ describe('auth pages', () => {
     expect(screen.getByLabelText('Password')).toBeTruthy()
     expect(screen.getByLabelText('Confirm Password')).toBeTruthy()
     expect(screen.getAllByRole('button', { name: 'Show password' })).toHaveLength(2)
+  })
+
+  test('uses native POST for every auth form with named user input', async () => {
+    const expectNamedInputFormToPost = (label: string): void => {
+      const input = screen.getByLabelText(label)
+      const inputName = input.getAttribute('name')
+      const form = input.closest('form')
+      expect(inputName).not.toBeNull()
+      expect(inputName?.trim().length).toBeGreaterThan(0)
+      expect(form).not.toBeNull()
+      expect(form?.getAttribute('method')).toBe('post')
+    }
+
+    mockSignedOutState()
+    render(<SignInPage />)
+    expectNamedInputFormToPost('Password')
+
+    cleanup()
+    mockSignedOutState()
+    render(<SignUpPage />)
+    expectNamedInputFormToPost('Password')
+
+    cleanup()
+    mockSignedOutState()
+    render(<ForgotPasswordPage />)
+    expectNamedInputFormToPost('Account Email')
+
+    cleanup()
+    render(<ResetPasswordPage token="reset-token" />)
+    expectNamedInputFormToPost('Password')
+    expectNamedInputFormToPost('Confirm Password')
+
+    cleanup()
+    mockEmailUnverifiedState('owner@example.com')
+    render(<VerifyEmailPage />)
+    expectNamedInputFormToPost('Verification Code')
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }))
+    expectNamedInputFormToPost('New Account Email')
+    expectNamedInputFormToPost('New Email Code')
+
+    cleanup()
+    mockNeedsProfileState()
+    render(<UsernamePage />)
+    await waitFor(() => expectNamedInputFormToPost('Username'))
   })
 
   test('toggles password visibility in sign-in', () => {
@@ -192,15 +249,91 @@ describe('auth pages', () => {
     expect(() => renderToString(<ResetPasswordPage token={null} />)).not.toThrow()
   })
 
-  test('prefills verification email from query params', async () => {
-    mockSignedOutState()
-    window.history.replaceState(null, '', '/auth/verify-email?email=Mika%40Example.com')
+  test('uses authoritative verification email and ignores malformed query override', async () => {
+    mockEmailUnverifiedState('owner@example.com')
+    window.history.replaceState(null, '', '/auth/verify-email?email=%E0%A4%A')
 
     render(<VerifyEmailPage />)
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Account Email')).toHaveProperty('value', 'mika@example.com')
+      expect(screen.getByLabelText('Account Email')).toHaveProperty('value', 'owner@example.com')
     })
+    expect(screen.getByLabelText('Account Email')).toHaveProperty('readOnly', true)
+  })
+
+  test('keeps password reset request generic when provider returns a rate-limit detail', async () => {
+    mockSignedOutState()
+    authClientMock.$fetch.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'TOO_MANY_REQUESTS',
+        message: 'resend provider quota for customer-4821',
+        status: 429,
+      },
+    })
+
+    render(<ForgotPasswordPage />)
+    fireEvent.change(screen.getByLabelText('Account Email'), { target: { value: 'mika@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send Reset Link' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('If an account exists, reset instructions were sent.')).toBeTruthy()
+    })
+    expect(screen.queryByText('Too many attempts. Try again later.')).toBeNull()
+    expect(screen.queryByText('resend provider quota for customer-4821')).toBeNull()
+  })
+
+  test('Google sign-in sends success and error callbacks with return target', async () => {
+    mockSignedOutState()
+    authClientMock.signIn.social.mockResolvedValue({ data: { redirect: true }, error: null })
+    window.history.replaceState(null, '', '/auth/sign-in?returnTo=%2Fanime%2F86%3Ftab%3Dreviews%23latest')
+
+    render(<SignInPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with Google' }))
+
+    await waitFor(() => expect(authClientMock.signIn.social).toHaveBeenCalledOnce())
+    expect(authClientMock.signIn.social).toHaveBeenCalledWith(expect.objectContaining({
+      callbackURL: expect.stringContaining('returnTo=%2Fanime%2F86%3Ftab%3Dreviews%23latest'),
+      errorCallbackURL: expect.stringContaining('returnTo=%2Fanime%2F86%3Ftab%3Dreviews%23latest'),
+      provider: 'google',
+    }))
+  })
+
+  test('email correction sends one OTP and no second verification request', async () => {
+    mockEmailUnverifiedState('owner@example.com')
+    authClientMock.$fetch.mockResolvedValue({ data: { success: true }, error: null })
+    render(<VerifyEmailPage />)
+
+    await waitFor(() => expect(screen.getByLabelText('Account Email')).toHaveProperty('value', 'owner@example.com'))
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }))
+    fireEvent.change(screen.getByLabelText('New Account Email'), { target: { value: 'new@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+    await waitFor(() => expect(authClientMock.$fetch).toHaveBeenCalledTimes(1))
+    expect(authClientMock.$fetch.mock.calls[0]?.[0]).toBe('/email-otp/request-email-change')
+
+    fireEvent.change(screen.getByLabelText('New Email Code'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm email' }))
+    await waitFor(() => expect(authClientMock.$fetch).toHaveBeenCalledTimes(2))
+    expect(authClientMock.$fetch.mock.calls[1]?.[0]).toBe('/email-otp/change-email')
+    expect(authClientMock.$fetch.mock.calls.filter(([path]) => path === '/email-otp/send-verification-otp')).toHaveLength(0)
+    expect(navigateToAuthPathMock).toHaveBeenCalledWith('/auth/username')
+  })
+
+  test('maps verification send failure to settled copy', async () => {
+    mockEmailUnverifiedState('owner@example.com')
+    authClientMock.$fetch.mockResolvedValue({
+      data: null,
+      error: { code: 'DELIVERY_PROVIDER_DETAIL', message: 'sensitive provider failure' },
+    })
+    render(<VerifyEmailPage />)
+    await waitFor(() => expect(screen.getByLabelText('Account Email')).toHaveProperty('value', 'owner@example.com'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resend code' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Verification email couldn’t be sent. Try again.')).toBeTruthy()
+    })
+    expect(screen.queryByText('sensitive provider failure')).toBeNull()
   })
 
   test('does not render username form before auth gate resolves', () => {
@@ -228,26 +361,45 @@ describe('auth pages', () => {
     expect(getOAuthRedirectPath({
       status: 'complete',
       email: 'user@example.com',
-      emailVerified: true,
-      profile: {},
+      profile: {
+        id: 'profile-1',
+        username: 'mika',
+        name: 'Mika',
+        avatarUrl: null,
+        visibility: 'private',
+      },
     })).toBe('/home')
     expect(getOAuthRedirectPath({
       status: 'needsProfile',
       email: 'user@example.com',
-      emailVerified: true,
-      profile: null,
+      signupMethod: 'password',
+      suggestedUsername: null,
     })).toBe('/auth/username')
     expect(getOAuthRedirectPath({
       status: 'emailUnverified',
       email: 'Mika@example.com',
-      emailVerified: false,
-      profile: null,
-    })).toBe('/auth/verify-email?email=Mika%40example.com')
+    })).toBeNull()
     expect(getOAuthRedirectPath({
       status: 'signedOut',
-      email: null,
-      emailVerified: false,
-      profile: null,
     })).toBe('/auth/sign-in')
+  })
+
+  test('renders settled OAuth copy for unknown provider error without fetching state or leaking description', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.replaceState(
+      null,
+      '',
+      '/auth/oauth-callback?error=provider_secret_detail&error_description=tenant%20secret%20abc123',
+    )
+
+    render(<OAuthCallbackPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Google sign-in couldn’t continue. Try another sign-in method.')).toBeTruthy()
+    })
+    expect(screen.queryByText('tenant secret abc123')).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(navigateToAuthPathMock).not.toHaveBeenCalled()
   })
 })

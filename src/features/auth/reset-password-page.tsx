@@ -1,11 +1,16 @@
-import { useState, type Dispatch, type SetStateAction } from 'react'
-import { useForm } from '@tanstack/react-form'
+import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { revalidateLogic, useForm } from '@tanstack/react-form'
 import { Check } from 'lucide-react'
 
 import { AsyncButton } from '../../components/async-button'
 import { resetPasswordSchema } from '../../lib/auth-schemas'
 import { getAuthErrorMessage, postAuthEndpoint } from './auth-actions'
-import { parseAuthInput, submitAuthForm } from './auth-form'
+import {
+  focusFirstInvalidAuthField,
+  getAuthFieldError,
+  getAuthSchemaErrors,
+  submitAuthForm,
+} from './auth-form'
 import { AuthMessage, AuthPageShell } from './auth-page-shell'
 import { PasswordField } from './password-field'
 
@@ -46,11 +51,15 @@ const useResetPasswordForm = ({
       password: '',
       confirmPassword: '',
     },
+    validationLogic: revalidateLogic({ mode: 'blur', modeAfterSubmission: 'change' }),
+    validators: {
+      onDynamic: resetPasswordSchema,
+    },
     onSubmit: async ({ value }) => {
       setMessage(null)
-      const input = parseAuthInput(resetPasswordSchema, value, 'Password reset failed.')
-      if (!input.ok) {
-        setMessage(input.message)
+      const input = resetPasswordSchema.safeParse(value)
+      if (!input.success) {
+        setMessage(input.error.issues[0]?.message ?? 'Password reset failed.')
         return
       }
       if (!token) {
@@ -71,8 +80,11 @@ const useResetPasswordForm = ({
 
 export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
   const [message, setMessage] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+  const [submitErrors, setSubmitErrors] = useState<Readonly<Record<string, string>>>({})
   const [success, setSuccess] = useState(false)
   const [secondsRemaining, setSecondsRemaining] = useState(RESET_SUCCESS_SECONDS)
+  const formRef = useRef<HTMLFormElement>(null)
 
   const form = useResetPasswordForm({
     setMessage,
@@ -87,7 +99,7 @@ export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
   return (
     <AuthPageShell eyebrow="Account recovery" subtitle={null} title={success ? 'Password reset.' : 'Set New Password'}>
       {success ? (
-        <section className="auth-success-state" aria-label="Password reset success">
+        <section className="auth-success-state" aria-label="Password reset success" role="status">
           <div className="auth-success-icon">
             <Check aria-hidden="true" className="size-12" />
           </div>
@@ -101,7 +113,22 @@ export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
         </section>
       ) : null}
       {token && !success ? (
-        <form className="auth-form" onSubmit={(event) => submitAuthForm(event, form.handleSubmit)}>
+        <form
+          ref={formRef}
+          className="auth-form"
+          method="post"
+          noValidate
+          onSubmit={(event) => submitAuthForm(event, () => {
+            setSubmitted(true)
+            const errors = getAuthSchemaErrors(resetPasswordSchema, form.state.values)
+            setSubmitErrors(errors)
+            if (Object.keys(errors).length > 0) {
+              window.setTimeout(() => focusFirstInvalidAuthField(formRef.current, ['password', 'confirmPassword']), 0)
+              return
+            }
+            void form.handleSubmit()
+          })}
+        >
           <form.Field
             name="password"
             children={(field) => (
@@ -110,8 +137,12 @@ export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
                 label="Password"
                 name={field.name}
                 value={field.state.value}
+                error={submitted ? submitErrors.password ?? null : getAuthFieldError(field.state.meta.errors)}
                 onBlur={field.handleBlur}
-                onChange={field.handleChange}
+                onChange={(value) => {
+                  field.handleChange(value)
+                  if (submitted) setSubmitErrors(getAuthSchemaErrors(resetPasswordSchema, { ...form.state.values, password: value }))
+                }}
               />
             )}
           />
@@ -123,17 +154,21 @@ export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
                 label="Confirm Password"
                 name={field.name}
                 value={field.state.value}
+                error={submitted ? submitErrors.confirmPassword ?? null : getAuthFieldError(field.state.meta.errors)}
                 onBlur={field.handleBlur}
-                onChange={field.handleChange}
+                onChange={(value) => {
+                  field.handleChange(value)
+                  if (submitted) setSubmitErrors(getAuthSchemaErrors(resetPasswordSchema, { ...form.state.values, confirmPassword: value }))
+                }}
               />
             )}
           />
           <form.Subscribe
             selector={(state) => [state.canSubmit, state.isSubmitting]}
-            children={([canSubmit, isSubmitting]) => (
+            children={([, isSubmitting]) => (
               <AsyncButton
                 className="auth-submit auth-submit-teal"
-                disabled={!canSubmit}
+                disabled={isSubmitting}
                 isLoading={isSubmitting}
                 type="submit"
               >

@@ -40,46 +40,62 @@ export function AuthPageShell({
 
 export function AuthControlledField({
   autoComplete,
+  error,
   icon: Icon,
   label,
   name,
   onBlur,
   onChange,
+  readOnly,
   type,
   value,
 }: {
   autoComplete: string
+  error?: string | null
   icon: LucideIcon | null
   label: string
   name: string
   onBlur: () => void
   onChange: (value: string) => void
+  readOnly?: boolean
   type: string
   value: string
 }) {
+  const errorId = `${name}-error`
   return (
     <label className="auth-field">
       <span>{label}</span>
       <span className="auth-input-shell">
         {Icon ? <Icon aria-hidden="true" className="auth-input-icon" /> : null}
         <input
+          aria-label={label}
+          aria-describedby={error ? errorId : undefined}
+          aria-invalid={error ? true : undefined}
           autoComplete={autoComplete}
           name={name}
+          readOnly={readOnly}
           type={type}
           value={value}
           onBlur={onBlur}
           onChange={(event) => onChange(event.target.value)}
         />
       </span>
+      {error ? <small className="auth-field-hint auth-field-hint-error" id={errorId}>{error}</small> : null}
     </label>
   )
 }
 
-export function AuthMessage({ message }: { message: string | null }) {
+export function AuthMessage({
+  kind,
+  message,
+}: {
+  kind?: 'error' | 'status'
+  message: string | null
+}) {
   if (!message) {
     return null
   }
-  return <p className="auth-message">{message}</p>
+  return <p className="auth-message" role={kind === 'status' ? 'status' : 'alert'}>{message}</p>
 }
 
 export function GoogleButton({ onClick }: { onClick: () => Promise<void> }) {
