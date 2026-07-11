@@ -8,6 +8,8 @@
 
 **Tech Stack:** TanStack Start, React 19, Better Auth, Convex, TanStack Form, Zod, Vitest, Fallow, Vite.
 
+**Status:** Complete. Phase 2 closed on `dev` at commit `f7e0c58`.
+
 ## Global Constraints
 
 - No application edits during audit.
@@ -84,5 +86,5 @@
 - Modify only after PASS: `PLAN.md`
 
 - [x] Integrate agent evidence and controller checks.
-- [x] Keep Phase 2 open for P1/P2 findings and the reproduced malformed verification-email route failure.
-- [ ] Mark formal Phase 2 closure only after every required gate passes; list residual P3 risks explicitly.
+- [x] Resolve Phase 2 P1/P2 findings and the reproduced malformed verification-email route failure before closure.
+- [x] Mark formal Phase 2 closure after every required gate passed; list residual P3 risks explicitly.

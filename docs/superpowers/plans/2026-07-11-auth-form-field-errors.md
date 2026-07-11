@@ -39,9 +39,9 @@
 - Consumes existing auth pages and user-visible DOM.
 - Produces regression coverage for validation timing, all-field submit errors, focus order, ARIA links, safe server mapping and clearing, notice roles, read-only email, `confirmPassword`, and transformed email API values.
 
-- [ ] Write user-visible integration tests for each required behavior.
-- [ ] Run `pnpm test src/features/auth/auth-field-errors.test.tsx`.
-- [ ] Confirm failures describe missing field-error behavior, not setup defects.
+- [x] Write user-visible integration tests for each required behavior.
+- [x] Run `pnpm test src/features/auth/auth-field-errors.test.tsx`.
+- [x] Confirm failures describe missing field-error behavior, not setup defects.
 
 ### Task 2: Shared Validation And Presentation Contract
 
@@ -59,12 +59,12 @@
 - Produces typed field-error, notice, focus, and explicit error-classification helpers used by all auth pages.
 - Field inputs receive one displayed error, stable description ID, invalid state, and mapped-error clearing callback.
 
-- [ ] Add minimal typed helpers needed by failing tests.
-- [ ] Keep error classification based on explicit codes/statuses; never unknown-message substrings.
-- [ ] Add shared accessible field-error and notice presentation.
-- [ ] Add invalid-state styles without visual redesign.
-- [ ] Run focused auth integration tests and confirm shared-contract cases pass.
-- [ ] Release shared-contract lock after controller inspection.
+- [x] Add minimal typed helpers needed by failing tests.
+- [x] Keep error classification based on explicit codes/statuses; never unknown-message substrings.
+- [x] Add shared accessible field-error and notice presentation.
+- [x] Add invalid-state styles without visual redesign.
+- [x] Run focused auth integration tests and confirm shared-contract cases pass.
+- [x] Release shared-contract lock after controller inspection.
 
 ### Task 3: Standard Auth Pages
 
@@ -78,11 +78,11 @@
 - Consumes Task 2 shared contract.
 - Produces schema-driven field errors, submit focus, mapped-server clearing, and transformed API values for standard forms.
 
-- [ ] Configure `revalidateLogic` and form-level Zod validators on each form.
-- [ ] Parse valid submissions with same Zod schema before API calls.
-- [ ] Wire first field error, ARIA state, mapped server errors, and edit clearing.
-- [ ] Preserve submit, redirect, copy, and native POST behavior.
-- [ ] Run focused integration and existing auth-page tests.
+- [x] Configure `revalidateLogic` and form-level Zod validators on each form.
+- [x] Parse valid submissions with same Zod schema before API calls.
+- [x] Wire first field error, ARIA state, mapped server errors, and edit clearing.
+- [x] Preserve submit, redirect, copy, and native POST behavior.
+- [x] Run focused integration and existing auth-page tests.
 
 ### Task 4: Verification And Username Pages
 
@@ -94,12 +94,12 @@
 - Consumes Task 2 shared contract.
 - Produces intent-aware email-change validation and authoritative username-submit errors without background focus changes.
 
-- [ ] Configure verification and username forms with required validation timing.
-- [ ] Keep Send code validation limited to `newEmail`.
-- [ ] Validate `newEmail` plus `otp` for Confirm.
-- [ ] Exclude read-only email from invalid focus.
-- [ ] Keep background username availability informational; map authoritative submit failures only.
-- [ ] Run focused integration and existing auth-page tests.
+- [x] Configure verification and username forms with required validation timing.
+- [x] Keep Send code validation limited to `newEmail`.
+- [x] Validate `newEmail` plus `otp` for Confirm.
+- [x] Exclude read-only email from invalid focus.
+- [x] Keep background username availability informational; map authoritative submit failures only.
+- [x] Run focused integration and existing auth-page tests.
 
 ### Task 5: Integration, Review, QA, Current-State Docs
 
@@ -107,15 +107,15 @@
 - Modify after QA only: `TODO.md`
 - Modify as execution tracker: this plan.
 
-- [ ] Run focused integration tests and existing auth tests.
-- [ ] Run `pnpm test`.
-- [ ] Run `pnpm exec tsc --noEmit`.
-- [ ] Run `pnpm build`.
-- [ ] Run Fallow and inspect findings.
-- [ ] Run `git diff --check` and scoped diff review.
-- [ ] Run findings-first spec review and mandatory auth thermo review.
-- [ ] Browser QA at 390, 768, and 1280 widths: blur/change timing, mouse and keyboard submit, focus order and no stealing, inline versus form errors, ARIA, console, and network.
-- [ ] Update TODO current state only after QA passes.
+- [x] Run focused integration tests and existing auth tests.
+- [x] Run `pnpm test`.
+- [x] Run `pnpm exec tsc --noEmit`.
+- [x] Run `pnpm build`.
+- [x] Run Fallow and inspect findings.
+- [x] Run `git diff --check` and scoped diff review.
+- [x] Run findings-first spec review and mandatory auth thermo review.
+- [x] Browser QA at 390, 768, and 1280 widths: blur/change timing, mouse and keyboard submit, focus order and no stealing, inline versus form errors, ARIA, console, and network.
+- [x] Update TODO current state only after QA passes.
 
 ## Ownership And Locks
 

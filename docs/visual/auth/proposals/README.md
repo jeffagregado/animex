@@ -5,7 +5,7 @@ Source of truth for missing auth page visuals. Existing locked refs stay:
 - `docs/visual/auth/auth-desktop-sign-in.png`
 - `docs/visual/auth/auth-mobile-create-account.png`
 
-These proposal refs cover the remaining auth pages:
+These proposal refs cover the auth pages:
 
 - `auth-proposal-verify-email-desktop.png`
 - `auth-proposal-verify-email-mobile.png`

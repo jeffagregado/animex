@@ -12,6 +12,8 @@ Status: PASS. 18 files / 138 tests; TypeScript; client + SSR build; `git diff --
 
 ## Phase 2 Formal Closure Validation
 
+Phase 2 closed on `dev` at commit `f7e0c58`.
+
 - [x] Trace Phase 2 requirements to implementation and tests.
 - [x] Review auth security, state transitions, and edge cases.
 - [x] Run maintainability and TanStack Start boundary review.
@@ -21,7 +23,7 @@ Status: PASS. 18 files / 138 tests; TypeScript; client + SSR build; `git diff --
 
 ## Phase 2 Formal Closure Status
 
-Implementation branch: `jeff-cx/phase-2-auth-closure`
+Implementation branch: merged to `dev`; source feature branch deleted after merge.
 
 - [x] Lock shared auth/error/return contracts. Owner: controller + worker.
 - [x] Implement durable Convex auth security and lifecycle. Owner: worker.
@@ -29,7 +31,7 @@ Implementation branch: `jeff-cx/phase-2-auth-closure`
 - [x] Complete independent review, browser, Google, and Resend QA. Owner: reviewer + QA.
 - [x] Publish closure verdict and current auth-flow UX summary. Owner: controller.
 
-Root gates: 17 files / 132 tests pass; TypeScript; client + SSR build; Convex dev push after temporary harness removal; `git diff --check`; Fallow complexity 0; duplicate scan 0. Known `react-dom` test-only Fallow false-positive warning remains.
+Root gates: 18 files / 138 tests pass; TypeScript; client + SSR build; Convex dev push after temporary harness removal; `git diff --check`; Fallow complexity 0; duplicate scan 0. Known `react-dom` test-only Fallow false-positive warning remains.
 
 Live UX: desktop, mobile, and tablet clean; sanitized OAuth callback; JavaScript-disabled native auth forms submit by POST without email/password in URL; hydrated password sign-in returns Home; current Resend sandbox verification OTP delivered and previewed; verify/profile complete; email correction old → new uses one delivered and previewed OTP then profile; reset link delivered and previewed; password-change security notice delivered; old password rejected and new password accepted; returning Google sign-in returns Home; console clean.
 
@@ -39,7 +41,7 @@ QA cleanup: two smoke identities inspected and cleaned; post-inspect counts are 
 
 Non-blocking QA note: in-app browser keyboard Tab command did not advance focus; semantics, roles, labels, and native controls reviewed, and QA marked this non-blocking.
 
-Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified production domain; abrupt avatar store termination can leave an orphan window; intentionally dirty unstaged branch carries integration risk.
+Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified production domain; abrupt avatar store termination can leave an orphan window.
 
 - [x] [P1] Make Better Fetch auth endpoint failures block caller success paths.
 - [x] [P1] Keep password-reset session revocation independent from security-notice email delivery.
