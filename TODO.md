@@ -649,3 +649,13 @@ Status: COMPLETE.
 - [x] Generate and inspect six dedicated image references.
 - [x] Save final assets under `docs/visual/anime-details/`.
 - [x] Commit approved visual references on `jeff-cx/phase-4-tab-visuals`.
+
+# Phase 4 Anime Detail Layout Consistency
+
+Status: design approved; written spec ready for review.
+
+- [x] Compare Reviews, Characters, and Staff references.
+- [x] Select Staff desktop as canonical shared shell.
+- [x] Lock stable desktop shell, sidebar, controls, tabs, and responsive translation.
+- [x] Define tab-content boundaries and implementation constraints.
+- [x] Write and self-review consistency specification.
