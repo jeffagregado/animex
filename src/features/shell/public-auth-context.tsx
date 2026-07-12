@@ -1,0 +1,25 @@
+import { createContext, useContext, type ReactNode } from 'react'
+
+import { type ClientAuthState, useAuthState } from '../auth/use-auth-state'
+
+const PublicAuthStateContext = createContext<ClientAuthState | null>(null)
+
+type PublicAuthStateProviderProps = {
+  children: ReactNode
+}
+
+/** Reads public auth state once for all public shell consumers. */
+export function PublicAuthStateProvider({ children }: PublicAuthStateProviderProps) {
+  const authState = useAuthState()
+
+  return <PublicAuthStateContext.Provider value={authState}>{children}</PublicAuthStateContext.Provider>
+}
+
+/** Returns the auth state supplied by the public shell boundary. */
+export const usePublicAuthState = (): ClientAuthState => {
+  const authState = useContext(PublicAuthStateContext)
+  if (authState === null) {
+    throw new Error('Public auth state is required inside PublicShell.')
+  }
+  return authState
+}

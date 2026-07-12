@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { type AuthState } from '../auth/profile-actions'
+import { PublicAuthStateProvider } from '../shell/public-auth-context'
 import { HomePage } from './home-page'
 
 const mockAuthState = (state: AuthState): void => {
@@ -25,30 +26,22 @@ const mockPendingAuthState = (): void => {
   )
 }
 
-const getHeaderQueries = () => {
-  const header = document.querySelector('header')
-  if (header === null) {
-    throw new Error('Expected home page header.')
-  }
-  return within(header)
-}
-
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
 })
 
 describe('HomePage', () => {
-  it('renders the AnimeX shell navigation and feed preview', () => {
+  it('renders content without duplicating the public shell', () => {
     mockAuthState({
       status: 'signedOut',
     })
 
-    render(<HomePage />)
+    render(<PublicAuthStateProvider><HomePage /></PublicAuthStateProvider>)
 
-    expect(screen.getByRole('link', { name: /AnimeX/i })).toBeTruthy()
-    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeTruthy()
-    expect(screen.getByRole('navigation', { name: 'Mobile' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /AnimeX/i })).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Mobile' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Community' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Stats' })).toBeNull()
     expect(screen.getByRole('heading', { name: 'Seasonal Anime' })).toBeTruthy()
@@ -60,36 +53,27 @@ describe('HomePage', () => {
     expect(screen.queryByText('Profile')).toBeNull()
   })
 
-  it('shows sign-in action for signed-out users', async () => {
+  it('shows no shell auth controls for signed-out users', () => {
     mockAuthState({
       status: 'signedOut',
     })
 
-    render(<HomePage />)
+    render(<PublicAuthStateProvider><HomePage /></PublicAuthStateProvider>)
 
     expect(screen.queryByRole('button', { name: 'Auth' })).toBeNull()
 
-    await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Sign in' })).toBeTruthy()
-    })
-
-    const header = getHeaderQueries()
-    expect(header.getByRole('button', { name: 'Search' })).toBeTruthy()
-    expect(header.queryByRole('button', { name: 'Notifications' })).toBeNull()
-    expect(header.queryByRole('button', { name: 'Profile' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull()
   })
 
-  it('shows a header auth skeleton while auth state loads', () => {
+  it('does not render shell loading chrome while auth state loads', () => {
     mockPendingAuthState()
 
-    render(<HomePage />)
+    render(<PublicAuthStateProvider><HomePage /></PublicAuthStateProvider>)
 
-    const header = getHeaderQueries()
-    expect(header.queryByRole('link', { name: 'Sign in' })).toBeNull()
-    expect(document.querySelector('[data-testid="header-auth-skeleton"]')).toBeTruthy()
+    expect(document.querySelector('[data-testid="header-auth-skeleton"]')).toBeNull()
   })
 
-  it('shows sign-out action for signed-in users', async () => {
+  it('shows private content for signed-in users', async () => {
     mockAuthState({
       status: 'complete',
       email: 'mika@example.com',
@@ -102,16 +86,9 @@ describe('HomePage', () => {
       },
     })
 
-    render(<HomePage />)
+    render(<PublicAuthStateProvider><HomePage /></PublicAuthStateProvider>)
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
-    })
-
-    const header = getHeaderQueries()
-    expect(header.getByRole('button', { name: 'Search' })).toBeTruthy()
-    expect(header.getByRole('button', { name: 'Notifications' })).toBeTruthy()
-    expect(header.getByRole('button', { name: 'Profile' })).toBeTruthy()
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'My Anime' })).toBeTruthy())
     expect(screen.getByRole('heading', { name: 'My Anime' })).toBeTruthy()
     expect(screen.getByText('What are you watching?')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Following' })).toBeTruthy()
@@ -126,16 +103,9 @@ describe('HomePage', () => {
       suggestedUsername: null,
     })
 
-    render(<HomePage />)
+    render(<PublicAuthStateProvider><HomePage /></PublicAuthStateProvider>)
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
-    })
-
-    const header = getHeaderQueries()
-    expect(header.getByRole('button', { name: 'Search' })).toBeTruthy()
-    expect(header.queryByRole('button', { name: 'Notifications' })).toBeNull()
-    expect(header.queryByRole('button', { name: 'Profile' })).toBeNull()
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Seasonal Anime' })).toBeTruthy())
     expect(screen.queryByText('What are you watching?')).toBeNull()
   })
 })

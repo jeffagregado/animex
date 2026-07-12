@@ -1,0 +1,60 @@
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import type { AnimeSummary } from '../shared/discover-contracts'
+import { DiscoverSectionRail } from './discover-section'
+
+const anime: AnimeSummary = {
+  anilistId: 1, slug: 'frieren', titles: { display: 'Frieren', english: 'Frieren', romaji: 'Sousou no Frieren', native: null }, coverImageUrl: 'https://example.test/first.jpg', bannerImageUrl: null, format: 'TV', season: 'FALL', seasonYear: 2023, episodes: 28, genres: ['Adventure'], popularity: 1, averageScore: 90, trending: 2, startDate: null, nextAiringAt: null,
+}
+
+afterEach(() => {
+  cleanup()
+})
+
+describe('DiscoverSectionRail', () => {
+  it('shows a clear section error and retries only that section', () => {
+    const onRetry = vi.fn()
+
+    render(
+      <DiscoverSectionRail
+        title="Trending Anime"
+        state={{ status: 'error', key: 'trending', code: 'UPSTREAM', retryAfterSeconds: null }}
+        onRetry={onRetry}
+        isRetrying={false}
+        retryError={null}
+      />,
+    )
+
+    expect(screen.getByRole('alert').textContent).toContain('Trending Anime is unavailable.')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Trending Anime' }))
+    expect(onRetry).toHaveBeenCalledWith('trending')
+  })
+
+  it('disables only its retry control while a refresh is pending', () => {
+    render(
+      <DiscoverSectionRail
+        title="Trending Anime"
+        state={{ status: 'error', key: 'trending', code: 'UPSTREAM', retryAfterSeconds: null }}
+        onRetry={vi.fn()}
+        isRetrying={true}
+        retryError={null}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Retry Trending Anime' })).toHaveProperty('disabled', true)
+  })
+
+  it('resets a failed rail image when the same anime receives a new cover URL', () => {
+    const props = { title: 'Trending Anime', onRetry: vi.fn(), isRetrying: false, retryError: null }
+    const view = render(<DiscoverSectionRail {...props} state={{ status: 'ready', section: { key: 'trending', items: [anime], refreshedAt: 1, expiresAt: 2 } }} />)
+
+    fireEvent.error(screen.getByAltText('Frieren cover'))
+    expect(screen.getByText('Image unavailable')).toBeTruthy()
+    view.rerender(<DiscoverSectionRail {...props} state={{ status: 'ready', section: { key: 'trending', items: [{ ...anime, coverImageUrl: 'https://example.test/second.jpg' }], refreshedAt: 1, expiresAt: 2 } }} />)
+
+    expect(screen.getByAltText('Frieren cover').getAttribute('src')).toBe('https://example.test/second.jpg')
+  })
+})

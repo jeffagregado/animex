@@ -9,7 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as HomeRouteImport } from './routes/home'
+import { Route as PublicRouteRouteImport } from './routes/_public/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthVerifyEmailRouteImport } from './routes/auth/verify-email'
 import { Route as AuthUsernameRouteImport } from './routes/auth/username'
@@ -19,14 +19,15 @@ import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-passw
 import { Route as AuthOauthUsernameRouteImport } from './routes/auth/oauth-username'
 import { Route as AuthOauthCallbackRouteImport } from './routes/auth/oauth-callback'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
+import { Route as PublicHomeRouteImport } from './routes/_public/home'
+import { Route as PublicDiscoverRouteImport } from './routes/_public/discover'
 import { Route as ApiProfileStateRouteImport } from './routes/api/profile/state'
 import { Route as ApiProfileCompleteRouteImport } from './routes/api/profile/complete'
 import { Route as ApiProfileCheckUsernameRouteImport } from './routes/api/profile/check-username'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
-const HomeRoute = HomeRouteImport.update({
-  id: '/home',
-  path: '/home',
+const PublicRouteRoute = PublicRouteRouteImport.update({
+  id: '/_public',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -74,6 +75,16 @@ const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
   path: '/auth/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PublicHomeRoute = PublicHomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicDiscoverRoute = PublicDiscoverRouteImport.update({
+  id: '/discover',
+  path: '/discover',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
 const ApiProfileStateRoute = ApiProfileStateRouteImport.update({
   id: '/api/profile/state',
   path: '/api/profile/state',
@@ -97,7 +108,8 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/home': typeof HomeRoute
+  '/discover': typeof PublicDiscoverRoute
+  '/home': typeof PublicHomeRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/oauth-callback': typeof AuthOauthCallbackRoute
   '/auth/oauth-username': typeof AuthOauthUsernameRoute
@@ -113,7 +125,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/home': typeof HomeRoute
+  '/discover': typeof PublicDiscoverRoute
+  '/home': typeof PublicHomeRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/oauth-callback': typeof AuthOauthCallbackRoute
   '/auth/oauth-username': typeof AuthOauthUsernameRoute
@@ -130,7 +143,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/home': typeof HomeRoute
+  '/_public': typeof PublicRouteRouteWithChildren
+  '/_public/discover': typeof PublicDiscoverRoute
+  '/_public/home': typeof PublicHomeRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/oauth-callback': typeof AuthOauthCallbackRoute
   '/auth/oauth-username': typeof AuthOauthUsernameRoute
@@ -148,6 +163,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/discover'
     | '/home'
     | '/auth/forgot-password'
     | '/auth/oauth-callback'
@@ -164,6 +180,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/discover'
     | '/home'
     | '/auth/forgot-password'
     | '/auth/oauth-callback'
@@ -180,7 +197,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/home'
+    | '/_public'
+    | '/_public/discover'
+    | '/_public/home'
     | '/auth/forgot-password'
     | '/auth/oauth-callback'
     | '/auth/oauth-username'
@@ -197,7 +216,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  HomeRoute: typeof HomeRoute
+  PublicRouteRoute: typeof PublicRouteRouteWithChildren
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthOauthCallbackRoute: typeof AuthOauthCallbackRoute
   AuthOauthUsernameRoute: typeof AuthOauthUsernameRoute
@@ -214,11 +233,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/home': {
-      id: '/home'
-      path: '/home'
-      fullPath: '/home'
-      preLoaderRoute: typeof HomeRouteImport
+    '/_public': {
+      id: '/_public'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof PublicRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -284,6 +303,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_public/home': {
+      id: '/_public/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof PublicHomeRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/discover': {
+      id: '/_public/discover'
+      path: '/discover'
+      fullPath: '/discover'
+      preLoaderRoute: typeof PublicDiscoverRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
     '/api/profile/state': {
       id: '/api/profile/state'
       path: '/api/profile/state'
@@ -315,9 +348,23 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface PublicRouteRouteChildren {
+  PublicDiscoverRoute: typeof PublicDiscoverRoute
+  PublicHomeRoute: typeof PublicHomeRoute
+}
+
+const PublicRouteRouteChildren: PublicRouteRouteChildren = {
+  PublicDiscoverRoute: PublicDiscoverRoute,
+  PublicHomeRoute: PublicHomeRoute,
+}
+
+const PublicRouteRouteWithChildren = PublicRouteRoute._addFileChildren(
+  PublicRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  HomeRoute: HomeRoute,
+  PublicRouteRoute: PublicRouteRouteWithChildren,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthOauthCallbackRoute: AuthOauthCallbackRoute,
   AuthOauthUsernameRoute: AuthOauthUsernameRoute,

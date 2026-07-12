@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as animeCache from "../animeCache.js";
+import type * as animeCachePolicy from "../animeCachePolicy.js";
 import type * as auth from "../auth.js";
 import type * as authEmailDelivery from "../authEmailDelivery.js";
 import type * as authEmails from "../authEmails.js";
@@ -38,6 +40,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  animeCache: typeof animeCache;
+  animeCachePolicy: typeof animeCachePolicy;
   auth: typeof auth;
   authEmailDelivery: typeof authEmailDelivery;
   authEmails: typeof authEmails;

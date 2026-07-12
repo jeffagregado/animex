@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
 const authClientMock = vi.hoisted(() => ({
@@ -22,6 +23,12 @@ vi.mock('../../lib/auth-client', () => ({
 
 vi.mock('./auth-navigation', () => ({
   navigateToAuthPath: navigateToAuthPathMock,
+}))
+
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ activeOptions: _activeOptions, activeProps: _activeProps, children, hash, to, ...props }: { activeOptions?: unknown, activeProps?: unknown, children: ReactNode, hash?: string, to: string }) => (
+    <a href={`${to}${hash === undefined ? '' : `#${hash}`}`} {...props}>{children}</a>
+  ),
 }))
 
 import { SignInPage } from './sign-in-page'

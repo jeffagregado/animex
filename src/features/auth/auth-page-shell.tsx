@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 
 import { AsyncButton } from '../../components/async-button'
 import { AnimeXLogo } from '../shell/animex-logo'
-import { authNavigationItems } from '../shell/navigation'
+import { mainNavigationItems } from '../shell/navigation'
 import { SiteHeader } from '../shell/site-header'
 
 export function AuthPageShell({
@@ -19,7 +19,7 @@ export function AuthPageShell({
 }) {
   return (
     <main className="auth-page">
-      <SiteHeader activeLabel={null} navItems={authNavigationItems} showAuthAction={false} />
+      <SiteHeader navItems={mainNavigationItems} showAuthAction={false} />
       <div className="auth-poster-grid" aria-hidden="true">
         <span />
         <span />

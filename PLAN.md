@@ -92,12 +92,18 @@ Convex env already available:
 
 ### Phase 3: AniList And Discover
 
-- Add AniList GraphQL action helpers.
-- Add metadata normalization and canonical `anilistId`.
-- Add slug generation from AniList title metadata.
-- Add Discover section caches for Trending, Seasonal, Recommendations, and local Genres.
-- Discover stores lightweight summaries only.
-- Stop after validation and wait for approval.
+- Add server-only TanStack Start AniList GraphQL helpers. Never call AniList from browser or Convex actions.
+- Add metadata normalization, canonical numeric `anilistId`, and Unicode-safe title slugs.
+- Store lightweight anime summaries and ordered Discover caches through Convex queries/mutations only.
+- Cache Trending for 3 hours, Upcoming for 6 hours, and Seasonal/Recommendations for 24 hours.
+- Add public `/discover` under shared `_public/route.tsx` layout.
+- Build approved desktop/mobile Trending, Seasonal, Genres, Popular Recommendations, This Week, Upcoming, Top Genres desktop module, and future Manga placeholder.
+- Add inline anime-only AniList search with genre, format, season, year, sort, and infinite pagination.
+  - Keep cards non-interactive until Phase 4 anime detail routes exist.
+  - Run schema push, route generation, automated gates, review, and responsive browser QA.
+  - Stop after validation and wait for approval.
+
+Phase 3 status: COMPLETE on `dev`; final integrated review PASS with no findings. Validation: 212 tests pass / 2 skipped; TypeScript, build, route generation, Convex dev push, Fallow new-only audit, client endpoint scan, two live AniList tests, and responsive browser QA pass. Phase 4 remains paused until approval.
 
 ### Phase 4: Anime Detail
 

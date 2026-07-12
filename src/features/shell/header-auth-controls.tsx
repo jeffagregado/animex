@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { LogIn, LogOut } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 
 import { AsyncButton } from '../../components/async-button'
 import { authClient } from '../../lib/auth-client'
 import { assertAuthResponse } from '../auth/auth-actions'
-import { isCompleteAuthState, useAuthState } from '../auth/use-auth-state'
+import { isCompleteAuthState } from '../auth/use-auth-state'
 import { headerActionItems } from './navigation'
+import { usePublicAuthState } from './public-auth-context'
 
 type HeaderAuthView = 'loading' | 'signedOut' | 'pending' | 'complete' | 'error'
 
-const getHeaderAuthView = (state: ReturnType<typeof useAuthState>): HeaderAuthView => {
+const getHeaderAuthView = (state: ReturnType<typeof usePublicAuthState>): HeaderAuthView => {
   if (state.status === 'loading') {
     return 'loading'
   }
@@ -22,19 +24,16 @@ const getHeaderAuthView = (state: ReturnType<typeof useAuthState>): HeaderAuthVi
   return isCompleteAuthState(state.authState) ? 'complete' : 'pending'
 }
 
-const isHeaderActionVisible = (label: string, view: HeaderAuthView): boolean => {
-  if (label === 'Search') {
-    return true
-  }
-  return view === 'complete'
+const isHeaderActionVisible = (label: string): boolean => {
+  return label === 'Search'
 }
 
 export function HeaderAuthControls() {
-  const authState = useAuthState()
+  const authState = usePublicAuthState()
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
   const view = getHeaderAuthView(authState)
-  const visibleActions = headerActionItems.filter((item) => isHeaderActionVisible(item.label, view))
+  const visibleActions = headerActionItems.filter((item) => isHeaderActionVisible(item.label))
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
@@ -53,15 +52,16 @@ export function HeaderAuthControls() {
   return (
     <>
       {visibleActions.map((item) => (
-        <button
+        <Link
           className="icon-button"
-          type="button"
+          to={item.href}
+          hash={item.hash}
           aria-label={item.label}
           data-header-action={item.label}
           key={item.label}
         >
           <item.icon aria-hidden="true" className="size-5" />
-        </button>
+        </Link>
       ))}
       {view === 'loading' ? (
         <span className="header-auth-skeleton" data-testid="header-auth-skeleton" aria-hidden="true" />

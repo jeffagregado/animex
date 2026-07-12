@@ -1,5 +1,17 @@
 # TODO
 
+## Phase 3 AniList And Discover
+
+- [x] Persist approved Phase 3 design, implementation plan, and canonical Discover references. Owner: controller.
+- [x] Lock normalized anime, section, cache, search, error, slug, season, and TTL contracts through red-green tests. Owner: controller.
+- [x] Add Convex summary/cache/lease tables with validated queries and mutations; no Convex actions. Owner: cache worker.
+- [x] Add server-only AniList transport, normalization, section refresh, retries, errors, and live search. Owner: server worker.
+- [x] Move Home and Discover under shared `_public/route.tsx` shell and regenerate routes. Owner: route worker.
+- [x] Build approved responsive Discover UI, complete states, filters, and infinite search. Owner: UI worker.
+- [x] Run spec review, thermo review, full validation, live AniList smoke, responsive browser QA, docs/data-flow sync, and final integrated review. Final review PASS with no findings. Owner: controller + reviewer + QA.
+
+Status: COMPLETE on `dev`; final integrated review PASS with no findings. Phase 4 paused and not started.
+
 ## Auth Form Field Errors
 
 - [x] Add integration coverage for validation timing, focus, ARIA, roles, server mapping, intent handling, and transformed values. Owner: controller.
