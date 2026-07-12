@@ -610,3 +610,13 @@ Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified 
 - [x] Decide whether profiles use favorite anime, and if yes, what limit they use.
 - [x] Decide anime stats shown on profiles.
 - [x] Decide whether profile anime stats include On Hold.
+# Discover Feedback Fixes
+
+Status: in progress.
+
+- [ ] Theme filter selects. Remove native white hover/arrow surface.
+- [ ] Add one-step Clear filters. Preserve search query.
+- [ ] Add reusable controlled horizontal rails to Trending, Seasonal, Recommendations.
+- [ ] Add RED/GREEN tests for filters and rail behavior.
+- [ ] Run full automated gates, responsive browser QA, and review.
+- [ ] Commit verified implementation on `jeff-cx/phase-3-feedback`.
