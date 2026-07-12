@@ -612,7 +612,7 @@ Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified 
 - [x] Decide whether profile anime stats include On Hold.
 # Discover Feedback Fixes
 
-Status: in progress.
+Status: COMPLETE.
 
 - [x] Theme filter selects. Remove native white hover/arrow surface.
 - [x] Add one-step Clear filters. Preserve search query.
