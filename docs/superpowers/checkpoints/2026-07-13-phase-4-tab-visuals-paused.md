@@ -2,7 +2,7 @@
 
 Branch: `jeff-cx/phase-4-tab-visuals`
 
-State: five of six references generated, inspected, and saved. Mobile Staff reference blocked by image-generation service network failure.
+State: resolved. All six references generated, inspected, and saved.
 
 ## Complete
 
@@ -19,4 +19,4 @@ Three Mobile Staff attempts failed. No partial Mobile Staff file exists.
 
 ## Resume
 
-Generate `docs/visual/anime-details/anime-details-staff-mobile-frieren.png` from approved spec and plan. Inspect all six together, close `TODO.md`, run `git diff --check`, then commit final closure.
+No resume action. Mobile Staff generation succeeded on later retry; tab-label correction restored required Overview, Reviews, Characters, Staff order.
