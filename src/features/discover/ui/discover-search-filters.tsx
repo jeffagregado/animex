@@ -1,5 +1,14 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { ChevronDown, ListFilter, Search } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { ListFilter, Search } from 'lucide-react'
+
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '#/components/ui/select.tsx'
 
 import {
   DISCOVER_GENRES,
@@ -24,9 +33,9 @@ type SearchSelectProps<TValue extends string> = {
 
 type ThemedSelectProps = {
   label: string
-  value: string | number | null
+  value: string | null
   children: ReactNode
-  onChange: (value: string) => void
+  onChange: (value: string | null) => void
 }
 
 const animeFormats: readonly AnimeFormat[] = ['TV', 'TV_SHORT', 'MOVIE', 'SPECIAL', 'OVA', 'ONA', 'MUSIC']
@@ -42,21 +51,19 @@ const getQueryError = (query: string): string | null => {
   return null
 }
 
-/** Renders a dark select with a consistent themed arrow. */
+/** Renders a URL-controlled dark select. */
 function ThemedSelect({ label, value, children, onChange }: ThemedSelectProps) {
   return (
     <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
       {label}
-      <span className="relative">
-        <select
-          className="h-10 w-full appearance-none rounded-lg border border-border bg-background px-3 pr-10 text-sm text-foreground outline-none transition hover:border-cyan-300 hover:bg-cyan-300/5 focus-visible:border-cyan-300 focus-visible:ring-2 focus-visible:ring-cyan-300/40"
-          value={value ?? ''}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {children}
-        </select>
-        <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-cyan-300" />
-      </span>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue placeholder="Any" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>{children}</SelectGroup>
+        </SelectContent>
+      </Select>
     </label>
   )
 }
@@ -64,9 +71,9 @@ function ThemedSelect({ label, value, children, onChange }: ThemedSelectProps) {
 /** Renders a URL-controlled searchable filter select. */
 function SearchSelect<TValue extends string>({ label, value, options, onChange }: SearchSelectProps<TValue>) {
   return (
-    <ThemedSelect label={label} value={value} onChange={(nextValue) => onChange(nextValue === '' ? null : nextValue as TValue)}>
-        <option value="">Any</option>
-        {options.map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}
+    <ThemedSelect label={label} value={value} onChange={(nextValue) => onChange(nextValue as TValue | null)}>
+      <SelectItem value={null}>Any</SelectItem>
+      {options.map((option) => <SelectItem key={option} value={option}>{option.replaceAll('_', ' ')}</SelectItem>)}
     </ThemedSelect>
   )
 }
@@ -145,8 +152,9 @@ export function DiscoverSearchFilters({ searchState, onStateChange }: DiscoverSe
             <SearchSelect label="Genre" value={searchState.genre} options={DISCOVER_GENRES} onChange={(value) => updateFilter('genre', value as AnimeGenre | null)} />
             <SearchSelect label="Format" value={searchState.format} options={animeFormats} onChange={(value) => updateFilter('format', value as AnimeFormat | null)} />
             <SearchSelect label="Season" value={searchState.season} options={animeSeasons} onChange={(value) => updateFilter('season', value as AnimeSeason | null)} />
-            <ThemedSelect label="Year" value={searchState.year} onChange={(value) => updateFilter('year', value === '' ? null : Number(value))}>
-                <option value="">Any</option>{years.map((year) => <option key={year} value={year}>{year}</option>)}
+            <ThemedSelect label="Year" value={searchState.year === null ? null : String(searchState.year)} onChange={(value) => updateFilter('year', value === null ? null : Number(value))}>
+              <SelectItem value={null}>Any</SelectItem>
+              {years.map((year) => <SelectItem key={year} value={String(year)}>{year}</SelectItem>)}
             </ThemedSelect>
             <SearchSelect label="Sort" value={searchState.sort} options={animeSorts} onChange={(value) => updateFilter('sort', value as AnimeSearchSort)} />
             {hasActiveFilters ? <button className="col-span-2 rounded-lg border border-cyan-400/50 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-100 outline-none transition hover:border-cyan-300 hover:bg-cyan-300/20 focus-visible:ring-2 focus-visible:ring-cyan-300/40" type="button" onClick={clearFilters}>Clear filters</button> : null}

@@ -15,6 +15,11 @@ const searchState: DiscoverUrlSearchState = {
   sort: 'relevance',
 }
 
+const chooseOption = (option: HTMLElement): void => {
+  fireEvent.pointerDown(option, { pointerType: 'mouse' })
+  fireEvent.click(option)
+}
+
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
@@ -43,12 +48,21 @@ describe('DiscoverSearchFilters', () => {
     )
   })
 
-  it('uses push navigation for selected filters', () => {
+  it('opens genre choices in a themed popup and selects a normal value', () => {
     const onStateChange = vi.fn()
 
     render(<DiscoverSearchFilters searchState={searchState} onStateChange={onStateChange} />)
 
-    fireEvent.change(screen.getByLabelText('Genre'), { target: { value: 'Action' } })
+    const trigger = screen.getByRole('combobox', { name: 'Genre' })
+    fireEvent.click(trigger)
+
+    const popup = document.querySelector<HTMLElement>('[data-slot="select-content"]')
+    const action = screen.getByRole('option', { name: 'Action' })
+    expect(trigger.className).toContain('hover:border-cyan-300')
+    expect(popup?.className).toContain('bg-card')
+    expect(action.className).toContain('data-[highlighted]:bg-cyan-300/10')
+
+    chooseOption(action)
 
     expect(onStateChange).toHaveBeenCalledWith(
       { ...searchState, genre: 'Action' },
@@ -56,16 +70,33 @@ describe('DiscoverSearchFilters', () => {
     )
   })
 
-  it('renders every filter select with themed native-arrow replacement styles', () => {
-    render(<DiscoverSearchFilters searchState={searchState} onStateChange={vi.fn()} />)
+  it('maps Any choices to null and renders a selected indicator', () => {
+    const onStateChange = vi.fn()
+    render(<DiscoverSearchFilters searchState={{ ...searchState, genre: 'Action' }} onStateChange={onStateChange} />)
 
-    const filters = ['Genre', 'Format', 'Season', 'Year', 'Sort']
-    for (const label of filters) {
-      const select = screen.getByLabelText(label)
-      expect(select.className).toContain('appearance-none')
-      expect(select.className).toContain('hover:border-cyan-300')
-      expect(select.className).toContain('focus-visible:ring-cyan-300/40')
-    }
+    fireEvent.click(screen.getByRole('combobox', { name: 'Genre' }))
+
+    expect(screen.getByRole('option', { name: 'Action' }).querySelector('[data-slot="select-item-indicator"]')).not.toBeNull()
+    chooseOption(screen.getByRole('option', { name: 'Any' }))
+
+    expect(onStateChange).toHaveBeenCalledWith(
+      { ...searchState, genre: null },
+      'push',
+    )
+  })
+
+  it('converts year selection strings to numbers', () => {
+    const onStateChange = vi.fn()
+    const year = new Date().getFullYear() - 1
+    render(<DiscoverSearchFilters searchState={searchState} onStateChange={onStateChange} />)
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Year' }))
+    chooseOption(screen.getByRole('option', { name: String(year) }))
+
+    expect(onStateChange).toHaveBeenCalledWith(
+      { ...searchState, year },
+      'push',
+    )
   })
 
   it('shows Clear filters only for active filters and resets them in one push without clearing the query', () => {

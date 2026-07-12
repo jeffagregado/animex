@@ -49,6 +49,24 @@ afterEach(() => {
 })
 
 describe('DiscoverSearchResults', () => {
+  it('renders an average score badge', async () => {
+    serverMocks.searchAnime.mockResolvedValueOnce(page([anime], 1, false))
+
+    renderResults()
+
+    expect(await screen.findByText('90%')).toBeTruthy()
+    expect(screen.getByLabelText('Average score: 90 percent')).toBeTruthy()
+  })
+
+  it('renders an unavailable average score badge', async () => {
+    serverMocks.searchAnime.mockResolvedValueOnce(page([{ ...anime, averageScore: null }], 1, false))
+
+    renderResults()
+
+    expect(await screen.findByText('—')).toBeTruthy()
+    expect(screen.getByLabelText('Average score unavailable')).toBeTruthy()
+  })
+
   it('keeps loaded results visible and exposes a specific retry when next page fails', async () => {
     serverMocks.searchAnime.mockResolvedValueOnce(page([anime], 1, true)).mockRejectedValueOnce({ code: 'RATE_LIMITED', retryAfterSeconds: 12 })
 

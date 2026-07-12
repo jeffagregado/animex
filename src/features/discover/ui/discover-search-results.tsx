@@ -54,12 +54,14 @@ const dedupeSearchResults = (pages: { items: AnimeSummary[] }[]): AnimeSummary[]
 function SearchResultCard({ anime }: SearchResultCardProps) {
   const [hasImageError, setHasImageError] = useState(false)
   const imageUrl = anime.coverImageUrl
+  const scoreLabel = anime.averageScore === null ? 'Average score unavailable' : `Average score: ${anime.averageScore} percent`
+  const score = anime.averageScore === null ? '—' : `${anime.averageScore}%`
 
   useEffect(() => {
     setHasImageError(false)
   }, [imageUrl])
 
-  return <article className="flex min-w-0 gap-3 rounded-lg border border-border bg-card p-3"><div className="h-20 w-14 shrink-0 overflow-hidden rounded bg-muted">{imageUrl !== null && !hasImageError ? <img className="size-full object-cover" src={imageUrl} alt={`${anime.titles.display} cover`} onError={() => setHasImageError(true)} /> : <span className="flex size-full flex-col items-center justify-center gap-1 text-center text-[10px] text-muted-foreground"><ImageOff aria-hidden="true" className="size-4" />Image unavailable</span>}</div><div className="min-w-0"><h3 className="truncate font-bold">{anime.titles.display}</h3><p className="mt-1 text-sm text-muted-foreground">{anime.format?.replaceAll('_', ' ') ?? 'Anime'} · {anime.seasonYear ?? 'TBA'}</p><p className="mt-1 truncate text-xs text-muted-foreground">{anime.genres.join(' · ')}</p></div></article>
+  return <article className="relative flex min-w-0 gap-3 rounded-lg border border-border bg-card p-3"><div className="h-20 w-14 shrink-0 overflow-hidden rounded bg-muted">{imageUrl !== null && !hasImageError ? <img className="size-full object-cover" src={imageUrl} alt={`${anime.titles.display} cover`} onError={() => setHasImageError(true)} /> : <span className="flex size-full flex-col items-center justify-center gap-1 text-center text-[10px] text-muted-foreground"><ImageOff aria-hidden="true" className="size-4" />Image unavailable</span>}</div><div className="min-w-0 flex-1 pr-12"><h3 className="truncate font-bold">{anime.titles.display}</h3><p className="mt-1 text-sm text-muted-foreground">{anime.format?.replaceAll('_', ' ') ?? 'Anime'} · {anime.seasonYear ?? 'TBA'}</p><p className="mt-1 truncate text-xs text-muted-foreground">{anime.genres.join(' · ')}</p></div><span aria-label={scoreLabel} className="absolute right-3 top-3 rounded bg-muted px-1.5 py-0.5 text-xs font-bold tabular-nums">{score}</span></article>
 }
 
 /** Uses guarded infinite pagination for a valid URL search/filter state. */

@@ -620,3 +620,12 @@ Status: in progress.
 - [x] Add RED/GREEN tests for filters and rail behavior.
 - [x] Run full automated gates, responsive browser QA, and review.
 - [x] Commit verified implementation on `jeff-cx/phase-3-feedback`.
+
+# Discover Dropdown And Search Score Fix
+
+- [x] Add official shadcn Select backed by Base UI without changing the global shadcn preset.
+- [x] Replace native Discover filter selects and preserve controlled URL behavior.
+- [x] Add `averageScore` badges to search-result cards, using `—` when unavailable.
+- [x] Add RED/GREEN regression tests for dropdowns and scores.
+- [x] Run review, full automated gates, responsive browser QA, and console checks.
+- [x] Commit the verified follow-up on `jeff-cx/phase-3-feedback`.
