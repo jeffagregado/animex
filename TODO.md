@@ -638,3 +638,14 @@ Status: COMPLETE.
 - [x] Add RED/GREEN regression tests for both fixes.
 - [x] Run review, full automated gates, Chromium responsive QA, and console checks.
 - [x] Commit the verified fixes on `jeff-cx/phase-3-feedback`.
+
+# Phase 4 Tab Visual References
+
+Status: design approved; written spec awaiting review.
+
+- [x] Inspect approved Anime Detail desktop/mobile Overview references.
+- [x] Lock full-page Reviews, Characters, and Staff desktop/mobile design contract.
+- [x] Write and self-review visual specification.
+- [ ] Generate and inspect six dedicated image references.
+- [ ] Save final assets under `docs/visual/anime-details/`.
+- [ ] Commit approved visual references on `jeff-cx/phase-4-tab-visuals`.
