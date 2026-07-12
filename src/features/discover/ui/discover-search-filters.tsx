@@ -56,11 +56,11 @@ function ThemedSelect({ label, value, children, onChange }: ThemedSelectProps) {
   return (
     <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
       {label}
-      <Select value={value} onValueChange={onChange}>
+      <Select modal={false} value={value} onValueChange={onChange}>
         <SelectTrigger>
           <SelectValue placeholder="Any" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent alignItemWithTrigger={false}>
           <SelectGroup>{children}</SelectGroup>
         </SelectContent>
       </Select>

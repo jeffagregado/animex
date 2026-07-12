@@ -629,3 +629,12 @@ Status: in progress.
 - [x] Add RED/GREEN regression tests for dropdowns and scores.
 - [x] Run review, full automated gates, responsive browser QA, and console checks.
 - [x] Commit the verified follow-up on `jeff-cx/phase-3-feedback`.
+
+# Discover Dropdown Gutter And This Week Fidelity
+
+- [x] Create snapshot branch `jeff-cx/snapshot-before-discover-ui-fix-20260713`.
+- [x] Prevent filter dropdowns from replacing the page scrollbar with a white gutter.
+- [x] Match desktop This Week rows to `docs/visual/discover/discover-desktop.png`.
+- [x] Add RED/GREEN regression tests for both fixes.
+- [x] Run review, full automated gates, Chromium responsive QA, and console checks.
+- [x] Commit the verified fixes on `jeff-cx/phase-3-feedback`.

@@ -22,6 +22,7 @@ const chooseOption = (option: HTMLElement): void => {
 
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
   vi.useRealTimers()
 })
 
@@ -68,6 +69,52 @@ describe('DiscoverSearchFilters', () => {
       { ...searchState, genre: 'Action' },
       'push',
     )
+  })
+
+  it('does not lock body scroll when opening genre choices', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('CSS', { supports: () => false })
+    const originalDocumentElementClientWidth = Object.getOwnPropertyDescriptor(document.documentElement, 'clientWidth')
+    const originalBodyClientWidth = Object.getOwnPropertyDescriptor(document.body, 'clientWidth')
+    const originalInnerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth')
+    let unmount: (() => void) | null = null
+
+    try {
+      Object.defineProperties(document.documentElement, {
+        clientWidth: { configurable: true, value: 1422 },
+      })
+      Object.defineProperties(document.body, {
+        clientWidth: { configurable: true, value: 1422 },
+      })
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1437 })
+
+      const onStateChange = vi.fn()
+      const view = render(<DiscoverSearchFilters searchState={searchState} onStateChange={onStateChange} />)
+      unmount = view.unmount
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Genre' }))
+      vi.runAllTimers()
+
+      expect(document.body.style.overflow).not.toBe('hidden')
+    } finally {
+      unmount?.()
+      vi.runAllTimers()
+      if (originalDocumentElementClientWidth === undefined) {
+        Reflect.deleteProperty(document.documentElement, 'clientWidth')
+      } else {
+        Object.defineProperty(document.documentElement, 'clientWidth', originalDocumentElementClientWidth)
+      }
+      if (originalBodyClientWidth === undefined) {
+        Reflect.deleteProperty(document.body, 'clientWidth')
+      } else {
+        Object.defineProperty(document.body, 'clientWidth', originalBodyClientWidth)
+      }
+      if (originalInnerWidth === undefined) {
+        Reflect.deleteProperty(window, 'innerWidth')
+      } else {
+        Object.defineProperty(window, 'innerWidth', originalInnerWidth)
+      }
+    }
   })
 
   it('maps Any choices to null and renders a selected indicator', () => {
