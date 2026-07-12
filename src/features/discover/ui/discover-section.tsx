@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AlertTriangle, ImageOff, RefreshCw } from 'lucide-react'
 
 import type { AnimeSummary, DiscoverSectionKey, DiscoverSectionState } from '../shared/discover-contracts'
+import { HorizontalRail } from './horizontal-rail'
 
 type DiscoverSectionRailProps = {
   title: string
@@ -52,5 +53,5 @@ export function DiscoverSectionRail({ title, state, onRetry, isRetrying, retryEr
   }
 
   const key = state.section.key
-  return <section aria-labelledby={`${key}-heading`} className="space-y-3"><h2 id={`${key}-heading`} className="text-xl font-extrabold">{title}</h2><div className="scrollbar-none flex gap-3 overflow-x-auto pb-2">{state.section.items.map((anime, index) => <AnimePoster anime={anime} rank={key === 'trending' ? index + 1 : null} key={anime.anilistId} />)}</div></section>
+  return <section aria-labelledby={`${key}-heading`} className="space-y-3"><h2 id={`${key}-heading`} className="text-xl font-extrabold">{title}</h2><HorizontalRail label={title}>{state.section.items.map((anime, index) => <AnimePoster anime={anime} rank={key === 'trending' ? index + 1 : null} key={anime.anilistId} />)}</HorizontalRail></section>
 }

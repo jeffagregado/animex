@@ -57,4 +57,16 @@ describe('DiscoverSectionRail', () => {
 
     expect(screen.getByAltText('Frieren cover').getAttribute('src')).toBe('https://example.test/second.jpg')
   })
+
+  it('adds accessible horizontal controls only when a section is ready with items', () => {
+    const props = { title: 'Trending Anime', onRetry: vi.fn(), isRetrying: false, retryError: null }
+    const view = render(<DiscoverSectionRail {...props} state={{ status: 'ready', section: { key: 'trending', items: [anime], refreshedAt: 1, expiresAt: 2 } }} />)
+
+    expect(screen.getByRole('button', { name: 'Previous Trending Anime' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Next Trending Anime' })).toBeTruthy()
+
+    view.rerender(<DiscoverSectionRail {...props} state={undefined} />)
+    expect(screen.queryByRole('button', { name: 'Previous Trending Anime' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Next Trending Anime' })).toBeNull()
+  })
 })

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { ListFilter, Search } from 'lucide-react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { ChevronDown, ListFilter, Search } from 'lucide-react'
 
 import {
   DISCOVER_GENRES,
@@ -22,6 +22,13 @@ type SearchSelectProps<TValue extends string> = {
   onChange: (value: TValue | null) => void
 }
 
+type ThemedSelectProps = {
+  label: string
+  value: string | number | null
+  children: ReactNode
+  onChange: (value: string) => void
+}
+
 const animeFormats: readonly AnimeFormat[] = ['TV', 'TV_SHORT', 'MOVIE', 'SPECIAL', 'OVA', 'ONA', 'MUSIC']
 const animeSeasons: readonly AnimeSeason[] = ['WINTER', 'SPRING', 'SUMMER', 'FALL']
 const animeSorts: readonly AnimeSearchSort[] = ['relevance', 'trending', 'popularity', 'score', 'newest']
@@ -35,20 +42,32 @@ const getQueryError = (query: string): string | null => {
   return null
 }
 
-/** Renders a URL-controlled searchable filter select. */
-function SearchSelect<TValue extends string>({ label, value, options, onChange }: SearchSelectProps<TValue>) {
+/** Renders a dark select with a consistent themed arrow. */
+function ThemedSelect({ label, value, children, onChange }: ThemedSelectProps) {
   return (
     <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
       {label}
-      <select
-        className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition focus-visible:border-cyan-300 focus-visible:ring-2 focus-visible:ring-cyan-300/40"
-        value={value ?? ''}
-        onChange={(event) => onChange(event.target.value === '' ? null : event.target.value as TValue)}
-      >
+      <span className="relative">
+        <select
+          className="h-10 w-full appearance-none rounded-lg border border-border bg-background px-3 pr-10 text-sm text-foreground outline-none transition hover:border-cyan-300 hover:bg-cyan-300/5 focus-visible:border-cyan-300 focus-visible:ring-2 focus-visible:ring-cyan-300/40"
+          value={value ?? ''}
+          onChange={(event) => onChange(event.target.value)}
+        >
+          {children}
+        </select>
+        <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-cyan-300" />
+      </span>
+    </label>
+  )
+}
+
+/** Renders a URL-controlled searchable filter select. */
+function SearchSelect<TValue extends string>({ label, value, options, onChange }: SearchSelectProps<TValue>) {
+  return (
+    <ThemedSelect label={label} value={value} onChange={(nextValue) => onChange(nextValue === '' ? null : nextValue as TValue)}>
         <option value="">Any</option>
         {options.map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}
-      </select>
-    </label>
+    </ThemedSelect>
   )
 }
 
@@ -58,6 +77,7 @@ export function DiscoverSearchFilters({ searchState, onStateChange }: DiscoverSe
   const previousQuery = useRef(searchState.query)
   const clearingInvalidQuery = useRef(false)
   const queryError = getQueryError(draftQuery)
+  const hasActiveFilters = searchState.genre !== null || searchState.format !== null || searchState.season !== null || searchState.year !== null || searchState.sort !== 'relevance'
 
   useEffect(() => {
     if (previousQuery.current === searchState.query) {
@@ -97,6 +117,10 @@ export function DiscoverSearchFilters({ searchState, onStateChange }: DiscoverSe
     onStateChange({ ...searchState, [key]: value }, 'push')
   }
 
+  const clearFilters = (): void => {
+    onStateChange({ ...searchState, genre: null, format: null, season: null, year: null, sort: 'relevance' }, 'push')
+  }
+
   return (
     <section id="discover-search" aria-label="Discover search" className="space-y-3 scroll-mt-4">
       <div className="flex gap-3">
@@ -121,12 +145,11 @@ export function DiscoverSearchFilters({ searchState, onStateChange }: DiscoverSe
             <SearchSelect label="Genre" value={searchState.genre} options={DISCOVER_GENRES} onChange={(value) => updateFilter('genre', value as AnimeGenre | null)} />
             <SearchSelect label="Format" value={searchState.format} options={animeFormats} onChange={(value) => updateFilter('format', value as AnimeFormat | null)} />
             <SearchSelect label="Season" value={searchState.season} options={animeSeasons} onChange={(value) => updateFilter('season', value as AnimeSeason | null)} />
-            <label className="grid gap-1 text-xs font-semibold text-muted-foreground">Year
-              <select className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition focus-visible:border-cyan-300 focus-visible:ring-2 focus-visible:ring-cyan-300/40" value={searchState.year ?? ''} onChange={(event) => updateFilter('year', event.target.value === '' ? null : Number(event.target.value))}>
+            <ThemedSelect label="Year" value={searchState.year} onChange={(value) => updateFilter('year', value === '' ? null : Number(value))}>
                 <option value="">Any</option>{years.map((year) => <option key={year} value={year}>{year}</option>)}
-              </select>
-            </label>
+            </ThemedSelect>
             <SearchSelect label="Sort" value={searchState.sort} options={animeSorts} onChange={(value) => updateFilter('sort', value as AnimeSearchSort)} />
+            {hasActiveFilters ? <button className="col-span-2 rounded-lg border border-cyan-400/50 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-100 outline-none transition hover:border-cyan-300 hover:bg-cyan-300/20 focus-visible:ring-2 focus-visible:ring-cyan-300/40" type="button" onClick={clearFilters}>Clear filters</button> : null}
           </div>
         </details>
       </div>

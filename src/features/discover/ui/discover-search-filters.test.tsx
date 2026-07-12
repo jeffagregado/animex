@@ -56,6 +56,42 @@ describe('DiscoverSearchFilters', () => {
     )
   })
 
+  it('renders every filter select with themed native-arrow replacement styles', () => {
+    render(<DiscoverSearchFilters searchState={searchState} onStateChange={vi.fn()} />)
+
+    const filters = ['Genre', 'Format', 'Season', 'Year', 'Sort']
+    for (const label of filters) {
+      const select = screen.getByLabelText(label)
+      expect(select.className).toContain('appearance-none')
+      expect(select.className).toContain('hover:border-cyan-300')
+      expect(select.className).toContain('focus-visible:ring-cyan-300/40')
+    }
+  })
+
+  it('shows Clear filters only for active filters and resets them in one push without clearing the query', () => {
+    const onStateChange = vi.fn()
+    const activeSearchState: DiscoverUrlSearchState = {
+      query: 'frieren',
+      genre: 'Action',
+      format: 'TV',
+      season: 'WINTER',
+      year: 2026,
+      sort: 'trending',
+    }
+
+    const view = render(<DiscoverSearchFilters searchState={searchState} onStateChange={onStateChange} />)
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull()
+
+    view.rerender(<DiscoverSearchFilters searchState={activeSearchState} onStateChange={onStateChange} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+    expect(onStateChange).toHaveBeenCalledTimes(1)
+    expect(onStateChange).toHaveBeenCalledWith(
+      { ...searchState, query: 'frieren' },
+      'push',
+    )
+  })
+
   it('clears a prior canonical query when the draft becomes invalid', () => {
     const onStateChange = vi.fn()
 

@@ -1,6 +1,6 @@
 # Discover feedback design
 
-Status: approved design. Implementation pending.
+Status: implemented and verified.
 
 ## Scope
 

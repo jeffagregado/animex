@@ -29,7 +29,7 @@
 - Consumes: `DiscoverUrlSearchState`, `DiscoverSearchStateChange`.
 - Produces: existing `DiscoverSearchFilters` API unchanged.
 
-- [ ] **Step 1: Write failing behavior tests**
+- [x] **Step 1: Write failing behavior tests**
 
 Add assertions that selects use `appearance-none`, render themed chevrons, and `Clear filters` appears only with active filters. Click must emit:
 
@@ -44,13 +44,13 @@ expect(onStateChange).toHaveBeenCalledWith({
 }, 'push')
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `pnpm test src/features/discover/ui/discover-search-filters.test.tsx`
 
 Expected: FAIL because themed chevrons and `Clear filters` do not exist.
 
-- [ ] **Step 3: Implement minimal themed controls**
+- [x] **Step 3: Implement minimal themed controls**
 
 Use one internal select component with `appearance-none`, dark/cyan hover classes, and `ChevronDown`. Add:
 
@@ -71,7 +71,7 @@ const clearFilters = (): void => onStateChange({
 }, 'push')
 ```
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run: `pnpm test src/features/discover/ui/discover-search-filters.test.tsx`
 
@@ -89,17 +89,17 @@ Expected: all filter tests PASS.
 - Produces: `HorizontalRail({ children, label }: { children: ReactNode; label: string })`.
 - Consumes: poster cards as children; no anime-domain dependency.
 
-- [ ] **Step 1: Write failing rail tests**
+- [x] **Step 1: Write failing rail tests**
 
 Cover accessible previous/next buttons, initial previous disabled state, `scrollBy` on next, state updates after scroll, and resize recalculation. Mock element metrics directly; do not mock component behavior.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `pnpm test src/features/discover/ui/horizontal-rail.test.tsx`
 
 Expected: FAIL because module does not exist.
 
-- [ ] **Step 3: Implement minimal rail**
+- [x] **Step 3: Implement minimal rail**
 
 Use a ref, one metric updater, passive scroll listener, resize listener, and viewport-relative scrolling:
 
@@ -110,7 +110,7 @@ viewport.scrollBy({ left: direction * distance, behavior: 'smooth' })
 
 Render native `overflow-x-auto`, `snap-x`, and accessible controls. Hide/disable controls only from measured boundaries; keep touch and trackpad behavior.
 
-- [ ] **Step 4: Wire all poster sections**
+- [x] **Step 4: Wire all poster sections**
 
 Replace ready-state row only:
 
@@ -122,7 +122,7 @@ Replace ready-state row only:
 
 Add `snap-start` to poster cards. Keep loading/error/empty states unchanged.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 Run: `pnpm test src/features/discover/ui/horizontal-rail.test.tsx src/features/discover/ui/discover-section.test.tsx`
 
@@ -138,7 +138,7 @@ Expected: rail and section tests PASS.
 **Interfaces:**
 - No new public API beyond `HorizontalRail`.
 
-- [ ] **Step 1: Run automated gates**
+- [x] **Step 1: Run automated gates**
 
 ```powershell
 pnpm test
@@ -150,15 +150,15 @@ git diff --check
 
 Expected: tests/type/build/diff PASS; Fallow has no introduced error findings.
 
-- [ ] **Step 2: Run browser QA**
+- [x] **Step 2: Run browser QA**
 
 At 390, 768, and 1280 pixels verify select hover/focus remains dark, Clear filters preserves query and removes filter URL keys, rail arrows scroll, touch/native overflow remains, boundary buttons disable, no page overflow, keyboard focus works, console stays clean.
 
-- [ ] **Step 3: Review and close trackers**
+- [x] **Step 3: Review and close trackers**
 
 Run independent findings-first review. Fix every P1/P2, rerun affected gates, update checkboxes and `TODO.md` with current state.
 
-- [ ] **Step 4: Commit implementation**
+- [x] **Step 4: Commit implementation**
 
 ```powershell
 git add TODO.md docs/superpowers/plans/2026-07-12-discover-feedback-fixes.md src/features/discover/ui
