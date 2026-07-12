@@ -641,11 +641,11 @@ Status: COMPLETE.
 
 # Phase 4 Tab Visual References
 
-Status: design and written spec approved; implementation plan awaiting execution choice.
+Status: paused at 5 of 6 images; Mobile Staff generation blocked by service network error.
 
 - [x] Inspect approved Anime Detail desktop/mobile Overview references.
 - [x] Lock full-page Reviews, Characters, and Staff desktop/mobile design contract.
 - [x] Write and self-review visual specification.
-- [ ] Generate and inspect six dedicated image references.
-- [ ] Save final assets under `docs/visual/anime-details/`.
+- [ ] Generate and inspect six dedicated image references. Five complete; Mobile Staff pending.
+- [ ] Save final assets under `docs/visual/anime-details/`. Five saved; Mobile Staff pending.
 - [ ] Commit approved visual references on `jeff-cx/phase-4-tab-visuals`.
