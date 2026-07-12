@@ -641,7 +641,7 @@ Status: COMPLETE.
 
 # Phase 4 Tab Visual References
 
-Status: design approved; written spec awaiting review.
+Status: design and written spec approved; implementation plan awaiting execution choice.
 
 - [x] Inspect approved Anime Detail desktop/mobile Overview references.
 - [x] Lock full-page Reviews, Characters, and Staff desktop/mobile design contract.
