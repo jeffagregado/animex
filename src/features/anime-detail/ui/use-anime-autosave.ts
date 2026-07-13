@@ -17,7 +17,6 @@ type AnimeAutosave<Value> = {
 }
 
 type ScoreAnimeAutosave = {
-  clear: () => void
   commit: () => void
   error: string | null
   schedule: (value: number | null) => void
@@ -67,25 +66,20 @@ export function useAnimeAutosave<Value>({ delayMs, isValid, persist, save, serve
   return { cancel, flush, schedule, setDraft, value }
 }
 
-/** Adds explicit half-step validation to score autosave. */
+/** Adds score-range and precision validation to score autosave. */
 export function useScoreAnimeAutosave({ delayMs, persist, save, serverValue }: Omit<AnimeAutosaveOptions<number | null>, 'isValid'>): ScoreAnimeAutosave {
   const [error, setError] = useState<string | null>(null)
   const autosave = useAnimeAutosave<number | null>({ delayMs, isValid: isValidScore, persist, save, serverValue })
 
   const schedule = (value: number | null): void => {
-    if (!isValidScore(value)) {
+    const validationError = getScoreError(value)
+    if (validationError) {
       autosave.cancel()
-      setError('Score must use 0.5 increments.')
+      setError(validationError)
       return
     }
     setError(null)
     autosave.schedule(value)
-  }
-
-  const clear = (): void => {
-    setError(null)
-    autosave.setDraft(null)
-    autosave.flush(null)
   }
 
   const commit = (): void => {
@@ -93,7 +87,7 @@ export function useScoreAnimeAutosave({ delayMs, persist, save, serverValue }: O
     autosave.flush(autosave.value)
   }
 
-  return { clear, commit, error, schedule, value: autosave.value }
+  return { commit, error, schedule, value: autosave.value }
 }
 
 /** Clears one pending trailing save. */
@@ -102,7 +96,15 @@ function clearTimeoutRef(timeoutRef: { current: ReturnType<typeof setTimeout> | 
   timeoutRef.current = null
 }
 
-/** Validates the allowed score range and half-point increment. */
+/** Validates the allowed score range and one decimal-place precision. */
 function isValidScore(score: number | null): boolean {
-  return score === null || (score >= 0 && score <= 10 && Number.isInteger(score * 2))
+  return getScoreError(score) === null
+}
+
+/** Returns one actionable score validation message. */
+function getScoreError(score: number | null): string | null {
+  if (score === null) return null
+  if (score < 0 || score > 10) return 'Score must be between 0 and 10.'
+  if (!Number.isInteger(score * 10)) return 'Score must use at most one decimal place.'
+  return null
 }

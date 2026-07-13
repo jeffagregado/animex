@@ -681,3 +681,13 @@ Status: COMPLETE on `jeff-cx/phase-4-anime-detail`; final review, gates, and hov
 - [x] Add 0.5-step debounced Status/Score autosave with Sonner feedback. Owner: controls worker.
 - [x] Preserve tabs/content; update approved layout spec. Owner: controller + docs mapper.
 - [x] Run full gates plus hover, keyboard, responsive, console, and overflow browser QA. Owner: controller + reviewer + QA.
+
+# Phase 4 Anime Controls Feedback Fixes
+
+Status: COMPLETE on `jeff-cx/phase-4-anime-detail`.
+
+- [x] Save approved control design reference and lock behavior/spec. Owner: controller.
+- [x] Add regression coverage for score/status invariant and revised control UX. Owner: backend + frontend workers.
+- [x] Atomically set first-score Status to Watching only when unset. Owner: Convex worker.
+- [x] Match approved Status, Score, Favorite, and Rewatch history controls. Owner: UI worker.
+- [x] Run full gates, design comparison, hover/focus/responsive browser QA, review, and closure. Owner: controller + reviewer + QA.

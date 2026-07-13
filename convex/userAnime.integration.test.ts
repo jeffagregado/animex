@@ -93,6 +93,26 @@ describe('user anime Convex integration', () => {
     expect(await other.client.query(api.userAnime.getMine, { anilistId: 1 })).toBeNull()
   }, 15_000)
 
+  test('sets Watching only for the first non-null score on an unset entry', async () => {
+    const t = createHarness()
+    const owner = await createAuthUser(t, true, 'first-score')
+    await insertProfile(t, owner.authId, 'FirstScore', 'private')
+    await insertAnime(t, 1)
+    await insertAnime(t, 2)
+
+    expect(await owner.client.mutation(api.userAnime.setScore, { anilistId: 1, score: 8.1 })).toMatchObject({
+      status: 'saved', entry: { anilistId: 1, score: 8.1, status: 'watching' },
+    })
+    expect(await owner.client.mutation(api.userAnime.setScore, { anilistId: 1, score: 9 })).toMatchObject({
+      status: 'saved', entry: { anilistId: 1, score: 9, status: 'watching' },
+    })
+
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 2, status: 'planned' })
+    expect(await owner.client.mutation(api.userAnime.setScore, { anilistId: 2, score: 7.5 })).toMatchObject({
+      status: 'saved', entry: { anilistId: 2, score: 7.5, status: 'planned' },
+    })
+  })
+
   test('pages 0, 20, 21, and 41 same-time rewatches without gaps', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))

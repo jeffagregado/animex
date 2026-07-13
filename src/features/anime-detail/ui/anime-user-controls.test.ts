@@ -79,7 +79,9 @@ describe('anime user control policies', () => {
     const returnTo = '%2Fanime%2F1%2Ffrieren%3Ftab%3Dstaff'
     expect(screen.getByRole('link', { name: 'Status' }).getAttribute('href')).toBe(`/auth/sign-in?returnTo=${returnTo}`)
     expect(screen.getByRole('link', { name: 'Status' }).className).toContain('focus-visible:ring-cyan-300')
+    expect(screen.getByRole('link', { name: 'Status' }).textContent).toContain('Set status')
     expect(screen.getByRole('link', { name: 'Score' }).getAttribute('href')).toBe(`/auth/sign-in?returnTo=${returnTo}`)
+    expect(screen.getByRole('link', { name: 'Score' }).textContent).toContain('0')
     expect(screen.getByRole('link', { name: 'Favorite' }).getAttribute('href')).toBe(`/auth/sign-in?returnTo=${returnTo}`)
     expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull()
     expect(screen.queryByRole('textbox', { name: 'Score' })).toBeNull()
@@ -144,30 +146,69 @@ describe('anime user control policies', () => {
     expect(screen.getByRole('button', { name: 'Rewatch history' }).hasAttribute('disabled')).toBe(true)
   })
 
-  it('offers half-point score controls from zero through ten and clears to null', async () => {
+  it('shows the reference-aligned controls with an unscored default of zero', () => {
+    controlState.entry = { anilistId: 1, status: null, score: null, isFavorite: false, favoriteChangedAt: null, rewatchCount: 0, createdAt: 1, updatedAt: 1 }
     render(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
 
     const score = screen.getByRole('textbox', { name: 'Score' })
     expect(score.getAttribute('min')).toBe('0')
     expect(score.getAttribute('max')).toBe('10')
     expect(score.getAttribute('step')).toBe('0.5')
+    expect(score.getAttribute('value')).toBe('0')
     expect(screen.getByRole('button', { name: 'Decrease score' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Increase score' })).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Clear score' }))
-    await waitFor(() => expect(controlState.score).toHaveBeenCalledWith({ anilistId: 1, score: null }))
+    expect(screen.queryByRole('button', { name: 'Clear score' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Rewatch history' }).className).toContain('min-h-14')
+    expect(controlState.score).not.toHaveBeenCalled()
   })
 
-  it('rejects direct non-half-step scores with explicit feedback', async () => {
+  it('persists an explicitly entered zero from an unset score', async () => {
+    controlState.entry = { anilistId: 1, status: null, score: null, isFavorite: false, favoriteChangedAt: null, rewatchCount: 0, createdAt: 1, updatedAt: 1 }
+    render(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
+
+    const score = screen.getByRole('textbox', { name: 'Score' })
+    fireEvent.keyDown(score, { key: '0' })
+    fireEvent.change(score, { target: { value: '0' } })
+    fireEvent.blur(score)
+
+    await waitFor(() => expect(controlState.score).toHaveBeenCalledWith({ anilistId: 1, score: 0 }))
+  })
+
+  it('shows the exact Status label with the reference state indicator', () => {
+    controlState.entry = { anilistId: 1, status: 'planned', score: 0, isFavorite: false, favoriteChangedAt: null, rewatchCount: 0, createdAt: 1, updatedAt: 1 }
+    render(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
+
+    expect(screen.getByRole('combobox', { name: 'Status' }).textContent).toContain('Plan to watch')
+    expect(screen.getByTestId('status-indicator').className).toContain('bg-emerald-400')
+  })
+
+  it('accepts one-decimal typed scores and rejects values with more precision', async () => {
     render(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
     const score = screen.getByRole('textbox', { name: 'Score' })
 
     fireEvent.change(score, { target: { value: '8.1' } })
     fireEvent.blur(score)
 
-    expect((await screen.findByRole('alert')).textContent).toContain('Score must use 0.5 increments.')
+    await waitFor(() => expect(controlState.score).toHaveBeenCalledWith({ anilistId: 1, score: 8.1 }))
+    controlState.score.mockClear()
+
+    fireEvent.change(score, { target: { value: '8.12' } })
+    fireEvent.blur(score)
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Score must use at most one decimal place.')
     expect(score.getAttribute('aria-invalid')).toBe('true')
-    expect(score.getAttribute('value')).toBe('7')
+    expect(score.getAttribute('value')).toBe('8.1')
+    expect(controlState.score).not.toHaveBeenCalled()
+  })
+
+  it('reports the score range separately from decimal precision', () => {
+    render(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
+    const score = screen.getByRole('textbox', { name: 'Score' })
+
+    fireEvent.change(score, { target: { value: '11' } })
+    fireEvent.blur(score)
+
+    expect(screen.getByRole('alert').textContent).toContain('Score must be between 0 and 10.')
     expect(controlState.score).not.toHaveBeenCalled()
   })
 
@@ -177,12 +218,12 @@ describe('anime user control policies', () => {
     const score = screen.getByRole('textbox', { name: 'Score' })
 
     fireEvent.change(score, { target: { value: '8.5' } })
-    fireEvent.change(score, { target: { value: '8.1' } })
+    fireEvent.change(score, { target: { value: '8.12' } })
     fireEvent.blur(score)
     fireEvent.keyDown(score, { key: 'Enter' })
     await act(async () => { await vi.advanceTimersByTimeAsync(500) })
 
-    expect(screen.getByRole('alert').textContent).toContain('Score must use 0.5 increments.')
+    expect(screen.getByRole('alert').textContent).toContain('Score must use at most one decimal place.')
     expect(score.getAttribute('value')).toBe('8.5')
     expect(controlState.score).not.toHaveBeenCalled()
   })
@@ -240,7 +281,7 @@ describe('anime user control policies', () => {
     controlState.entry = { anilistId: 1, status: 'planned', score: 6, isFavorite: true, favoriteChangedAt: 2, rewatchCount: 0, createdAt: 1, updatedAt: 2 }
     view.rerender(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
     expect(score.getAttribute('value')).toBe('8.5')
-    expect(screen.getByRole('combobox', { name: 'Status' }).textContent).toContain('completed')
+    expect(screen.getByRole('combobox', { name: 'Status' }).textContent).toContain('Completed')
 
     controlState.score.mockRejectedValueOnce(new Error('Score save failed.'))
     fireEvent.blur(score)

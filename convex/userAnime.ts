@@ -148,13 +148,15 @@ export const setStatus = mutation({
   },
 })
 
-/** Saves or clears a validated score without creating milestones. */
+/** Saves a validated score and starts watching only for an unset first score. */
 export const setScore = mutation({
   args: { anilistId: v.number(), score: v.union(v.number(), v.null()) }, returns: savedResultValidator,
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const now = Date.now(); let score
     try { score = normalizeScore(args.score) } catch (error) { throw new ConvexError({ code: 'INVALID_SCORE', message: error instanceof Error ? error.message : 'Score is invalid.' }) }
-    const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now); await ctx.db.patch(entry._id, { score, updatedAt: now })
+    const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
+    const status = entry.score === null && score !== null && entry.status === null ? 'watching' : entry.status
+    await ctx.db.patch(entry._id, { score, status, updatedAt: now })
     const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
   },
 })
