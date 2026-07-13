@@ -132,7 +132,7 @@ export default defineSchema({
   userAnimeEntries: defineTable({
     userId: v.id('users'), anilistId: v.number(),
     status: v.union(v.literal('watching'), v.literal('planned'), v.literal('dropped'), v.literal('completed'), v.literal('rewatched'), v.null()),
-    score: v.union(v.number(), v.null()), favoriteAt: v.union(v.number(), v.null()), rewatchCount: v.number(), createdAt: v.number(), updatedAt: v.number(),
+    score: v.union(v.number(), v.null()), favoriteAt: v.union(v.number(), v.null()), rewatchCount: v.number(), lastRewatchSequence: v.number(), createdAt: v.number(), updatedAt: v.number(),
   })
     .index('by_user_anime', ['userId', 'anilistId'])
     .index('by_user_status', ['userId', 'status'])

@@ -65,7 +65,7 @@ const readEntry = async (ctx: UserCtx, userId: Id<'users'>, anilistId: number) =
 const getOrCreateEntry = async (ctx: MutationCtx, userId: Id<'users'>, anilistId: number, now: number): Promise<Doc<'userAnimeEntries'>> => {
   const current = await readEntry(ctx, userId, anilistId)
   if (current) return current
-  const id = await ctx.db.insert('userAnimeEntries', { userId, anilistId, status: null, score: null, favoriteAt: null, rewatchCount: 0, createdAt: now, updatedAt: now })
+  const id = await ctx.db.insert('userAnimeEntries', { userId, anilistId, status: null, score: null, favoriteAt: null, rewatchCount: 0, lastRewatchSequence: 0, createdAt: now, updatedAt: now })
   const created = await ctx.db.get('userAnimeEntries', id)
   if (!created) throw new ConvexError({ code: 'ENTRY_CREATE_FAILED', message: 'User anime entry was not created.' })
   return created
@@ -84,11 +84,12 @@ const createMilestoneOnce = async (ctx: MutationCtx, profile: Profile, anilistId
 
 /** Records one rewatch and creates or bumps its single milestone. */
 const addRewatch = async (ctx: MutationCtx, profile: Profile, entry: Doc<'userAnimeEntries'>, now: number): Promise<void> => {
-  await ctx.db.insert('animeRewatchEntries', { entryId: entry._id, userId: profile._id, anilistId: entry.anilistId, completedAt: now, sequence: entry.rewatchCount + 1 })
+  const sequence = entry.lastRewatchSequence + 1
+  await ctx.db.insert('animeRewatchEntries', { entryId: entry._id, userId: profile._id, anilistId: entry.anilistId, completedAt: now, sequence })
   const milestone = await readMilestone(ctx, profile._id, entry.anilistId, 'rewatched')
   if (milestone) await ctx.db.patch(milestone._id, createMilestoneTimestampPatch(now))
   else await createMilestoneOnce(ctx, profile, entry.anilistId, 'rewatched', now)
-  await ctx.db.patch(entry._id, { rewatchCount: entry.rewatchCount + 1, updatedAt: now })
+  await ctx.db.patch(entry._id, { rewatchCount: entry.rewatchCount + 1, lastRewatchSequence: sequence, updatedAt: now })
 }
 
 /** Returns the authenticated user's state for one cached anime. */
