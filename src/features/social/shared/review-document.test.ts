@@ -56,6 +56,13 @@ describe('review document validation', () => {
     expect(() => parseReviewDocument(document([paragraph([{ ...text('styled'), style: 'color:red' }])]))).toThrow()
   })
 
+  test('preserves canonical Lexical fields while rejecting alignment and indentation throughout', () => {
+    expect(() => parseReviewDocument({ ...document([]), editorState: { root: { ...document([]).editorState.root, format: 'center' } } })).toThrow()
+    expect(() => parseReviewDocument(document([{ ...paragraph([text('x')]), indent: 1 }]))).toThrow()
+    expect(() => parseReviewDocument(document([{ children: [text('x')], direction: null, format: 'right', indent: 0, type: 'heading', tag: 'h2', version: 1 }]))).toThrow()
+    expect(() => parseReviewDocument(document([{ children: [{ children: [text('x')], direction: null, format: '', indent: 1, type: 'listitem', value: 1, version: 1 }], direction: null, format: '', indent: 0, listType: 'bullet', start: 1, tag: 'ul', type: 'list', version: 1 }]))).toThrow()
+  })
+
   test('rejects unsafe, credentialed, oversized, and provider-mismatched media URLs', () => {
     expect(() => parseReviewDocument(document([{ type: 'review-image', version: 1, url: 'http://images.example/a.jpg', alt: 'A' }]))).toThrow()
     expect(() => parseReviewDocument(document([{ type: 'review-image', version: 1, url: 'https://user:pass@images.example/a.jpg', alt: 'A' }]))).toThrow()
@@ -87,6 +94,16 @@ describe('review document validation', () => {
     ])
 
     expect(validatePublishedReview(body, 50, 'Summary').visibleTextLength).toBe(14)
+  })
+
+  test('publish rejects invisible or control-only text and accepts legitimate Unicode', () => {
+    for (const invisibleText of ['\u200B', '\u2060', '\uFEFF', '\u0000', ' \n\t']) {
+      expect(() => validatePublishedReview(document([paragraph([text(invisibleText)])]), 50, 'Summary')).toThrow('real body text')
+    }
+
+    for (const unicodeText of ['葬送のフリーレン', 'مرحبا', '🧙🏽‍♀️']) {
+      expect(validatePublishedReview(document([paragraph([text(unicodeText)])]), 50, 'Summary').body).toBeDefined()
+    }
   })
 
   test('locks document and summary limits', () => {

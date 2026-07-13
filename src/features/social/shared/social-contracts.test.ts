@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, expectTypeOf, test } from 'vitest'
 
 import {
   ANIME_REVIEWS_PAGE_SIZE,
@@ -13,8 +13,12 @@ import {
   reviewListItemSchema,
   reviewPublishInputSchema,
   reviewRatingSchema,
+  reviewSortSchema,
   reviewStatsSchema,
+  socialAnimeSchema,
+  socialAuthorSchema,
   updatePostInputSchema,
+  type FeedPage,
 } from './social-contracts'
 
 const author = {
@@ -51,7 +55,13 @@ describe('social contracts', () => {
     expect(() => reviewRatingSchema.parse(8.25)).toThrow()
   })
 
-  test('validates strict discriminated feed pages', () => {
+  test('accepts every exact Review sort and rejects unsupported values', () => {
+    expect(['newest', 'rating-high', 'rating-low'].map((sort) => reviewSortSchema.parse(sort))).toEqual(['newest', 'rating-high', 'rating-low'])
+    expect(() => reviewSortSchema.parse('highest-rating')).toThrow()
+    expect(() => reviewSortSchema.parse('oldest')).toThrow()
+  })
+
+  test('validates exact generic cursor feed pages', () => {
     const page = {
       items: [
         { id: 'post-1', kind: 'post', author, text: 'Magic.', imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 10, updatedAt: 10 },
@@ -59,14 +69,25 @@ describe('social contracts', () => {
         { id: 'completed-1', kind: 'completed', author, anime, settledAt: 8 },
         { id: 'rewatched-1', kind: 'rewatched', author, anime, settledAt: 7 },
       ],
-      continueCursor: 'next',
-      isDone: false,
-      perPage: 20,
+      cursor: 'next',
+      hasMore: true,
     }
 
+    const genericPage: FeedPage<string> = { items: ['one'], cursor: null, hasMore: false }
+
     expect(feedPageSchema.parse(page)).toEqual(page)
+    expect(feedPageSchema.parse({ ...page, cursor: null })).toEqual({ ...page, cursor: null })
     expect(() => feedPageSchema.parse({ ...page, items: [{ ...page.items[0], unknown: true }] })).toThrow()
-    expect(() => feedPageSchema.parse({ ...page, perPage: 21 })).toThrow()
+    expect(() => feedPageSchema.parse({ ...page, isDone: false })).toThrow()
+    expectTypeOf(genericPage.items).toEqualTypeOf<string[]>()
+  })
+
+  test('exports strict author and anime DTO schemas', () => {
+    expect(socialAuthorSchema.parse(author)).toEqual(author)
+    expect(socialAnimeSchema.parse(anime)).toEqual(anime)
+    expect(() => socialAuthorSchema.parse({ ...author, role: 'admin' })).toThrow()
+    expect(() => socialAnimeSchema.parse({ ...anime, internalId: 'secret' })).toThrow()
+    expect(() => socialAuthorSchema.parse({ ...author, avatarUrl: 'http://example.com/avatar.jpg' })).toThrow()
   })
 
   test('validates review list, detail, and ten-band stats DTOs', () => {

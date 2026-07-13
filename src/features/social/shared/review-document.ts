@@ -23,8 +23,8 @@ type LineBreakNode = { type: 'linebreak'; version: 1 }
 type ElementFields = {
   children: ReviewNode[]
   direction: 'ltr' | 'rtl' | null
-  format: '' | 'left' | 'start' | 'center' | 'right' | 'end' | 'justify'
-  indent: number
+  format: ''
+  indent: 0
   version: 1
 }
 
@@ -60,8 +60,8 @@ export interface ReviewStats {
 
 const textFormatSchema = z.number().int().min(0).max(15)
 const directionSchema = z.enum(['ltr', 'rtl']).nullable()
-const elementFormatSchema = z.enum(['', 'left', 'start', 'center', 'right', 'end', 'justify'])
-const indentSchema = z.number().int().nonnegative()
+const elementFormatSchema = z.literal('')
+const indentSchema = z.literal(0)
 
 const textNodeSchema: z.ZodType<TextNode> = z.object({
   detail: z.literal(0),
@@ -269,6 +269,10 @@ export const parseReviewDocument = (value: unknown): ReviewDocumentV1 => reviewD
 
 const parseReviewRating = (value: unknown): number | null => z.number().min(0).max(100).multipleOf(0.1).nullable().parse(value)
 const parseReviewSummary = (value: unknown): string => z.string().trim().max(REVIEW_SUMMARY_LIMIT).parse(value)
+const ignoredPublishTextSchema = /[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Cc}]/gu
+
+/** Detects at least one visible, user-meaningful Unicode character. */
+const hasRealText = (value: string): boolean => value.replace(ignoredPublishTextSchema, '').length > 0
 
 /** Validates draft fields while allowing incomplete content. */
 export const validateDraftReview = (body: unknown, rating: unknown, summary: unknown): { body: ReviewDocumentV1; rating: number | null; summary: string } => ({
@@ -281,7 +285,7 @@ export const validateDraftReview = (body: unknown, rating: unknown, summary: unk
 export const validatePublishedReview = (body: unknown, rating: unknown, summary: unknown): { body: ReviewDocumentV1; rating: number; summary: string; visibleTextLength: number } => {
   const draft = validateDraftReview(body, rating, summary)
   const metrics = measureDocument(draft.body)
-  if (metrics.realText.trim().length === 0) throw new RangeError('Published Review requires real body text.')
+  if (!hasRealText(metrics.realText)) throw new RangeError('Published Review requires real body text.')
   if (draft.rating === null) throw new RangeError('Published Review requires a Rating.')
   if (draft.summary.length === 0) throw new RangeError('Published Review requires a Summary.')
   return { ...draft, rating: draft.rating, visibleTextLength: metrics.visibleText }

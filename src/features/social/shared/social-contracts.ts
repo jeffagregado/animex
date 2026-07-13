@@ -18,7 +18,7 @@ export const REQUEST_ID_MAX_LENGTH = 128 as const
 export const visibilitySchema = z.enum(['public', 'followers', 'private'])
 export const feedCardKindSchema = z.enum(['post', 'review', 'completed', 'rewatched'])
 export const reviewStateSchema = z.enum(['draft', 'published'])
-export const reviewSortSchema = z.enum(['newest', 'highest-rating'])
+export const reviewSortSchema = z.enum(['newest', 'rating-high', 'rating-low'])
 export const reviewRatingSchema = z.number().min(0).max(100).multipleOf(0.1).nullable()
 
 export type Visibility = z.infer<typeof visibilitySchema>
@@ -44,14 +44,14 @@ export interface SocialAnime {
   coverImageUrl: string | null
 }
 
-const socialAuthorSchema: z.ZodType<SocialAuthor> = z.object({
+export const socialAuthorSchema: z.ZodType<SocialAuthor> = z.object({
   avatarUrl: nullableHttpsUrlSchema,
   displayName: z.string().trim().min(1).max(128),
   id: idSchema,
   username: z.string().trim().min(1).max(128),
 }).strict()
 
-const socialAnimeSchema: z.ZodType<SocialAnime> = z.object({
+export const socialAnimeSchema: z.ZodType<SocialAnime> = z.object({
   anilistId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   coverImageUrl: nullableHttpsUrlSchema,
   slug: z.string().trim().min(1).max(128),
@@ -102,18 +102,16 @@ export const feedCardSchema = z.discriminatedUnion('kind', [
 
 export type FeedCard = z.infer<typeof feedCardSchema>
 
-export interface FeedPage {
-  items: FeedCard[]
-  continueCursor: string
-  isDone: boolean
-  perPage: 20
+export interface FeedPage<T> {
+  items: T[]
+  cursor: string | null
+  hasMore: boolean
 }
 
-export const feedPageSchema: z.ZodType<FeedPage> = z.object({
-  continueCursor: z.string(),
-  isDone: z.boolean(),
+export const feedPageSchema: z.ZodType<FeedPage<FeedCard>> = z.object({
+  cursor: z.string().nullable(),
+  hasMore: z.boolean(),
   items: z.array(feedCardSchema).max(FEED_PAGE_SIZE),
-  perPage: z.literal(FEED_PAGE_SIZE),
 }).strict()
 
 export interface ReviewListItem {
