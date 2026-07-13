@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
 import { AnimeDetailPage } from '#/features/anime-detail/ui/anime-detail-page'
-import { createCanonicalAnimePath, normalizeAnimeDetailTab, type AnimeDetailTab } from '#/features/anime-detail/shared/anime-detail-contracts'
+import { createCanonicalAnimePath, normalizeAnimeDetailTab, type AnimeDetailTab, type PublicAnimeDetailState } from '#/features/anime-detail/shared/anime-detail-contracts'
 
 type AnimeDetailSearch = { tab?: Exclude<AnimeDetailTab, 'overview'> }
 
@@ -11,14 +11,20 @@ export const serializeAnimeTab = (value: unknown): AnimeDetailSearch => {
   return tab === 'overview' ? {} : { tab }
 }
 
+/** Keeps tab history scroll-stable for browser back and forward. */
+export const getAnimeTabNavigationOptions = (tab: AnimeDetailTab) => ({ search: serializeAnimeTab(tab), resetScroll: false as const })
+
+/** Returns canonical replacement target only when loaded slug is stale. */
+export const getStaleSlugRedirectHref = (state: PublicAnimeDetailState, slug: string, search: string): string | null => state.status === 'ready' && slug !== state.entry.detail.slug
+  ? createCanonicalAnimePath(state.entry.detail.anilistId, state.entry.detail.titles.display, normalizeAnimeDetailTab(new URLSearchParams(search).get('tab')))
+  : null
+
 export const Route = createFileRoute('/_public/anime/$anilistId/$slug')({
   validateSearch: (search) => serializeAnimeTab(search.tab),
   loader: ({ params, location, context }) => {
-    const state = context.queryClient.getQueryData(['anime-detail', Number(params.anilistId)]) as { status: string; entry?: { detail: { anilistId: number; slug: string; titles: { display: string } } } } | undefined
-    if (state?.status === 'ready' && state.entry && params.slug !== state.entry.detail.slug) {
-      const tab = normalizeAnimeDetailTab(new URLSearchParams(location.searchStr).get('tab'))
-      throw redirect({ href: createCanonicalAnimePath(state.entry.detail.anilistId, state.entry.detail.titles.display, tab), replace: true })
-    }
+    const state = context.queryClient.getQueryData(['anime-detail', Number(params.anilistId)]) as PublicAnimeDetailState
+    const href = getStaleSlugRedirectHref(state, params.slug, location.searchStr)
+    if (href) throw redirect({ href, replace: true })
     return null
   },
   component: AnimeDetailRoute,
@@ -28,5 +34,5 @@ function AnimeDetailRoute() {
   const state = Route.parentRoute.useLoaderData()
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  return <AnimeDetailPage state={state} tab={normalizeAnimeDetailTab(search.tab)} onTabChange={(tab) => void navigate({ search: serializeAnimeTab(tab), resetScroll: false })} />
+  return <AnimeDetailPage state={state} tab={normalizeAnimeDetailTab(search.tab)} onTabChange={(tab) => void navigate(getAnimeTabNavigationOptions(tab))} />
 }

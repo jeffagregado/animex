@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { parseAnimeRouteId } from './$anilistId/route'
-import { serializeAnimeTab } from './$anilistId/$slug/route'
+import { getAnimeTabNavigationOptions, getStaleSlugRedirectHref, serializeAnimeTab } from './$anilistId/$slug/route'
+import { getMissingSlugRedirectHref } from './$anilistId/index'
+import type { PublicAnimeDetailState } from '#/features/anime-detail/shared/anime-detail-contracts'
 
 describe('anime detail route state', () => {
   it('accepts only positive safe integer route IDs', () => {
@@ -13,5 +15,18 @@ describe('anime detail route state', () => {
     expect(serializeAnimeTab('overview')).toEqual({})
     expect(serializeAnimeTab('reviews')).toEqual({ tab: 'reviews' })
     expect(serializeAnimeTab('invalid')).toEqual({})
+  })
+
+  it('preserves valid tabs in stale-slug replacement and leaves non-ready states visible', () => {
+    const ready = { status: 'ready', entry: { detail: { anilistId: 1, slug: 'frieren', titles: { display: 'Frieren' } } } } as PublicAnimeDetailState
+    expect(getStaleSlugRedirectHref(ready, 'old', '?tab=staff')).toBe('/anime/1/frieren?tab=staff')
+    expect(getStaleSlugRedirectHref({ status: 'not-found', code: 'NOT_FOUND', message: 'Missing' }, 'old', '?tab=staff')).toBeNull()
+    expect(getMissingSlugRedirectHref(ready, '?tab=characters')).toBe('/anime/1/frieren?tab=characters')
+    expect(getMissingSlugRedirectHref({ status: 'error', code: 'UPSTREAM', message: 'Down', retryAfterSeconds: null }, '?tab=staff')).toBeNull()
+  })
+
+  it('creates scroll-stable tab navigation options', () => {
+    expect(getAnimeTabNavigationOptions('overview')).toEqual({ search: {}, resetScroll: false })
+    expect(getAnimeTabNavigationOptions('characters')).toEqual({ search: { tab: 'characters' }, resetScroll: false })
   })
 })

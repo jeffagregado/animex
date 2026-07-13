@@ -31,6 +31,18 @@ describe('AnimeDetailPage', () => {
     expect(screen.getByText('Average rating unavailable · 0 reviews')).toBeTruthy()
   })
 
+  it('supports roving keyboard tabs with linked tabpanel semantics', () => {
+    const onTabChange = vi.fn()
+    render(<AnimeDetailPage state={state} tab="overview" onTabChange={onTabChange} />)
+    const overview = screen.getByRole('tab', { name: 'Overview' })
+    const reviews = screen.getByRole('tab', { name: 'Reviews' })
+    expect(overview.tabIndex).toBe(0); expect(reviews.tabIndex).toBe(-1)
+    fireEvent.keyDown(overview, { key: 'ArrowRight' })
+    expect(onTabChange).toHaveBeenCalledWith('reviews')
+    expect(reviews.getAttribute('aria-controls')).toBe('anime-panel-reviews')
+    expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('anime-tab-overview')
+  })
+
   it('shows distinct not-found and rate-limit states', () => {
     const { rerender } = render(<AnimeDetailPage state={{ status: 'not-found', code: 'NOT_FOUND', message: 'Missing.' }} tab="overview" onTabChange={vi.fn()} />)
     expect(screen.getByRole('heading', { name: 'Anime not found' })).toBeTruthy()
