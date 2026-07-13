@@ -83,6 +83,8 @@ describe('social Convex integration', () => {
       bodyJson, visibility: 'public',
     })
     expect(publishedId).toBe(draftId)
+    const reviewFeed = await viewer.client.query(socialApi.feed.listGlobal, { cursor: null })
+    expect(reviewFeed.items).toContainEqual(expect.objectContaining({ kind: 'review', reviewId: draftId }))
     expect(await owner.client.mutation(socialApi.reviews.publish, {
       anilistId: 1, requestId: 'publish-1', rating: 95, summary: 'Great', summaryHasSpoiler: false,
       bodyJson, visibility: 'public',

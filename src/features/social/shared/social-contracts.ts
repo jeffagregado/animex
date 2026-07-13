@@ -77,6 +77,7 @@ const reviewFeedCardSchema = z.object({
   kind: z.literal('review'),
   publishedAt: timestampSchema,
   rating: reviewRatingSchema.unwrap(),
+  reviewId: idSchema,
   summary: z.string().trim().min(1).max(REVIEW_SUMMARY_LIMIT),
   summaryHasSpoiler: z.boolean(),
   updatedAt: timestampSchema,

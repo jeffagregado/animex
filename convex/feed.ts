@@ -14,7 +14,7 @@ const authorValidator = v.object({ id: v.string(), username: v.string(), display
 const animeValidator = v.object({ anilistId: v.number(), slug: v.string(), title: v.string(), coverImageUrl: v.union(v.string(), v.null()) })
 const feedCardValidator = v.union(
   v.object({ id: v.string(), kind: v.literal('post'), author: authorValidator, text: v.string(), imageUrls: v.array(v.string()), hasSpoiler: v.boolean(), visibility: visibilityValidator, createdAt: v.number(), updatedAt: v.number() }),
-  v.object({ id: v.string(), kind: v.literal('review'), author: authorValidator, anime: animeValidator, rating: v.number(), summary: v.string(), summaryHasSpoiler: v.boolean(), visibility: visibilityValidator, publishedAt: v.number(), updatedAt: v.number() }),
+  v.object({ id: v.string(), reviewId: v.string(), kind: v.literal('review'), author: authorValidator, anime: animeValidator, rating: v.number(), summary: v.string(), summaryHasSpoiler: v.boolean(), visibility: visibilityValidator, publishedAt: v.number(), updatedAt: v.number() }),
   v.object({ id: v.string(), kind: v.literal('completed'), author: authorValidator, anime: animeValidator, settledAt: v.number() }),
   v.object({ id: v.string(), kind: v.literal('rewatched'), author: authorValidator, anime: animeValidator, settledAt: v.number() }),
 )
@@ -53,7 +53,7 @@ const resolveReviewCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, author: 
   const reviewId = card.sourceId ? ctx.db.normalizeId('reviews', card.sourceId) : null
   const review = reviewId ? await ctx.db.get('reviews', reviewId) : null
   if (!review || review.rating === null || review.publishedAt === undefined) return fail('FEED_SOURCE_MISSING', 'Feed Review source is missing.')
-  return { id: card._id, kind: 'review', author, anime: await getAnime(ctx, review.anilistId), rating: review.rating, summary: review.summary, summaryHasSpoiler: review.summaryHasSpoiler, visibility: review.visibility, publishedAt: review.publishedAt, updatedAt: review.updatedAt }
+  return { id: card._id, reviewId: review._id, kind: 'review', author, anime: await getAnime(ctx, review.anilistId), rating: review.rating, summary: review.summary, summaryHasSpoiler: review.summaryHasSpoiler, visibility: review.visibility, publishedAt: review.publishedAt, updatedAt: review.updatedAt }
 }
 
 const resolveMilestoneCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, author: FeedAuthor): Promise<FeedCard> => {
