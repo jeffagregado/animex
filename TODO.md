@@ -659,3 +659,15 @@ Status: design approved; written spec ready for review.
 - [x] Lock stable desktop shell, sidebar, controls, tabs, and responsive translation.
 - [x] Define tab-content boundaries and implementation constraints.
 - [x] Write and self-review consistency specification.
+
+# Phase 4 Anime Detail Implementation
+
+Status: IN PROGRESS on `jeff-cx/phase-4-anime-detail`.
+
+- [ ] Lock and test shared contracts. Owner: contract worker.
+- [ ] Build server-only AniList detail transport and 24-hour Convex detail/page cache. Owner: server/cache worker.
+- [ ] Build authenticated user anime state, milestones, and paginated rewatch history. Owner: Convex worker.
+- [ ] Build canonical route shell, redirects, tabs, states, and responsive layout. Owner: route/shell worker.
+- [ ] Build tab content, pagination, user controls, and rewatch dialog. Owner: UI worker.
+- [ ] Link all Discover anime surfaces to canonical detail routes. Owner: Discover worker.
+- [ ] Integrate, regenerate routes, push Convex schema, review, validate, browser-QA, document, and close Phase 4. Owner: controller + reviewer + QA + docs mapper.
