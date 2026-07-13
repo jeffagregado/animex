@@ -17,7 +17,7 @@ export const ANIME_REWATCHES_PER_PAGE = 20 as const
 export const ANIME_EXTERNAL_LINKS_LIMIT = 8 as const
 export const ANIME_DETAIL_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
-export const animeDetailTabSchema = z.enum(['overview', 'reviews', 'characters', 'staff'])
+const animeDetailTabSchema = z.enum(['overview', 'reviews', 'characters', 'staff'])
 export const animePeopleKindSchema = z.enum(['characters', 'staff'])
 export const animeStatusSchema = z.enum(['watching', 'planned', 'dropped', 'completed', 'rewatched'])
 export const animeScoreSchema = z.number().min(0).max(10).multipleOf(0.1).nullable()
@@ -166,14 +166,14 @@ export interface AnimePeoplePage<T> {
   perPage: 24
 }
 
-export const animeVoiceActorSchema: z.ZodType<AnimeVoiceActor> = z.object({
+const animeVoiceActorSchema: z.ZodType<AnimeVoiceActor> = z.object({
   anilistId: positiveSafeIntegerSchema,
   name: z.string().trim().min(1),
   imageUrl: nullableHttpsUrlSchema,
   language: z.literal('Japanese'),
 }).strict()
 
-export const animeCharacterSchema: z.ZodType<AnimeCharacter> = z.object({
+const animeCharacterSchema: z.ZodType<AnimeCharacter> = z.object({
   anilistId: positiveSafeIntegerSchema,
   name: z.string().trim().min(1),
   role: z.enum(['MAIN', 'SUPPORTING', 'BACKGROUND']),
@@ -181,7 +181,7 @@ export const animeCharacterSchema: z.ZodType<AnimeCharacter> = z.object({
   japaneseVoiceActor: animeVoiceActorSchema.nullable(),
 }).strict()
 
-export const animeStaffSchema: z.ZodType<AnimeStaff> = z.object({
+const animeStaffSchema: z.ZodType<AnimeStaff> = z.object({
   anilistId: positiveSafeIntegerSchema,
   name: z.string().trim().min(1),
   role: z.string().trim().min(1),
@@ -265,7 +265,7 @@ export interface AnimeDetailCacheEntry {
 }
 
 const timestampSchema = z.number().finite().nonnegative()
-export const animeDetailCacheEntrySchema: z.ZodType<AnimeDetailCacheEntry> = z.object({
+const animeDetailCacheEntrySchema: z.ZodType<AnimeDetailCacheEntry> = z.object({
   detail: animeDetailSchema,
   refreshedAt: timestampSchema,
   expiresAt: timestampSchema,
@@ -306,7 +306,7 @@ export interface UserAnimeEntry {
   updatedAt: number
 }
 
-export const animeMilestoneKindSchema = z.enum(['completed', 'rewatched'])
+const animeMilestoneKindSchema = z.enum(['completed', 'rewatched'])
 export type AnimeMilestoneKind = z.infer<typeof animeMilestoneKindSchema>
 
 export interface AnimeMilestone {
@@ -353,7 +353,7 @@ export const animeMilestoneSchema: z.ZodType<AnimeMilestone> = z.object({
   settledAt: timestampSchema,
 }).strict()
 
-export const animeRewatchEntrySchema: z.ZodType<AnimeRewatchEntry> = z.object({
+const animeRewatchEntrySchema: z.ZodType<AnimeRewatchEntry> = z.object({
   id: z.string().trim().min(1),
   anilistId: positiveSafeIntegerSchema,
   completedAt: timestampSchema,

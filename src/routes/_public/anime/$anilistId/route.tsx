@@ -4,7 +4,7 @@ import { queryOptions } from '@tanstack/react-query'
 import { getAnimeDetail } from '#/features/anime-detail/server/anime-detail.functions'
 import { parseAnilistId, type PublicAnimeDetailState } from '#/features/anime-detail/shared/anime-detail-contracts'
 
-export const ANIME_DETAIL_STALE_TIME_MS = 15 * 60 * 1000
+const ANIME_DETAIL_STALE_TIME_MS = 15 * 60 * 1000
 
 /** Parses a route parameter without accepting partial or unsafe numbers. */
 export const parseAnimeRouteId = (value: string): number => {
@@ -13,7 +13,7 @@ export const parseAnimeRouteId = (value: string): number => {
 }
 
 /** Defines the one hydrated browser query for public detail metadata. */
-export const animeDetailQueryOptions = (anilistId: number) => queryOptions({
+const animeDetailQueryOptions = (anilistId: number) => queryOptions({
   queryKey: ['anime-detail', anilistId],
   queryFn: async (): Promise<PublicAnimeDetailState> => await getAnimeDetail({ data: { anilistId } }),
   staleTime: ANIME_DETAIL_STALE_TIME_MS,
