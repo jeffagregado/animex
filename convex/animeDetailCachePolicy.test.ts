@@ -8,6 +8,7 @@ import {
   decideDetailLease,
   decideDetailLeaseRelease,
   resolveDetailRead,
+  validateDetailCommit,
   validatePeoplePage,
 } from './animeDetailCachePolicy'
 import { DiscoverCachePolicyError, validateCacheWriteToken } from './animeCachePolicy'
@@ -21,6 +22,21 @@ const getError = (run: () => void): AnimeDetailCachePolicyError => {
 }
 
 describe('anime detail cache policy', () => {
+  const emptyPage = { items: [], currentPage: 1, hasNextPage: false, perPage: 24 as const }
+  const detail = {
+    anilistId: 1, slug: 'one', titles: { display: 'One', english: 'One', romaji: null, native: null },
+    coverImageUrl: 'https://example.com/cover.jpg', bannerImageUrl: null, synopsis: null, format: 'TV', status: 'FINISHED', source: null,
+    season: null, seasonYear: 2024, episodes: 1, durationMinutes: 24, startDate: { year: 2024, month: 1, day: 1 }, endDate: null,
+    genres: ['Fantasy'], mainStudio: { name: 'Studio', siteUrl: 'https://example.com' }, related: [], recommendations: [],
+    trailer: { youtubeId: 'abc', thumbnailUrl: 'https://example.com/trailer.jpg' }, externalLinks: [{ site: 'Official', url: 'https://example.com/anime' }],
+    charactersPage: emptyPage, staffPage: emptyPage,
+  }
+  const summary = {
+    anilistId: 1, slug: 'one', titles: detail.titles, coverImageUrl: detail.coverImageUrl, bannerImageUrl: null, format: 'TV', season: null,
+    seasonYear: 2024, episodes: 1, genres: ['Fantasy'], popularity: 1, averageScore: 80, trending: 1,
+    startDate: detail.startDate, nextAiringAt: 1,
+  }
+
   test('uses an exact 24-hour cache window and hides expired payloads', () => {
     expect(ANIME_DETAIL_CACHE_TTL_MS).toBe(24 * 60 * 60 * 1000)
     expect(createDetailTiming(100)).toEqual({ refreshedAt: 100, expiresAt: 100 + ANIME_DETAIL_CACHE_TTL_MS })
@@ -52,8 +68,20 @@ describe('anime detail cache policy', () => {
     expect(() => validatePeoplePage(1, 'staff', 1, [staff])).not.toThrow()
     expect(getError(() => validatePeoplePage(1, 'characters', 1, [staff])).code).toBe('INVALID_PEOPLE_KIND')
     expect(getError(() => validatePeoplePage(1, 'staff', 1, [character])).code).toBe('INVALID_PEOPLE_KIND')
+    expect(getError(() => validatePeoplePage(1, 'characters', 1, [{ ...character, anilistId: 0 }])).code).toBe('INVALID_DETAIL')
+    expect(getError(() => validatePeoplePage(1, 'staff', 1, [{ ...staff, imageUrl: 'http://example.com' }])).code).toBe('INVALID_DETAIL')
     expect(getError(() => validatePeoplePage(0, 'characters', 1, [])).code).toBe('INVALID_ANILIST_ID')
     expect(getError(() => validatePeoplePage(1, 'characters', 0, [])).code).toBe('INVALID_PAGE')
     expect(getError(() => validatePeoplePage(1, 'characters', 1, Array.from({ length: 25 }))).code).toBe('PEOPLE_PAGE_LIMIT_EXCEEDED')
+  })
+
+  test('rejects malformed detail and summary writes at frozen contract boundaries', () => {
+    expect(() => validateDetailCommit(detail, summary)).not.toThrow()
+    expect(getError(() => validateDetailCommit({ ...detail, slug: '' }, summary)).code).toBe('INVALID_DETAIL')
+    expect(getError(() => validateDetailCommit({ ...detail, coverImageUrl: 'http://example.com' }, summary)).code).toBe('INVALID_DETAIL')
+    expect(getError(() => validateDetailCommit({ ...detail, episodes: -1 }, summary)).code).toBe('INVALID_DETAIL')
+    expect(getError(() => validateDetailCommit({ ...detail, startDate: { year: 2024, month: 13, day: 1 } }, summary)).code).toBe('INVALID_DETAIL')
+    expect(getError(() => validateDetailCommit({ ...detail, related: [{ anilistId: 0, slug: 'bad', title: 'Bad', coverImageUrl: null, format: null, seasonYear: null }] }, summary)).code).toBe('INVALID_DETAIL')
+    expect(getError(() => validateDetailCommit(detail, { ...summary, popularity: -1 })).code).toBe('INVALID_SUMMARY')
   })
 })

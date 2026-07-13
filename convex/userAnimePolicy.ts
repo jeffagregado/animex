@@ -1,4 +1,34 @@
 export type AnimeStatus = 'watching' | 'planned' | 'dropped' | 'completed' | 'rewatched'
+export const ANIME_REWATCH_PAGE_SIZE = 20
+
+/** Wraps saved user state in the frozen mutation result contract. */
+export const toSavedResult = <T>(entry: T) => ({ status: 'saved' as const, entry })
+
+/** Validates the fixed-size opaque cursor input. */
+export const assertRewatchPageInput = (input: { numItems: number; cursor: unknown }): void => {
+  if (input.numItems !== ANIME_REWATCH_PAGE_SIZE) throw new RangeError('Rewatch history page size must be 20.')
+  if (input.cursor !== null && typeof input.cursor !== 'string') throw new TypeError('Rewatch history cursor must be a string or null.')
+}
+
+/** Maps Convex pagination to the frozen public cursor contract. */
+export const formatRewatchPage = <T>(result: { page: T[]; continueCursor: string; isDone: boolean }) => ({
+  items: result.page,
+  continueCursor: result.continueCursor,
+  isDone: result.isDone,
+  perPage: ANIME_REWATCH_PAGE_SIZE as 20,
+})
+
+/** Builds a new milestone with visibility captured only at creation. */
+export const createMilestoneInsert = <TUserId>(
+  userId: TUserId,
+  anilistId: number,
+  kind: 'completed' | 'rewatched',
+  visibility: 'private' | 'followers' | 'public',
+  now: number,
+) => ({ userId, anilistId, kind, visibility, occurredAt: now, updatedAt: now })
+
+/** Bumps milestone time without changing its settled visibility. */
+export const createMilestoneTimestampPatch = (now: number) => ({ occurredAt: now, updatedAt: now })
 
 /** Validates a nullable score with at most one decimal place. */
 export const normalizeScore = (score: number | null): number | null => {

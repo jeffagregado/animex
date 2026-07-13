@@ -11,6 +11,7 @@ import {
   decideDetailLease,
   decideDetailLeaseRelease,
   resolveDetailRead,
+  validateDetailCommit,
   validatePeoplePage,
 } from './animeDetailCachePolicy'
 
@@ -108,13 +109,10 @@ const requireLease = async (ctx: MutationCtx, key: string, leaseId: string, now:
 export const commitDetail = mutation({
   args: { leaseId: v.string(), token: v.string(), summary: summaryValidator, detail: detailValidator }, returns: v.null(),
   handler: async (ctx, args) => {
-    requireCacheWriteToken(args.token); assertPositive(args.detail.anilistId, 'anilistId')
-    if (args.summary.anilistId !== args.detail.anilistId || args.detail.related.length > 5 || args.detail.recommendations.length > 5 || args.detail.externalLinks.length > 8) throw new ConvexError({ code: 'INVALID_DETAIL', message: 'Detail identity or bounded lists are invalid.' })
+    requireCacheWriteToken(args.token)
     try {
-      validatePeoplePage(args.detail.anilistId, 'characters', args.detail.charactersPage.currentPage, args.detail.charactersPage.items)
-      validatePeoplePage(args.detail.anilistId, 'staff', args.detail.staffPage.currentPage, args.detail.staffPage.items)
+      validateDetailCommit(args.detail, args.summary)
     } catch (error) { return failPolicy(error) }
-    if (args.detail.charactersPage.currentPage !== 1 || args.detail.staffPage.currentPage !== 1) throw new ConvexError({ code: 'INVALID_DETAIL', message: 'Initial Character and Staff pages must be page 1.' })
     const now = Date.now(); const lease = await requireLease(ctx, detailKey(args.detail.anilistId), args.leaseId, now); const timing = createDetailTiming(now)
     const summary = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', args.summary.anilistId)).unique()
     if (summary) await ctx.db.patch(summary._id, { ...args.summary, updatedAt: now }); else await ctx.db.insert('animeSummaries', { ...args.summary, updatedAt: now })

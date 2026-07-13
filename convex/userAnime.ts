@@ -1,10 +1,21 @@
-import { paginationOptsValidator, paginationResultValidator } from 'convex/server'
+import { paginationOptsValidator } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
 
 import { type Doc, type Id } from './_generated/dataModel'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { requireProfile } from './users'
-import { applyFavorite, decideStatusChange, normalizeScore, rollbackRewatch, type AnimeStatus } from './userAnimePolicy'
+import {
+  applyFavorite,
+  assertRewatchPageInput,
+  createMilestoneInsert,
+  createMilestoneTimestampPatch,
+  decideStatusChange,
+  formatRewatchPage,
+  normalizeScore,
+  rollbackRewatch,
+  toSavedResult,
+  type AnimeStatus,
+} from './userAnimePolicy'
 
 const statusValidator = v.union(v.literal('watching'), v.literal('planned'), v.literal('dropped'), v.literal('completed'), v.literal('rewatched'))
 const nullableStatusValidator = v.union(statusValidator, v.null())
@@ -13,10 +24,14 @@ const entryValidator = v.object({
   favoriteChangedAt: v.union(v.number(), v.null()), rewatchCount: v.number(), createdAt: v.number(), updatedAt: v.number(),
 })
 const rewatchValidator = v.object({ id: v.string(), anilistId: v.number(), completedAt: v.number() })
+const savedResultValidator = v.object({ status: v.literal('saved'), entry: entryValidator })
+const rewatchPageValidator = v.object({
+  items: v.array(rewatchValidator), continueCursor: v.string(), isDone: v.boolean(), perPage: v.literal(20),
+})
 type UserCtx = QueryCtx | MutationCtx
 type Profile = Doc<'users'>
 
-const toPublicEntry = (entry: Doc<'userAnimeEntries'>) => ({
+export const toPublicEntry = (entry: Doc<'userAnimeEntries'>) => ({
   anilistId: entry.anilistId,
   status: entry.status,
   score: entry.score,
@@ -32,11 +47,31 @@ const assertAnilistId = (anilistId: number): void => {
 }
 
 /** Requires the anime to exist in the normalized summary cache. */
-const requireCachedAnime = async (ctx: UserCtx, anilistId: number): Promise<void> => {
+export const requireCachedAnimeWith = async (
+  anilistId: number,
+  findAnime: (id: number) => Promise<unknown | null>,
+): Promise<void> => {
   assertAnilistId(anilistId)
-  const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', anilistId)).unique()
+  const anime = await findAnime(anilistId)
   if (!anime) throw new ConvexError({ code: 'ANIME_NOT_CACHED', message: 'Anime must be loaded before saving user state.' })
 }
+
+const requireCachedAnime = async (ctx: UserCtx, anilistId: number): Promise<void> => await requireCachedAnimeWith(
+  anilistId,
+  async (id) => await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', id)).unique(),
+)
+
+/** Runs one opaque-cursor history page scoped to the authenticated owner. */
+export const listOwnedRewatchesWith = async <TUserId, TItem>(
+  userId: TUserId,
+  anilistId: number,
+  paginationOpts: { numItems: number; cursor: string | null },
+  paginate: (
+    ownerId: TUserId,
+    animeId: number,
+    options: { numItems: number; cursor: string | null },
+  ) => Promise<{ page: TItem[]; continueCursor: string; isDone: boolean }>,
+) => formatRewatchPage(await paginate(userId, anilistId, paginationOpts))
 
 const readEntry = async (ctx: UserCtx, userId: Id<'users'>, anilistId: number) => await ctx.db
   .query('userAnimeEntries').withIndex('by_user_anime', (q) => q.eq('userId', userId).eq('anilistId', anilistId)).unique()
@@ -57,7 +92,7 @@ const readMilestone = async (ctx: UserCtx, userId: Id<'users'>, anilistId: numbe
 const createMilestoneOnce = async (ctx: MutationCtx, profile: Profile, anilistId: number, kind: 'completed' | 'rewatched', now: number) => {
   const existing = await readMilestone(ctx, profile._id, anilistId, kind)
   if (existing) return existing
-  const id = await ctx.db.insert('animeMilestones', { userId: profile._id, anilistId, kind, visibility: profile.visibility, occurredAt: now, updatedAt: now })
+  const id = await ctx.db.insert('animeMilestones', createMilestoneInsert(profile._id, anilistId, kind, profile.visibility, now))
   return await ctx.db.get('animeMilestones', id)
 }
 
@@ -65,7 +100,7 @@ const createMilestoneOnce = async (ctx: MutationCtx, profile: Profile, anilistId
 const addRewatch = async (ctx: MutationCtx, profile: Profile, entry: Doc<'userAnimeEntries'>, now: number): Promise<void> => {
   await ctx.db.insert('animeRewatchEntries', { entryId: entry._id, userId: profile._id, anilistId: entry.anilistId, completedAt: now })
   const milestone = await readMilestone(ctx, profile._id, entry.anilistId, 'rewatched')
-  if (milestone) await ctx.db.patch(milestone._id, { occurredAt: now, updatedAt: now })
+  if (milestone) await ctx.db.patch(milestone._id, createMilestoneTimestampPatch(now))
   else await createMilestoneOnce(ctx, profile, entry.anilistId, 'rewatched', now)
   await ctx.db.patch(entry._id, { rewatchCount: entry.rewatchCount + 1, updatedAt: now })
 }
@@ -82,18 +117,22 @@ export const getMine = query({
 
 /** Lists only the authenticated owner's rewatch history, fixed at 20 per page. */
 export const listMyRewatches = query({
-  args: { anilistId: v.number(), paginationOpts: paginationOptsValidator }, returns: paginationResultValidator(rewatchValidator),
+  args: { anilistId: v.number(), paginationOpts: paginationOptsValidator }, returns: rewatchPageValidator,
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId)
-    if (args.paginationOpts.numItems !== 20) throw new ConvexError({ code: 'INVALID_PAGE_SIZE', message: 'Rewatch history page size must be 20.' })
-    const result = await ctx.db.query('animeRewatchEntries').withIndex('by_user_anime_completed_at', (q) => q.eq('userId', profile._id).eq('anilistId', args.anilistId)).order('desc').paginate(args.paginationOpts)
-    return { ...result, page: result.page.map((item) => ({ id: item._id, anilistId: item.anilistId, completedAt: item.completedAt })) }
+    try { assertRewatchPageInput(args.paginationOpts) } catch (error) {
+      throw new ConvexError({ code: 'INVALID_PAGINATION', message: error instanceof Error ? error.message : 'Rewatch pagination is invalid.' })
+    }
+    return await listOwnedRewatchesWith(profile._id, args.anilistId, args.paginationOpts, async (userId, anilistId, paginationOpts) => {
+      const result = await ctx.db.query('animeRewatchEntries').withIndex('by_user_anime_completed_at', (q) => q.eq('userId', userId).eq('anilistId', anilistId)).order('desc').paginate(paginationOpts)
+      return { ...result, page: result.page.map((item) => ({ id: item._id, anilistId: item.anilistId, completedAt: item.completedAt })) }
+    })
   },
 })
 
 /** Sets status and applies settled completion/rewatch rules. */
 export const setStatus = mutation({
-  args: { anilistId: v.number(), status: statusValidator }, returns: entryValidator,
+  args: { anilistId: v.number(), status: statusValidator }, returns: savedResultValidator,
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const now = Date.now()
     const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
@@ -104,44 +143,44 @@ export const setStatus = mutation({
     await ctx.db.patch(entry._id, { status: args.status, updatedAt: now })
     const saved = await ctx.db.get('userAnimeEntries', entry._id)
     if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' })
-    return toPublicEntry(saved)
+    return toSavedResult(toPublicEntry(saved))
   },
 })
 
 /** Saves or clears a validated score without creating milestones. */
 export const setScore = mutation({
-  args: { anilistId: v.number(), score: v.union(v.number(), v.null()) }, returns: entryValidator,
+  args: { anilistId: v.number(), score: v.union(v.number(), v.null()) }, returns: savedResultValidator,
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const now = Date.now(); let score
     try { score = normalizeScore(args.score) } catch (error) { throw new ConvexError({ code: 'INVALID_SCORE', message: error instanceof Error ? error.message : 'Score is invalid.' }) }
     const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now); await ctx.db.patch(entry._id, { score, updatedAt: now })
-    const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toPublicEntry(saved)
+    const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
   },
 })
 
 /** Sets explicit favorite state with idempotent timestamps. */
 export const setFavorite = mutation({
-  args: { anilistId: v.number(), isFavorite: v.boolean() }, returns: entryValidator,
+  args: { anilistId: v.number(), isFavorite: v.boolean() }, returns: savedResultValidator,
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const now = Date.now(); const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
     await ctx.db.patch(entry._id, { favoriteAt: applyFavorite(entry.favoriteAt, args.isFavorite, now), updatedAt: now })
-    const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toPublicEntry(saved)
+    const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
   },
 })
 
 /** Explicitly records another completed rewatch. */
 export const recordRewatch = mutation({
-  args: { anilistId: v.number() }, returns: entryValidator,
+  args: { anilistId: v.number() }, returns: savedResultValidator,
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const now = Date.now(); const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
     await addRewatch(ctx, profile, entry, now); await ctx.db.patch(entry._id, { status: 'rewatched', updatedAt: now })
-    const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toPublicEntry(saved)
+    const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
   },
 })
 
 /** Removes the latest owned rewatch and rolls milestone/status state back. */
 export const removeLatestRewatch = mutation({
-  args: { anilistId: v.number() }, returns: entryValidator,
+  args: { anilistId: v.number() }, returns: savedResultValidator,
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const entry = await readEntry(ctx, profile._id, args.anilistId)
     if (!entry) throw new ConvexError({ code: 'REWATCH_NOT_FOUND', message: 'No rewatch exists to remove.' })
@@ -150,8 +189,8 @@ export const removeLatestRewatch = mutation({
     const now = Date.now(); const rollback = rollbackRewatch(history.map((item) => item.completedAt), entry.status as AnimeStatus | null); await ctx.db.delete(history[0]._id)
     const milestone = await readMilestone(ctx, profile._id, args.anilistId, 'rewatched')
     if (milestone && rollback.milestoneAt === null) await ctx.db.delete(milestone._id)
-    else if (milestone && rollback.milestoneAt !== null) await ctx.db.patch(milestone._id, { occurredAt: rollback.milestoneAt, updatedAt: now })
+    else if (milestone && rollback.milestoneAt !== null) await ctx.db.patch(milestone._id, { ...createMilestoneTimestampPatch(now), occurredAt: rollback.milestoneAt })
     await ctx.db.patch(entry._id, { rewatchCount: Math.max(0, entry.rewatchCount - 1), status: rollback.nextStatus, updatedAt: now })
-    const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toPublicEntry(saved)
+    const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
   },
 })
