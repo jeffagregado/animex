@@ -22,7 +22,7 @@ describe('FeedCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reveal Post spoiler' }))
     expect(screen.getByText('Secret')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Like · Coming in Phase 6' }).hasAttribute('disabled')).toBe(true)
-    expect(screen.queryByText(/\b\d+\b/)).toBeNull()
+    expect(screen.queryByText('142')).toBeNull()
   })
 
   it('routes Review cards with reviewId and reveals only Summary', () => {
@@ -36,7 +36,7 @@ describe('FeedCard', () => {
   })
 
   it.each(['completed', 'rewatched'] as const)('renders compact %s Anime Detail activity', (kind) => {
-    const card: FeedCardData = { ...common, kind, anime, settledAt: 1 }
+    const card: FeedCardData = { ...common, kind, anime, settledAt: 1, visibility: 'private' }
     render(<FeedCard card={card} onChanged={() => undefined} onEdit={() => undefined} owner={false} signedIn={false} />)
     expect(screen.getByRole('link', { name: /View Anime Detail/ }).getAttribute('href')).toBe('/anime/154587/frieren')
     expect(screen.getByText(kind === 'completed' ? 'Completed' : 'Rewatched')).toBeTruthy()

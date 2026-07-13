@@ -12,16 +12,21 @@ Status: implemented. Controller integration still owns generated route tree.
 - Added browser image validation, resize/re-encode, GIF pass-through, upload claim/register/discard cleanup.
 - Added complete-user mobile Create entry. No Profile destination.
 - Removed fake feed records, counts, favorites, and private metrics.
+- Gated private feeds and mutation UI on both complete public auth and Convex auth; feed scope reloads across auth changes.
+- Hardened feed paging against stale view/auth responses, duplicate cursor requests, and destructive retry resets.
+- Made upload cancellation explicit across claim, storage, and register stages with awaited cleanup and submit locking.
+- Replaced browser confirmation with a themed Base UI discard dialog and blocked publishing errored images.
+- Added deterministic timestamps and truthful malformed/private/not-found detail states.
 
 ## Validation
 
-- `pnpm test -- src/features/feed/feed-state.test.ts src/features/feed/process-post-image.test.ts src/features/feed/feed-card.test.tsx src/features/home/home-page.test.tsx src/features/shell/public-shell.test.tsx src/features/social/shared/feed-ranking.test.ts` — 6 files, 20 tests passed.
+- `pnpm test -- src/features/feed/feed-state.test.ts src/features/feed/use-feed-pages.test.tsx src/features/feed/process-post-image.test.ts src/features/feed/use-post-composer.test.tsx src/features/feed/post-composer.test.tsx src/features/feed/feed-card.test.tsx src/features/feed/feed-card-detail-page.test.tsx src/features/feed/feed-owner-actions.test.tsx src/features/home/home-page.test.tsx src/features/shell/public-shell.test.tsx src/features/social/shared/feed-ranking.test.ts` — 11 files, 38 tests passed.
 - `pnpm exec tsc --noEmit` — passed.
 - `git diff --check` — passed; PowerShell emitted line-ending warnings only.
 
 ## Integration Notes
 
-- Shared contract blocker resolved by controller commit `c09dda0`: Post feed DTO now provides `postId` and ordered `imageIds`.
+- Shared contract blocker resolved by controller commits `c09dda0` and `e4d52f4`: Post DTO includes ordered image IDs; direct detail accepts string IDs and returns null for malformed IDs; milestone DTO includes visibility.
 - `src/routeTree.gen.ts` changed through TanStack route discovery but remains controller-owned and excluded from this task commit.
 - Browser QA not run in worker slice. Controller QA should verify 390/768/1280 layouts, focus/touch, console, upload, and live Convex mutations.
 

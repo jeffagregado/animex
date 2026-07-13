@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { useConvexAuth } from 'convex/react'
 import { PlusSquareIcon } from 'lucide-react'
 
 import { cn } from '#/lib/utils'
@@ -10,7 +11,8 @@ import { usePublicAuthState } from './public-auth-context'
 /** Renders typed public mobile links. */
 export function MobileBottomNavigation() {
   const auth = usePublicAuthState()
-  const canCreate = auth.status === 'ready' && isCompleteAuthState(auth.authState)
+  const convexAuth = useConvexAuth()
+  const canCreate = auth.status === 'ready' && isCompleteAuthState(auth.authState) && convexAuth.isAuthenticated
   return (
     <nav
       className={cn(

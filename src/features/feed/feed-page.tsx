@@ -1,7 +1,7 @@
 import { useState } from 'react'
+import { useConvexAuth } from 'convex/react'
 import { PenLineIcon } from 'lucide-react'
 
-import { isCompleteAuthState } from '../auth/use-auth-state'
 import { SeasonalRail } from '../home/seasonal-rail'
 import { usePublicAuthState } from '../shell/public-auth-context'
 import type { FeedCard } from '../social/shared/social-contracts'
@@ -14,13 +14,14 @@ export interface HomeFeedSearch { feed: FeedView; compose: boolean }
 /** Orchestrates public/private Home feeds and shared Post composer URL state. */
 export function FeedPage({ search, onSearchChange }: { search: HomeFeedSearch; onSearchChange: (next: HomeFeedSearch) => void }) {
   const auth = usePublicAuthState()
-  const signedIn = auth.status === 'ready' && isCompleteAuthState(auth.authState)
+  const convexAuth = useConvexAuth()
   const profile = auth.status === 'ready' && auth.authState.status === 'complete' ? auth.authState.profile : null
+  const signedIn = profile !== null && convexAuth.isAuthenticated
   const view = signedIn ? search.feed : 'global'
-  const pages = useFeedPages(view)
+  const pages = useFeedPages(view, signedIn ? profile.id : 'public')
   const [edit, setEdit] = useState<Extract<FeedCard, { kind: 'post' }> | null>(null)
-  const ownerId = profile?.id ?? null
-  const visibility = profile?.visibility ?? 'public'
+  const ownerId = signedIn ? profile.id : null
+  const visibility = signedIn ? profile.visibility : 'public'
   const composerOpen = signedIn && (search.compose || edit !== null)
   const closeComposer = (): void => { setEdit(null); if (search.compose) onSearchChange({ ...search, compose: false }) }
   const saved = (): void => { closeComposer(); void pages.refresh() }

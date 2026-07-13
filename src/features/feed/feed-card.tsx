@@ -13,11 +13,7 @@ interface FeedCardProps {
 }
 
 const timestamp = (value: number): string => {
-  const elapsed = Date.now() - value
-  if (elapsed < 60_000) return 'just now'
-  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}m ago`
-  if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)}h ago`
-  return new Date(value).toLocaleDateString()
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(value)
 }
 
 /** Renders one strict discriminated feed card. */
@@ -29,7 +25,7 @@ export function FeedCard({ card, owner, signedIn, onEdit, onChanged }: FeedCardP
     <article className="rounded-xl border border-white/8 bg-card/55 p-4 shadow-lg shadow-black/10 sm:p-5">
       <header className="flex items-start gap-3">
         {card.author.avatarUrl ? <img alt={`${card.author.displayName} avatar`} className="size-11 rounded-full object-cover" src={card.author.avatarUrl} /> : <span aria-label={`${card.author.displayName} avatar`} className="grid size-11 shrink-0 place-items-center rounded-full border border-cyan-300/30 bg-cyan-300/10 font-black text-cyan-300">{card.author.displayName.slice(0, 1).toUpperCase()}</span>}
-        <div className="min-w-0 flex-1"><p className="truncate font-black">{card.author.displayName}</p><p className="text-sm text-muted-foreground">@{card.author.username} · <a className="hover:text-cyan-300 hover:underline focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/feed/${card.id}`} title={new Date(occurredAt).toLocaleString()}>{timestamp(occurredAt)}</a>{edited ? ' · Edited' : ''}</p></div>
+        <div className="min-w-0 flex-1"><p className="truncate font-black">{card.author.displayName}</p><p className="text-sm text-muted-foreground">@{card.author.username} · <a className="hover:text-cyan-300 hover:underline focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/feed/${card.id}`} title={new Date(occurredAt).toISOString()}><time dateTime={new Date(occurredAt).toISOString()}>{timestamp(occurredAt)}</time></a>{edited ? ' · Edited' : ''}</p></div>
         {owner && card.kind !== 'review' ? <FeedOwnerActions card={card} onChanged={onChanged} onEdit={() => { if (card.kind === 'post') onEdit(card) }} /> : null}
       </header>
       <div className="mt-4">{renderBody(card, revealed, () => setRevealed(true))}</div>

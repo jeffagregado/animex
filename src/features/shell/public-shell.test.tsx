@@ -14,6 +14,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from '../home/home-page'
 import { PublicShell } from './public-shell'
 
+const convex = vi.hoisted(() => ({ authenticated: true, query: vi.fn(async () => ({ items: [], cursor: null, hasMore: false })), mutation: vi.fn(() => vi.fn()) }))
+vi.mock('convex/react', () => ({ useConvexAuth: () => ({ isAuthenticated: convex.authenticated, isLoading: false }), useConvex: () => ({ query: convex.query }), useMutation: convex.mutation }))
+
 const createPublicTestRouter = (initialEntry: string) => {
   const rootRoute = createRootRoute({
     component: () => <PublicShell><Outlet /></PublicShell>,
@@ -21,7 +24,7 @@ const createPublicTestRouter = (initialEntry: string) => {
   const homeRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: 'home',
-    component: HomePage,
+    component: () => <HomePage onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} />,
   })
   const discoverRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -40,6 +43,8 @@ const createPublicTestRouter = (initialEntry: string) => {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  convex.authenticated = true
+  convex.query.mockClear()
 })
 
 describe('PublicShell', () => {
@@ -87,5 +92,15 @@ describe('PublicShell', () => {
     await screen.findByRole('button', { name: 'Sign out' })
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(screen.getByText('What are you watching?')).toBeTruthy()
+  })
+
+  it('hides mobile Create until Convex authentication is ready', async () => {
+    convex.authenticated = false
+    vi.stubGlobal('scrollTo', vi.fn())
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ status: 'complete', email: 'mika@example.com', profile: { id: 'profile-1', username: 'mika', name: 'Mika', avatarUrl: null, visibility: 'private' } }) }) as Response))
+    const { router } = createPublicTestRouter('/home')
+    render(<RouterProvider router={router} />)
+    await screen.findByRole('button', { name: 'Sign out' })
+    expect(screen.queryByText('Create')).toBeNull()
   })
 })
