@@ -2,16 +2,14 @@ import { describe, expect, test } from 'vitest'
 
 import {
   applyFavorite,
-  assertRewatchPageInput,
   createMilestoneInsert,
   createMilestoneTimestampPatch,
   decideStatusChange,
-  formatRewatchPage,
   normalizeScore,
   rollbackRewatch,
   toSavedResult,
 } from './userAnimePolicy'
-import { listOwnedRewatchesWith, requireCachedAnimeWith } from './userAnime'
+import { requireCachedAnimeWith } from './userAnime'
 
 describe('user anime policy', () => {
   test('accepts null or one-decimal scores from zero through ten', () => {
@@ -40,15 +38,9 @@ describe('user anime policy', () => {
     expect(rollbackRewatch([300], 'rewatched')).toEqual({ milestoneAt: null, nextStatus: 'completed' })
   })
 
-  test('formats frozen mutation and cursor pagination envelopes', () => {
+  test('formats frozen mutation envelopes', () => {
     const entry = { anilistId: 1, status: null }
     expect(toSavedResult(entry)).toEqual({ status: 'saved', entry })
-    expect(formatRewatchPage({ page: [{ id: 'one' }], continueCursor: 'next', isDone: false })).toEqual({
-      items: [{ id: 'one' }], continueCursor: 'next', isDone: false, perPage: 20,
-    })
-    expect(() => assertRewatchPageInput({ numItems: 20, cursor: null })).not.toThrow()
-    expect(() => assertRewatchPageInput({ numItems: 19, cursor: null })).toThrow('20')
-    expect(() => assertRewatchPageInput({ numItems: 20, cursor: 1 as never })).toThrow('cursor')
   })
 
   test('enforces cached anime identity before user operations', async () => {
@@ -57,15 +49,10 @@ describe('user anime policy', () => {
     await expect(requireCachedAnimeWith(1, async (id) => ({ id }))).resolves.toBeUndefined()
   })
 
-  test('keeps milestone visibility on bumps and scopes history to owner', async () => {
+  test('keeps milestone visibility on bumps', () => {
     expect(createMilestoneInsert('owner', 1, 'rewatched', 'private', 100)).toEqual({
       userId: 'owner', anilistId: 1, kind: 'rewatched', visibility: 'private', occurredAt: 100, updatedAt: 100,
     })
     expect(createMilestoneTimestampPatch(200)).toEqual({ occurredAt: 200, updatedAt: 200 })
-    const page = await listOwnedRewatchesWith('owner', 1, { numItems: 20, cursor: null }, async (owner, id, opts) => {
-      expect({ owner, id, opts }).toEqual({ owner: 'owner', id: 1, opts: { numItems: 20, cursor: null } })
-      return { page: [{ id: 'rewatch-1' }], continueCursor: 'next', isDone: false }
-    })
-    expect(page).toEqual({ items: [{ id: 'rewatch-1' }], continueCursor: 'next', isDone: false, perPage: 20 })
   })
 })

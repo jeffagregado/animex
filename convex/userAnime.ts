@@ -1,4 +1,3 @@
-import { paginationOptsValidator } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
 
 import { type Doc, type Id } from './_generated/dataModel'
@@ -6,11 +5,9 @@ import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/s
 import { requireProfile } from './users'
 import {
   applyFavorite,
-  assertRewatchPageInput,
   createMilestoneInsert,
   createMilestoneTimestampPatch,
   decideStatusChange,
-  formatRewatchPage,
   normalizeScore,
   rollbackRewatch,
   toSavedResult,
@@ -24,6 +21,7 @@ const entryValidator = v.object({
   favoriteChangedAt: v.union(v.number(), v.null()), rewatchCount: v.number(), createdAt: v.number(), updatedAt: v.number(),
 })
 const rewatchValidator = v.object({ id: v.string(), anilistId: v.number(), completedAt: v.number() })
+const rewatchPaginationValidator = v.object({ numItems: v.literal(20), cursor: v.union(v.string(), v.null()) })
 const savedResultValidator = v.object({ status: v.literal('saved'), entry: entryValidator })
 const rewatchPageValidator = v.object({
   items: v.array(rewatchValidator), continueCursor: v.string(), isDone: v.boolean(), perPage: v.literal(20),
@@ -61,18 +59,6 @@ const requireCachedAnime = async (ctx: UserCtx, anilistId: number): Promise<void
   async (id) => await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', id)).unique(),
 )
 
-/** Runs one opaque-cursor history page scoped to the authenticated owner. */
-export const listOwnedRewatchesWith = async <TUserId, TItem>(
-  userId: TUserId,
-  anilistId: number,
-  paginationOpts: { numItems: number; cursor: string | null },
-  paginate: (
-    ownerId: TUserId,
-    animeId: number,
-    options: { numItems: number; cursor: string | null },
-  ) => Promise<{ page: TItem[]; continueCursor: string; isDone: boolean }>,
-) => formatRewatchPage(await paginate(userId, anilistId, paginationOpts))
-
 const readEntry = async (ctx: UserCtx, userId: Id<'users'>, anilistId: number) => await ctx.db
   .query('userAnimeEntries').withIndex('by_user_anime', (q) => q.eq('userId', userId).eq('anilistId', anilistId)).unique()
 
@@ -98,7 +84,7 @@ const createMilestoneOnce = async (ctx: MutationCtx, profile: Profile, anilistId
 
 /** Records one rewatch and creates or bumps its single milestone. */
 const addRewatch = async (ctx: MutationCtx, profile: Profile, entry: Doc<'userAnimeEntries'>, now: number): Promise<void> => {
-  await ctx.db.insert('animeRewatchEntries', { entryId: entry._id, userId: profile._id, anilistId: entry.anilistId, completedAt: now })
+  await ctx.db.insert('animeRewatchEntries', { entryId: entry._id, userId: profile._id, anilistId: entry.anilistId, completedAt: now, sequence: entry.rewatchCount + 1 })
   const milestone = await readMilestone(ctx, profile._id, entry.anilistId, 'rewatched')
   if (milestone) await ctx.db.patch(milestone._id, createMilestoneTimestampPatch(now))
   else await createMilestoneOnce(ctx, profile, entry.anilistId, 'rewatched', now)
@@ -117,16 +103,30 @@ export const getMine = query({
 
 /** Lists only the authenticated owner's rewatch history, fixed at 20 per page. */
 export const listMyRewatches = query({
-  args: { anilistId: v.number(), paginationOpts: paginationOptsValidator }, returns: rewatchPageValidator,
+  args: { anilistId: v.number(), paginationOpts: rewatchPaginationValidator }, returns: rewatchPageValidator,
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId)
-    try { assertRewatchPageInput(args.paginationOpts) } catch (error) {
-      throw new ConvexError({ code: 'INVALID_PAGINATION', message: error instanceof Error ? error.message : 'Rewatch pagination is invalid.' })
+    let anchor: Doc<'animeRewatchEntries'> | null = null
+    if (args.paginationOpts.cursor !== null) {
+      const cursorId = ctx.db.normalizeId('animeRewatchEntries', args.paginationOpts.cursor)
+      if (!cursorId) throw new ConvexError({ code: 'INVALID_CURSOR', message: 'Rewatch history cursor is invalid.' })
+      anchor = await ctx.db.get('animeRewatchEntries', cursorId)
+      if (!anchor || anchor.userId !== profile._id || anchor.anilistId !== args.anilistId) {
+        throw new ConvexError({ code: 'INVALID_CURSOR', message: 'Rewatch history cursor is invalid for this owner and anime.' })
+      }
     }
-    return await listOwnedRewatchesWith(profile._id, args.anilistId, args.paginationOpts, async (userId, anilistId, paginationOpts) => {
-      const result = await ctx.db.query('animeRewatchEntries').withIndex('by_user_anime_completed_at', (q) => q.eq('userId', userId).eq('anilistId', anilistId)).order('desc').paginate(paginationOpts)
-      return { ...result, page: result.page.map((item) => ({ id: item._id, anilistId: item.anilistId, completedAt: item.completedAt })) }
-    })
+    const records = await ctx.db.query('animeRewatchEntries').withIndex('by_user_anime_sequence', (q) => {
+      const ownerAnime = q.eq('userId', profile._id).eq('anilistId', args.anilistId)
+      return anchor ? ownerAnime.lt('sequence', anchor.sequence) : ownerAnime
+    }).order('desc').take(21)
+    const page = records.slice(0, 20)
+    const isDone = records.length <= 20
+    return {
+      items: page.map((item) => ({ id: item._id, anilistId: item.anilistId, completedAt: item.completedAt })),
+      continueCursor: isDone ? '' : page[19]._id,
+      isDone,
+      perPage: 20 as const,
+    }
   },
 })
 
@@ -184,7 +184,7 @@ export const removeLatestRewatch = mutation({
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const entry = await readEntry(ctx, profile._id, args.anilistId)
     if (!entry) throw new ConvexError({ code: 'REWATCH_NOT_FOUND', message: 'No rewatch exists to remove.' })
-    const history = await ctx.db.query('animeRewatchEntries').withIndex('by_user_anime_completed_at', (q) => q.eq('userId', profile._id).eq('anilistId', args.anilistId)).order('desc').take(2)
+    const history = await ctx.db.query('animeRewatchEntries').withIndex('by_user_anime_sequence', (q) => q.eq('userId', profile._id).eq('anilistId', args.anilistId)).order('desc').take(2)
     if (!history[0]) throw new ConvexError({ code: 'REWATCH_NOT_FOUND', message: 'No rewatch exists to remove.' })
     const now = Date.now(); const rollback = rollbackRewatch(history.map((item) => item.completedAt), entry.status as AnimeStatus | null); await ctx.db.delete(history[0]._id)
     const milestone = await readMilestone(ctx, profile._id, args.anilistId, 'rewatched')

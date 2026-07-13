@@ -138,8 +138,8 @@ export default defineSchema({
     .index('by_user_status', ['userId', 'status'])
     .index('by_user_favorite_at', ['userId', 'favoriteAt']),
   animeRewatchEntries: defineTable({
-    entryId: v.id('userAnimeEntries'), userId: v.id('users'), anilistId: v.number(), completedAt: v.number(),
-  }).index('by_user_anime_completed_at', ['userId', 'anilistId', 'completedAt']),
+    entryId: v.id('userAnimeEntries'), userId: v.id('users'), anilistId: v.number(), completedAt: v.number(), sequence: v.number(),
+  }).index('by_user_anime_sequence', ['userId', 'anilistId', 'sequence']),
   animeMilestones: defineTable({
     userId: v.id('users'), anilistId: v.number(), kind: v.union(v.literal('completed'), v.literal('rewatched')),
     visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
