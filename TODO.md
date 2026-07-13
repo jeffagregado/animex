@@ -691,3 +691,12 @@ Status: COMPLETE on `jeff-cx/phase-4-anime-detail`.
 - [x] Atomically set first-score Status to Watching only when unset. Owner: Convex worker.
 - [x] Match approved Status, Score, Favorite, and Rewatch history controls. Owner: UI worker.
 - [x] Run full gates, design comparison, hover/focus/responsive browser QA, review, and closure. Owner: controller + reviewer + QA.
+
+## Score Autosave Focus Follow-up
+
+Status: COMPLETE on `jeff-cx/phase-4-anime-detail`.
+
+- [x] Raise Status and Score trailing debounce to 750 ms.
+- [x] Preserve Score focus and editing while its mutation is pending.
+- [x] Coalesce edits made during a pending Score save without losing the latest draft.
+- [x] Run focused, full, build, Fallow, and browser validation.

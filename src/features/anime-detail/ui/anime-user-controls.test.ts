@@ -221,40 +221,40 @@ describe('anime user control policies', () => {
     fireEvent.change(score, { target: { value: '8.12' } })
     fireEvent.blur(score)
     fireEvent.keyDown(score, { key: 'Enter' })
-    await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(750) })
 
     expect(screen.getByRole('alert').textContent).toContain('Score must use at most one decimal place.')
     expect(score.getAttribute('value')).toBe('8.5')
     expect(controlState.score).not.toHaveBeenCalled()
   })
 
-  it('autosaves only latest score after 500 ms and skips unchanged values', async () => {
+  it('autosaves only latest score after 750 ms and skips unchanged values', async () => {
     vi.useFakeTimers()
     render(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
 
     const score = screen.getByRole('textbox', { name: 'Score' })
     fireEvent.change(score, { target: { value: '8' } })
-    await act(async () => { await vi.advanceTimersByTimeAsync(499) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(749) })
     expect(controlState.score).not.toHaveBeenCalled()
     fireEvent.change(score, { target: { value: '8.5' } })
-    await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(750) })
     expect(controlState.score).toHaveBeenCalledTimes(1)
     expect(controlState.score).toHaveBeenLastCalledWith({ anilistId: 1, score: 8.5 })
 
     controlState.score.mockClear()
     fireEvent.change(score, { target: { value: '8.5' } })
     fireEvent.blur(score)
-    await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(750) })
     expect(controlState.score).not.toHaveBeenCalled()
   })
 
-  it('autosaves Status after 500 ms and flushes valid score changes on blur or Enter', () => {
+  it('autosaves Status after 750 ms and flushes valid score changes on blur or Enter', async () => {
     vi.useFakeTimers()
     render(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Status' }))
     fireEvent.click(screen.getByRole('option', { name: 'Completed' }))
-    act(() => { vi.advanceTimersByTime(499) })
+    act(() => { vi.advanceTimersByTime(749) })
     expect(controlState.status).not.toHaveBeenCalled()
     act(() => { vi.advanceTimersByTime(1) })
     expect(controlState.status).toHaveBeenCalledWith({ anilistId: 1, status: 'completed' })
@@ -264,11 +264,51 @@ describe('anime user control policies', () => {
     fireEvent.change(score, { target: { value: '9' } })
     fireEvent.blur(score)
     expect(controlState.score).toHaveBeenCalledWith({ anilistId: 1, score: 9 })
+    await act(async () => { await Promise.resolve() })
 
     controlState.score.mockClear()
     fireEvent.change(score, { target: { value: '9.5' } })
     fireEvent.keyDown(score, { key: 'Enter' })
     expect(controlState.score).toHaveBeenCalledWith({ anilistId: 1, score: 9.5 })
+  })
+
+  it('keeps the Score field focused and enabled while its save is pending', async () => {
+    vi.useFakeTimers()
+    let resolveSave: (() => void) | null = null
+    controlState.score.mockImplementationOnce(() => new Promise<null>((resolve) => { resolveSave = () => resolve(null) }))
+    render(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
+    const score = screen.getByRole('textbox', { name: 'Score' })
+
+    score.focus()
+    fireEvent.change(score, { target: { value: '8' } })
+    await act(async () => { await vi.advanceTimersByTimeAsync(750) })
+    const disabledWhileSaving = score.hasAttribute('disabled')
+    const focusedWhileSaving = document.activeElement === score
+    const savingMessage = screen.queryByRole('status')?.textContent
+    await act(async () => { resolveSave?.(); await Promise.resolve() })
+
+    expect(disabledWhileSaving).toBe(false)
+    expect(focusedWhileSaving).toBe(true)
+    expect(savingMessage).toContain('Saving')
+  })
+
+  it('coalesces score edits made while a prior save is pending', async () => {
+    vi.useFakeTimers()
+    let resolveSave: (() => void) | null = null
+    controlState.score.mockImplementationOnce(() => new Promise<null>((resolve) => { resolveSave = () => resolve(null) }))
+    render(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
+    const score = screen.getByRole('textbox', { name: 'Score' })
+
+    fireEvent.change(score, { target: { value: '8' } })
+    await act(async () => { await vi.advanceTimersByTimeAsync(750) })
+    fireEvent.change(score, { target: { value: '9' } })
+    await act(async () => { await vi.advanceTimersByTimeAsync(750) })
+    const callsWhileSaving = controlState.score.mock.calls.length
+    await act(async () => { resolveSave?.(); await Promise.resolve(); await vi.advanceTimersByTimeAsync(0) })
+
+    expect(callsWhileSaving).toBe(1)
+    expect(controlState.score).toHaveBeenCalledTimes(2)
+    expect(controlState.score).toHaveBeenLastCalledWith({ anilistId: 1, score: 9 })
   })
 
   it('preserves dirty drafts through query refreshes and failed score saves', async () => {
@@ -291,14 +331,14 @@ describe('anime user control policies', () => {
     expect(score.getAttribute('value')).toBe('8.5')
   })
 
-  it('flushes pending Status on trigger blur while pointer selection waits 500 ms', async () => {
+  it('flushes pending Status on trigger blur while pointer selection waits 750 ms', async () => {
     vi.useFakeTimers()
     render(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
     const trigger = screen.getByRole('combobox', { name: 'Status' })
 
     fireEvent.click(trigger)
     fireEvent.click(screen.getByRole('option', { name: 'Completed' }))
-    act(() => { vi.advanceTimersByTime(499) })
+    act(() => { vi.advanceTimersByTime(749) })
     expect(controlState.status).not.toHaveBeenCalled()
     fireEvent.blur(trigger)
     expect(controlState.status).toHaveBeenCalledWith({ anilistId: 1, status: 'completed' })

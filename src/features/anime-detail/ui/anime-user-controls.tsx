@@ -29,6 +29,7 @@ const statuses: { label: string; value: AnimeStatus }[] = [
 ]
 
 const controlShellClass = 'min-h-14 rounded-lg border border-border bg-card px-3 py-2 transition hover:border-cyan-300 hover:bg-cyan-300/5 focus-within:border-cyan-300 focus-within:ring-2 focus-within:ring-cyan-300/40'
+const autosaveDelayMs = 750
 
 /** Shows public facades until both client auth sources confirm a complete user. */
 export function AnimeUserControls({ anilistId, canonicalPath }: AnimeUserControlsProps) {
@@ -99,7 +100,7 @@ function CompleteAnimeUserControls({ anilistId }: { anilistId: number }) {
 /** Autosaves status after trailing inactivity. */
 function StatusControl({ anilistId, entry, loading, mutate, pending, setStatus }: { anilistId: number; entry: ControlEntry; loading: boolean; mutate: AnimeMutation; pending: SaveKey | null; setStatus: ReturnType<typeof useMutation> }) {
   const autosave = useAnimeAutosave<AnimeStatus | null>({
-    delayMs: 500,
+    delayMs: autosaveDelayMs,
     isValid: (value) => value !== null,
     persist: (action) => mutate('status', action),
     save: async (value) => {
@@ -134,17 +135,17 @@ function StatusControl({ anilistId, entry, loading, mutate, pending, setStatus }
 /** Autosaves valid scores and flushes committed values. */
 function ScoreControl({ anilistId, entry, loading, mutate, pending, setScore }: { anilistId: number; entry: ControlEntry; loading: boolean; mutate: AnimeMutation; pending: SaveKey | null; setScore: ReturnType<typeof useMutation> }) {
   const autosave = useScoreAnimeAutosave({
-    delayMs: 500,
+    delayMs: autosaveDelayMs,
     persist: (action) => mutate('score', action),
     save: async (value) => await setScore({ anilistId, score: value }),
     serverValue: entry?.score ?? null,
   })
-  const disabled = loading || pending !== null
+  const saving = pending === 'score'
 
   return (
-    <div className={controlShellClass}>
-      <span className="block text-xs text-muted-foreground">Score</span>
-      <ScoreNumberField autosave={autosave} disabled={disabled} />
+    <div aria-busy={saving} className={controlShellClass}>
+      <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground"><span>Score</span>{saving ? <span role="status">Saving…</span> : null}</span>
+      <ScoreNumberField autosave={autosave} disabled={loading} />
       <ScoreValidationError message={autosave.error} />
     </div>
   )

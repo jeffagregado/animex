@@ -28,11 +28,14 @@ export function useAnimeAutosave<Value>({ delayMs, isValid, persist, save, serve
   const [value, setValue] = useState<Value>(serverValue)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedValueRef = useRef<Value>(serverValue)
+  const draftValueRef = useRef<Value>(serverValue)
   const dirtyRef = useRef(false)
+  const savingRef = useRef(false)
 
   useEffect(() => {
     if (dirtyRef.current) return
     savedValueRef.current = serverValue
+    draftValueRef.current = serverValue
     setValue(serverValue)
   }, [serverValue])
 
@@ -40,11 +43,26 @@ export function useAnimeAutosave<Value>({ delayMs, isValid, persist, save, serve
 
   const flush = (nextValue: Value): void => {
     clearTimeoutRef(timeoutRef)
-    if (nextValue === savedValueRef.current || !isValid(nextValue)) return
-    persist(async () => {
-      await save(nextValue)
-      savedValueRef.current = nextValue
+    if (nextValue === savedValueRef.current) {
       dirtyRef.current = false
+      return
+    }
+    if (!isValid(nextValue) || savingRef.current) return
+    savingRef.current = true
+    persist(async () => {
+      let saved = false
+      savingRef.current = true
+      try {
+        await save(nextValue)
+        savedValueRef.current = nextValue
+        saved = true
+      } finally {
+        savingRef.current = false
+        dirtyRef.current = draftValueRef.current !== savedValueRef.current
+        if (saved && dirtyRef.current && timeoutRef.current === null) {
+          timeoutRef.current = setTimeout(() => flush(draftValueRef.current), 0)
+        }
+      }
     })
   }
 
@@ -52,6 +70,7 @@ export function useAnimeAutosave<Value>({ delayMs, isValid, persist, save, serve
 
   const setDraft = (nextValue: Value): void => {
     setValue(nextValue)
+    draftValueRef.current = nextValue
     clearTimeoutRef(timeoutRef)
     dirtyRef.current = nextValue !== savedValueRef.current
   }
