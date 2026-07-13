@@ -17,15 +17,17 @@ Status: DONE_WITH_CONCERNS
 - Custom Lexical nodes: missing node modules failed before implementation.
 - Toolbar, Anime Reviews panel, protected gate, Review Detail owner rules: each failed on missing production module before GREEN.
 - Strict `bodyJson` detail adapter: focused test failed with `parseReviewWireDetail is not a function` before implementation.
+- Review request-ID, shared spoiler Summary, rating bands, real Lexical commands, and 2,501-character enforcement tests failed before their review fixes.
 
 ## GREEN Evidence
 
-- `pnpm test -- src/features/reviews src/features/anime-detail/ui/anime-detail-page.test.tsx 'src/routes/_public/_protected/-protected-route.test.ts'`: 9 files passed, 23 tests passed.
-- `pnpm exec tsc --noEmit --pretty false`: exit 0 with temporary generated route types.
+- `pnpm test -- src/features/reviews`: 14 files passed, 30 tests passed.
+- `pnpm exec tsc --noEmit`: exit 0.
+- Behavior coverage includes Draft retry/Publish intent IDs, post-persist navigation, failure/dirty state, blocker actions, Preview parity, owner/detail states, real More Reviews data, Anime Reviews sort/pagination/retry/auth visibility, and real Lexical selection commands.
 - Forbidden scan: no `dangerouslySetInnerHTML`, iframe, or disallowed Lexical package imports.
 - Route tree restored to HEAD after validation. Controller owns final generation.
 
 ## Concerns
 
-- Browser QA not run. Route tree intentionally excluded, so routes need controller generation before app/browser verification.
+- Browser QA not run. Controller owns the currently modified generated route tree and final browser verification.
 - No backend, generated Convex, dependency, Home/feed/Post, global CSS, docs, or TODO files changed.

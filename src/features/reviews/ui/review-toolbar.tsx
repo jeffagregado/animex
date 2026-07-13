@@ -29,7 +29,14 @@ type MediaDialog = 'image' | 'video' | null
 export function ReviewToolbar() {
   const [editor] = useLexicalComposerContext()
   const [dialog, setDialog] = useState<MediaDialog>(null)
-  const block = (kind: 'h2' | 'h3' | 'quote'): void => editor.update(() => {
+  const block = (kind: 'h2' | 'h3' | 'quote'): void => formatReviewBlock(editor, kind)
+  const mark = (format: TextFormatType): void => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, format) }
+
+  return <><div aria-label="Review formatting" className="flex flex-wrap items-center gap-1 border-b border-border p-2" role="toolbar"><Tool label="H2" onClick={() => block('h2')}>H2</Tool><Tool label="H3" onClick={() => block('h3')}>H3</Tool><Tool label="Quote" onClick={() => block('quote')}><QuoteIcon /></Tool><Tool label="Bulleted list" onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}><ListIcon /></Tool><Tool label="Numbered list" onClick={() => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)}><ListOrderedIcon /></Tool><Tool label="Bold" onClick={() => mark('bold')}><strong>B</strong></Tool><Tool label="Italic" onClick={() => mark('italic')}><em>I</em></Tool><Tool label="Underline" onClick={() => mark('underline')}><u>U</u></Tool><Tool label="Strikethrough" onClick={() => mark('strikethrough')}><StrikethroughIcon /></Tool><Tool label="Image" onClick={() => setDialog('image')}><ImageIcon /></Tool><Tool label="Video" onClick={() => setDialog('video')}><VideoIcon /></Tool><Tool label="Spoiler" onClick={() => markSelectedBlocksAsSpoiler(editor)}><EyeOffIcon /></Tool><Tool label="Undo" onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)}><UndoIcon /></Tool><Tool label="Redo" onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)}><RedoIcon /></Tool></div><Dialog onOpenChange={(open) => { if (!open) setDialog(null) }} open={dialog !== null}>{dialog ? <DialogContent title={dialog === 'image' ? 'Add image' : 'Add video'}><MediaForm editor={editor} kind={dialog} onDone={() => setDialog(null)} /></DialogContent> : null}</Dialog></>
+}
+
+/** Replaces selected text blocks with one approved semantic block type. */
+export const formatReviewBlock = (editor: ReturnType<typeof useLexicalComposerContext>[0], kind: 'h2' | 'h3' | 'quote'): void => editor.update(() => {
     const selection = $getSelection()
     if (!$isRangeSelection(selection)) return
     const blocks = selection.getNodes().map((node) => node.getTopLevelElement()).filter((node): node is ElementNode => $isElementNode(node))
@@ -40,11 +47,7 @@ export function ReviewToolbar() {
       next.append(...current.getChildren())
       current.replace(next)
     })
-  })
-  const mark = (format: TextFormatType): void => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, format) }
-
-  return <><div aria-label="Review formatting" className="flex flex-wrap items-center gap-1 border-b border-border p-2" role="toolbar"><Tool label="H2" onClick={() => block('h2')}>H2</Tool><Tool label="H3" onClick={() => block('h3')}>H3</Tool><Tool label="Quote" onClick={() => block('quote')}><QuoteIcon /></Tool><Tool label="Bulleted list" onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}><ListIcon /></Tool><Tool label="Numbered list" onClick={() => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)}><ListOrderedIcon /></Tool><Tool label="Bold" onClick={() => mark('bold')}><strong>B</strong></Tool><Tool label="Italic" onClick={() => mark('italic')}><em>I</em></Tool><Tool label="Underline" onClick={() => mark('underline')}><u>U</u></Tool><Tool label="Strikethrough" onClick={() => mark('strikethrough')}><StrikethroughIcon /></Tool><Tool label="Image" onClick={() => setDialog('image')}><ImageIcon /></Tool><Tool label="Video" onClick={() => setDialog('video')}><VideoIcon /></Tool><Tool label="Spoiler" onClick={() => markSelectedBlocksAsSpoiler(editor)}><EyeOffIcon /></Tool><Tool label="Undo" onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)}><UndoIcon /></Tool><Tool label="Redo" onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)}><RedoIcon /></Tool></div><Dialog onOpenChange={(open) => { if (!open) setDialog(null) }} open={dialog !== null}>{dialog ? <DialogContent title={dialog === 'image' ? 'Add image' : 'Add video'}><MediaForm editor={editor} kind={dialog} onDone={() => setDialog(null)} /></DialogContent> : null}</Dialog></>
-}
+  }, { discrete: true })
 
 function Tool({ children, label, onClick }: { children: ReactNode; label: string; onClick: () => void }) {
   return <button aria-label={label} className="grid min-h-11 min-w-11 place-items-center rounded-md px-2 text-muted-foreground hover:bg-cyan-300/10 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 [&_svg]:size-5" onClick={onClick} title={label} type="button">{children}</button>
@@ -68,7 +71,7 @@ function MediaForm({ editor, kind, onDone }: { editor: ReturnType<typeof useLexi
 }
 
 /** Wraps selected top-level blocks once; existing spoiler selections stay unchanged. */
-const markSelectedBlocksAsSpoiler = (editor: ReturnType<typeof useLexicalComposerContext>[0]): void => editor.update(() => {
+export const markSelectedBlocksAsSpoiler = (editor: ReturnType<typeof useLexicalComposerContext>[0]): void => editor.update(() => {
   const selection = $getSelection()
   if (!$isRangeSelection(selection)) return
   const blocks = selection.getNodes().map((node) => node.getTopLevelElement()).filter((node): node is ElementNode => node !== null && !$isSpoilerNode(node))
@@ -77,4 +80,4 @@ const markSelectedBlocksAsSpoiler = (editor: ReturnType<typeof useLexicalCompose
   const spoiler = $createSpoilerNode()
   unique[0].insertBefore(spoiler)
   spoiler.append(...unique)
-})
+}, { discrete: true })

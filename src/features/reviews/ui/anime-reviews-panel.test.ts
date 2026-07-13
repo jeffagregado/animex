@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ReviewListItem } from '#/features/social/shared/social-contracts'
-import { getReviewWriteHref, reconcileReviewItems } from './anime-reviews-panel'
+import { getRatingBandLabel, getReviewWriteHref, reconcileReviewItems } from './anime-reviews-panel'
 
 const item = (id: string): ReviewListItem => ({
   id,
@@ -21,5 +21,12 @@ describe('Anime Reviews panel helpers', () => {
     expect(getReviewWriteHref(null, 1, 'frieren')).toBe('/anime/1/frieren/reviews/new')
     expect(getReviewWriteHref(item('review-1'), 1, 'frieren')).toBe('/reviews/review-1')
     expect(getReviewWriteHref({ ...item('draft-1'), state: 'draft', rating: null, summary: '', publishedAt: null }, 1, 'frieren')).toBe('/anime/1/frieren/reviews/new')
+  })
+
+  it('labels rating bands as exact non-overlapping intervals', () => {
+    expect(Array.from({ length: 10 }, (_, index) => getRatingBandLabel(index))).toEqual([
+      '90–100', '80–<90', '70–<80', '60–<70', '50–<60',
+      '40–<50', '30–<40', '20–<30', '10–<20', '0–<10',
+    ])
   })
 })

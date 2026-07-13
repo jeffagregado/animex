@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
-import { useBlocker } from '@tanstack/react-router'
+import { useBlocker, useNavigate } from '@tanstack/react-router'
 import { FileTextIcon, SendIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -14,6 +14,7 @@ import { REVIEW_DOCUMENT_MAX_VISIBLE_TEXT, REVIEW_SUMMARY_LIMIT, type ReviewDocu
 import { createEmptyReviewDocument, parseReviewWireDetail, serializeReviewEditorState } from '../review-document-adapter'
 import { getReviewVisibleTextLength, validateReviewEditorFields, type ReviewSaveMode } from '../review-validation'
 import { usePublicAuthState } from '#/features/shell/public-auth-context'
+import { createReviewRequestState, getReviewRequestId, settleReviewRequest } from '../review-request-ids'
 import { ReviewEditor } from './review-editor'
 import { ReviewPreview } from './review-preview'
 
@@ -25,34 +26,45 @@ const visibilityOptions: Visibility[] = ['private', 'followers', 'public']
 /** Owns Review Draft/Publish persistence, preview, and unsaved-navigation safety. */
 export function ReviewEditorPage({ anime, mode, reviewId }: ReviewEditorPageProps) {
   const auth = usePublicAuthState()
+  const navigate = useNavigate()
   const mine = useQuery(api.reviews.getMineForAnime, mode === 'create' && anime ? { anilistId: anime.anilistId } : 'skip')
   const edit = useQuery(api.reviews.getById, mode === 'edit' && reviewId ? { reviewId: reviewId as Id<'reviews'> } : 'skip')
+  const raw = mode === 'create' ? mine : edit
+  const existing = raw === undefined || raw === null ? null : parseReviewWireDetail(raw)
+  useEffect(() => {
+    if (mode === 'create' && existing?.state === 'published') void navigate({ to: '/reviews/$reviewId', params: { reviewId: existing.id }, replace: true })
+  }, [existing?.id, existing?.state, mode, navigate])
   if (mode === 'create' && anime === null) throw new Error('Create Review requires anime details.')
   if (mode === 'create' && mine === undefined) return <EditorLoading />
   if (mode === 'edit' && edit === undefined) return <EditorLoading />
-  const raw = mode === 'create' ? mine : edit
   if (mode === 'edit' && raw === null) return <EditorState title="Review not found" message="This Review is unavailable or no longer editable." />
-  const existing = raw ? parseReviewWireDetail(raw) : null
-  if (mode === 'create' && existing?.state === 'published') { window.location.replace(`/reviews/${existing.id}`); return <EditorLoading /> }
+  if (mode === 'create' && existing?.state === 'published') return <EditorLoading />
   if (mode === 'edit' && existing?.state !== 'published') return <EditorState title="Published Review required" message="Drafts resume from the anime Reviews tab." />
   if (mode === 'edit' && (existing === null || auth.status !== 'ready' || auth.authState.status !== 'complete' || auth.authState.profile.id !== existing.author.id)) return <EditorState title="Review unavailable" message="Only the Review owner can edit it." />
   const editorAnime = anime ?? { anilistId: existing!.anime.anilistId, coverImageUrl: existing!.anime.coverImageUrl, episodes: null, format: null, seasonYear: null, slug: existing!.anime.slug, titles: { display: existing!.anime.title, english: null, native: null, romaji: null } }
   return <LoadedReviewEditor anime={editorAnime} existing={existing} mode={mode} />
 }
 
-function LoadedReviewEditor({ anime, existing, mode }: { anime: ReviewEditorAnime; existing: ReviewDetail | null; mode: 'create' | 'edit' }) {
+export function LoadedReviewEditor({ anime, existing, mode }: { anime: ReviewEditorAnime; existing: ReviewDetail | null; mode: 'create' | 'edit' }) {
   const [fields, setFields] = useState<EditorFields>(() => existing ? fromExisting(existing) : { body: createEmptyReviewDocument(), rating: REVIEW_RATING_DEFAULT, summary: '', summaryHasSpoiler: false, visibility: 'private' })
   const [tab, setTab] = useState<'editor' | 'preview'>('editor')
   const [dirty, setDirty] = useState(false)
   const [pending, setPending] = useState<ReviewSaveMode | null>(null)
   const [errors, setErrors] = useState<string[]>([])
   const [editorInvalid, setEditorInvalid] = useState(false)
-  const [requestId] = useState(() => crypto.randomUUID())
+  const [attemptedVisibleCount, setAttemptedVisibleCount] = useState<number | null>(null)
+  const [completedReviewId, setCompletedReviewId] = useState<string | null>(null)
+  const requestState = useRef(createReviewRequestState())
+  const navigate = useNavigate()
   const saveDraft = useMutation(api.reviews.saveDraft)
   const publish = useMutation(api.reviews.publish)
   const update = useMutation(api.reviews.update)
   const blocker = useBlocker({ shouldBlockFn: () => dirty, enableBeforeUnload: dirty, withResolver: true })
   const visibleCount = getReviewVisibleTextLength(fields.body)
+
+  useEffect(() => {
+    if (completedReviewId && !dirty) void navigate({ to: '/reviews/$reviewId', params: { reviewId: completedReviewId }, replace: true, ignoreBlocker: true })
+  }, [completedReviewId, dirty, navigate])
 
   const change = <K extends keyof EditorFields>(key: K, value: EditorFields[K]): void => { setFields((current) => ({ ...current, [key]: value })); setDirty(true); setErrors([]) }
   const persist = async (intent: ReviewSaveMode): Promise<void> => {
@@ -63,17 +75,24 @@ function LoadedReviewEditor({ anime, existing, mode }: { anime: ReviewEditorAnim
     setErrors([])
     try {
       const bodyJson = serializeReviewEditorState(fields.body.editorState)
+      const requestPayload = JSON.stringify({ rating: fields.rating, summary: fields.summary, summaryHasSpoiler: fields.summaryHasSpoiler, bodyJson, visibility: fields.visibility })
       if (mode === 'edit') {
         if (!existing || fields.rating === null) throw new Error('Published Review requires an editable Rating.')
         await update({ reviewId: existing.id as Id<'reviews'>, rating: fields.rating, summary: fields.summary, summaryHasSpoiler: fields.summaryHasSpoiler, bodyJson, visibility: fields.visibility })
-        setDirty(false); toast.success('Review updated.'); window.location.assign(`/reviews/${existing.id}`)
+        setDirty(false); setCompletedReviewId(existing.id); toast.success('Review updated.')
       } else if (intent === 'draft') {
-        await saveDraft({ anilistId: anime.anilistId, requestId, rating: fields.rating, summary: fields.summary, summaryHasSpoiler: fields.summaryHasSpoiler, bodyJson, visibility: fields.visibility })
+        const request = getReviewRequestId(requestState.current, 'draft', requestPayload, () => crypto.randomUUID())
+        requestState.current = request.state
+        await saveDraft({ anilistId: anime.anilistId, requestId: request.id, rating: fields.rating, summary: fields.summary, summaryHasSpoiler: fields.summaryHasSpoiler, bodyJson, visibility: fields.visibility })
+        requestState.current = settleReviewRequest(requestState.current, 'draft', request.id)
         setDirty(false); toast.success('Draft saved.')
       } else {
         if (fields.rating === null) throw new Error('Published Review requires a Rating.')
-        const id = await publish({ anilistId: anime.anilistId, requestId, rating: fields.rating, summary: fields.summary, summaryHasSpoiler: fields.summaryHasSpoiler, bodyJson, visibility: fields.visibility })
-        setDirty(false); toast.success('Review published.'); window.location.assign(`/reviews/${id}`)
+        const request = getReviewRequestId(requestState.current, 'publish', requestPayload, () => crypto.randomUUID())
+        requestState.current = request.state
+        const id = await publish({ anilistId: anime.anilistId, requestId: request.id, rating: fields.rating, summary: fields.summary, summaryHasSpoiler: fields.summaryHasSpoiler, bodyJson, visibility: fields.visibility })
+        requestState.current = settleReviewRequest(requestState.current, 'publish', request.id)
+        setDirty(false); setCompletedReviewId(id); toast.success('Review published.')
       }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Review could not be saved.'
@@ -81,9 +100,10 @@ function LoadedReviewEditor({ anime, existing, mode }: { anime: ReviewEditorAnim
     } finally { setPending(null) }
   }
 
-  const onEditorChange = (body: ReviewDocumentV1): void => { setEditorInvalid(false); if (JSON.stringify(body) !== JSON.stringify(fields.body)) change('body', body) }
+  const onEditorChange = (body: ReviewDocumentV1): void => { setAttemptedVisibleCount(null); setEditorInvalid(false); if (JSON.stringify(body) !== JSON.stringify(fields.body)) change('body', body) }
   const onEditorError = (error: Error): void => { setEditorInvalid(true); setDirty(true); setErrors([error.message]) }
-  return <main className="mx-auto max-w-[1480px] px-4 py-6 pb-28 md:px-7 md:pb-12"><AnimeIdentity anime={anime} /><h1 className="mt-6 text-3xl font-black">{mode === 'edit' ? 'Edit review' : 'Write a review'}</h1><div className="mt-5 grid grid-cols-2 border border-border lg:hidden"><button className={`min-h-12 font-bold ${tab === 'editor' ? 'border-b-2 border-cyan-300 text-cyan-300' : 'text-muted-foreground'}`} onClick={() => setTab('editor')} type="button">Editor</button><button className={`min-h-12 font-bold ${tab === 'preview' ? 'border-b-2 border-cyan-300 text-cyan-300' : 'text-muted-foreground'}`} onClick={() => setTab('preview')} type="button">Preview</button></div><div className="mt-5 grid gap-7 lg:grid-cols-2"><section className={tab === 'preview' ? 'hidden lg:block' : ''}><ReviewFields fields={fields} onChange={change} /><ReviewEditor document={fields.body} onChange={onEditorChange} onError={onEditorError} /><p className={`mt-2 text-right text-sm ${editorInvalid ? 'text-red-300' : 'text-muted-foreground'}`}>{visibleCount.toLocaleString()} / {REVIEW_DOCUMENT_MAX_VISIBLE_TEXT.toLocaleString()} visible characters</p></section><div className={tab === 'editor' ? 'hidden lg:block' : ''}><ReviewPreview document={fields.body} rating={fields.rating} summary={fields.summary} summaryHasSpoiler={fields.summaryHasSpoiler} /></div></div>{errors.length > 0 ? <ul className="mt-5 rounded-lg border border-red-400/50 bg-red-400/5 p-4 text-red-200" role="alert">{errors.map((error) => <li key={error}>{error}</li>)}</ul> : null}<div className="mt-7 grid gap-3 sm:grid-cols-2 lg:max-w-2xl"><button className="flex min-h-14 items-center justify-center gap-2 rounded-lg border border-border font-bold hover:border-cyan-300" disabled={pending !== null || mode === 'edit'} onClick={() => void persist('draft')} type="button"><FileTextIcon className="size-5" />{pending === 'draft' ? 'Saving…' : 'Save draft'}</button><button className="flex min-h-14 items-center justify-center gap-2 rounded-lg bg-coral-400 font-black text-white hover:bg-coral-300" disabled={pending !== null} onClick={() => void persist('publish')} type="button"><SendIcon className="size-5" />{pending === 'publish' ? 'Saving…' : mode === 'edit' ? 'Update review' : 'Publish review'}</button></div><Dialog onOpenChange={(open) => { if (!open && blocker.status === 'blocked') blocker.reset() }} open={blocker.status === 'blocked'}>{blocker.status === 'blocked' ? <DialogContent title="Discard unsaved changes?"><p className="mt-4 text-muted-foreground">Your latest Review edits have not been saved.</p><div className="mt-6 grid grid-cols-2 gap-3"><button className="min-h-11 rounded-lg border border-border font-bold" onClick={blocker.reset} type="button">Stay</button><button className="min-h-11 rounded-lg bg-red-500 font-black text-white" onClick={blocker.proceed} type="button">Discard</button></div></DialogContent> : null}</Dialog></main>
+  const onLimitExceeded = (attemptedCount: number): void => { setAttemptedVisibleCount(attemptedCount); setErrors([`Attempted ${attemptedCount.toLocaleString()} visible characters. Limit is ${REVIEW_DOCUMENT_MAX_VISIBLE_TEXT.toLocaleString()}; last insertion was reverted.`]) }
+  return <main className="mx-auto max-w-[1480px] px-4 py-6 pb-28 md:px-7 md:pb-12"><AnimeIdentity anime={anime} /><h1 className="mt-6 text-3xl font-black">{mode === 'edit' ? 'Edit review' : 'Write a review'}</h1><div className="mt-5 grid grid-cols-2 border border-border lg:hidden"><button className={`min-h-12 font-bold ${tab === 'editor' ? 'border-b-2 border-cyan-300 text-cyan-300' : 'text-muted-foreground'}`} onClick={() => setTab('editor')} type="button">Editor</button><button className={`min-h-12 font-bold ${tab === 'preview' ? 'border-b-2 border-cyan-300 text-cyan-300' : 'text-muted-foreground'}`} onClick={() => setTab('preview')} type="button">Preview</button></div><div className="mt-5 grid gap-7 lg:grid-cols-2"><section className={tab === 'preview' ? 'hidden lg:block' : ''}><ReviewFields fields={fields} onChange={change} /><ReviewEditor document={fields.body} onChange={onEditorChange} onError={onEditorError} onLimitExceeded={onLimitExceeded} /><p className={`mt-2 text-right text-sm ${attemptedVisibleCount !== null || editorInvalid ? 'text-red-300' : 'text-muted-foreground'}`}>{attemptedVisibleCount !== null ? `Attempted ${attemptedVisibleCount.toLocaleString()}; current ` : ''}{visibleCount.toLocaleString()} / {REVIEW_DOCUMENT_MAX_VISIBLE_TEXT.toLocaleString()} visible characters</p></section><div className={tab === 'editor' ? 'hidden lg:block' : ''}><ReviewPreview document={fields.body} rating={fields.rating} summary={fields.summary} summaryHasSpoiler={fields.summaryHasSpoiler} /></div></div>{errors.length > 0 ? <ul className="mt-5 rounded-lg border border-red-400/50 bg-red-400/5 p-4 text-red-200" role="alert">{errors.map((error) => <li key={error}>{error}</li>)}</ul> : null}<div className="mt-7 grid gap-3 sm:grid-cols-2 lg:max-w-2xl"><button className="flex min-h-14 items-center justify-center gap-2 rounded-lg border border-border font-bold hover:border-cyan-300" disabled={pending !== null || mode === 'edit'} onClick={() => void persist('draft')} type="button"><FileTextIcon className="size-5" />{pending === 'draft' ? 'Saving…' : 'Save draft'}</button><button className="flex min-h-14 items-center justify-center gap-2 rounded-lg bg-coral-400 font-black text-white hover:bg-coral-300" disabled={pending !== null} onClick={() => void persist('publish')} type="button"><SendIcon className="size-5" />{pending === 'publish' ? 'Saving…' : mode === 'edit' ? 'Update review' : 'Publish review'}</button></div><Dialog onOpenChange={(open) => { if (!open && blocker.status === 'blocked') blocker.reset() }} open={blocker.status === 'blocked'}>{blocker.status === 'blocked' ? <DialogContent title="Discard unsaved changes?"><p className="mt-4 text-muted-foreground">Your latest Review edits have not been saved.</p><div className="mt-6 grid grid-cols-2 gap-3"><button className="min-h-11 rounded-lg border border-border font-bold" onClick={blocker.reset} type="button">Stay</button><button className="min-h-11 rounded-lg bg-red-500 font-black text-white" onClick={blocker.proceed} type="button">Discard</button></div></DialogContent> : null}</Dialog></main>
 }
 
 function ReviewFields({ fields, onChange }: { fields: EditorFields; onChange: <K extends keyof EditorFields>(key: K, value: EditorFields[K]) => void }) {

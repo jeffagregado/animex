@@ -5,6 +5,9 @@ import { parseReviewDocument } from '#/features/social/shared/review-document'
 import { ReviewImageNode } from './review-image-node'
 import { SpoilerNode } from './spoiler-node'
 import { ReviewVideoNode } from './review-video-node'
+import { formatReviewBlock, markSelectedBlocksAsSpoiler } from '../ui/review-toolbar'
+import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
+import { HeadingNode, QuoteNode } from '@lexical/rich-text'
 
 const fields = { direction: null, format: '' as const, indent: 0 as const, version: 1 as const }
 const document = parseReviewDocument({ version: 1, editorState: { root: { ...fields, type: 'root', children: [
@@ -23,5 +26,22 @@ describe('custom Review Lexical nodes', () => {
 
   it('registers only locked custom node types', () => {
     expect([SpoilerNode.getType(), ReviewImageNode.getType(), ReviewVideoNode.getType()]).toEqual(['spoiler', 'review-image', 'review-video'])
+  })
+
+  it('formats a selected block and wraps selected top-level blocks once', () => {
+    const editor = createEditor({ nodes: [HeadingNode, QuoteNode, SpoilerNode, ReviewImageNode, ReviewVideoNode] })
+    editor.update(() => {
+      const paragraph = $createParagraphNode().append($createTextNode('Selected'))
+      $getRoot().append(paragraph)
+      paragraph.select()
+    }, { discrete: true })
+
+    formatReviewBlock(editor, 'h2')
+    markSelectedBlocksAsSpoiler(editor)
+
+    expect(editor.getEditorState().toJSON().root.children[0]).toMatchObject({
+      type: 'spoiler',
+      children: [{ type: 'heading', tag: 'h2' }],
+    })
   })
 })

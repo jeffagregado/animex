@@ -22,7 +22,7 @@ export function AnimeReviewsPanel(props: AnimeReviewsPanelProps) {
   return <ReviewPanelBoundary><AnimeReviewsContent {...props} /></ReviewPanelBoundary>
 }
 
-function AnimeReviewsContent({ anilistId, slug }: AnimeReviewsPanelProps) {
+export function AnimeReviewsContent({ anilistId, slug }: AnimeReviewsPanelProps) {
   const auth = usePublicAuthState()
   const convexAuth = useConvexAuth()
   const [sort, setSort] = useState<ReviewSort>('newest')
@@ -48,7 +48,7 @@ function PrivateWriteReview({ anilistId, slug }: AnimeReviewsPanelProps) {
 }
 
 function RatingBands({ bands, count }: { bands: [number, number, number, number, number, number, number, number, number, number]; count: number }) {
-  return <div aria-label="Rating distribution" className="grid gap-2 rounded-xl border border-border bg-card/30 p-4 sm:grid-cols-2">{bands.map((value, index) => { const high = 100 - index * 10; const low = index === 0 ? 90 : high - 10; return <div className="grid grid-cols-[4.5rem_1fr_2rem] items-center gap-2 text-sm" key={high}><span>{low}–{high}</span><span className="h-2 overflow-hidden rounded-full bg-white/5"><span className="block h-full bg-cyan-300" style={{ width: `${count === 0 ? 0 : (value / count) * 100}%` }} /></span><span className="text-right text-muted-foreground">{value}</span></div> })}</div>
+  return <div aria-label="Rating distribution" className="grid gap-2 rounded-xl border border-border bg-card/30 p-4 sm:grid-cols-2">{bands.map((value, index) => <div className="grid grid-cols-[4.5rem_1fr_2rem] items-center gap-2 text-sm" key={getRatingBandLabel(index)}><span>{getRatingBandLabel(index)}</span><span className="h-2 overflow-hidden rounded-full bg-white/5"><span className="block h-full bg-cyan-300" style={{ width: `${count === 0 ? 0 : (value / count) * 100}%` }} /></span><span className="text-right text-muted-foreground">{value}</span></div>)}</div>
 }
 
 function PanelSkeleton() { return <div aria-label="Loading reviews" className="space-y-3 rounded-xl border border-border p-5"><div className="h-5 w-2/5 animate-pulse rounded bg-white/5" /><div className="h-24 animate-pulse rounded bg-white/5" /></div> }
@@ -65,3 +65,4 @@ class ReviewPanelBoundary extends Component<{ children: ReactNode }, { error: Er
 const parseReviewPage = (value: { items: unknown[]; cursor: string | null; hasMore: boolean }): ReviewPage => ({ items: value.items.map((item) => reviewListItemSchema.parse(item)), cursor: value.cursor, hasMore: value.hasMore })
 export const reconcileReviewItems = (current: ReviewListItem[], page: ReviewListItem[], cursor: string | null): ReviewListItem[] => cursor === null ? page : [...current, ...page.filter((item) => !current.some((existing) => existing.id === item.id))]
 export const getReviewWriteHref = (review: ReviewListItem | null, anilistId: number, slug: string): string => review?.state === 'published' ? `/reviews/${review.id}` : `/anime/${anilistId}/${slug}/reviews/new`
+export const getRatingBandLabel = (index: number): string => index === 0 ? '90–100' : `${90 - index * 10}–<${100 - index * 10}`
