@@ -23,8 +23,21 @@ export function AnimeDetailTabs({ detail, tab, onTabChange }: AnimeDetailTabsPro
 function Reviews() { return <div className="rounded-xl border border-border bg-card/60 p-8 text-center"><h2 className="text-xl font-black">No reviews yet</h2><p className="mt-2 text-muted-foreground">Average rating unavailable · 0 reviews</p></div> }
 
 function Overview({ detail }: { detail: AnimeDetail }) {
-  const values: [string, string][] = [['Format', formatLabel(detail.format)], ['Episodes', detail.episodes?.toString() ?? 'Unknown'], ['Episode Duration', detail.durationMinutes ? `${detail.durationMinutes} min` : 'Unknown'], ['Status', statusLabel(detail.status)], ['Aired', dateRange(detail)], ['Season', detail.season && detail.seasonYear ? `${titleCase(detail.season)} ${detail.seasonYear}` : 'Unknown'], ['Studio', detail.mainStudio?.name ?? 'Unknown'], ['Source', detail.source ? titleCase(detail.source) : 'Unknown'], ['Genres', detail.genres.join(', ') || 'Unknown'], ['English Title', detail.titles.english ?? 'Unknown'], ['Native Title', detail.titles.native ?? 'Unknown']]
+  const values = [...getReleaseMetadata(detail), ...getSourceMetadata(detail), ...getTitleMetadata(detail)]
   return <dl className="grid gap-x-10 md:grid-cols-2">{values.map(([label, value]) => <div className="grid grid-cols-[9rem_1fr] gap-3 border-b border-border py-3" key={label}><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>)}</dl>
+}
+
+function getReleaseMetadata(detail: AnimeDetail): [string, string][] {
+  const season = detail.season && detail.seasonYear ? `${titleCase(detail.season)} ${detail.seasonYear}` : 'Unknown'
+  return [['Format', formatLabel(detail.format)], ['Episodes', detail.episodes?.toString() ?? 'Unknown'], ['Episode Duration', detail.durationMinutes ? `${detail.durationMinutes} min` : 'Unknown'], ['Status', statusLabel(detail.status)], ['Aired', dateRange(detail)], ['Season', season]]
+}
+
+function getSourceMetadata(detail: AnimeDetail): [string, string][] {
+  return [['Studio', detail.mainStudio?.name ?? 'Unknown'], ['Source', detail.source ? titleCase(detail.source) : 'Unknown'], ['Genres', detail.genres.join(', ') || 'Unknown']]
+}
+
+function getTitleMetadata(detail: AnimeDetail): [string, string][] {
+  return [['English Title', detail.titles.english ?? 'Unknown'], ['Native Title', detail.titles.native ?? 'Unknown']]
 }
 
 const titleCase = (value: string) => value.toLowerCase().replace(/(^|_)(\w)/g, (_match, _prefix, letter: string) => `${_prefix ? ' ' : ''}${letter.toUpperCase()}`)

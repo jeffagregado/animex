@@ -31,6 +31,20 @@ describe('AnimeDetailPage', () => {
     expect(screen.getByText('Average rating unavailable · 0 reviews')).toBeTruthy()
   })
 
+  it('shows populated and unavailable Overview metadata without changing the tab panel', () => {
+    const { rerender } = render(<AnimeDetailPage state={state} tab="overview" onTabChange={vi.fn()} />)
+    expect(screen.getByText('TV').tagName).toBe('DD')
+    expect(screen.getByText('Finished').tagName).toBe('DD')
+    expect(screen.getByText('Fall 2023').tagName).toBe('DD')
+    expect(screen.getByText('Adventure').tagName).toBe('DD')
+    expect(screen.getByText('Unknown to Unknown').tagName).toBe('DD')
+
+    const unavailable: AnimeDetail = { ...detail, format: null, status: null, source: null, season: null, seasonYear: null, episodes: null, durationMinutes: null, genres: [], mainStudio: null, titles: { ...detail.titles, english: null, native: null } }
+    rerender(<AnimeDetailPage state={{ status: 'ready', entry: { detail: unavailable, refreshedAt: 1, expiresAt: 86_400_001 } }} tab="overview" onTabChange={vi.fn()} />)
+    expect(screen.getAllByText('Unknown').length).toBeGreaterThanOrEqual(9)
+    expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('anime-tab-overview')
+  })
+
   it('supports roving keyboard tabs with linked tabpanel semantics', () => {
     const onTabChange = vi.fn()
     render(<AnimeDetailPage state={state} tab="overview" onTabChange={onTabChange} />)
