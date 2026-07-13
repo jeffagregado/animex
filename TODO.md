@@ -671,3 +671,13 @@ Status: COMPLETE on `jeff-cx/phase-4-anime-detail`; final QA and integrated revi
 - [x] Build tab content, pagination, user controls, and rewatch dialog. Owner: UI worker.
 - [x] Link all Discover anime surfaces to canonical detail routes. Owner: Discover worker.
 - [x] Integrate, regenerate routes, push Convex schema, review, validate, browser-QA, document, and close Phase 4. Owner: controller + reviewer + QA + docs mapper.
+
+# Phase 4 Anime Detail Feedback Fixes
+
+Status: COMPLETE on `jeff-cx/phase-4-anime-detail`; final review, gates, and hover-focused browser QA PASS.
+
+- [x] Match canonical Staff desktop banner, controls, and sidebar shell. Owner: layout worker.
+- [x] Gate public Status, Score, and Favorite before private controls mount. Owner: controls worker.
+- [x] Add 0.5-step debounced Status/Score autosave with Sonner feedback. Owner: controls worker.
+- [x] Preserve tabs/content; update approved layout spec. Owner: controller + docs mapper.
+- [x] Run full gates plus hover, keyboard, responsive, console, and overflow browser QA. Owner: controller + reviewer + QA.

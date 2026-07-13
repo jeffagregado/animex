@@ -12,18 +12,14 @@ All other Anime Detail images provide tab-content direction only. When header, h
 
 ## Shared Desktop Shell
 
-Desktop keeps one unchanged two-column page below site header:
+Canonical shell uses taller image-led banner. Poster, title, metadata, and controls sit over lower gradient. No separate controls card.
 
 - Main column uses roughly three quarters of available width.
 - Right sidebar uses remaining quarter with narrow fixed gutter.
-- Header shows AnimeX, Home, Discover, centered search, notifications, and account avatar.
-- Community and Stats stay absent.
-- Hero remains inside main column. Sidebar starts beside hero, directly below header.
-- Hero keeps backdrop, left cover poster, right title block, metadata, synopsis, and one control row.
-- Control order stays Status, Score, Favorite, Write review, Rewatch history.
-- Coral remains reserved for Write review. Cyan marks interactive state and selected values.
-- Tab order stays Overview, Reviews, Characters, Staff.
-- Tab bar width equals main column width. Active tab changes cyan text and underline only.
+- Header shows AnimeX, Home, Discover, centered search, notifications, and account avatar. Community and Stats stay absent.
+- Control order is Status, Score, Favorite. Write Review stays hidden until Phase 5. Rewatch History stays owner-only.
+- Cyan marks interactive state and selected values; coral remains reserved for future Write Review.
+- Tab order stays Overview, Reviews, Characters, Staff. Active tab changes cyan text and underline only.
 - Active content begins at same vertical origin below tab divider on every tab.
 
 Changing tabs must not shift header height, hero height, cover position, title position, synopsis width, control geometry, tab position, sidebar width, or sidebar section order.
@@ -37,7 +33,7 @@ Sidebar stays visible and unchanged on all four tabs:
 3. Trailer
 4. External Links
 
-Each section uses canonical compact vertical card treatment. Tab changes must not replace sidebar with poster rails, move sidebar below main content, or alter its width.
+Each section uses compact rows: poster, metadata, and chevron. Trailer uses thumbnail with play overlay. External links are flat links, not cards. Tab changes must not replace sidebar with poster rails or alter its order/width.
 
 ## Tab Content
 
@@ -63,6 +59,8 @@ Mobile is one responsive translation of canonical desktop shell, not separate ta
 
 - Header, hero, cover/title relationship, metadata order, controls, tabs, and bottom navigation stay identical across tabs.
 - Desktop sidebar leaves side column and moves below active tab content in same Related Anime, Recommendations, Trailer, External Links order.
+- Mobile hero keeps image-led banner and lower-gradient poster/title/meta/control composition. No separate controls card.
+- Mobile sidebar appears after tab content.
 - Tabs remain Overview, Reviews, Characters, Staff with one cyan active state.
 - Reviews use single-column cards.
 - Characters and Staff use two-column cards when labels remain readable; use one column below that threshold.
@@ -72,13 +70,22 @@ Mobile is one responsive translation of canonical desktop shell, not separate ta
 
 Mobile tab changes must not replace header controls, change hero composition, reorder user controls, rename tabs, or change bottom navigation.
 
+## Controls And State Rules
+
+- Public controls expose only Status, Score, and Favorite as auth/profile redirect facades. Signed-out facades link to auth/profile return flow.
+- Unresolved auth state renders disabled facades. Settled auth errors or public/Convex disagreement show an actionable refresh error. No real Select, NumberField, private query, or mutation mounts in unresolved/public/error mode.
+- Signed-in users get real controls. Status and Score autosave with 500 ms trailing debounce; valid blur or Enter flushes pending value.
+- Score accepts 0-10 in 0.5 steps; direct non-half-step input restores the last valid draft, cancels pending saves, and shows an accessible error. Clear persists null. Favorite saves immediately.
+- Sonner confirms success and surfaces errors with Retry. Retry must report failure when retry fails.
+- Rewatch History and Rewatch Complete controls remain owner-only. Write Review remains hidden until Phase 5.
+
 ## Content And State Rules
 
 - AniList ID remains canonical anime identity.
 - Full metadata hydrates on first detail-page open.
 - Missing or stale slug redirects to canonical slug before stable page render.
-- Signed-out users do not see Write review or owner-only Rewatch history.
-- Rewatch history and count remain owner-only.
+- Signed-out users do not see Write Review or owner-only Rewatch History.
+- Rewatch History and count remain owner-only.
 - Loading, error, empty, and unavailable-image states preserve shell dimensions to avoid layout jumps.
 - Tab state must remain linkable and keyboard accessible without duplicating page shell.
 
