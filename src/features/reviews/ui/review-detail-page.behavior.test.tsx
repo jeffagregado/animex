@@ -1,26 +1,35 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ReviewDetailContent } from './review-detail-page'
 
-const mocks = vi.hoisted(() => ({ query: vi.fn(), mutation: vi.fn(), auth: vi.fn(), publicAuth: vi.fn() }))
+const mocks = vi.hoisted(() => ({ query: vi.fn(), mutation: vi.fn(), auth: vi.fn(), publicAuth: vi.fn(), navigate: vi.fn(), success: vi.fn(), error: vi.fn(), visibility: vi.fn(), activity: vi.fn(), remove: vi.fn() }))
 
 vi.mock('convex/react', () => ({ useQuery: mocks.query, useMutation: mocks.mutation, useConvexAuth: mocks.auth }))
 vi.mock('#/features/shell/public-auth-context', () => ({ usePublicAuthState: mocks.publicAuth }))
-vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
+vi.mock('@tanstack/react-router', () => ({ useNavigate: () => mocks.navigate }))
+vi.mock('sonner', () => ({ toast: { error: mocks.error, success: mocks.success } }))
+vi.mock('#/components/ui/select', () => ({
+  Select: ({ children, onValueChange, value }: { children: React.ReactNode; onValueChange: (value: string) => void; value: string }) => <select aria-label="Change visibility" onChange={(event) => onValueChange(event.target.value)} value={value}>{children}</select>,
+  SelectTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>, SelectValue: () => null, SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => <option value={value}>{children}</option>,
+}))
 
 const fields = { direction: null, format: '', indent: 0, version: 1 }
 const bodyJson = JSON.stringify({ version: 1, editorState: { root: { ...fields, type: 'root', children: [{ ...fields, children: [{ detail: 0, format: 0, mode: 'normal', style: '', text: 'Review body', type: 'text', version: 1 }], textFormat: 0, textStyle: '', type: 'paragraph' }] } } })
 const item = (id: string, authorId: string) => ({ id, author: { id: authorId, username: `user-${id}`, displayName: `User ${id}`, avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: `Summary ${id}`, summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 })
 const detail = { ...item('current', 'author-1'), bodyJson }
-const morePage = { items: [item('current', 'author-1'), item('other', 'author-2')], cursor: null, hasMore: false }
+const morePage = { items: [item('current', 'author-1'), { ...item('other', 'author-2'), summary: 'Secret ending', summaryHasSpoiler: true }], cursor: null, hasMore: false }
 
 beforeEach(() => {
   mocks.auth.mockReturnValue({ isAuthenticated: true })
   mocks.publicAuth.mockReturnValue({ status: 'ready', authState: { status: 'complete', email: 'fan@example.com', profile: { id: 'author-1', username: 'fan', name: 'Fan', avatarUrl: null, visibility: 'public' } } })
-  mocks.mutation.mockReturnValue(vi.fn())
+  let mutationCall = 0
+  const mutations = [mocks.visibility, mocks.activity, mocks.remove]
+  mocks.mutation.mockImplementation(() => mutations[mutationCall++ % mutations.length])
+  mocks.visibility.mockResolvedValue(undefined); mocks.activity.mockResolvedValue(undefined); mocks.remove.mockResolvedValue(undefined)
   mocks.query.mockImplementation((_query, args: { reviewId?: string }) => args.reviewId ? detail : morePage)
 })
 
@@ -33,6 +42,8 @@ describe('ReviewDetailContent behavior', () => {
     expect(screen.getByText('Review body')).toBeTruthy()
     expect(screen.getByRole('link', { name: /User other/ }).getAttribute('href')).toBe('/reviews/other')
     expect(screen.queryByRole('link', { name: /User current/ })).toBeNull()
+    expect(screen.queryByText('Secret ending')).toBeNull()
+    expect(screen.getByText('Spoiler summary hidden')).toBeTruthy()
   })
 
   it('renders explicit loading and not-found states', () => {
@@ -42,5 +53,19 @@ describe('ReviewDetailContent behavior', () => {
     mocks.query.mockReturnValue(null)
     view.rerender(<ReviewDetailContent reviewId="missing" />)
     expect(screen.getByText('Review not found')).toBeTruthy()
+  })
+
+  it('runs owner visibility, activity, and delete mutations with effects', async () => {
+    render(<ReviewDetailContent reviewId="current" />)
+    fireEvent.change(screen.getByLabelText('Change visibility'), { target: { value: 'private' } })
+    await waitFor(() => expect(mocks.visibility).toHaveBeenCalledWith({ reviewId: 'current', visibility: 'private' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove feed activity' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(mocks.activity).toHaveBeenCalledWith({ reviewId: 'current' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete review' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith({ reviewId: 'current' }))
+    expect(mocks.success).toHaveBeenCalledWith('Review deleted.')
+    expect(mocks.navigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/anime/$anilistId/$slug' }))
   })
 })

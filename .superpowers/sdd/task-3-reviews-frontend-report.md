@@ -18,12 +18,14 @@ Status: DONE_WITH_CONCERNS
 - Toolbar, Anime Reviews panel, protected gate, Review Detail owner rules: each failed on missing production module before GREEN.
 - Strict `bodyJson` detail adapter: focused test failed with `parseReviewWireDetail is not a function` before implementation.
 - Review request-ID, shared spoiler Summary, rating bands, real Lexical commands, and 2,501-character enforcement tests failed before their review fixes.
+- Spoiler state-reset, More Reviews spoiler redaction, owner mutation effects, and published-create redirect tests failed before the second review fixes.
 
 ## GREEN Evidence
 
-- `pnpm test -- src/features/reviews`: 14 files passed, 30 tests passed.
+- `pnpm test -- src/features/reviews`: 14 files passed, 36 tests passed.
 - `pnpm exec tsc --noEmit`: exit 0.
 - Behavior coverage includes Draft retry/Publish intent IDs, post-persist navigation, failure/dirty state, blocker actions, Preview parity, owner/detail states, real More Reviews data, Anime Reviews sort/pagination/retry/auth visibility, and real Lexical selection commands.
+- Toolbar coverage uses a real LexicalComposer for H3, quote, both list types, all approved inline formats, image/video insertion, undo, and redo. Owner coverage asserts visibility, activity, delete, toast, and router effects.
 - Forbidden scan: no `dangerouslySetInnerHTML`, iframe, or disallowed Lexical package imports.
 - Route tree restored to HEAD after validation. Controller owns final generation.
 

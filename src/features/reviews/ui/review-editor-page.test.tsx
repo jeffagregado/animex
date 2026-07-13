@@ -2,10 +2,10 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useMutation } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { useBlocker, useNavigate } from '@tanstack/react-router'
 
-import { LoadedReviewEditor } from './review-editor-page'
+import { LoadedReviewEditor, ReviewEditorPage } from './review-editor-page'
 
 const saveDraft = vi.fn()
 const publish = vi.fn()
@@ -13,27 +13,32 @@ const update = vi.fn()
 const navigate = vi.fn()
 const reset = vi.fn()
 const proceed = vi.fn()
+const publicAuth = vi.fn()
 let blockerOptions: { shouldBlockFn: () => boolean } | null = null
 let blocker: { status: 'idle' | 'blocked'; reset?: () => void; proceed?: () => void } = { status: 'idle' }
 
-vi.mock('convex/react', () => ({ useMutation: vi.fn() }))
+vi.mock('convex/react', () => ({ useMutation: vi.fn(), useQuery: vi.fn() }))
 vi.mock('@tanstack/react-router', () => ({
   useBlocker: vi.fn((options) => { blockerOptions = options; return blocker }),
   useNavigate: vi.fn(() => navigate),
 }))
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
+vi.mock('#/features/shell/public-auth-context', () => ({ usePublicAuthState: () => publicAuth() }))
 vi.mock('./review-editor', () => ({ ReviewEditor: ({ onChange }: { onChange: (body: unknown) => void }) => <button onClick={() => onChange(textDocument('Body text'))} type="button">Change body</button> }))
 vi.mock('./review-preview', () => ({ ReviewPreview: ({ summary }: { summary: string }) => <div>Preview: {summary}</div> }))
 
 const fields = { direction: null, format: '' as const, indent: 0 as const, version: 1 as const }
 const textDocument = (value: string) => ({ version: 1 as const, editorState: { root: { ...fields, type: 'root' as const, children: [{ ...fields, children: [{ detail: 0 as const, format: 0, mode: 'normal' as const, style: '' as const, text: value, type: 'text' as const, version: 1 as const }], textFormat: 0, textStyle: '' as const, type: 'paragraph' as const }] } } })
 const anime = { anilistId: 1, coverImageUrl: null, episodes: 28, format: 'TV' as const, seasonYear: 2023, slug: 'frieren', titles: { display: 'Frieren', english: null, native: null, romaji: null } }
+const published = { id: 'review-1', author: { id: 'author-1', username: 'fan', displayName: 'Fan', avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: 'Published summary', summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1, bodyJson: JSON.stringify(textDocument('Published body')) }
 
 beforeEach(() => {
   let mutationCall = 0
   const mutations = [saveDraft, publish, update]
   vi.mocked(useMutation).mockReset().mockImplementation(() => mutations[mutationCall++ % mutations.length] as unknown as ReturnType<typeof useMutation>)
   vi.mocked(useNavigate).mockReturnValue(navigate)
+  vi.mocked(useQuery).mockReset().mockImplementation((...args) => args[1] === 'skip' ? undefined : published as ReturnType<typeof useQuery>)
+  publicAuth.mockReturnValue({ status: 'ready', authState: { status: 'signedOut' } })
   vi.mocked(useBlocker).mockImplementation((options) => { blockerOptions = options as unknown as { shouldBlockFn: () => boolean }; return blocker as ReturnType<typeof useBlocker> })
   saveDraft.mockReset().mockResolvedValue('review-1')
   publish.mockReset().mockResolvedValue('review-1')
@@ -85,5 +90,12 @@ describe('LoadedReviewEditor lifecycle', () => {
     expect(reset).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
     expect(proceed).toHaveBeenCalledOnce()
+  })
+})
+
+describe('ReviewEditorPage existing Review routing', () => {
+  it('redirects an existing published create intent from an effect', async () => {
+    render(<ReviewEditorPage anime={anime} mode="create" reviewId={null} />)
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/reviews/$reviewId', params: { reviewId: 'review-1' }, replace: true }))
   })
 })

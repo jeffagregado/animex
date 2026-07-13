@@ -30,10 +30,13 @@ export function ReviewToolbar() {
   const [editor] = useLexicalComposerContext()
   const [dialog, setDialog] = useState<MediaDialog>(null)
   const block = (kind: 'h2' | 'h3' | 'quote'): void => formatReviewBlock(editor, kind)
-  const mark = (format: TextFormatType): void => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, format) }
+  const mark = (format: TextFormatType): void => formatReviewText(editor, format)
 
   return <><div aria-label="Review formatting" className="flex flex-wrap items-center gap-1 border-b border-border p-2" role="toolbar"><Tool label="H2" onClick={() => block('h2')}>H2</Tool><Tool label="H3" onClick={() => block('h3')}>H3</Tool><Tool label="Quote" onClick={() => block('quote')}><QuoteIcon /></Tool><Tool label="Bulleted list" onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}><ListIcon /></Tool><Tool label="Numbered list" onClick={() => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)}><ListOrderedIcon /></Tool><Tool label="Bold" onClick={() => mark('bold')}><strong>B</strong></Tool><Tool label="Italic" onClick={() => mark('italic')}><em>I</em></Tool><Tool label="Underline" onClick={() => mark('underline')}><u>U</u></Tool><Tool label="Strikethrough" onClick={() => mark('strikethrough')}><StrikethroughIcon /></Tool><Tool label="Image" onClick={() => setDialog('image')}><ImageIcon /></Tool><Tool label="Video" onClick={() => setDialog('video')}><VideoIcon /></Tool><Tool label="Spoiler" onClick={() => markSelectedBlocksAsSpoiler(editor)}><EyeOffIcon /></Tool><Tool label="Undo" onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)}><UndoIcon /></Tool><Tool label="Redo" onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)}><RedoIcon /></Tool></div><Dialog onOpenChange={(open) => { if (!open) setDialog(null) }} open={dialog !== null}>{dialog ? <DialogContent title={dialog === 'image' ? 'Add image' : 'Add video'}><MediaForm editor={editor} kind={dialog} onDone={() => setDialog(null)} /></DialogContent> : null}</Dialog></>
 }
+
+/** Applies one approved inline format to the active Lexical selection. */
+export const formatReviewText = (editor: ReturnType<typeof useLexicalComposerContext>[0], format: TextFormatType): void => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, format) }
 
 /** Replaces selected text blocks with one approved semantic block type. */
 export const formatReviewBlock = (editor: ReturnType<typeof useLexicalComposerContext>[0], kind: 'h2' | 'h3' | 'quote'): void => editor.update(() => {
@@ -61,13 +64,18 @@ function MediaForm({ editor, kind, onDone }: { editor: ReturnType<typeof useLexi
     const url = String(values.get('url') ?? '').trim()
     const label = String(values.get('label') ?? '').trim()
     try {
-      const provider = kind === 'video' ? getVideoProvider(url) : null
-      if (kind === 'image' && label.length === 0) throw new RangeError('Image alt text is required.')
-      editor.update(() => { $insertNodes([kind === 'image' ? $createReviewImageNode(url, label) : $createReviewVideoNode(url, provider!, label || undefined)]) })
+      insertReviewMedia(editor, kind, url, label)
       onDone()
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Media link is invalid.') }
   }
   return <form className="mt-5 space-y-4" onSubmit={submit}><label className="block text-sm font-bold">HTTPS URL<input className="mt-2 min-h-11 w-full rounded-lg border border-border bg-background px-3" name="url" required type="url" /></label><label className="block text-sm font-bold">{kind === 'image' ? 'Alt text' : 'Label (optional)'}<input className="mt-2 min-h-11 w-full rounded-lg border border-border bg-background px-3" name="label" required={kind === 'image'} /></label>{error ? <p className="text-red-300" role="alert">{error}</p> : null}<button className="min-h-11 rounded-lg bg-cyan-300 px-5 font-black text-primary-foreground" type="submit">Add {kind}</button></form>
+}
+
+/** Validates and inserts one approved Review media node at the active selection. */
+export const insertReviewMedia = (editor: ReturnType<typeof useLexicalComposerContext>[0], kind: Exclude<MediaDialog, null>, url: string, label: string): void => {
+  const provider = kind === 'video' ? getVideoProvider(url) : null
+  if (kind === 'image' && label.length === 0) throw new RangeError('Image alt text is required.')
+  editor.update(() => { $insertNodes([kind === 'image' ? $createReviewImageNode(url, label) : $createReviewVideoNode(url, provider!, label || undefined)]) }, { discrete: true })
 }
 
 /** Wraps selected top-level blocks once; existing spoiler selections stay unchanged. */
