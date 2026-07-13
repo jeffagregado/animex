@@ -19,7 +19,7 @@ TTL: Trending 3h; Upcoming 6h; Seasonal and Recommendations 24h. Expired or miss
 
 ## Search path
 
-Valid URL search/filter state enables `DiscoverSearchResults`, which calls TanStack Query infinite pagination through server function `searchAnime` (`GET`). Search bypasses Convex cache and queries AniList directly on the server. Results are deduplicated by AniList ID, display-only until Phase 4 detail routes exist, and expose explicit loading, empty, retry, rate-limit, and end states. No stale fallback.
+Valid URL search/filter state enables `DiscoverSearchResults`, which calls TanStack Query infinite pagination through server function `searchAnime` (`GET`). Search bypasses Convex cache and queries AniList directly on the server. Results are deduplicated by AniList ID and link each card/list row to `/anime/$anilistId/$slug`; the detail route owns canonical slug correction after metadata loads. Search exposes explicit loading, empty, retry, rate-limit, and end states. No stale fallback.
 
 ## UI and validation
 
