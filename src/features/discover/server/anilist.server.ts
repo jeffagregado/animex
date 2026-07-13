@@ -1,6 +1,13 @@
 import { z } from 'zod'
 
 import {
+  AniListRequestError,
+  createAniListDependencies,
+  requestAniList,
+  type AniListDependencies,
+} from '../../../lib/anilist-client.server'
+
+import {
   DISCOVER_SECTION_CONFIG,
   animeSearchInputSchema,
   getAnimeSeason,
@@ -11,9 +18,8 @@ import {
   type DiscoverSectionKey,
 } from '../shared/discover-contracts'
 
-const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
-const ANILIST_TIMEOUT_MS = 8_000
-const ANILIST_MAX_ATTEMPTS = 3
+export { AniListRequestError, createAniListDependencies }
+export type { AniListDependencies }
 
 const mediaSelection = `
   id type isAdult
@@ -74,134 +80,7 @@ const searchResponseSchema = z.object({
   }),
 })
 
-const graphQlErrorSchema = z.object({ errors: z.array(z.object({ message: z.string() })).min(1) })
-
-type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
-
-export interface AniListDependencies {
-  fetch: FetchLike
-  delay: (milliseconds: number) => Promise<void>
-  warn: (message: string) => void
-  now: () => number
-}
-
-type RequestErrorCode = 'UPSTREAM' | 'RATE_LIMITED'
-
-/** Represents a client-safe AniList transport failure. */
-export class AniListRequestError extends Error {
-  readonly code: RequestErrorCode
-  readonly retryAfterSeconds: number | null
-
-  constructor(code: RequestErrorCode, message: string, retryAfterSeconds: number | null) {
-    super(message)
-    this.name = 'AniListRequestError'
-    this.code = code
-    this.retryAfterSeconds = retryAfterSeconds
-  }
-}
-
-/** Supplies production transport dependencies explicitly. */
-export const createAniListDependencies = (): AniListDependencies => ({
-  fetch: globalThis.fetch,
-  delay: async (milliseconds) => await new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds)),
-  warn: (message) => console.warn(message),
-  now: () => Date.now(),
-})
-
 const upstreamError = (): AniListRequestError => new AniListRequestError('UPSTREAM', 'AniList is temporarily unavailable.', null)
-
-const getRetryAfterSeconds = (response: Response): number | null => {
-  const value = response.headers.get('retry-after')
-  if (value === null) return null
-  const seconds = Number(value)
-  return Number.isFinite(seconds) && seconds >= 0 ? Math.ceil(seconds) : null
-}
-
-/** Reports a retry without exposing provider details. */
-const warnAniListRetry = (attempt: number, dependencies: AniListDependencies): void => {
-  dependencies.warn(`AniList request retry ${attempt} of ${ANILIST_MAX_ATTEMPTS - 1}.`)
-}
-
-/** Waits before retrying a transient AniList transport failure. */
-const retryAniListRequest = async (attempt: number, dependencies: AniListDependencies): Promise<void> => {
-  warnAniListRetry(attempt, dependencies)
-  await dependencies.delay(attempt * 200)
-}
-
-/** Retries transient upstream failures or raises after the final attempt. */
-const throwOrRetryUpstream = async (attempt: number, dependencies: AniListDependencies): Promise<void> => {
-  if (attempt === ANILIST_MAX_ATTEMPTS) throw upstreamError()
-  await retryAniListRequest(attempt, dependencies)
-}
-
-/** Retries only short rate-limit windows, preserving the provider retry hint. */
-const throwOrRetryRateLimit = async (
-  response: Response,
-  attempt: number,
-  dependencies: AniListDependencies,
-): Promise<void> => {
-  const retryAfterSeconds = getRetryAfterSeconds(response)
-  if (retryAfterSeconds === null || retryAfterSeconds > 2 || attempt === ANILIST_MAX_ATTEMPTS) {
-    throw new AniListRequestError('RATE_LIMITED', 'AniList rate limit exceeded.', retryAfterSeconds)
-  }
-  await dependencies.delay(retryAfterSeconds * 1_000)
-  warnAniListRetry(attempt, dependencies)
-}
-
-/** Sends one GraphQL request and exposes a network failure as null. */
-const fetchAniListResponse = async (
-  document: string,
-  variables: Record<string, unknown>,
-  dependencies: AniListDependencies,
-): Promise<Response | null> => {
-  try {
-    return await dependencies.fetch(ANILIST_GRAPHQL_ENDPOINT, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ query: document, variables }),
-      signal: AbortSignal.timeout(ANILIST_TIMEOUT_MS),
-    })
-  } catch {
-    return null
-  }
-}
-
-/** Reads valid JSON responses or raises a sanitized upstream error. */
-const readAniListBody = async (response: Response): Promise<unknown> => {
-  try {
-    return await response.json()
-  } catch {
-    throw upstreamError()
-  }
-}
-
-/** Rejects GraphQL error payloads without exposing provider details. */
-const throwOnGraphQlError = (body: unknown): void => {
-  if (graphQlErrorSchema.safeParse(body).success) throw upstreamError()
-}
-
-const requestAniList = async (document: string, variables: Record<string, unknown>, dependencies: AniListDependencies): Promise<unknown> => {
-  for (let attempt = 1; attempt <= ANILIST_MAX_ATTEMPTS; attempt += 1) {
-    const response = await fetchAniListResponse(document, variables, dependencies)
-    if (response === null) {
-      await throwOrRetryUpstream(attempt, dependencies)
-      continue
-    }
-    if (response.status === 429) {
-      await throwOrRetryRateLimit(response, attempt, dependencies)
-      continue
-    }
-    if (response.status >= 500) {
-      await throwOrRetryUpstream(attempt, dependencies)
-      continue
-    }
-    if (!response.ok) throw upstreamError()
-    const body = await readAniListBody(response)
-    throwOnGraphQlError(body)
-    return body
-  }
-  throw upstreamError()
-}
 
 /** Normalizes one provider media object or raises a sanitized upstream error. */
 const normalizeSingleMedia = (value: unknown): AnimeSummary => {

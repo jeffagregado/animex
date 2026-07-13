@@ -1,0 +1,41 @@
+import { describe, expect, test } from 'vitest'
+
+import { AniListRequestError, requestAniList, type AniListDependencies } from './anilist-client.server'
+
+const dependencies = (responses: Response[]): AniListDependencies => ({
+  fetch: async () => {
+    const response = responses.shift()
+    if (!response) throw new Error('Unexpected request.')
+    return response
+  },
+  delay: async () => {},
+  warn: () => {},
+  now: () => 0,
+})
+
+describe('AniList client', () => {
+  test('sanitizes malformed JSON as an upstream error', async () => {
+    await expect(requestAniList('query Test { Viewer { id } }', {}, dependencies([
+      new Response('{bad', { status: 200 }),
+    ]))).rejects.toEqual(expect.objectContaining({
+      name: 'AniListRequestError',
+      code: 'UPSTREAM',
+      message: 'AniList is temporarily unavailable.',
+    }))
+  })
+
+  test('exposes only sanitized rate-limit details', async () => {
+    await expect(requestAniList('query Test { Viewer { id } }', {}, dependencies([
+      new Response('secret', { status: 429, headers: { 'retry-after': '12' } }),
+    ]))).rejects.toBeInstanceOf(AniListRequestError)
+  })
+
+  test('does not retry a rate limit without a Retry-After value', async () => {
+    await expect(requestAniList('query Test { Viewer { id } }', {}, dependencies([
+      new Response('limited', { status: 429 }),
+    ]))).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+      retryAfterSeconds: null,
+    })
+  })
+})
