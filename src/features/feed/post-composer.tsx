@@ -23,7 +23,7 @@ const errorMessage = (cause: unknown, fallback: string): string => cause instanc
 export function PostComposer({ initial, postId, onCancel, onSaved, registerClose }: PostComposerProps) {
   const composer = usePostComposer(initial)
   const savedRef = useRef(false)
-  const blocker = useBlocker({ shouldBlockFn: () => composer.dirty && !savedRef.current, enableBeforeUnload: composer.dirty && !savedRef.current, withResolver: true })
+  const blocker = useBlocker({ shouldBlockFn: () => composer.dirty && !savedRef.current, enableBeforeUnload: () => composer.dirty && !savedRef.current, withResolver: true })
   const fileInput = useRef<HTMLInputElement>(null)
   const [discardIntent, setDiscardIntent] = useState<'close' | 'navigate' | null>(null)
 

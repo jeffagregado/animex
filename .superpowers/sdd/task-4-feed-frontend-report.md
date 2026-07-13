@@ -22,6 +22,7 @@ Status: implemented. Controller integration still owns generated route tree.
 - Made refresh advance the feed request epoch so every older initial/load-more continuation is ignored without corrupting loading state.
 - Made upload abort phase-aware: cancellation stops pre-response fetches but lets an arrived response body reveal its storage ID before deletion.
 - Added a successful-save blocker bypass/reset so changed visibility cannot prevent the post-save close or navigation; failed saves remain dirty.
+- Kept both client-navigation and before-unload guards dynamic so the saved bypass applies immediately without waiting for a rerender.
 
 ## Validation
 
