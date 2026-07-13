@@ -7,6 +7,7 @@ import type { AnimeDetail, PublicAnimeDetailState } from '../shared/anime-detail
 import { AnimeDetailPage } from './anime-detail-page'
 
 vi.mock('./anime-user-controls', () => ({ AnimeUserControls: () => <div>User controls</div> }))
+vi.mock('#/features/reviews/ui/anime-reviews-panel', () => ({ AnimeReviewsPanel: () => <div className="rounded-xl border border-border bg-card/60 p-8 text-center"><h2 className="text-xl font-black">No reviews yet</h2><p className="mt-2 text-muted-foreground">Average rating unavailable · 0 reviews</p></div> }))
 vi.mock('../server/anime-detail.functions', () => ({ getAnimePeoplePage: vi.fn() }))
 
 const page = { items: [], currentPage: 1, hasNextPage: false, perPage: 24 as const }
