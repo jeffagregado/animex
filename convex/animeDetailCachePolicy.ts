@@ -1,5 +1,6 @@
 export const ANIME_DETAIL_CACHE_TTL_MS = 24 * 60 * 60 * 1000
-export const ANIME_DETAIL_LEASE_MS = 30_000
+// Covers two full retry stages plus bounded commit overhead.
+export const ANIME_DETAIL_LEASE_MS = 60_000
 export const ANIME_PEOPLE_LIMIT = 24
 
 type Lease = { leaseId: string; leaseUntil: number }

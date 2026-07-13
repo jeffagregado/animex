@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 
 import {
   ANIME_DETAIL_CACHE_TTL_MS,
+  ANIME_DETAIL_LEASE_MS,
   AnimeDetailCachePolicyError,
   assertDetailLease,
   createDetailTiming,
@@ -60,6 +61,20 @@ describe('anime detail cache policy', () => {
     expect(getError(() => assertDetailLease({ leaseId: 'a', leaseUntil: 200 }, 'b', 100)).code).toBe('LEASE_NOT_OWNED')
     expect(decideDetailLeaseRelease({ leaseId: 'a', leaseUntil: 200 }, 'a', 100)).toBe(true)
     expect(getError(() => decideDetailLeaseRelease({ leaseId: 'a', leaseUntil: 200 }, 'b', 100)).code).toBe('LEASE_NOT_OWNED')
+  })
+
+  test('keeps the lease active through the supported hydration retry budget and commit overhead', () => {
+    const retryStageMs = (3 * 8_000) + 200 + 400
+    const fullHydrationMs = 2 * retryStageMs
+    const commitOverheadMs = 10_000
+    const commitAt = fullHydrationMs + commitOverheadMs
+
+    expect(ANIME_DETAIL_LEASE_MS).toBeGreaterThan(commitAt)
+    expect(() => assertDetailLease(
+      { leaseId: 'worker', leaseUntil: ANIME_DETAIL_LEASE_MS },
+      'worker',
+      commitAt,
+    )).not.toThrow()
   })
 
   test('reuses the deployment cache token gate', () => {
