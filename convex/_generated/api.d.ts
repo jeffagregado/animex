@@ -10,6 +10,8 @@
 
 import type * as animeCache from "../animeCache.js";
 import type * as animeCachePolicy from "../animeCachePolicy.js";
+import type * as animeDetailCache from "../animeDetailCache.js";
+import type * as animeDetailCachePolicy from "../animeDetailCachePolicy.js";
 import type * as auth from "../auth.js";
 import type * as authEmailDelivery from "../authEmailDelivery.js";
 import type * as authEmails from "../authEmails.js";
@@ -31,6 +33,8 @@ import type * as otpSendLimits from "../otpSendLimits.js";
 import type * as passwordResets from "../passwordResets.js";
 import type * as pendingOauthSignups from "../pendingOauthSignups.js";
 import type * as todos from "../todos.js";
+import type * as userAnime from "../userAnime.js";
+import type * as userAnimePolicy from "../userAnimePolicy.js";
 import type * as users from "../users.js";
 
 import type {
@@ -42,6 +46,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   animeCache: typeof animeCache;
   animeCachePolicy: typeof animeCachePolicy;
+  animeDetailCache: typeof animeDetailCache;
+  animeDetailCachePolicy: typeof animeDetailCachePolicy;
   auth: typeof auth;
   authEmailDelivery: typeof authEmailDelivery;
   authEmails: typeof authEmails;
@@ -63,6 +69,8 @@ declare const fullApi: ApiFromModules<{
   passwordResets: typeof passwordResets;
   pendingOauthSignups: typeof pendingOauthSignups;
   todos: typeof todos;
+  userAnime: typeof userAnime;
+  userAnimePolicy: typeof userAnimePolicy;
   users: typeof users;
 }>;
 
