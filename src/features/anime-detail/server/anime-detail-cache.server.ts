@@ -20,6 +20,10 @@ const CONTENTION_DELAY_MS = 500
 
 type CacheRead<T> = { status: 'fresh'; entry: { payload: T; refreshedAt: number; expiresAt: number } } | { status: 'missing' | 'expired'; entry: null }
 type PeoplePage = AnimePeoplePage<AnimeCharacter> | AnimePeoplePage<AnimeStaff>
+type CacheLease = { acquired: boolean; leaseUntil: number | null }
+
+export type AnimePeoplePageState = { status: 'ready'; page: PeoplePage } | { status: 'not-found' } | { status: 'error'; code: 'UPSTREAM' | 'RATE_LIMITED'; message: string; retryAfterSeconds: number | null }
+type CacheErrorState = Extract<PublicAnimeDetailState, { status: 'error' }>
 
 export interface AnimeDetailCacheClient {
   readDetail: (anilistId: number) => Promise<CacheRead<AnimeDetail>>
@@ -40,9 +44,11 @@ export interface AnimeDetailCacheDependencies {
   fetchPeople: (anilistId: number, kind: AnimePeopleKind, page: number) => Promise<PeoplePage | null>
 }
 
-const errorState = (error: unknown): PublicAnimeDetailState => error instanceof AniListRequestError
+const errorState = (error: unknown): CacheErrorState => error instanceof AniListRequestError
   ? { status: 'error', code: error.code, message: error.message, retryAfterSeconds: error.retryAfterSeconds }
   : { status: 'error', code: 'UPSTREAM', message: 'Anime detail is temporarily unavailable.', retryAfterSeconds: null }
+
+const peopleErrorState = (error: unknown): Extract<AnimePeoplePageState, { status: 'error' }> => errorState(error)
 
 const ready = (read: CacheRead<AnimeDetail>): PublicAnimeDetailState | null => read.status === 'fresh'
   ? { status: 'ready', entry: { detail: read.entry.payload, refreshedAt: read.entry.refreshedAt, expiresAt: read.entry.expiresAt } }
@@ -61,27 +67,29 @@ const releasePreservingError = async (dependencies: AnimeDetailCacheDependencies
   }
 }
 
-/** Reads or refreshes one public detail without serving expired data. */
-export const getAnimeDetailServer = async (anilistId: number, dependencies: AnimeDetailCacheDependencies): Promise<PublicAnimeDetailState> => {
-  const id = parseAnilistId(anilistId)
-  let cached: PublicAnimeDetailState | null
-  try { cached = ready(await dependencies.client.readDetail(id)) } catch (error) { return errorState(error) }
-  if (cached) return cached
-  const key = `detail:${id}`
-  const leaseId = dependencies.createLeaseId()
-  let lease: { acquired: boolean; leaseUntil: number | null }
-  try { lease = await dependencies.client.acquireLease(key, leaseId, dependencies.writeToken) } catch (error) { return errorState(error) }
-  if (!lease.acquired) {
-    for (let attempt = 0; attempt < CONTENTION_READS; attempt += 1) {
-      await dependencies.delay(CONTENTION_DELAY_MS)
-      let reread: PublicAnimeDetailState | null
-      try { reread = ready(await dependencies.client.readDetail(id)) } catch (error) { return errorState(error) }
-      if (reread) return reread
-    }
-    return errorState(new Error('Detail refresh lease contention.'))
-  }
+/** Reads one detail and converts cache failures to public errors. */
+const readDetailState = async (anilistId: number, dependencies: AnimeDetailCacheDependencies): Promise<PublicAnimeDetailState | null> => {
   try {
-    const fetched = await dependencies.fetchDetail(id)
+    return ready(await dependencies.client.readDetail(anilistId))
+  } catch (error) {
+    return errorState(error)
+  }
+}
+
+/** Waits for another request to commit one fresh detail. */
+const waitForDetail = async (anilistId: number, dependencies: AnimeDetailCacheDependencies): Promise<PublicAnimeDetailState> => {
+  for (let attempt = 0; attempt < CONTENTION_READS; attempt += 1) {
+    await dependencies.delay(CONTENTION_DELAY_MS)
+    const reread = await readDetailState(anilistId, dependencies)
+    if (reread) return reread
+  }
+  return errorState(new Error('Detail refresh lease contention.'))
+}
+
+/** Fetches and commits one detail while holding its lease. */
+const refreshDetail = async (anilistId: number, key: string, leaseId: string, dependencies: AnimeDetailCacheDependencies): Promise<PublicAnimeDetailState> => {
+  try {
+    const fetched = await dependencies.fetchDetail(anilistId)
     if (fetched === null) {
       try {
         await releaseLease(dependencies, key, leaseId)
@@ -91,7 +99,7 @@ export const getAnimeDetailServer = async (anilistId: number, dependencies: Anim
       return { status: 'not-found', code: 'NOT_FOUND', message: 'Anime was not found.' }
     }
     await dependencies.client.commitDetail(leaseId, fetched.summary, fetched.detail, dependencies.writeToken)
-    const reread = ready(await dependencies.client.readDetail(id))
+    const reread = ready(await dependencies.client.readDetail(anilistId))
     return reread ?? errorState(new Error('Committed detail was unavailable.'))
   } catch (error) {
     await releasePreservingError(dependencies, key, leaseId)
@@ -99,57 +107,73 @@ export const getAnimeDetailServer = async (anilistId: number, dependencies: Anim
   }
 }
 
-export type AnimePeoplePageState = { status: 'ready'; page: PeoplePage } | { status: 'not-found' } | { status: 'error'; code: 'UPSTREAM' | 'RATE_LIMITED'; message: string; retryAfterSeconds: number | null }
+/** Reads or refreshes one public detail without serving expired data. */
+export const getAnimeDetailServer = async (anilistId: number, dependencies: AnimeDetailCacheDependencies): Promise<PublicAnimeDetailState> => {
+  const id = parseAnilistId(anilistId)
+  const cached = await readDetailState(id, dependencies)
+  if (cached) return cached
+  const key = `detail:${id}`
+  const leaseId = dependencies.createLeaseId()
+  let lease: CacheLease
+  try { lease = await dependencies.client.acquireLease(key, leaseId, dependencies.writeToken) } catch (error) { return errorState(error) }
+  if (!lease.acquired) return await waitForDetail(id, dependencies)
+  return await refreshDetail(id, key, leaseId, dependencies)
+}
+
+/** Reads one people page and converts cache failures to public errors. */
+const readPeoplePageState = async (anilistId: number, kind: AnimePeopleKind, page: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState | null> => {
+  try {
+    const cached = await dependencies.client.readPeoplePage(anilistId, kind, page)
+    return cached.status === 'fresh' ? { status: 'ready', page: cached.entry.payload } : null
+  } catch (error) {
+    return peopleErrorState(error)
+  }
+}
+
+/** Waits for another request to commit one fresh people page. */
+const waitForPeoplePage = async (anilistId: number, kind: AnimePeopleKind, page: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState> => {
+  for (let attempt = 0; attempt < CONTENTION_READS; attempt += 1) {
+    await dependencies.delay(CONTENTION_DELAY_MS)
+    const reread = await readPeoplePageState(anilistId, kind, page, dependencies)
+    if (reread) return reread
+  }
+  return { status: 'error', code: 'UPSTREAM', message: 'Anime people page is temporarily unavailable.', retryAfterSeconds: null }
+}
+
+/** Fetches and commits one people page while holding its lease. */
+const refreshPeoplePage = async (anilistId: number, kind: AnimePeopleKind, page: number, key: string, leaseId: string, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState> => {
+  try {
+    const fetched = await dependencies.fetchPeople(anilistId, kind, page)
+    if (fetched === null) {
+      try {
+        await releaseLease(dependencies, key, leaseId)
+      } catch (error) {
+        return peopleErrorState(error)
+      }
+      return { status: 'not-found' }
+    }
+    await dependencies.client.commitPeoplePage(anilistId, kind, page, fetched, leaseId, dependencies.writeToken)
+    const reread = await dependencies.client.readPeoplePage(anilistId, kind, page)
+    if (reread.status !== 'fresh') throw new TypeError('Committed anime people page was unavailable.')
+    return { status: 'ready', page: reread.entry.payload }
+  } catch (error) {
+    await releasePreservingError(dependencies, key, leaseId)
+    return peopleErrorState(error)
+  }
+}
 
 /** Reads or refreshes one independent people page without stale fallback. */
 export const getAnimePeoplePageServer = async (anilistId: number, kind: AnimePeopleKind, page: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState> => {
   const id = parseAnilistId(anilistId)
   const validPage = parseAnimePage(page)
-  let cached: CacheRead<PeoplePage>
-  try { cached = await dependencies.client.readPeoplePage(id, kind, validPage) } catch (error) {
-    const state = errorState(error)
-    return state.status === 'error' ? state : { status: 'error', code: 'UPSTREAM', message: 'Anime people page is temporarily unavailable.', retryAfterSeconds: null }
-  }
-  if (cached.status === 'fresh') return { status: 'ready', page: cached.entry.payload }
+  const cached = await readPeoplePageState(id, kind, validPage, dependencies)
+  if (cached) return cached
   const key = `people:${id}:${kind}:${validPage}`
   const leaseId = dependencies.createLeaseId()
-  let lease: { acquired: boolean; leaseUntil: number | null }
-  try { lease = await dependencies.client.acquireLease(key, leaseId, dependencies.writeToken) } catch (error) {
-    const state = errorState(error)
-    return state.status === 'error' ? state : { status: 'error', code: 'UPSTREAM', message: 'Anime people page is temporarily unavailable.', retryAfterSeconds: null }
-  }
-  if (!lease.acquired) {
-    for (let attempt = 0; attempt < CONTENTION_READS; attempt += 1) {
-      await dependencies.delay(CONTENTION_DELAY_MS)
-      let reread: CacheRead<PeoplePage>
-      try { reread = await dependencies.client.readPeoplePage(id, kind, validPage) } catch (error) {
-        const state = errorState(error)
-        return state.status === 'error' ? state : { status: 'error', code: 'UPSTREAM', message: 'Anime people page is temporarily unavailable.', retryAfterSeconds: null }
-      }
-      if (reread.status === 'fresh') return { status: 'ready', page: reread.entry.payload }
-    }
-    return { status: 'error', code: 'UPSTREAM', message: 'Anime people page is temporarily unavailable.', retryAfterSeconds: null }
-  }
-  try {
-    const fetched = await dependencies.fetchPeople(id, kind, validPage)
-    if (fetched === null) {
-      try {
-        await releaseLease(dependencies, key, leaseId)
-      } catch (error) {
-        const state = errorState(error)
-        return state.status === 'error' ? state : { status: 'error', code: 'UPSTREAM', message: 'Anime people page is temporarily unavailable.', retryAfterSeconds: null }
-      }
-      return { status: 'not-found' }
-    }
-    await dependencies.client.commitPeoplePage(id, kind, validPage, fetched, leaseId, dependencies.writeToken)
-    const reread = await dependencies.client.readPeoplePage(id, kind, validPage)
-    if (reread.status !== 'fresh') throw new TypeError('Committed anime people page was unavailable.')
-    return { status: 'ready', page: reread.entry.payload }
-  } catch (error) {
-    await releasePreservingError(dependencies, key, leaseId)
-    const state = errorState(error)
-    return state.status === 'error' ? state : { status: 'error', code: 'UPSTREAM', message: 'Anime people page is temporarily unavailable.', retryAfterSeconds: null }
-  }
+  let lease: CacheLease
+  try { lease = await dependencies.client.acquireLease(key, leaseId, dependencies.writeToken) } catch (error) { return peopleErrorState(error) }
+  if (!lease.acquired) return await waitForPeoplePage(id, kind, validPage, dependencies)
+  return await refreshPeoplePage(id, kind, validPage, key, leaseId, dependencies)
 }
 
 const requireEnv = (name: 'VITE_CONVEX_URL' | 'DISCOVER_CACHE_WRITE_TOKEN'): string => {

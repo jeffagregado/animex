@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { AniListRequestError, requestAniList, type AniListDependencies } from './anilist-client.server'
+import { AniListRequestError, requestAniList, requestAniListAllowingNotFound, type AniListDependencies } from './anilist-client.server'
 
 const dependencies = (responses: Response[]): AniListDependencies => ({
   fetch: async () => {
@@ -43,5 +43,72 @@ describe('AniList client', () => {
     await expect(requestAniList('query Test { Media { id } }', {}, dependencies([
       new Response(JSON.stringify({ data: { Media: null } }), { status: 404 }),
     ]))).rejects.toMatchObject({ code: 'UPSTREAM' })
+  })
+
+  test('retries server errors with bounded linear delays', async () => {
+    const delays: number[] = []
+    const warnings: string[] = []
+    const deps = dependencies([
+      new Response('unavailable', { status: 500 }),
+      new Response('unavailable', { status: 503 }),
+      Response.json({ data: { Viewer: { id: 1 } } }),
+    ])
+    deps.delay = async (milliseconds) => { delays.push(milliseconds) }
+    deps.warn = (message) => { warnings.push(message) }
+
+    await expect(requestAniList('query Test { Viewer { id } }', {}, deps)).resolves.toEqual({ data: { Viewer: { id: 1 } } })
+    expect(delays).toEqual([200, 400])
+    expect(warnings).toEqual([
+      'AniList request retry 1 of 2.',
+      'AniList request retry 2 of 2.',
+    ])
+  })
+
+  test('retries a short rate limit before returning the response', async () => {
+    const delays: number[] = []
+    const deps = dependencies([
+      new Response('limited', { status: 429, headers: { 'retry-after': '2' } }),
+      Response.json({ data: { Viewer: { id: 1 } } }),
+    ])
+    deps.delay = async (milliseconds) => { delays.push(milliseconds) }
+
+    await expect(requestAniList('query Test { Viewer { id } }', {}, deps)).resolves.toEqual({ data: { Viewer: { id: 1 } } })
+    expect(delays).toEqual([2_000])
+  })
+
+  test('returns a sanitized error after timeout retries are exhausted', async () => {
+    let attempts = 0
+    const deps = dependencies([])
+    deps.fetch = async () => {
+      attempts += 1
+      throw new DOMException('request timed out with secret context', 'TimeoutError')
+    }
+
+    await expect(requestAniList('query Test { Viewer { id } }', {}, deps)).rejects.toMatchObject({
+      code: 'UPSTREAM',
+      message: 'AniList is temporarily unavailable.',
+    })
+    expect(attempts).toBe(3)
+  })
+
+  test('allows only the validated AniList not-found response shape', async () => {
+    const body = { errors: [{ message: 'Not Found.', status: 404 }], data: { Media: null } }
+
+    await expect(requestAniListAllowingNotFound('query Test { Media { id } }', {}, dependencies([
+      Response.json(body, { status: 404 }),
+    ]))).resolves.toEqual(body)
+
+    await expect(requestAniListAllowingNotFound('query Test { Media { id } }', {}, dependencies([
+      Response.json({ data: { Media: null } }, { status: 404 }),
+    ]))).rejects.toMatchObject({ code: 'UPSTREAM' })
+  })
+
+  test('sanitizes GraphQL error response details', async () => {
+    await expect(requestAniList('query Test { Viewer { id } }', {}, dependencies([
+      Response.json({ errors: [{ message: 'secret resolver detail' }] }),
+    ]))).rejects.toMatchObject({
+      code: 'UPSTREAM',
+      message: 'AniList is temporarily unavailable.',
+    })
   })
 })

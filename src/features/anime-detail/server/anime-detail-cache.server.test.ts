@@ -41,6 +41,58 @@ describe('anime detail cache orchestration', () => {
     })
   })
 
+  test('returns a fresh people page without acquiring a lease', async () => {
+    const deps = createDeps(async () => ({ status: 'expired', entry: null }))
+    deps.client.readPeoplePage = async () => ({ status: 'fresh', entry: { payload: emptyPage, refreshedAt: 1, expiresAt: 86_400_001 } })
+    deps.client.acquireLease = async () => { throw new Error('must not acquire') }
+
+    await expect(getAnimePeoplePageServer(1, 'characters', 1, deps)).resolves.toEqual({ status: 'ready', page: emptyPage })
+  })
+
+  test('returns a people page refreshed by the lease holder during contention', async () => {
+    let reads = 0
+    let delays = 0
+    const deps = createDeps(async () => ({ status: 'expired', entry: null }))
+    deps.client.readPeoplePage = async () => {
+      reads += 1
+      return reads < 3
+        ? { status: 'expired', entry: null }
+        : { status: 'fresh', entry: { payload: emptyPage, refreshedAt: 1, expiresAt: 86_400_001 } }
+    }
+    deps.delay = async () => { delays += 1 }
+
+    await expect(getAnimePeoplePageServer(1, 'characters', 1, deps)).resolves.toEqual({ status: 'ready', page: emptyPage })
+    expect(delays).toBe(2)
+  })
+
+  test('commits and rereads a people page after acquiring a refresh lease', async () => {
+    let reads = 0
+    let committed = false
+    const deps = createDeps(async () => ({ status: 'expired', entry: null }))
+    deps.client.readPeoplePage = async () => {
+      reads += 1
+      return reads === 1
+        ? { status: 'missing', entry: null }
+        : { status: 'fresh', entry: { payload: emptyPage, refreshedAt: 1, expiresAt: 86_400_001 } }
+    }
+    deps.client.acquireLease = async () => ({ acquired: true, leaseUntil: 30_000 })
+    deps.client.commitPeoplePage = async () => { committed = true }
+
+    await expect(getAnimePeoplePageServer(1, 'characters', 1, deps)).resolves.toEqual({ status: 'ready', page: emptyPage })
+    expect(committed).toBe(true)
+  })
+
+  test('releases its lease when a people page is not found', async () => {
+    let released = false
+    const deps = createDeps(async () => ({ status: 'expired', entry: null }))
+    deps.client.acquireLease = async () => ({ acquired: true, leaseUntil: 30_000 })
+    deps.fetchPeople = async () => null
+    deps.client.releaseLease = async () => { released = true; return true }
+
+    await expect(getAnimePeoplePageServer(1, 'staff', 1, deps)).resolves.toEqual({ status: 'not-found' })
+    expect(released).toBe(true)
+  })
+
   test('commits and rereads detail after acquiring a refresh lease', async () => {
     let reads = 0
     let committed = false

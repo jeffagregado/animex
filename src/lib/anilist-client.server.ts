@@ -63,6 +63,44 @@ const fetchResponse = async (document: string, variables: Record<string, unknown
   }
 }
 
+/** Retries one unavailable response or raises the final sanitized error. */
+const retryUnavailable = async (attempt: number, dependencies: AniListDependencies): Promise<void> => {
+  if (attempt === ANILIST_MAX_ATTEMPTS) throw upstreamError()
+  warnRetry(attempt, dependencies)
+  await dependencies.delay(attempt * 200)
+}
+
+/** Applies bounded Retry-After handling to one rate-limited response. */
+const retryRateLimited = async (response: Response, attempt: number, dependencies: AniListDependencies): Promise<void> => {
+  const seconds = retryAfter(response)
+  if (seconds === null || seconds > 2 || attempt === ANILIST_MAX_ATTEMPTS) {
+    throw new AniListRequestError('RATE_LIMITED', 'AniList rate limit exceeded.', seconds)
+  }
+  await dependencies.delay(seconds * 1_000)
+  warnRetry(attempt, dependencies)
+}
+
+/** Parses one JSON body without exposing upstream parse details. */
+const parseResponseBody = async (response: Response): Promise<unknown> => {
+  try {
+    return await response.json()
+  } catch {
+    throw upstreamError()
+  }
+}
+
+/** Validates status and GraphQL error policy for one response. */
+const readResponseBody = async (response: Response, allowNotFoundBody: boolean): Promise<unknown> => {
+  if (!response.ok && !(allowNotFoundBody && response.status === 404)) throw upstreamError()
+  const body = await parseResponseBody(response)
+  if (allowNotFoundBody && response.status === 404) {
+    if (notFoundGraphQlBodySchema.safeParse(body).success) return body
+    throw upstreamError()
+  }
+  if (graphQlErrorSchema.safeParse(body).success) throw upstreamError()
+  return body
+}
+
 const requestAniListWithNotFoundPolicy = async (
   document: string,
   variables: Record<string, unknown>,
@@ -72,33 +110,14 @@ const requestAniListWithNotFoundPolicy = async (
   for (let attempt = 1; attempt <= ANILIST_MAX_ATTEMPTS; attempt += 1) {
     const response = await fetchResponse(document, variables, dependencies)
     if (response === null || response.status >= 500) {
-      if (attempt === ANILIST_MAX_ATTEMPTS) throw upstreamError()
-      warnRetry(attempt, dependencies)
-      await dependencies.delay(attempt * 200)
+      await retryUnavailable(attempt, dependencies)
       continue
     }
     if (response.status === 429) {
-      const seconds = retryAfter(response)
-      if (seconds === null || seconds > 2 || attempt === ANILIST_MAX_ATTEMPTS) {
-        throw new AniListRequestError('RATE_LIMITED', 'AniList rate limit exceeded.', seconds)
-      }
-      await dependencies.delay(seconds * 1_000)
-      warnRetry(attempt, dependencies)
+      await retryRateLimited(response, attempt, dependencies)
       continue
     }
-    if (!response.ok && !(allowNotFoundBody && response.status === 404)) throw upstreamError()
-    let body: unknown
-    try {
-      body = await response.json()
-    } catch {
-      throw upstreamError()
-    }
-    if (allowNotFoundBody && response.status === 404) {
-      if (notFoundGraphQlBodySchema.safeParse(body).success) return body
-      throw upstreamError()
-    }
-    if (graphQlErrorSchema.safeParse(body).success) throw upstreamError()
-    return body
+    return await readResponseBody(response, allowNotFoundBody)
   }
   throw upstreamError()
 }
