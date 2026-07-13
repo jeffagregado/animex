@@ -5,6 +5,7 @@ export const ANIME_PEOPLE_LIMIT = 24
 type Lease = { leaseId: string; leaseUntil: number }
 type TimedPayload<T> = { payload: T; refreshedAt: number; expiresAt: number }
 type UnknownRecord = Record<string, unknown>
+type WriteCode = 'INVALID_DETAIL' | 'INVALID_SUMMARY'
 
 export class AnimeDetailCachePolicyError extends Error {
   constructor(public readonly code: string, message: string) {
@@ -13,26 +14,26 @@ export class AnimeDetailCachePolicyError extends Error {
   }
 }
 
-const failWrite = (code: 'INVALID_DETAIL' | 'INVALID_SUMMARY', message: string): never => {
+const failWrite = (code: WriteCode, message: string): never => {
   throw new AnimeDetailCachePolicyError(code, message)
 }
 
-const requireRecord = (value: unknown, code: 'INVALID_DETAIL' | 'INVALID_SUMMARY', name: string): UnknownRecord => {
+const requireRecord = (value: unknown, code: WriteCode, name: string): UnknownRecord => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return failWrite(code, `${name} must be an object.`)
   return value as UnknownRecord
 }
 
-const requireText = (value: unknown, code: 'INVALID_DETAIL' | 'INVALID_SUMMARY', name: string, nullable = false): void => {
+const requireText = (value: unknown, code: WriteCode, name: string, nullable: boolean): void => {
   if (nullable && value === null) return
   if (typeof value !== 'string' || !value.trim()) failWrite(code, `${name} must be a non-empty string.`)
 }
 
-const requireInteger = (value: unknown, code: 'INVALID_DETAIL' | 'INVALID_SUMMARY', name: string, minimum: number, nullable = false): void => {
+const requireInteger = (value: unknown, code: WriteCode, name: string, minimum: number, nullable: boolean): void => {
   if (nullable && value === null) return
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < minimum) failWrite(code, `${name} is outside its allowed integer range.`)
 }
 
-const requireHttps = (value: unknown, code: 'INVALID_DETAIL' | 'INVALID_SUMMARY', name: string, nullable: boolean): void => {
+const requireHttps = (value: unknown, code: WriteCode, name: string, nullable: boolean): void => {
   if (nullable && value === null) return
   if (typeof value !== 'string') return failWrite(code, `${name} must be an HTTPS URL.`)
   try {
@@ -42,17 +43,26 @@ const requireHttps = (value: unknown, code: 'INVALID_DETAIL' | 'INVALID_SUMMARY'
   }
 }
 
-const validateDate = (value: unknown, code: 'INVALID_DETAIL' | 'INVALID_SUMMARY', name: string): void => {
-  if (value === null) return
-  const date = requireRecord(value, code, name)
-  if (date.year !== null && (!Number.isInteger(date.year) || typeof date.year !== 'number')) failWrite(code, `${name}.year must be an integer or null.`)
-  if (date.month !== null && (typeof date.month !== 'number' || !Number.isInteger(date.month) || date.month < 1 || date.month > 12)) failWrite(code, `${name}.month must be 1 through 12 or null.`)
-  if (date.day !== null && (typeof date.day !== 'number' || !Number.isInteger(date.day) || date.day < 1 || date.day > 31)) failWrite(code, `${name}.day must be 1 through 31 or null.`)
+const requireNullableDateInteger = (value: unknown, code: WriteCode, message: string): void => {
+  if (value !== null && (typeof value !== 'number' || !Number.isInteger(value))) failWrite(code, message)
 }
 
-const validateTitles = (value: unknown, code: 'INVALID_DETAIL' | 'INVALID_SUMMARY'): void => {
+const requireNullableDateRange = (value: unknown, code: WriteCode, minimum: number, maximum: number, message: string): void => {
+  requireNullableDateInteger(value, code, message)
+  if (typeof value === 'number' && (value < minimum || value > maximum)) failWrite(code, message)
+}
+
+const validateDate = (value: unknown, code: WriteCode, name: string): void => {
+  if (value === null) return
+  const date = requireRecord(value, code, name)
+  requireNullableDateInteger(date.year, code, `${name}.year must be an integer or null.`)
+  requireNullableDateRange(date.month, code, 1, 12, `${name}.month must be 1 through 12 or null.`)
+  requireNullableDateRange(date.day, code, 1, 31, `${name}.day must be 1 through 31 or null.`)
+}
+
+const validateTitles = (value: unknown, code: WriteCode): void => {
   const titles = requireRecord(value, code, 'titles')
-  requireText(titles.display, code, 'titles.display')
+  requireText(titles.display, code, 'titles.display', false)
   requireText(titles.english, code, 'titles.english', true)
   requireText(titles.romaji, code, 'titles.romaji', true)
   requireText(titles.native, code, 'titles.native', true)
@@ -60,34 +70,78 @@ const validateTitles = (value: unknown, code: 'INVALID_DETAIL' | 'INVALID_SUMMAR
 
 const validateListItem = (value: unknown): void => {
   const item = requireRecord(value, 'INVALID_DETAIL', 'detail list item')
-  requireInteger(item.anilistId, 'INVALID_DETAIL', 'detail list item anilistId', 1)
-  requireText(item.slug, 'INVALID_DETAIL', 'detail list item slug')
-  requireText(item.title, 'INVALID_DETAIL', 'detail list item title')
+  requireInteger(item.anilistId, 'INVALID_DETAIL', 'detail list item anilistId', 1, false)
+  requireText(item.slug, 'INVALID_DETAIL', 'detail list item slug', false)
+  requireText(item.title, 'INVALID_DETAIL', 'detail list item title', false)
   requireHttps(item.coverImageUrl, 'INVALID_DETAIL', 'detail list item coverImageUrl', true)
   requireInteger(item.seasonYear, 'INVALID_DETAIL', 'detail list item seasonYear', 1, true)
 }
 
 const validatePerson = (value: unknown, kind: 'characters' | 'staff'): void => {
   const person = requireRecord(value, 'INVALID_DETAIL', `${kind} item`)
-  requireInteger(person.anilistId, 'INVALID_DETAIL', `${kind} item anilistId`, 1)
-  requireText(person.name, 'INVALID_DETAIL', `${kind} item name`)
-  requireText(person.role, 'INVALID_DETAIL', `${kind} item role`)
+  requireInteger(person.anilistId, 'INVALID_DETAIL', `${kind} item anilistId`, 1, false)
+  requireText(person.name, 'INVALID_DETAIL', `${kind} item name`, false)
+  requireText(person.role, 'INVALID_DETAIL', `${kind} item role`, false)
   requireHttps(person.imageUrl, 'INVALID_DETAIL', `${kind} item imageUrl`, true)
   if (kind === 'characters' && person.japaneseVoiceActor !== null) {
     const actor = requireRecord(person.japaneseVoiceActor, 'INVALID_DETAIL', 'Japanese voice actor')
-    requireInteger(actor.anilistId, 'INVALID_DETAIL', 'Japanese voice actor anilistId', 1)
-    requireText(actor.name, 'INVALID_DETAIL', 'Japanese voice actor name')
+    requireInteger(actor.anilistId, 'INVALID_DETAIL', 'Japanese voice actor anilistId', 1, false)
+    requireText(actor.name, 'INVALID_DETAIL', 'Japanese voice actor name', false)
     requireHttps(actor.imageUrl, 'INVALID_DETAIL', 'Japanese voice actor imageUrl', true)
     if (actor.language !== 'Japanese') failWrite('INVALID_DETAIL', 'Japanese voice actor language must be Japanese.')
   }
 }
 
-/** Validates detail and summary writes against frozen shared constraints. */
-export const validateDetailCommit = (detailValue: unknown, summaryValue: unknown): void => {
-  const detail = requireRecord(detailValue, 'INVALID_DETAIL', 'detail')
-  const summary = requireRecord(summaryValue, 'INVALID_SUMMARY', 'summary')
-  requireInteger(detail.anilistId, 'INVALID_DETAIL', 'detail anilistId', 1)
-  requireText(detail.slug, 'INVALID_DETAIL', 'detail slug')
+const validateGenres = (value: unknown, code: WriteCode, arrayMessage: string, itemName: string): void => {
+  if (!Array.isArray(value)) return failWrite(code, arrayMessage)
+  value.forEach((genre: unknown) => requireText(genre, code, itemName, false))
+}
+
+const validateMainStudio = (value: unknown): void => {
+  if (value === null) return
+  const studio = requireRecord(value, 'INVALID_DETAIL', 'mainStudio')
+  requireText(studio.name, 'INVALID_DETAIL', 'mainStudio.name', false)
+  requireHttps(studio.siteUrl, 'INVALID_DETAIL', 'mainStudio.siteUrl', true)
+}
+
+const validateDetailLists = (relatedValue: unknown, recommendationsValue: unknown): void => {
+  if (!Array.isArray(relatedValue)) return failWrite('INVALID_DETAIL', 'Related anime must be an array.')
+  if (relatedValue.length > 5) failWrite('INVALID_DETAIL', 'Related anime cannot exceed five items.')
+  if (!Array.isArray(recommendationsValue)) return failWrite('INVALID_DETAIL', 'Recommendations must be an array.')
+  if (recommendationsValue.length > 5) failWrite('INVALID_DETAIL', 'Recommendations cannot exceed five items.')
+  relatedValue.forEach(validateListItem)
+  recommendationsValue.forEach(validateListItem)
+}
+
+const validateTrailer = (value: unknown): void => {
+  if (value === null) return
+  const trailer = requireRecord(value, 'INVALID_DETAIL', 'trailer')
+  requireText(trailer.youtubeId, 'INVALID_DETAIL', 'trailer.youtubeId', false)
+  requireHttps(trailer.thumbnailUrl, 'INVALID_DETAIL', 'trailer.thumbnailUrl', true)
+}
+
+const validateExternalLinks = (value: unknown): void => {
+  if (!Array.isArray(value)) return failWrite('INVALID_DETAIL', 'External links must be an array.')
+  if (value.length > 8) failWrite('INVALID_DETAIL', 'External links cannot exceed eight items.')
+  value.forEach((linkValue: unknown) => {
+    const link = requireRecord(linkValue, 'INVALID_DETAIL', 'external link')
+    requireText(link.site, 'INVALID_DETAIL', 'external link site', false)
+    requireHttps(link.url, 'INVALID_DETAIL', 'external link url', false)
+  })
+}
+
+const validateInitialPeoplePages = (detail: UnknownRecord): void => {
+  for (const kind of ['characters', 'staff'] as const) {
+    const page = requireRecord(detail[`${kind}Page`], 'INVALID_DETAIL', `${kind}Page`)
+    const items = page.items
+    if (page.currentPage !== 1 || page.perPage !== 24 || !Array.isArray(items)) return failWrite('INVALID_DETAIL', `Initial ${kind} page is invalid.`)
+    validatePeoplePage(detail.anilistId as number, kind, 1, items)
+  }
+}
+
+const validateDetail = (detail: UnknownRecord): void => {
+  requireInteger(detail.anilistId, 'INVALID_DETAIL', 'detail anilistId', 1, false)
+  requireText(detail.slug, 'INVALID_DETAIL', 'detail slug', false)
   validateTitles(detail.titles, 'INVALID_DETAIL')
   requireHttps(detail.coverImageUrl, 'INVALID_DETAIL', 'detail coverImageUrl', true)
   requireHttps(detail.bannerImageUrl, 'INVALID_DETAIL', 'detail bannerImageUrl', true)
@@ -98,59 +152,38 @@ export const validateDetailCommit = (detailValue: unknown, summaryValue: unknown
   requireInteger(detail.durationMinutes, 'INVALID_DETAIL', 'detail durationMinutes', 1, true)
   validateDate(detail.startDate, 'INVALID_DETAIL', 'detail startDate')
   validateDate(detail.endDate, 'INVALID_DETAIL', 'detail endDate')
-  const detailGenres = detail.genres
-  if (!Array.isArray(detailGenres)) return failWrite('INVALID_DETAIL', 'Detail genres must be an array.')
-  detailGenres.forEach((genre: unknown) => requireText(genre, 'INVALID_DETAIL', 'detail genre'))
-  if (detail.mainStudio !== null) {
-    const studio = requireRecord(detail.mainStudio, 'INVALID_DETAIL', 'mainStudio')
-    requireText(studio.name, 'INVALID_DETAIL', 'mainStudio.name')
-    requireHttps(studio.siteUrl, 'INVALID_DETAIL', 'mainStudio.siteUrl', true)
-  }
-  const related = detail.related
-  const recommendations = detail.recommendations
-  if (!Array.isArray(related)) return failWrite('INVALID_DETAIL', 'Related anime must be an array.')
-  if (related.length > 5) failWrite('INVALID_DETAIL', 'Related anime cannot exceed five items.')
-  if (!Array.isArray(recommendations)) return failWrite('INVALID_DETAIL', 'Recommendations must be an array.')
-  if (recommendations.length > 5) failWrite('INVALID_DETAIL', 'Recommendations cannot exceed five items.')
-  related.forEach(validateListItem)
-  recommendations.forEach(validateListItem)
-  if (detail.trailer !== null) {
-    const trailer = requireRecord(detail.trailer, 'INVALID_DETAIL', 'trailer')
-    requireText(trailer.youtubeId, 'INVALID_DETAIL', 'trailer.youtubeId')
-    requireHttps(trailer.thumbnailUrl, 'INVALID_DETAIL', 'trailer.thumbnailUrl', true)
-  }
-  const externalLinks = detail.externalLinks
-  if (!Array.isArray(externalLinks)) return failWrite('INVALID_DETAIL', 'External links must be an array.')
-  if (externalLinks.length > 8) failWrite('INVALID_DETAIL', 'External links cannot exceed eight items.')
-  externalLinks.forEach((value: unknown) => {
-    const link = requireRecord(value, 'INVALID_DETAIL', 'external link')
-    requireText(link.site, 'INVALID_DETAIL', 'external link site')
-    requireHttps(link.url, 'INVALID_DETAIL', 'external link url', false)
-  })
-  for (const kind of ['characters', 'staff'] as const) {
-    const page = requireRecord(detail[`${kind}Page`], 'INVALID_DETAIL', `${kind}Page`)
-    const items = page.items
-    if (page.currentPage !== 1 || page.perPage !== 24 || !Array.isArray(items)) return failWrite('INVALID_DETAIL', `Initial ${kind} page is invalid.`)
-    validatePeoplePage(detail.anilistId as number, kind, 1, items)
-  }
+  validateGenres(detail.genres, 'INVALID_DETAIL', 'Detail genres must be an array.', 'detail genre')
+  validateMainStudio(detail.mainStudio)
+  validateDetailLists(detail.related, detail.recommendations)
+  validateTrailer(detail.trailer)
+  validateExternalLinks(detail.externalLinks)
+  validateInitialPeoplePages(detail)
+}
 
-  requireInteger(summary.anilistId, 'INVALID_SUMMARY', 'summary anilistId', 1)
-  if (summary.anilistId !== detail.anilistId) failWrite('INVALID_SUMMARY', 'Summary and detail identities must match.')
-  requireText(summary.slug, 'INVALID_SUMMARY', 'summary slug')
+const validateSummary = (summary: UnknownRecord, detailAnilistId: unknown): void => {
+  requireInteger(summary.anilistId, 'INVALID_SUMMARY', 'summary anilistId', 1, false)
+  if (summary.anilistId !== detailAnilistId) failWrite('INVALID_SUMMARY', 'Summary and detail identities must match.')
+  requireText(summary.slug, 'INVALID_SUMMARY', 'summary slug', false)
   validateTitles(summary.titles, 'INVALID_SUMMARY')
   requireHttps(summary.coverImageUrl, 'INVALID_SUMMARY', 'summary coverImageUrl', true)
   requireHttps(summary.bannerImageUrl, 'INVALID_SUMMARY', 'summary bannerImageUrl', true)
   requireInteger(summary.seasonYear, 'INVALID_SUMMARY', 'summary seasonYear', 1, true)
   requireInteger(summary.episodes, 'INVALID_SUMMARY', 'summary episodes', 0, true)
-  requireInteger(summary.popularity, 'INVALID_SUMMARY', 'summary popularity', 0)
+  requireInteger(summary.popularity, 'INVALID_SUMMARY', 'summary popularity', 0, false)
   requireInteger(summary.averageScore, 'INVALID_SUMMARY', 'summary averageScore', 0, true)
   if (typeof summary.averageScore === 'number' && summary.averageScore > 100) failWrite('INVALID_SUMMARY', 'Summary averageScore cannot exceed 100.')
   requireInteger(summary.trending, 'INVALID_SUMMARY', 'summary trending', 0, true)
   validateDate(summary.startDate, 'INVALID_SUMMARY', 'summary startDate')
   requireInteger(summary.nextAiringAt, 'INVALID_SUMMARY', 'summary nextAiringAt', 0, true)
-  const summaryGenres = summary.genres
-  if (!Array.isArray(summaryGenres)) return failWrite('INVALID_SUMMARY', 'Summary genres must be an array.')
-  summaryGenres.forEach((genre: unknown) => requireText(genre, 'INVALID_SUMMARY', 'summary genre'))
+  validateGenres(summary.genres, 'INVALID_SUMMARY', 'Summary genres must be an array.', 'summary genre')
+}
+
+/** Validates detail and summary writes against frozen shared constraints. */
+export const validateDetailCommit = (detailValue: unknown, summaryValue: unknown): void => {
+  const detail = requireRecord(detailValue, 'INVALID_DETAIL', 'detail')
+  const summary = requireRecord(summaryValue, 'INVALID_SUMMARY', 'summary')
+  validateDetail(detail)
+  validateSummary(summary, detail.anilistId)
 }
 
 export const createDetailTiming = (now: number) => ({

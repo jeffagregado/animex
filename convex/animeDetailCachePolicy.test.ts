@@ -21,6 +21,12 @@ const getError = (run: () => void): AnimeDetailCachePolicyError => {
   throw new Error('Expected anime detail cache policy failure.')
 }
 
+const expectPolicyError = (run: () => void, code: string, message: string): void => {
+  const error = getError(run)
+  expect(error.code).toBe(code)
+  expect(error.message).toBe(message)
+}
+
 describe('anime detail cache policy', () => {
   const emptyPage = { items: [], currentPage: 1, hasNextPage: false, perPage: 24 as const }
   const detail = {
@@ -83,5 +89,74 @@ describe('anime detail cache policy', () => {
     expect(getError(() => validateDetailCommit({ ...detail, startDate: { year: 2024, month: 13, day: 1 } }, summary)).code).toBe('INVALID_DETAIL')
     expect(getError(() => validateDetailCommit({ ...detail, related: [{ anilistId: 0, slug: 'bad', title: 'Bad', coverImageUrl: null, format: null, seasonYear: null }] }, summary)).code).toBe('INVALID_DETAIL')
     expect(getError(() => validateDetailCommit(detail, { ...summary, popularity: -1 })).code).toBe('INVALID_SUMMARY')
+  })
+
+  test('preserves nullable date types and inclusive month and day bounds', () => {
+    expect(() => validateDetailCommit({ ...detail, startDate: { year: null, month: 1, day: 31 } }, summary)).not.toThrow()
+    expect(() => validateDetailCommit(detail, { ...summary, startDate: { year: 2024, month: 12, day: 1 } })).not.toThrow()
+
+    expectPolicyError(
+      () => validateDetailCommit({ ...detail, startDate: { year: '2024', month: 1, day: 1 } }, summary),
+      'INVALID_DETAIL',
+      'detail startDate.year must be an integer or null.',
+    )
+    expectPolicyError(
+      () => validateDetailCommit({ ...detail, endDate: { year: 2024, month: 0, day: 1 } }, summary),
+      'INVALID_DETAIL',
+      'detail endDate.month must be 1 through 12 or null.',
+    )
+    expectPolicyError(
+      () => validateDetailCommit({ ...detail, endDate: { year: 2024, month: 12, day: 32 } }, summary),
+      'INVALID_DETAIL',
+      'detail endDate.day must be 1 through 31 or null.',
+    )
+    expectPolicyError(
+      () => validateDetailCommit(detail, { ...summary, startDate: { year: 2024, month: 1.5, day: 1 } }),
+      'INVALID_SUMMARY',
+      'summary startDate.month must be 1 through 12 or null.',
+    )
+  })
+
+  test('preserves nested detail and complete summary validation contracts', () => {
+    expectPolicyError(
+      () => validateDetailCommit({ ...detail, genres: 'Fantasy' }, summary),
+      'INVALID_DETAIL',
+      'Detail genres must be an array.',
+    )
+    expectPolicyError(
+      () => validateDetailCommit({ ...detail, mainStudio: { name: '', siteUrl: null } }, summary),
+      'INVALID_DETAIL',
+      'mainStudio.name must be a non-empty string.',
+    )
+    expectPolicyError(
+      () => validateDetailCommit({ ...detail, trailer: { youtubeId: '', thumbnailUrl: null } }, summary),
+      'INVALID_DETAIL',
+      'trailer.youtubeId must be a non-empty string.',
+    )
+    expectPolicyError(
+      () => validateDetailCommit({ ...detail, externalLinks: [{ site: 'Official', url: 'http://example.com' }] }, summary),
+      'INVALID_DETAIL',
+      'external link url must be an HTTPS URL.',
+    )
+    expectPolicyError(
+      () => validateDetailCommit({ ...detail, staffPage: { ...emptyPage, currentPage: 2 } }, summary),
+      'INVALID_DETAIL',
+      'Initial staff page is invalid.',
+    )
+    expectPolicyError(
+      () => validateDetailCommit(detail, { ...summary, anilistId: 2 }),
+      'INVALID_SUMMARY',
+      'Summary and detail identities must match.',
+    )
+    expectPolicyError(
+      () => validateDetailCommit(detail, { ...summary, averageScore: 101 }),
+      'INVALID_SUMMARY',
+      'Summary averageScore cannot exceed 100.',
+    )
+    expectPolicyError(
+      () => validateDetailCommit(detail, { ...summary, genres: null }),
+      'INVALID_SUMMARY',
+      'Summary genres must be an array.',
+    )
   })
 })
