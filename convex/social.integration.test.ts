@@ -123,6 +123,9 @@ describe('social Convex integration', () => {
     const postId = await owner.client.mutation(socialApi.posts.create, {
       requestId: 'post-1', text: '', imageIds: [imageId], hasSpoiler: false, visibility: 'public',
     })
+    expect(await owner.client.query(socialApi.feed.listGlobal, { cursor: null })).toMatchObject({
+      items: [expect.objectContaining({ kind: 'post', postId, imageIds: [imageId] })],
+    })
     await owner.client.mutation(socialApi.posts.update, {
       postId, requestId: 'post-update-1', text: 'edited', imageIds: [imageId], hasSpoiler: true, visibility: 'followers',
     })

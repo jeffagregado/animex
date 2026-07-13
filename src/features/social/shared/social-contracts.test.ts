@@ -64,7 +64,7 @@ describe('social contracts', () => {
   test('validates exact generic cursor feed pages', () => {
     const page = {
       items: [
-        { id: 'post-1', kind: 'post', author, text: 'Magic.', imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 10, updatedAt: 10 },
+        { id: 'post-1', postId: 'source-post-1', kind: 'post', author, text: 'Magic.', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 10, updatedAt: 10 },
         { id: 'review-1', reviewId: 'source-review-1', kind: 'review', author, anime, rating: 90, summary: 'Excellent.', summaryHasSpoiler: false, visibility: 'public', publishedAt: 9, updatedAt: 9 },
         { id: 'completed-1', kind: 'completed', author, anime, settledAt: 8 },
         { id: 'rewatched-1', kind: 'rewatched', author, anime, settledAt: 7 },

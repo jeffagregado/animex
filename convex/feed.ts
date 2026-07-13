@@ -13,7 +13,7 @@ const visibilityValidator = v.union(v.literal('private'), v.literal('followers')
 const authorValidator = v.object({ id: v.string(), username: v.string(), displayName: v.string(), avatarUrl: v.union(v.string(), v.null()) })
 const animeValidator = v.object({ anilistId: v.number(), slug: v.string(), title: v.string(), coverImageUrl: v.union(v.string(), v.null()) })
 const feedCardValidator = v.union(
-  v.object({ id: v.string(), kind: v.literal('post'), author: authorValidator, text: v.string(), imageUrls: v.array(v.string()), hasSpoiler: v.boolean(), visibility: visibilityValidator, createdAt: v.number(), updatedAt: v.number() }),
+  v.object({ id: v.string(), postId: v.string(), kind: v.literal('post'), author: authorValidator, text: v.string(), imageIds: v.array(v.string()), imageUrls: v.array(v.string()), hasSpoiler: v.boolean(), visibility: visibilityValidator, createdAt: v.number(), updatedAt: v.number() }),
   v.object({ id: v.string(), reviewId: v.string(), kind: v.literal('review'), author: authorValidator, anime: animeValidator, rating: v.number(), summary: v.string(), summaryHasSpoiler: v.boolean(), visibility: visibilityValidator, publishedAt: v.number(), updatedAt: v.number() }),
   v.object({ id: v.string(), kind: v.literal('completed'), author: authorValidator, anime: animeValidator, settledAt: v.number() }),
   v.object({ id: v.string(), kind: v.literal('rewatched'), author: authorValidator, anime: animeValidator, settledAt: v.number() }),
@@ -46,7 +46,11 @@ const resolvePostCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, author: Fe
   if (!post) return fail('FEED_SOURCE_MISSING', 'Feed Post source is missing.')
   const images = await Promise.all(post.imageIds.map((id) => ctx.db.get('postImages', id)))
   const imageUrls = await Promise.all(images.map(async (image) => image?.storageId ? await ctx.storage.getUrl(image.storageId) : null))
-  return { id: card._id, kind: 'post', author, text: post.text, imageUrls: imageUrls.flatMap((url) => url ? [url] : []), hasSpoiler: post.hasSpoiler, visibility: post.visibility, createdAt: post.createdAt, updatedAt: post.updatedAt }
+  const resolvedImages = post.imageIds.flatMap((imageId, index) => {
+    const url = imageUrls[index]
+    return url ? [{ imageId, url }] : []
+  })
+  return { id: card._id, postId: post._id, kind: 'post', author, text: post.text, imageIds: resolvedImages.map((image) => image.imageId), imageUrls: resolvedImages.map((image) => image.url), hasSpoiler: post.hasSpoiler, visibility: post.visibility, createdAt: post.createdAt, updatedAt: post.updatedAt }
 }
 
 const resolveReviewCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, author: FeedAuthor): Promise<FeedCard> => {
