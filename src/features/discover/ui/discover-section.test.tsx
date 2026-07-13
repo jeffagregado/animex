@@ -7,7 +7,14 @@ import type { AnimeSummary } from '../shared/discover-contracts'
 import { DiscoverSectionRail } from './discover-section'
 
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children, params }: { children: React.ReactNode; params: { anilistId: string; slug: string } }) => <a href={`/anime/${params.anilistId}/${params.slug}`}>{children}</a>,
+  Link: ({ children, to, params, className }: { children: React.ReactNode; to: string; params: Record<string, string>; className?: string }) => {
+    const href = to.replace(/\$([A-Za-z0-9_]+)/g, (_, key: string) => {
+      const value = params[key]
+      if (value === undefined) throw new Error(`Missing route param: ${key}`)
+      return value
+    })
+    return <a data-to={to} href={href} className={className}>{children}</a>
+  },
 }))
 
 const anime: AnimeSummary = {
@@ -22,7 +29,10 @@ describe('DiscoverSectionRail', () => {
   it('links a rail card to its canonical anime route', () => {
     render(<DiscoverSectionRail title="Trending Anime" state={{ status: 'ready', section: { key: 'trending', items: [anime], refreshedAt: 1, expiresAt: 2 } }} onRetry={vi.fn()} isRetrying={false} retryError={null} />)
 
-    expect(screen.getByRole('link', { name: /Frieren/ }).getAttribute('href')).toBe('/anime/1/frieren')
+    const link = screen.getByRole('link', { name: /Frieren/ })
+    expect(link.dataset.to).toBe('/anime/$anilistId/$slug')
+    expect(link.getAttribute('href')).toBe('/anime/1/frieren')
+    expect(link.className).toContain('focus-visible:ring-2')
   })
   it('shows a clear section error and retries only that section', () => {
     const onRetry = vi.fn()

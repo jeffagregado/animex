@@ -17,6 +17,12 @@ Status: complete
 - Types: `pnpm exec tsc --noEmit` — passed.
 - Diff: `git diff --check -- <owned Discover files>` — passed.
 
+## Review Fix
+
+- Link test doubles now derive hrefs from production `to` templates and params.
+- Missing route params fail explicitly.
+- Tests assert route template, interpolated href, and focus-visible class forwarding.
+
 ## Risk
 
 - Browser QA remains integration Task 7 scope.

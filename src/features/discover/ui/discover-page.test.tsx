@@ -16,7 +16,14 @@ vi.mock('../server/discover.functions', () => ({
 }))
 
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children, params }: { children: React.ReactNode; params: { anilistId: string; slug: string } }) => <a href={`/anime/${params.anilistId}/${params.slug}`}>{children}</a>,
+  Link: ({ children, to, params, className }: { children: React.ReactNode; to: string; params: Record<string, string>; className?: string }) => {
+    const href = to.replace(/\$([A-Za-z0-9_]+)/g, (_, key: string) => {
+      const value = params[key]
+      if (value === undefined) throw new Error(`Missing route param: ${key}`)
+      return value
+    })
+    return <a data-to={to} href={href} className={className}>{children}</a>
+  },
 }))
 
 const searchState: DiscoverUrlSearchState = { query: null, genre: null, format: null, season: null, year: null, sort: 'relevance' }
@@ -55,7 +62,10 @@ describe('DiscoverPage', () => {
     fireEvent.error(image)
     expect(screen.getAllByText('Image unavailable').length).toBeGreaterThan(0)
     expect(card).toBeTruthy()
-    expect(card?.closest('a')?.getAttribute('href')).toBe('/anime/1/frieren')
+    const link = card?.closest('a')
+    expect(link?.dataset.to).toBe('/anime/$anilistId/$slug')
+    expect(link?.getAttribute('href')).toBe('/anime/1/frieren')
+    expect(link?.className).toContain('focus-visible:ring-2')
   })
 
   it('renders rail skeletons while page data is loading', () => {
