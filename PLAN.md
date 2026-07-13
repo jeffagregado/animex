@@ -99,20 +99,24 @@ Convex env already available:
 - Add public `/discover` under shared `_public/route.tsx` layout.
 - Build approved desktop/mobile Trending, Seasonal, Genres, Popular Recommendations, This Week, Upcoming, Top Genres desktop module, and future Manga placeholder.
 - Add inline anime-only AniList search with genre, format, season, year, sort, and infinite pagination.
-  - Keep cards non-interactive until Phase 4 anime detail routes exist.
+  - Link cards and list rows to canonical Phase 4 anime detail routes.
   - Run schema push, route generation, automated gates, review, and responsive browser QA.
   - Stop after validation and wait for approval.
 
-Phase 3 status: COMPLETE on `dev`; final integrated review PASS with no findings. Validation: 212 tests pass / 2 skipped; TypeScript, build, route generation, Convex dev push, Fallow new-only audit, client endpoint scan, two live AniList tests, and responsive browser QA pass. Phase 4 remains paused until approval.
+Phase 3 status: COMPLETE on `dev`; final integrated review PASS with no findings. Validation: 212 tests pass / 2 skipped; TypeScript, build, route generation, Convex dev push, Fallow new-only audit, client endpoint scan, two live AniList tests, and responsive browser QA pass.
 
 ### Phase 4: Anime Detail
 
 - Build `/anime/$anilistId/$slug`.
-- Hydrate full anime metadata by AniList `id` on first page open.
+- Hydrate full anime metadata by AniList `id` through a server-only 24-hour Convex cache.
 - Redirect stale/missing slug to canonical slug.
 - Add Overview, Reviews, Characters, Staff tabs.
-- Add Status, Score, Favorite, Review button, and owner-only Rewatch History.
+- Add Status, Score, Favorite, and owner-only Rewatch History; review creation remains Phase 5.
+- Limit Related Anime and Recommendations to five; load Characters and Staff in explicit 24-item pages.
+- Persist Completed/Rewatched milestones for Phase 5 feed use.
 - Stop after validation and wait for approval.
+
+Phase 4 status: COMPLETE on `jeff-cx/phase-4-anime-detail`; automated gates, Convex push, live AniList smoke, responsive browser QA, final QA, and integrated review pass.
 
 ### Phase 5: Feed, Posts, Reviews
 

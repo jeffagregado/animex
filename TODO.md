@@ -10,7 +10,7 @@
 - [x] Build approved responsive Discover UI, complete states, filters, and infinite search. Owner: UI worker.
 - [x] Run spec review, thermo review, full validation, live AniList smoke, responsive browser QA, docs/data-flow sync, and final integrated review. Final review PASS with no findings. Owner: controller + reviewer + QA.
 
-Status: COMPLETE on `dev`; final integrated review PASS with no findings. Phase 4 paused and not started.
+Status: COMPLETE on `dev`; final integrated review PASS with no findings. Phase 4 is tracked in its completed section below.
 
 ## Auth Form Field Errors
 
@@ -662,12 +662,12 @@ Status: design approved; written spec ready for review.
 
 # Phase 4 Anime Detail Implementation
 
-Status: IN PROGRESS on `jeff-cx/phase-4-anime-detail`.
+Status: COMPLETE on `jeff-cx/phase-4-anime-detail`; final QA and integrated review PASS.
 
-- [ ] Lock and test shared contracts. Owner: contract worker.
-- [ ] Build server-only AniList detail transport and 24-hour Convex detail/page cache. Owner: server/cache worker.
-- [ ] Build authenticated user anime state, milestones, and paginated rewatch history. Owner: Convex worker.
-- [ ] Build canonical route shell, redirects, tabs, states, and responsive layout. Owner: route/shell worker.
-- [ ] Build tab content, pagination, user controls, and rewatch dialog. Owner: UI worker.
-- [ ] Link all Discover anime surfaces to canonical detail routes. Owner: Discover worker.
-- [ ] Integrate, regenerate routes, push Convex schema, review, validate, browser-QA, document, and close Phase 4. Owner: controller + reviewer + QA + docs mapper.
+- [x] Lock and test shared contracts. Owner: contract worker.
+- [x] Build server-only AniList detail transport and 24-hour Convex detail/page cache. Owner: server/cache worker.
+- [x] Build authenticated user anime state, milestones, and paginated rewatch history. Owner: Convex worker.
+- [x] Build canonical route shell, redirects, tabs, states, and responsive layout. Owner: route/shell worker.
+- [x] Build tab content, pagination, user controls, and rewatch dialog. Owner: UI worker.
+- [x] Link all Discover anime surfaces to canonical detail routes. Owner: Discover worker.
+- [x] Integrate, regenerate routes, push Convex schema, review, validate, browser-QA, document, and close Phase 4. Owner: controller + reviewer + QA + docs mapper.
