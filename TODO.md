@@ -700,3 +700,22 @@ Status: COMPLETE on `jeff-cx/phase-4-anime-detail`.
 - [x] Preserve Score focus and editing while its mutation is pending.
 - [x] Coalesce edits made during a pending Score save without losing the latest draft.
 - [x] Run focused, full, build, Fallow, and browser validation.
+
+# Phase 5 Feed, Posts, Reviews
+
+Status: IN PROGRESS on `jeff-cx/phase-5-feed-reviews`.
+
+- [x] Create feature branch; verify clean 349-pass baseline. Owner: controller.
+- [x] Add approved direct Lexical dependencies. Owner: controller.
+- [x] Generate, inspect, approve Review Creation and Review Detail desktop/mobile references. Owner: controller.
+- [ ] Lock shared contracts and RED validator/integration coverage. Owner: contract worker.
+- [ ] Add Convex schema, Posts, Reviews, feed projection, metrics, storage, milestone projection. Owner: backend worker.
+- [ ] Add protected routes, editor/renderer, Review Detail, Anime Reviews. Owner: review UI worker.
+- [ ] Replace Home mocks with feed, Composer, card lifecycle, responsive states. Owner: feed UI worker.
+- [ ] Integrate generated routes/types; run focused and full gates. Owner: controller.
+- [ ] Run spec/thermo review, responsive browser QA, docs/data-flow pass. Owner: reviewer + QA + docs mapper.
+- [ ] Commit verified Phase 5 and stop for user review. Owner: controller.
+
+## Optional Backlog
+
+- [ ] Optional anime attachment in Post Composer.
