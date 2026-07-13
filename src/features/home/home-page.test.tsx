@@ -88,11 +88,11 @@ describe('HomePage', () => {
 
     render(<PublicAuthStateProvider><HomePage /></PublicAuthStateProvider>)
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'My Anime' })).toBeTruthy())
-    expect(screen.getByRole('heading', { name: 'My Anime' })).toBeTruthy()
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'home' })).toBeTruthy())
+    expect(screen.queryByRole('heading', { name: 'My Anime' })).toBeNull()
     expect(screen.getByText('What are you watching?')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Following' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Global' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'following' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'global' })).toBeTruthy()
   })
 
   it('keeps pending users signed in but hides private actions', async () => {

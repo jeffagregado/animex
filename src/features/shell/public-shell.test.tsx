@@ -64,7 +64,7 @@ describe('PublicShell', () => {
     expect(searchLink.className).not.toContain('is-active')
   })
 
-  it('does not render incomplete Create or Profile controls', async () => {
+  it('renders complete-user Create without a broken Profile destination', async () => {
     vi.stubGlobal('scrollTo', vi.fn())
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ status: 'complete', email: 'mika@example.com', profile: { id: 'profile-1', username: 'mika', name: 'Mika', avatarUrl: null, visibility: 'private' } }) }) as Response))
     const { router } = createPublicTestRouter('/home')
@@ -72,7 +72,7 @@ describe('PublicShell', () => {
     render(<RouterProvider router={router} />)
 
     await screen.findByRole('button', { name: 'Sign out' })
-    expect(screen.queryByText('Create')).toBeNull()
+    expect(screen.getByText('Create')).toBeTruthy()
     expect(screen.queryByText('Profile')).toBeNull()
   })
 

@@ -8,6 +8,8 @@ const card = (id: string): FeedCard => ({
   kind: 'post',
   author: { id: `author-${id}`, username: id, displayName: id, avatarUrl: null },
   text: id,
+  postId: `post-${id}`,
+  imageIds: [],
   imageUrls: [],
   hasSpoiler: false,
   visibility: 'public',
