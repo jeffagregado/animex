@@ -44,6 +44,41 @@ describe('anime detail AniList normalization', () => {
     expect(detail.trailer?.youtubeId).toBe('abc')
   })
 
+  test('skips non-anime and adult related media while preserving eligible order', async () => {
+    const providerMedia = (id: number, type: 'ANIME' | 'MANGA', isAdult: boolean, format: string) => ({
+      id, type, isAdult, title: { english: `Media ${id}`, romaji: null, native: null },
+      coverImage: { large: null }, format, seasonYear: 2024,
+    })
+    const mixedMedia = {
+      ...media,
+      relations: { edges: [
+        { node: providerMedia(900, 'MANGA', false, 'MANGA') },
+        { node: providerMedia(901, 'ANIME', true, 'TV') },
+        { node: providerMedia(902, 'ANIME', false, 'MOVIE') },
+        { node: providerMedia(903, 'ANIME', false, 'TV') },
+      ] },
+      recommendations: { nodes: [
+        { mediaRecommendation: providerMedia(910, 'MANGA', false, 'MANGA') },
+        { mediaRecommendation: providerMedia(911, 'ANIME', true, 'TV') },
+        { mediaRecommendation: providerMedia(912, 'ANIME', false, 'ONA') },
+      ] },
+    }
+    const detail = await fetchAnimeDetailFromAniList(52991, deps([
+      { data: { Media: mixedMedia } }, emptyPeople('characters'), emptyPeople('staff'),
+    ]))
+
+    expect(detail?.related.map((item) => item.anilistId)).toEqual([902, 903])
+    expect(detail?.recommendations.map((item) => item.anilistId)).toEqual([912])
+
+    const malformedEligible = {
+      ...media,
+      relations: { edges: [{ node: providerMedia(920, 'ANIME', false, 'MANGA') }] },
+    }
+    await expect(fetchAnimeDetailFromAniList(52991, deps([
+      { data: { Media: malformedEligible } }, emptyPeople('characters'), emptyPeople('staff'),
+    ]))).rejects.toMatchObject({ code: 'UPSTREAM' })
+  })
+
   test('distinguishes a missing anime and rejects malformed provider data', async () => {
     await expect(fetchAnimeDetailFromAniList(52991, deps([{ data: { Media: null } }]))).resolves.toBeNull()
     await expect(fetchAnimeDetailFromAniList(52991, deps([{ data: { Media: { id: 'bad' } } }]))).rejects.toMatchObject({ code: 'UPSTREAM' })

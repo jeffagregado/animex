@@ -23,7 +23,7 @@ const characterDocument = `query AnimeCharacters($id: Int!, $page: Int!, $perPag
 const staffDocument = `query AnimeStaff($id: Int!, $page: Int!, $perPage: Int!) { Media(id: $id, type: ANIME, isAdult: false) { staff(page: $page, perPage: $perPage, sort: [RELEVANCE, ID]) { pageInfo { currentPage hasNextPage } edges { role node { id name { full } image { large } } } } } }`
 
 const titleSchema = z.object({ english: z.string().nullable(), romaji: z.string().nullable(), native: z.string().nullable() })
-const listMediaSchema = z.object({ id: z.number().int().positive(), type: z.literal('ANIME'), isAdult: z.literal(false), title: titleSchema, coverImage: z.object({ large: z.url().nullable() }).nullable(), format: animeFormatSchema.nullable(), seasonYear: z.number().int().nullable() })
+const listMediaSchema = z.object({ id: z.number().int().positive(), type: z.string(), isAdult: z.boolean(), title: titleSchema, coverImage: z.object({ large: z.url().nullable() }).nullable(), format: z.string().nullable(), seasonYear: z.number().int().nullable() })
 const detailResponseSchema = z.object({ data: z.object({ Media: z.object({
   id: z.number().int().positive(), type: z.literal('ANIME'), isAdult: z.literal(false), title: titleSchema,
   coverImage: z.object({ extraLarge: z.url().nullable() }).nullable(), bannerImage: z.url().nullable(), description: z.string().nullable(),
@@ -49,9 +49,10 @@ const titleParts = (title: z.infer<typeof titleSchema>) => {
   return { display, english, romaji, native }
 }
 
-const listItem = (media: z.infer<typeof listMediaSchema>): AnimeDetailListItem => {
+const listItem = (media: z.infer<typeof listMediaSchema>): AnimeDetailListItem | null => {
+  if (media.type !== 'ANIME' || media.isAdult !== false) return null
   const title = titleParts(media.title).display
-  return { anilistId: media.id, slug: slugifyAnimeTitle(title), title, coverImageUrl: media.coverImage?.large ?? null, format: media.format, seasonYear: media.seasonYear }
+  return { anilistId: media.id, slug: slugifyAnimeTitle(title), title, coverImageUrl: media.coverImage?.large ?? null, format: animeFormatSchema.nullable().parse(media.format), seasonYear: media.seasonYear }
 }
 
 /** Fetches and strictly normalizes public anime metadata. */
@@ -75,8 +76,16 @@ export const fetchAnimeDetailCachePayload = async (anilistId: number, dependenci
       episodes: media.episodes, durationMinutes: media.duration, startDate: media.startDate, endDate: media.endDate,
       genres: [...new Set(media.genres.map((genre) => genre.trim()).filter(Boolean))],
       mainStudio: media.studios.edges.find((edge) => edge.isMain) ? { name: media.studios.edges.find((edge) => edge.isMain)!.node.name, siteUrl: media.studios.edges.find((edge) => edge.isMain)!.node.siteUrl } : null,
-      related: media.relations.edges.flatMap((edge) => edge.node ? [listItem(edge.node)] : []).slice(0, 5),
-      recommendations: media.recommendations.nodes.flatMap((node) => node.mediaRecommendation ? [listItem(node.mediaRecommendation)] : []).slice(0, 5),
+      related: media.relations.edges.flatMap((edge) => {
+        if (!edge.node) return []
+        const item = listItem(edge.node)
+        return item ? [item] : []
+      }).slice(0, 5),
+      recommendations: media.recommendations.nodes.flatMap((node) => {
+        if (!node.mediaRecommendation) return []
+        const item = listItem(node.mediaRecommendation)
+        return item ? [item] : []
+      }).slice(0, 5),
       trailer: media.trailer?.site.toLowerCase() === 'youtube' ? { youtubeId: media.trailer.id, thumbnailUrl: media.trailer.thumbnail } : null,
       externalLinks: media.externalLinks.filter((link) => link.url.startsWith('https://')).slice(0, 8),
       charactersPage,
