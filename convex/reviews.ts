@@ -1,7 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 
 import { ANIME_REVIEWS_PAGE_SIZE, reviewDraftInputSchema, reviewPublishInputSchema, reviewStatsSchema, type ReviewSort } from '../src/features/social/shared/social-contracts'
-import { createReviewStats, parseReviewDocument, validateDraftReview, validatePublishedReview } from '../src/features/social/shared/review-document'
+import { createReviewStats, parseReviewDocument, REVIEW_DOCUMENT_MAX_BYTES, validateDraftReview, validatePublishedReview } from '../src/features/social/shared/review-document'
 import type { Doc, Id } from './_generated/dataModel'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { makeOrderKey } from './feedPolicy'
@@ -49,7 +49,11 @@ const readMatchingPublishRequest = (review: Doc<'reviews'> | null, intent: Publi
 const parseBodyJson = (bodyJson: string) => {
   try {
     const body = parseReviewDocument(JSON.parse(bodyJson))
-    return { body, bodyJson }
+    const canonicalBodyJson = JSON.stringify(body)
+    if (new TextEncoder().encode(canonicalBodyJson).byteLength > REVIEW_DOCUMENT_MAX_BYTES) {
+      return fail('INVALID_REVIEW_BODY', `Review body must not exceed ${REVIEW_DOCUMENT_MAX_BYTES} UTF-8 bytes.`)
+    }
+    return { body, bodyJson: canonicalBodyJson }
   } catch (error) {
     return fail('INVALID_REVIEW_BODY', `Review body JSON is invalid: ${error instanceof Error ? error.message : 'unknown error'}`)
   }

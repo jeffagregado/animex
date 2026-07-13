@@ -71,7 +71,9 @@ describe('social Convex integration', () => {
       anilistId: 1, requestId: 'draft-1', rating: null, summary: '', summaryHasSpoiler: false,
       bodyJson, visibility: 'private',
     })
-    expect(await owner.client.query(socialApi.reviews.getById, { reviewId: draftId })).toMatchObject({ id: draftId, state: 'draft', bodyJson })
+    const draft = await owner.client.query(socialApi.reviews.getById, { reviewId: draftId })
+    expect(draft).toMatchObject({ id: draftId, state: 'draft' })
+    expect(JSON.parse(draft.bodyJson)).toEqual(body)
     expect(await viewer.client.query(socialApi.reviews.getById, { reviewId: draftId })).toBeNull()
     expect(await owner.client.mutation(socialApi.reviews.saveDraft, {
       anilistId: 1, requestId: 'draft-2', rating: 80, summary: 'Draft', summaryHasSpoiler: false,
@@ -110,6 +112,23 @@ describe('social Convex integration', () => {
     await owner.client.mutation(socialApi.reviews.remove, { reviewId: draftId })
     expect(await owner.client.query(socialApi.reviews.getMineForAnime, { anilistId: 1 })).toBeNull()
     expect(await viewer.client.query(socialApi.reviews.getStats, { anilistId: 1 })).toMatchObject({ count: 0, average: null })
+  }, 20_000)
+
+  test('stores validated Review bodies as bounded canonical JSON', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'canonical-review-owner')
+    await insertAnime(t, 1)
+    const paddedBodyJson = `${' '.repeat((64 * 1024) + 1)}${bodyJson}`
+
+    const reviewId = await owner.client.mutation(socialApi.reviews.saveDraft, {
+      anilistId: 1, requestId: 'canonical-review', rating: null, summary: '', summaryHasSpoiler: false,
+      bodyJson: paddedBodyJson, visibility: 'private',
+    })
+
+    const stored = await owner.client.query(socialApi.reviews.getById, { reviewId })
+    expect(JSON.parse(stored?.bodyJson)).toEqual(body)
+    expect(stored?.bodyJson).toBe(JSON.stringify(JSON.parse(stored?.bodyJson)))
+    expect(new TextEncoder().encode(stored?.bodyJson).byteLength).toBeLessThanOrEqual(64 * 1024)
   }, 20_000)
 
   test('creates, edits, and removes an image Post with owned storage cleanup', async () => {
@@ -200,6 +219,50 @@ describe('social Convex integration', () => {
       postId: secondId, requestId: 'post-request-a', text: 'Collision', imageIds: [], hasSpoiler: false, visibility: 'public',
     })).rejects.toThrow('collision')
     expect(await t.run(async (ctx) => await ctx.db.get('posts', firstId))).not.toBeNull()
+  }, 20_000)
+
+  test('binds Post create request IDs to exact normalized intent before image attachment', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'post-create-retry-owner')
+    const firstStorageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(['first'], { type: 'image/png' })))
+    const secondStorageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(['second'], { type: 'image/png' })))
+    const [firstImageId, secondImageId] = await t.run(async (ctx) => {
+      const now = Date.now()
+      return await Promise.all([
+        ctx.db.insert('postImages', {
+          ownerId: owner.profileId, claimId: 'retry-first-image', storageId: firstStorageId, mimeType: 'image/png', size: 5,
+          width: 1, height: 1, state: 'pending', createdAt: now, updatedAt: now,
+        }),
+        ctx.db.insert('postImages', {
+          ownerId: owner.profileId, claimId: 'retry-second-image', storageId: secondStorageId, mimeType: 'image/png', size: 6,
+          width: 1, height: 1, state: 'pending', createdAt: now, updatedAt: now,
+        }),
+      ])
+    })
+    const requestId = 'post-create-retry'
+    const postId = await owner.client.mutation(socialApi.posts.create, {
+      requestId, text: '  Same text  ', imageIds: [firstImageId], hasSpoiler: false, visibility: 'public',
+    })
+
+    expect(await owner.client.mutation(socialApi.posts.create, {
+      requestId, text: 'Same text', imageIds: [firstImageId], hasSpoiler: false, visibility: 'public',
+    })).toBe(postId)
+    for (const changed of [
+      { text: 'Changed text', imageIds: [firstImageId], hasSpoiler: false, visibility: 'public' },
+      { text: 'Same text', imageIds: [firstImageId], hasSpoiler: true, visibility: 'public' },
+      { text: 'Same text', imageIds: [firstImageId], hasSpoiler: false, visibility: 'private' },
+      { text: 'Same text', imageIds: [secondImageId], hasSpoiler: false, visibility: 'public' },
+    ] as const) {
+      await expect(owner.client.mutation(socialApi.posts.create, { requestId, ...changed })).rejects.toThrow('collision')
+    }
+
+    expect(await t.run(async (ctx) => await ctx.db.get('posts', postId))).toMatchObject({
+      text: 'Same text', imageIds: [firstImageId], hasSpoiler: false, visibility: 'public',
+    })
+    expect(await t.run(async (ctx) => await ctx.db.get('postImages', firstImageId))).toMatchObject({ state: 'attached', postId, order: 0 })
+    expect(await t.run(async (ctx) => await ctx.db.get('postImages', secondImageId))).toMatchObject({
+      state: 'pending', storageId: secondStorageId,
+    })
   }, 20_000)
 
   test('requires cached anime for every Review lifecycle mutation', async () => {

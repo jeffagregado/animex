@@ -15,6 +15,25 @@ const postInput = {
 
 const fail = (code: string, message: string): never => { throw new ConvexError({ code, message }) }
 
+type CreateIntent = {
+  text: string
+  imageIds: Id<'postImages'>[]
+  hasSpoiler: boolean
+  visibility: Doc<'posts'>['visibility']
+}
+
+const readMatchingCreateRequest = (post: Doc<'posts'> | null, intent: CreateIntent): Id<'posts'> | null => {
+  if (!post) return null
+  const sameImages = post.imageIds.length === intent.imageIds.length
+    && post.imageIds.every((imageId, index) => imageId === intent.imageIds[index])
+  const differs = post.text !== intent.text
+    || !sameImages
+    || post.hasSpoiler !== intent.hasSpoiler
+    || post.visibility !== intent.visibility
+  if (differs) return fail('POST_REQUEST_COLLISION', 'Post request collision with a different create request.')
+  return post._id
+}
+
 const readOwnedPost = async (ctx: MutationCtx, postId: Id<'posts'>, userId: Id<'users'>) => {
   const post = await ctx.db.get('posts', postId)
   if (!post) return fail('POST_NOT_FOUND', 'Post not found.')
@@ -144,7 +163,10 @@ export const create = mutation({
     createPostInputSchema.parse({ ...args, imageIds: args.imageIds.map(String) })
     const requestId = assertRequestId(args.requestId)
     const previous = await ctx.db.query('posts').withIndex('by_user_request', (q) => q.eq('userId', profile._id).eq('requestId', requestId)).unique()
-    if (previous) return previous._id
+    const repeatedId = readMatchingCreateRequest(previous, {
+      text: normalized.text, imageIds: args.imageIds, hasSpoiler: args.hasSpoiler, visibility: args.visibility,
+    })
+    if (repeatedId) return repeatedId
     const images = await readOwnedImages(ctx, args.imageIds, profile._id, null)
     const now = Date.now()
     const postId = await ctx.db.insert('posts', { userId: profile._id, requestId, text: normalized.text, imageIds: args.imageIds, hasSpoiler: args.hasSpoiler, visibility: args.visibility, createdAt: now, updatedAt: now })
