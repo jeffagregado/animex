@@ -50,10 +50,19 @@ describe('anime detail AniList normalization', () => {
   })
 
   test('treats valid AniList 404 detail and people payloads as not found', async () => {
-    const notFound = () => new Response(JSON.stringify({ data: { Media: null } }), { status: 404 })
+    const notFound = () => new Response(JSON.stringify({
+      errors: [{ message: 'Not Found.', status: 404, locations: [{ line: 1, column: 1 }] }],
+      data: { Media: null },
+    }), { status: 404 })
 
     await expect(fetchAnimeDetailFromAniList(999_999, responseDeps([notFound()]))).resolves.toBeNull()
     await expect(fetchAnimePeoplePageFromAniList(999_999, 'characters', 1, responseDeps([notFound()]))).resolves.toBeNull()
+  })
+
+  test('rejects malformed AniList 404 bodies as upstream failures', async () => {
+    const malformed = new Response(JSON.stringify({ errors: [{ message: 'Upstream failed.', status: 500 }], data: { Media: null } }), { status: 404 })
+
+    await expect(fetchAnimeDetailFromAniList(999_999, responseDeps([malformed]))).rejects.toMatchObject({ code: 'UPSTREAM' })
   })
 
   test('normalizes exactly 24 characters and selects Japanese voice actors', async () => {

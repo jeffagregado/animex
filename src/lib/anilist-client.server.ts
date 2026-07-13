@@ -4,6 +4,10 @@ const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
 const ANILIST_TIMEOUT_MS = 8_000
 const ANILIST_MAX_ATTEMPTS = 3
 const graphQlErrorSchema = z.object({ errors: z.array(z.object({ message: z.string() })).min(1) })
+const notFoundGraphQlBodySchema = z.object({
+  errors: z.array(z.object({ message: z.string(), status: z.literal(404) }).passthrough()).min(1),
+  data: z.object({ Media: z.null() }).strict(),
+}).strict()
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 
@@ -87,6 +91,10 @@ const requestAniListWithNotFoundPolicy = async (
     try {
       body = await response.json()
     } catch {
+      throw upstreamError()
+    }
+    if (allowNotFoundBody && response.status === 404) {
+      if (notFoundGraphQlBodySchema.safeParse(body).success) return body
       throw upstreamError()
     }
     if (graphQlErrorSchema.safeParse(body).success) throw upstreamError()

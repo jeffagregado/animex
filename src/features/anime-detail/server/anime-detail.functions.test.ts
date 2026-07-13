@@ -8,6 +8,7 @@ import {
   getAnimeDetail,
   getAnimePeoplePage,
   runAnimeDetailGet,
+  runAnimePeopleGet,
 } from './anime-detail.functions'
 
 const emptyPage = { items: [], currentPage: 1, hasNextPage: false, perPage: 24 as const }
@@ -67,6 +68,36 @@ describe('anime detail GET functions', () => {
     limited.client.readDetail = async () => ({ status: 'missing', entry: null })
     limited.fetchDetail = async () => { throw new AniListRequestError('RATE_LIMITED', 'AniList rate limit exceeded.', 12) }
     const rateLimited = await runAnimeDetailGet({ anilistId: 1 }, limited)
+    expect(rateLimited).toMatchObject({ status: 'error', code: 'RATE_LIMITED', retryAfterSeconds: 12 })
+    expectSerializable(rateLimited)
+  })
+
+  test('returns serializable people-page ready and not-found states', async () => {
+    const readyDependencies = dependencies()
+    readyDependencies.client.readPeoplePage = async () => ({
+      status: 'fresh',
+      entry: { payload: emptyPage, refreshedAt: 1, expiresAt: 86_400_001 },
+    })
+    const ready = await runAnimePeopleGet({ anilistId: 1, kind: 'characters', page: 1 }, readyDependencies)
+    expect(ready).toEqual({ status: 'ready', page: emptyPage })
+    expectSerializable(ready)
+
+    const missingDependencies = dependencies()
+    const notFound = await runAnimePeopleGet({ anilistId: 1, kind: 'staff', page: 2 }, missingDependencies)
+    expect(notFound).toEqual({ status: 'not-found' })
+    expectSerializable(notFound)
+  })
+
+  test('returns serializable people-page upstream and rate-limit states', async () => {
+    const unavailable = dependencies()
+    unavailable.client.readPeoplePage = async () => { throw new Error('cache unavailable') }
+    const upstream = await runAnimePeopleGet({ anilistId: 1, kind: 'characters', page: 1 }, unavailable)
+    expect(upstream).toMatchObject({ status: 'error', code: 'UPSTREAM' })
+    expectSerializable(upstream)
+
+    const limited = dependencies()
+    limited.fetchPeople = async () => { throw new AniListRequestError('RATE_LIMITED', 'AniList rate limit exceeded.', 12) }
+    const rateLimited = await runAnimePeopleGet({ anilistId: 1, kind: 'staff', page: 2 }, limited)
     expect(rateLimited).toMatchObject({ status: 'error', code: 'RATE_LIMITED', retryAfterSeconds: 12 })
     expectSerializable(rateLimited)
   })
