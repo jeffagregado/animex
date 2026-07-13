@@ -10,7 +10,15 @@ import { canReadSocialRecord } from './socialPolicy'
 import { getOptionalProfile, requireProfile } from './users'
 
 const visibilityValidator = v.union(v.literal('private'), v.literal('followers'), v.literal('public'))
-const feedPageValidator = v.object({ items: v.array(v.any()), cursor: v.union(v.string(), v.null()), hasMore: v.boolean() })
+const authorValidator = v.object({ id: v.string(), username: v.string(), displayName: v.string(), avatarUrl: v.union(v.string(), v.null()) })
+const animeValidator = v.object({ anilistId: v.number(), slug: v.string(), title: v.string(), coverImageUrl: v.union(v.string(), v.null()) })
+const feedCardValidator = v.union(
+  v.object({ id: v.string(), kind: v.literal('post'), author: authorValidator, text: v.string(), imageUrls: v.array(v.string()), hasSpoiler: v.boolean(), visibility: visibilityValidator, createdAt: v.number(), updatedAt: v.number() }),
+  v.object({ id: v.string(), kind: v.literal('review'), author: authorValidator, anime: animeValidator, rating: v.number(), summary: v.string(), summaryHasSpoiler: v.boolean(), visibility: visibilityValidator, publishedAt: v.number(), updatedAt: v.number() }),
+  v.object({ id: v.string(), kind: v.literal('completed'), author: authorValidator, anime: animeValidator, settledAt: v.number() }),
+  v.object({ id: v.string(), kind: v.literal('rewatched'), author: authorValidator, anime: animeValidator, settledAt: v.number() }),
+)
+const feedPageValidator = v.object({ items: v.array(feedCardValidator), cursor: v.union(v.string(), v.null()), hasMore: v.boolean() })
 const fail = (code: string, message: string): never => { throw new ConvexError({ code, message }) }
 
 const getAuthor = async (ctx: QueryCtx, userId: Id<'users'>) => {
@@ -23,6 +31,11 @@ const getAnime = async (ctx: QueryCtx, anilistId: number) => {
   const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', anilistId)).unique()
   if (!anime) return fail('FEED_ANIME_MISSING', 'Feed anime summary is missing.')
   return { anilistId, slug: anime.slug, title: anime.titles.display, coverImageUrl: anime.coverImageUrl }
+}
+
+const requireCachedAnime = async (ctx: QueryCtx | MutationCtx, anilistId: number): Promise<void> => {
+  const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', anilistId)).unique()
+  if (!anime) return fail('ANIME_NOT_CACHED', 'Anime must be loaded before writing milestone activity.')
 }
 
 type FeedAuthor = Awaited<ReturnType<typeof getAuthor>>
@@ -67,29 +80,64 @@ const readOwn = async (ctx: QueryCtx, userId: Id<'users'>, anchor: string | null
     return anchor === null ? base : base.gt('orderKey', anchor)
   }).take(FEED_PAGE_SIZE + 1)
 
+type HomeGlobalPage = { cards: Doc<'feedCards'>[]; anchors: string[]; scannedAnchor: string | null; terminal: boolean }
+
+const readHomeGlobal = async (ctx: QueryCtx, viewerId: Id<'users'>, anchor: string | null): Promise<HomeGlobalPage> => {
+  const cards: Doc<'feedCards'>[] = []
+  const anchors: string[] = []
+  let scannedAnchor = anchor
+  let terminal = false
+  while (cards.length < FEED_PAGE_SIZE + 1 && !terminal) {
+    const batch = await readGlobal(ctx, scannedAnchor)
+    for (const card of batch) {
+      scannedAnchor = card.orderKey
+      if (card.userId !== viewerId) {
+        cards.push(card)
+        anchors.push(card.orderKey)
+        if (cards.length === FEED_PAGE_SIZE + 1) break
+      }
+    }
+    terminal = batch.length < FEED_PAGE_SIZE + 1
+  }
+  return { cards, anchors, scannedAnchor, terminal }
+}
+
 const listGlobalPage = async (ctx: QueryCtx, cursor: string | null, viewerId: Id<'users'> | null, view: FeedView) => {
   const anchors = decodeFeedCursor(cursor, view, viewerId)
   const candidates = await readGlobal(ctx, anchors.globalAnchor)
   const page = candidates.slice(0, FEED_PAGE_SIZE)
   return {
     items: await Promise.all(page.map((card) => resolveCard(ctx, card))),
-    cursor: candidates.length > FEED_PAGE_SIZE ? encodeFeedCursor({ view, viewerId, prioritizedAnchor: null, globalAnchor: page.at(-1)?.orderKey ?? null }) : null,
+    cursor: candidates.length > FEED_PAGE_SIZE ? encodeFeedCursor({ view, viewerId, prioritizedAnchor: null, globalAnchor: page.at(-1)?.orderKey ?? null, cycleIndex: 0 }) : null,
     hasMore: candidates.length > FEED_PAGE_SIZE,
   }
 }
 
+const getHomeGlobalAnchor = (page: HomeGlobalPage, consumed: number, current: string | null): string | null => {
+  if (consumed === page.cards.length && page.terminal) return page.scannedAnchor
+  if (consumed === 0) return current
+  return page.anchors[consumed - 1] ?? current
+}
+
+const hasHomeItems = (ownCount: number, ownConsumed: number, globalPage: HomeGlobalPage, globalConsumed: number): boolean => {
+  if (ownCount > ownConsumed) return true
+  if (globalPage.cards.length > globalConsumed) return true
+  return !globalPage.terminal
+}
+
 const listHomePage = async (ctx: QueryCtx, cursor: string | null, viewerId: Id<'users'>) => {
   const anchors = decodeFeedCursor(cursor, 'home', viewerId)
-  const [own, global] = await Promise.all([readOwn(ctx, viewerId, anchors.prioritizedAnchor), readGlobal(ctx, anchors.globalAnchor)])
+  const [own, globalPage] = await Promise.all([readOwn(ctx, viewerId, anchors.prioritizedAnchor), readHomeGlobal(ctx, viewerId, anchors.globalAnchor)])
+  const global = globalPage.cards
   const [ownDtos, globalDtos] = await Promise.all([
     Promise.all(own.slice(0, FEED_PAGE_SIZE).map((card) => resolveCard(ctx, card))),
     Promise.all(global.slice(0, FEED_PAGE_SIZE).map((card) => resolveCard(ctx, card))),
   ])
-  const merged = mergeFeedCards(ownDtos, globalDtos, FEED_PAGE_SIZE)
+  const merged = mergeFeedCards(ownDtos, globalDtos, FEED_PAGE_SIZE, anchors.cycleIndex)
   const prioritizedAnchor = merged.prioritizedConsumed > 0 ? own[merged.prioritizedConsumed - 1]?.orderKey ?? anchors.prioritizedAnchor : anchors.prioritizedAnchor
-  const globalAnchor = merged.globalConsumed > 0 ? global[merged.globalConsumed - 1]?.orderKey ?? anchors.globalAnchor : anchors.globalAnchor
-  const hasMore = own.length > merged.prioritizedConsumed || global.length > merged.globalConsumed
-  return { items: merged.items, cursor: hasMore ? encodeFeedCursor({ view: 'home', viewerId, prioritizedAnchor, globalAnchor }) : null, hasMore }
+  const globalAnchor = getHomeGlobalAnchor(globalPage, merged.globalConsumed, anchors.globalAnchor)
+  const hasMore = hasHomeItems(own.length, merged.prioritizedConsumed, globalPage, merged.globalConsumed)
+  return { items: merged.items, cursor: hasMore ? encodeFeedCursor({ view: 'home', viewerId, prioritizedAnchor, globalAnchor, cycleIndex: merged.nextCycleIndex }) : null, hasMore }
 }
 
 export const listGlobal = query({
@@ -118,7 +166,7 @@ export const listFollowing = query({
 })
 
 export const getById = query({
-  args: { cardId: v.id('feedCards') }, returns: v.union(v.any(), v.null()),
+  args: { cardId: v.id('feedCards') }, returns: v.union(feedCardValidator, v.null()),
   handler: async (ctx, args) => {
     const [card, viewer] = await Promise.all([ctx.db.get('feedCards', args.cardId), getOptionalProfile(ctx)])
     if (!card || !card.active || !canReadSocialRecord(card.visibility, viewer?._id ?? null, card.userId)) return null
@@ -153,6 +201,7 @@ export const setActivityVisibility = mutation({
     const { profile } = await requireProfile(ctx)
     const card = await readOwnedMilestoneCard(ctx, args.cardId, profile._id)
     if (card.anilistId === undefined) return fail('ACTIVITY_SOURCE_MISSING', 'Milestone activity source is missing.')
+    await requireCachedAnime(ctx, card.anilistId)
     const milestone = await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', profile._id).eq('anilistId', card.anilistId as number).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
     if (!milestone) return fail('ACTIVITY_SOURCE_MISSING', 'Milestone activity source is missing.')
     const now = Date.now()
@@ -167,6 +216,8 @@ export const removeActivity = mutation({
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx)
     const card = await readOwnedMilestoneCard(ctx, args.cardId, profile._id)
+    if (card.anilistId === undefined) return fail('ACTIVITY_SOURCE_MISSING', 'Milestone activity source is missing.')
+    await requireCachedAnime(ctx, card.anilistId)
     await ctx.db.patch('feedCards', card._id, { active: false, updatedAt: Date.now() })
     return null
   },
@@ -177,7 +228,10 @@ export const projectMilestones = internalMutation({
   returns: v.object({ continueCursor: v.string(), isDone: v.boolean() }),
   handler: async (ctx, args) => {
     const page = await ctx.db.query('animeMilestones').paginate(args.paginationOpts)
-    for (const milestone of page.page) await upsertMilestoneCard(ctx, milestone, false)
+    for (const milestone of page.page) {
+      await requireCachedAnime(ctx, milestone.anilistId)
+      await upsertMilestoneCard(ctx, milestone, false)
+    }
     return { continueCursor: page.continueCursor, isDone: page.isDone }
   },
 })

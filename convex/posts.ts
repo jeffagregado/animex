@@ -4,7 +4,7 @@ import { createPostInputSchema, updatePostInputSchema } from '../src/features/so
 import type { Doc, Id } from './_generated/dataModel'
 import { mutation, type MutationCtx } from './_generated/server'
 import { makeOrderKey } from './feedPolicy'
-import { assertImageMetadata, assertRequestId, normalizePostContent } from './socialPolicy'
+import { assertImageMetadata, assertRequestId, assertStoredImageMetadata, normalizePostContent } from './socialPolicy'
 import { requireProfile } from './users'
 
 const visibilityValidator = v.union(v.literal('private'), v.literal('followers'), v.literal('public'))
@@ -62,10 +62,17 @@ const assertStorageAvailable = async (ctx: MutationCtx, storageId: Id<'_storage'
 const readImageMetadata = async (ctx: MutationCtx, storageId: Id<'_storage'>, expectedMime: string, expectedSize: number) => {
   const metadata = await ctx.storage.getMetadata(storageId)
   if (!metadata) return fail('IMAGE_STORAGE_MISSING', 'Uploaded storage object not found.')
-  const mimeType = metadata.contentType ?? expectedMime
-  assertImageMetadata(mimeType, metadata.size)
-  if (metadata.size !== expectedSize || mimeType !== expectedMime) return fail('IMAGE_METADATA_MISMATCH', 'Uploaded image metadata does not match registration.')
-  return { mimeType, size: metadata.size }
+  return assertStoredImageMetadata(metadata.contentType ?? null, metadata.size, expectedMime, expectedSize)
+}
+
+const discardPendingImage = async (ctx: MutationCtx, image: Doc<'postImages'>, storageId: Id<'_storage'> | undefined): Promise<void> => {
+  if (image.storageId && storageId && image.storageId !== storageId) return fail('IMAGE_STORAGE_MISMATCH', 'Storage object does not match the image claim.')
+  if (!image.storageId && storageId) {
+    const registered = await ctx.db.query('postImages').withIndex('by_storage_id', (q) => q.eq('storageId', storageId)).unique()
+    if (registered) return fail('IMAGE_ALREADY_CLAIMED', 'Storage object is already registered to an image claim.')
+    await ctx.storage.delete(storageId)
+  }
+  await removeImage(ctx, image)
 }
 
 const upsertPostCard = async (ctx: MutationCtx, post: Doc<'posts'>, active: boolean): Promise<void> => {
@@ -117,14 +124,14 @@ export const registerImage = mutation({
 })
 
 export const discardImage = mutation({
-  args: { imageId: v.id('postImages') }, returns: v.null(),
+  args: { imageId: v.id('postImages'), storageId: v.optional(v.id('_storage')) }, returns: v.null(),
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx)
     const image = await ctx.db.get('postImages', args.imageId)
     if (!image) return null
     if (image.ownerId !== profile._id) return fail('IMAGE_FORBIDDEN', 'Post image belongs to another user.')
     if (image.state !== 'pending') return fail('IMAGE_ATTACHED', 'Attached Post image cannot be discarded.')
-    await removeImage(ctx, image)
+    await discardPendingImage(ctx, image, args.storageId)
     return null
   },
 })
@@ -191,7 +198,8 @@ export const remove = mutation({
     const post = await readOwnedPost(ctx, args.postId, profile._id)
     const images = await Promise.all(post.imageIds.map((id) => ctx.db.get('postImages', id)))
     await Promise.all(images.map(async (image) => { if (image) await removeImage(ctx, image) }))
-    await upsertPostCard(ctx, post, false)
+    const card = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `post:${post._id}`)).unique()
+    if (card) await ctx.db.delete('feedCards', card._id)
     await ctx.db.delete('posts', post._id)
     return null
   },

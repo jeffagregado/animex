@@ -9,8 +9,8 @@ describe('feed policy', () => {
   })
 
   test('round-trips a view and viewer-bound composite cursor', () => {
-    const cursor = encodeFeedCursor({ view: 'home', viewerId: 'viewer', prioritizedAnchor: 'p', globalAnchor: 'g' })
-    expect(decodeFeedCursor(cursor, 'home', 'viewer')).toEqual({ prioritizedAnchor: 'p', globalAnchor: 'g' })
+    const cursor = encodeFeedCursor({ view: 'home', viewerId: 'viewer', prioritizedAnchor: 'p', globalAnchor: 'g', cycleIndex: 2 })
+    expect(decodeFeedCursor(cursor, 'home', 'viewer')).toEqual({ prioritizedAnchor: 'p', globalAnchor: 'g', cycleIndex: 2 })
     expect(() => decodeFeedCursor(cursor, 'global', 'viewer')).toThrow('view')
     expect(() => decodeFeedCursor(cursor, 'home', 'other')).toThrow('viewer')
     expect(() => decodeFeedCursor('forged', 'home', 'viewer')).toThrow('cursor')

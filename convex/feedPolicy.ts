@@ -5,6 +5,7 @@ type FeedCursorPayload = {
   viewerId: string | null
   prioritizedAnchor: string | null
   globalAnchor: string | null
+  cycleIndex: number
 }
 
 const checksum = (value: string): string => {
@@ -38,6 +39,7 @@ const assertCursorAnchors = (payload: FeedCursorPayload): void => {
   const prioritizedValid = payload.prioritizedAnchor === null || typeof payload.prioritizedAnchor === 'string'
   const globalValid = payload.globalAnchor === null || typeof payload.globalAnchor === 'string'
   if (!prioritizedValid || !globalValid) throw new TypeError('Invalid feed cursor anchors.')
+  if (!Number.isInteger(payload.cycleIndex) || payload.cycleIndex < 0 || payload.cycleIndex > 2) throw new TypeError('Invalid feed cursor cycle.')
 }
 
 /** Validates and unwraps a view/viewer-bound feed cursor. */
@@ -45,14 +47,14 @@ export const decodeFeedCursor = (
   cursor: string | null,
   view: FeedView,
   viewerId: string | null,
-): Pick<FeedCursorPayload, 'prioritizedAnchor' | 'globalAnchor'> => {
-  if (cursor === null) return { prioritizedAnchor: null, globalAnchor: null }
+): Pick<FeedCursorPayload, 'prioritizedAnchor' | 'globalAnchor' | 'cycleIndex'> => {
+  if (cursor === null) return { prioritizedAnchor: null, globalAnchor: null, cycleIndex: 0 }
   try {
     const payload = parseCursorPayload(cursor)
     if (payload.view !== view) throw new TypeError('Feed cursor belongs to another view.')
     if (payload.viewerId !== viewerId) throw new TypeError('Feed cursor belongs to another viewer.')
     assertCursorAnchors(payload)
-    return { prioritizedAnchor: payload.prioritizedAnchor, globalAnchor: payload.globalAnchor }
+    return { prioritizedAnchor: payload.prioritizedAnchor, globalAnchor: payload.globalAnchor, cycleIndex: payload.cycleIndex }
   } catch (error) {
     if (error instanceof TypeError && error.message.includes('view')) throw error
     if (error instanceof TypeError && error.message.includes('viewer')) throw error

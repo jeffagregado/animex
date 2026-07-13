@@ -92,6 +92,12 @@ describe('user anime Convex integration', () => {
     expect(afterRollback.completionCard?.active).toBe(true)
     expect(afterRollback.rewatchCard?.active).toBe(false)
 
+    await owner.client.mutation(api.userAnime.recordRewatch, { anilistId: 1 })
+    const bumpedCard = await t.run(async (ctx) => await ctx.db.query('feedCards')
+      .withIndex('by_source_key', (q) => q.eq('sourceKey', `rewatched:${ownerProfileId}:1`)).unique())
+    expect(bumpedCard?.active).toBe(true)
+    expect(bumpedCard?.occurredAt).toBeGreaterThan(afterRollback.rewatchCard?.occurredAt ?? 0)
+
     const other = await createAuthUser(t, true, 'other')
     await insertProfile(t, other.authId, 'Other', 'private')
     expect(await other.client.query(api.userAnime.getMine, { anilistId: 1 })).toBeNull()

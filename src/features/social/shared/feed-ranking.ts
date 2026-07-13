@@ -4,6 +4,7 @@ export interface FeedMergeResult {
   items: FeedCard[]
   prioritizedConsumed: number
   globalConsumed: number
+  nextCycleIndex: number
 }
 
 /** Interleaves two prioritized cards then one global card with cursor-safe counts. */
@@ -11,16 +12,20 @@ export const mergeFeedCards = (
   prioritized: readonly FeedCard[],
   global: readonly FeedCard[],
   limit: number,
+  initialCycleIndex: number,
 ): FeedMergeResult => {
   if (!Number.isInteger(limit) || limit < 1 || limit > FEED_PAGE_SIZE) {
     throw new RangeError(`Feed merge limit must be an integer from 1 through ${FEED_PAGE_SIZE}.`)
+  }
+  if (!Number.isInteger(initialCycleIndex) || initialCycleIndex < 0 || initialCycleIndex > 2) {
+    throw new RangeError('Feed cycle index must be 0, 1, or 2.')
   }
 
   const items: FeedCard[] = []
   const seenIds = new Set<string>()
   let prioritizedConsumed = 0
   let globalConsumed = 0
-  let cycleIndex = 0
+  let cycleIndex = initialCycleIndex
 
   const takeNext = (lane: 'prioritized' | 'global'): FeedCard | null => {
     const source = lane === 'prioritized' ? prioritized : global
@@ -42,5 +47,5 @@ export const mergeFeedCards = (
     cycleIndex += 1
   }
 
-  return { items, prioritizedConsumed, globalConsumed }
+  return { items, prioritizedConsumed, globalConsumed, nextCycleIndex: cycleIndex % 3 }
 }
