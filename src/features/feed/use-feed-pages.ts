@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useConvex } from 'convex/react'
 
 import { api } from '../../../convex/_generated/api'
@@ -17,7 +17,6 @@ interface ScopedFeedState {
 }
 
 const emptyScope = (scope: string): ScopedFeedState => ({ scope, ...createFeedState(), loading: true, error: null })
-
 const feedQuery = (view: FeedView) => view === 'home' ? api.feed.listHome : view === 'following' ? api.feed.listFollowing : api.feed.listGlobal
 
 /** Loads explicit cursor pages with auth/view race isolation. */
@@ -25,38 +24,44 @@ export function useFeedPages(view: FeedView, authKey: string) {
   const client = useConvex()
   const scope = `${authKey}:${view}`
   const scopeRef = useRef(scope)
-  const generationRef = useRef(0)
+  const epochRef = useRef(0)
   const pendingRef = useRef(new Map<string, Promise<void>>())
   const [state, setState] = useState<ScopedFeedState>(() => emptyScope(scope))
-  if (scopeRef.current !== scope) {
-    scopeRef.current = scope
-    generationRef.current += 1
-    pendingRef.current.clear()
-  }
   const visible = state.scope === scope ? state : emptyScope(scope)
 
-  const load = (cursor: string | null): Promise<void> => {
-    const generation = generationRef.current
-    const requestKey = `${generation}:${cursor ?? 'initial'}`
+  useLayoutEffect(() => {
+    if (scopeRef.current === scope) return
+    scopeRef.current = scope
+    epochRef.current += 1
+    pendingRef.current.clear()
+    setState(emptyScope(scope))
+  }, [scope])
+
+  const load = (cursor: string | null, replace: boolean, advanceEpoch: boolean): Promise<void> => {
+    if (advanceEpoch) { epochRef.current += 1; pendingRef.current.clear() }
+    const epoch = epochRef.current
+    const requestKey = `${epoch}:${cursor ?? 'initial'}`
     const existing = pendingRef.current.get(requestKey)
     if (existing) return existing
-    setState((current) => current.scope === scope ? { ...current, loading: true, error: null } : emptyScope(scope))
+    setState((current) => replace || current.scope !== scope ? emptyScope(scope) : { ...current, loading: true, error: null })
     const request = client.query(feedQuery(view), { cursor }).then((raw) => {
-      if (generationRef.current !== generation || scopeRef.current !== scope) return
+      if (epochRef.current !== epoch || scopeRef.current !== scope) return
       const page = feedPageSchema.parse(raw)
       setState((current) => {
-        const base = cursor === null || current.scope !== scope ? createFeedState() : current
+        const base = replace || current.scope !== scope ? createFeedState() : current
         return { scope, ...appendFeedPage(base, page), loading: false, error: null }
       })
     }).catch((cause: unknown) => {
-      if (generationRef.current !== generation || scopeRef.current !== scope) return
+      if (epochRef.current !== epoch || scopeRef.current !== scope) return
       setState((current) => ({ ...(current.scope === scope ? current : emptyScope(scope)), loading: false, error: cause instanceof Error ? cause.message : 'Feed could not be loaded.' }))
-    }).finally(() => { pendingRef.current.delete(requestKey) })
+    }).finally(() => {
+      if (pendingRef.current.get(requestKey) === request) pendingRef.current.delete(requestKey)
+    })
     pendingRef.current.set(requestKey, request)
     return request
   }
 
-  useEffect(() => { void load(null) }, [client, scope])
+  useEffect(() => { void load(null, true, false) }, [client, scope])
 
   return {
     items: visible.items,
@@ -65,8 +70,8 @@ export function useFeedPages(view: FeedView, authKey: string) {
     error: visible.error,
     initialLoading: visible.loading && visible.items.length === 0,
     loadingMore: visible.loading && visible.items.length > 0,
-    loadMore: (): Promise<void> => load(visible.cursor),
-    retry: (): Promise<void> => load(visible.items.length === 0 ? null : visible.cursor),
-    refresh: (): Promise<void> => load(null),
+    loadMore: (): Promise<void> => load(visible.cursor, false, false),
+    retry: (): Promise<void> => load(visible.items.length === 0 ? null : visible.cursor, false, false),
+    refresh: (): Promise<void> => load(null, true, true),
   }
 }

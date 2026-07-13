@@ -43,4 +43,28 @@ describe('useFeedPages', () => {
     await act(async () => { await result.current.retry() })
     expect(result.current.items.map((item) => item.id)).toEqual(['one', 'two'])
   })
+
+  it.each(['refresh-first', 'load-more-first'] as const)('refresh invalidates load-more when %s resolves', async (order) => {
+    const loadMore = deferred<unknown>()
+    const refresh = deferred<unknown>()
+    query.mockResolvedValueOnce(page(['one'], 'cursor-1', true)).mockReturnValueOnce(loadMore.promise).mockReturnValueOnce(refresh.promise)
+    const { result } = renderHook(() => useFeedPages('global', 'signed-out'))
+    await waitFor(() => expect(result.current.items.map((item) => item.id)).toEqual(['one']))
+    act(() => { void result.current.loadMore() })
+    await waitFor(() => expect(result.current.loadingMore).toBe(true))
+    act(() => { void result.current.refresh() })
+    expect(result.current.items).toEqual([])
+    expect(result.current.initialLoading).toBe(true)
+    if (order === 'refresh-first') {
+      await act(async () => { refresh.resolve(page(['fresh'], null, false)); await refresh.promise })
+      expect(result.current.items.map((item) => item.id)).toEqual(['fresh'])
+      await act(async () => { loadMore.resolve(page(['stale'], null, false)); await loadMore.promise })
+    } else {
+      await act(async () => { loadMore.resolve(page(['stale'], null, false)); await loadMore.promise })
+      expect(result.current.initialLoading).toBe(true)
+      await act(async () => { refresh.resolve(page(['fresh'], null, false)); await refresh.promise })
+    }
+    expect(result.current.items.map((item) => item.id)).toEqual(['fresh'])
+    expect(result.current.initialLoading).toBe(false)
+  })
 })

@@ -46,19 +46,47 @@ export function usePostComposer(initial: { text: string; imageIds: string[]; ima
   const operationsRef = useRef(new Map<string, UploadOperation>())
   const operationId = useRef(newId())
   const submittingRef = useRef(false)
+  const mountedRef = useRef(true)
   const [text, setText] = useState(initial.text)
   const [hasSpoiler, setHasSpoiler] = useState(initial.hasSpoiler)
   const [visibility, setVisibility] = useState<Visibility>(initial.visibility)
   const [submitting, setSubmitting] = useState(false)
-  useEffect(() => { imagesRef.current = images }, [images])
-  useEffect(() => () => { operationsRef.current.forEach((operation) => URL.revokeObjectURL(operation.previewUrl)) }, [])
+  const changeImages = (change: (current: PendingPostImage[]) => PendingPostImage[]): void => {
+    if (mountedRef.current) setImages(change)
+  }
 
   const cleanupOperation = async (operation: UploadOperation): Promise<void> => {
     if (operation.attached || operation.cleaned || !operation.imageId) return
     if (operation.cleanup) return await operation.cleanup
-    operation.cleanup = discardImage({ imageId: operation.imageId as Id<'postImages'>, ...(!operation.registered && operation.storageId ? { storageId: operation.storageId as Id<'_storage'> } : {}) }).then(() => { operation.cleaned = true })
-    return await operation.cleanup
+    const cleanup = discardImage({ imageId: operation.imageId as Id<'postImages'>, ...(!operation.registered && operation.storageId ? { storageId: operation.storageId as Id<'_storage'> } : {}) }).then(() => { operation.cleaned = true })
+    operation.cleanup = cleanup
+    try { await cleanup }
+    finally { if (!operation.cleaned) operation.cleanup = null }
   }
+
+  const finishCancellation = async (operation: UploadOperation, updateImages: boolean): Promise<void> => {
+    operation.canceled = true
+    operation.controller.abort()
+    if (operation.finished) await operation.finished
+    await cleanupOperation(operation)
+    URL.revokeObjectURL(operation.previewUrl)
+    operationsRef.current.delete(operation.localId)
+    if (updateImages) changeImages((current) => current.filter((image) => image.localId !== operation.localId))
+  }
+
+  useEffect(() => { imagesRef.current = images }, [images])
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      const operations = [...operationsRef.current.values()].filter((operation) => !operation.attached)
+      operations.forEach((operation) => {
+        operation.canceled = true
+        operation.controller.abort()
+        void finishCancellation(operation, false).catch((cause: unknown) => { console.error('Pending Post image cleanup failed during unmount.', cause) })
+      })
+    }
+  }, [])
 
   const upload = async (file: File): Promise<void> => {
     if (submittingRef.current) throw new Error('Wait for Post submission to finish.')
@@ -68,45 +96,38 @@ export function usePostComposer(initial: { text: string; imageIds: string[]; ima
     const previewUrl = URL.createObjectURL(file)
     const operation: UploadOperation = { localId, previewUrl, controller: new AbortController(), canceled: false, attached: false, cleaned: false, imageId: null, storageId: null, registered: false, finished: null, cleanup: null }
     operationsRef.current.set(localId, operation)
-    setImages((current) => [...current, { localId, imageId: localId, previewUrl, status: 'processing', error: null, ownedPending: true }])
+    changeImages((current) => [...current, { localId, imageId: localId, previewUrl, status: 'processing', error: null, ownedPending: true }])
     operation.finished = (async () => {
       try {
         const processed = await processPostImage(file); assertActive(operation)
-        setImages((current) => current.map((image) => image.localId === localId ? { ...image, status: 'uploading' } : image))
+        changeImages((current) => current.map((image) => image.localId === localId ? { ...image, status: 'uploading' } : image))
         const claimId = newId()
         const claim = await generateUploadUrl({ claimId }); operation.imageId = String(claim.imageId); assertActive(operation)
-        const response = await fetch(claim.uploadUrl, { method: 'POST', headers: { 'Content-Type': processed.mimeType }, body: processed.blob, signal: operation.controller.signal }); assertActive(operation)
+        const response = await fetch(claim.uploadUrl, { method: 'POST', headers: { 'Content-Type': processed.mimeType }, body: processed.blob, signal: operation.controller.signal })
         if (!response.ok) throw new Error(`Image upload failed (${response.status}).`)
-        const body = await response.json() as { storageId?: unknown }; assertActive(operation)
+        const body = await response.json() as { storageId?: unknown }
         if (typeof body.storageId !== 'string' || body.storageId.length === 0) throw new Error('Image upload returned no storage ID.')
         operation.storageId = body.storageId
+        assertActive(operation)
         const registered = await registerImage({ claimId, storageId: body.storageId as Id<'_storage'>, mimeType: processed.mimeType, size: processed.size, width: processed.width, height: processed.height })
         operation.imageId = String(registered); operation.registered = true; assertActive(operation)
-        setImages((current) => current.map((image) => image.localId === localId ? { ...image, imageId: String(registered), status: 'ready' } : image))
+        changeImages((current) => current.map((image) => image.localId === localId ? { ...image, imageId: String(registered), status: 'ready' } : image))
       } catch (cause) {
         let message = cause instanceof Error ? cause.message : 'Image upload failed.'
         try { await cleanupOperation(operation) } catch (cleanupCause) { message = `${message} Cleanup failed: ${cleanupCause instanceof Error ? cleanupCause.message : 'pending image could not be discarded.'}` }
-        if (!operation.canceled) setImages((current) => current.map((image) => image.localId === localId ? { ...image, status: 'error', error: message } : image))
+        if (!operation.canceled) changeImages((current) => current.map((image) => image.localId === localId ? { ...image, status: 'error', error: message } : image))
       }
     })()
     await operation.finished
   }
 
-  const cancelOperation = async (operation: UploadOperation): Promise<void> => {
-    operation.canceled = true
-    operation.controller.abort()
-    if (operation.finished) await operation.finished
-    await cleanupOperation(operation)
-    URL.revokeObjectURL(operation.previewUrl)
-    operationsRef.current.delete(operation.localId)
-    setImages((current) => current.filter((image) => image.localId !== operation.localId))
-  }
+  const cancelOperation = async (operation: UploadOperation): Promise<void> => await finishCancellation(operation, true)
 
   const remove = async (index: number): Promise<void> => {
     if (submittingRef.current) throw new Error('Wait for Post submission to finish.')
     const image = imagesRef.current[index]
     if (!image) throw new Error('Post image no longer exists.')
-    if (!image.ownedPending) { setImages((current) => current.filter((_, itemIndex) => itemIndex !== index)); return }
+    if (!image.ownedPending) { changeImages((current) => current.filter((_, itemIndex) => itemIndex !== index)); return }
     const operation = operationsRef.current.get(image.localId)
     if (!operation) throw new Error('Pending image operation is unavailable.')
     await cancelOperation(operation)
@@ -114,7 +135,7 @@ export function usePostComposer(initial: { text: string; imageIds: string[]; ima
 
   const move = (index: number, direction: -1 | 1): void => {
     if (submittingRef.current) throw new Error('Wait for Post submission to finish.')
-    setImages((current) => { const target = index + direction; if (target < 0 || target >= current.length) return current; const next = [...current]; [next[index], next[target]] = [next[target], next[index]]; return next })
+    changeImages((current) => { const target = index + direction; if (target < 0 || target >= current.length) return current; const next = [...current]; [next[index], next[target]] = [next[target], next[index]]; return next })
   }
 
   const discardAll = async (): Promise<void> => {
@@ -130,14 +151,14 @@ export function usePostComposer(initial: { text: string; imageIds: string[]; ima
     if (currentImages.some((image) => image.status !== 'ready')) throw new Error('Wait for every image upload to finish.')
     const imageIds = currentImages.map((image) => image.imageId)
     const input = createPostInputSchema.parse({ requestId: operationId.current, text, imageIds, hasSpoiler, visibility })
-    submittingRef.current = true; setSubmitting(true)
+    submittingRef.current = true; if (mountedRef.current) setSubmitting(true)
     try {
       if (postId) await update({ postId: postId as Id<'posts'>, ...input, imageIds: imageIds as Id<'postImages'>[] })
       else await create({ ...input, imageIds: imageIds as Id<'postImages'>[] })
       operationsRef.current.forEach((operation) => { operation.attached = true; URL.revokeObjectURL(operation.previewUrl) })
-      operationsRef.current.clear(); setImages([]); setText(''); setHasSpoiler(false); operationId.current = newId()
+      operationsRef.current.clear(); changeImages(() => []); if (mountedRef.current) { setText(''); setHasSpoiler(false) }; operationId.current = newId()
     } catch (cause) { await discardAll(); throw cause }
-    finally { submittingRef.current = false; setSubmitting(false) }
+    finally { submittingRef.current = false; if (mountedRef.current) setSubmitting(false) }
   }
 
   const dirty = text !== initial.text || images.map((image) => image.imageId).join('|') !== initial.imageIds.join('|') || hasSpoiler !== initial.hasSpoiler || visibility !== initial.visibility
