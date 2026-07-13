@@ -80,6 +80,33 @@ describe('usePostComposer upload lifecycle', () => {
     expect(mocks.discard).toHaveBeenCalledWith({ imageId: 'claim-image', storageId: 'late-storage' })
   })
 
+  it('does not abort signal-aware body parsing after upload headers arrive', async () => {
+    const body = deferred<{ storageId: string }>()
+    const jsonStarted = deferred<void>()
+    let uploadSignal!: AbortSignal
+    vi.mocked(fetch).mockImplementationOnce(async (_input, init) => {
+      uploadSignal = init?.signal as AbortSignal
+      return {
+        ok: true,
+        json: () => {
+          jsonStarted.resolve()
+          uploadSignal.addEventListener('abort', () => body.reject(new DOMException('body aborted', 'AbortError')))
+          return body.promise
+        },
+      } as Response
+    })
+    const { result } = renderHook(() => usePostComposer(initial))
+    let upload!: Promise<void>
+    act(() => { upload = result.current.upload(new File(['a'], 'a.jpg', { type: 'image/jpeg' })) })
+    await jsonStarted.promise
+    let cleanup!: Promise<void>
+    act(() => { cleanup = result.current.discardAll() })
+    expect(uploadSignal.aborted).toBe(false)
+    await act(async () => { body.resolve({ storageId: 'body-storage' }); await upload; await cleanup })
+    expect(uploadSignal.aborted).toBe(false)
+    expect(mocks.discard).toHaveBeenCalledWith({ imageId: 'claim-image', storageId: 'body-storage' })
+  })
+
   it('retries a rejected cleanup instead of caching its rejection', async () => {
     mocks.discard.mockRejectedValueOnce(new Error('cleanup offline')).mockResolvedValueOnce(null)
     const { result } = renderHook(() => usePostComposer(initial))

@@ -25,6 +25,7 @@ interface UploadOperation {
   imageId: string | null
   storageId: string | null
   registered: boolean
+  responseReceived: boolean
   finished: Promise<void> | null
   cleanup: Promise<void> | null
 }
@@ -32,6 +33,10 @@ interface UploadOperation {
 const newId = (): string => crypto.randomUUID()
 const canceledError = (): Error => new DOMException('Image upload canceled.', 'AbortError')
 const assertActive = (operation: UploadOperation): void => { if (operation.canceled) throw canceledError() }
+const cancelUpload = (operation: UploadOperation): void => {
+  operation.canceled = true
+  if (!operation.responseReceived) operation.controller.abort()
+}
 
 /** Owns Post mutations and cancellation-safe upload cleanup. */
 export function usePostComposer(initial: { text: string; imageIds: string[]; imageUrls: string[]; hasSpoiler: boolean; visibility: Visibility }) {
@@ -65,8 +70,7 @@ export function usePostComposer(initial: { text: string; imageIds: string[]; ima
   }
 
   const finishCancellation = async (operation: UploadOperation, updateImages: boolean): Promise<void> => {
-    operation.canceled = true
-    operation.controller.abort()
+    cancelUpload(operation)
     if (operation.finished) await operation.finished
     await cleanupOperation(operation)
     URL.revokeObjectURL(operation.previewUrl)
@@ -81,8 +85,7 @@ export function usePostComposer(initial: { text: string; imageIds: string[]; ima
       mountedRef.current = false
       const operations = [...operationsRef.current.values()].filter((operation) => !operation.attached)
       operations.forEach((operation) => {
-        operation.canceled = true
-        operation.controller.abort()
+        cancelUpload(operation)
         void finishCancellation(operation, false).catch((cause: unknown) => { console.error('Pending Post image cleanup failed during unmount.', cause) })
       })
     }
@@ -94,7 +97,7 @@ export function usePostComposer(initial: { text: string; imageIds: string[]; ima
     if (attachedCount + operationsRef.current.size >= POST_IMAGE_LIMIT) throw new Error('A Post can include up to four images.')
     const localId = newId()
     const previewUrl = URL.createObjectURL(file)
-    const operation: UploadOperation = { localId, previewUrl, controller: new AbortController(), canceled: false, attached: false, cleaned: false, imageId: null, storageId: null, registered: false, finished: null, cleanup: null }
+    const operation: UploadOperation = { localId, previewUrl, controller: new AbortController(), canceled: false, attached: false, cleaned: false, imageId: null, storageId: null, registered: false, responseReceived: false, finished: null, cleanup: null }
     operationsRef.current.set(localId, operation)
     changeImages((current) => [...current, { localId, imageId: localId, previewUrl, status: 'processing', error: null, ownedPending: true }])
     operation.finished = (async () => {
@@ -104,6 +107,7 @@ export function usePostComposer(initial: { text: string; imageIds: string[]; ima
         const claimId = newId()
         const claim = await generateUploadUrl({ claimId }); operation.imageId = String(claim.imageId); assertActive(operation)
         const response = await fetch(claim.uploadUrl, { method: 'POST', headers: { 'Content-Type': processed.mimeType }, body: processed.blob, signal: operation.controller.signal })
+        operation.responseReceived = true
         if (!response.ok) throw new Error(`Image upload failed (${response.status}).`)
         const body = await response.json() as { storageId?: unknown }
         if (typeof body.storageId !== 'string' || body.storageId.length === 0) throw new Error('Image upload returned no storage ID.')
@@ -140,7 +144,7 @@ export function usePostComposer(initial: { text: string; imageIds: string[]; ima
 
   const discardAll = async (): Promise<void> => {
     const operations = [...operationsRef.current.values()].filter((operation) => !operation.attached)
-    operations.forEach((operation) => { operation.canceled = true; operation.controller.abort() })
+    operations.forEach(cancelUpload)
     await Promise.all(operations.map(cancelOperation))
   }
 

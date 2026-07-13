@@ -20,10 +20,12 @@ Status: implemented. Controller integration still owns generated route tree.
 - Added unmount/auth-loss cancellation for processing, uploading, and registered images with awaited backend cleanup and guarded state updates.
 - Preserved returned storage IDs before cancellation cleanup, made rejected cleanup retryable, and surfaced cleanup failures through actionable toasts.
 - Made refresh advance the feed request epoch so every older initial/load-more continuation is ignored without corrupting loading state.
+- Made upload abort phase-aware: cancellation stops pre-response fetches but lets an arrived response body reveal its storage ID before deletion.
+- Added a successful-save blocker bypass/reset so changed visibility cannot prevent the post-save close or navigation; failed saves remain dirty.
 
 ## Validation
 
-- `pnpm test -- src/features/feed/feed-state.test.ts src/features/feed/use-feed-pages.test.tsx src/features/feed/process-post-image.test.ts src/features/feed/use-post-composer.test.tsx src/features/feed/post-composer.test.tsx src/features/feed/feed-card.test.tsx src/features/feed/feed-card-detail-page.test.tsx src/features/feed/feed-owner-actions.test.tsx src/features/home/home-page.test.tsx src/features/shell/public-shell.test.tsx src/features/social/shared/feed-ranking.test.ts` — 11 files, 49 tests passed.
+- `pnpm test -- src/features/feed/feed-state.test.ts src/features/feed/use-feed-pages.test.tsx src/features/feed/process-post-image.test.ts src/features/feed/use-post-composer.test.tsx src/features/feed/post-composer.test.tsx src/features/feed/feed-card.test.tsx src/features/feed/feed-card-detail-page.test.tsx src/features/feed/feed-owner-actions.test.tsx src/features/home/home-page.test.tsx src/features/shell/public-shell.test.tsx src/features/social/shared/feed-ranking.test.ts` — 11 files, 51 tests passed.
 - `pnpm exec tsc --noEmit` — passed.
 - `git diff --check` — passed; PowerShell emitted line-ending warnings only.
 

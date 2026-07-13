@@ -22,7 +22,8 @@ const errorMessage = (cause: unknown, fallback: string): string => cause instanc
 /** Renders text/image/spoiler/visibility form with themed dirty confirmation. */
 export function PostComposer({ initial, postId, onCancel, onSaved, registerClose }: PostComposerProps) {
   const composer = usePostComposer(initial)
-  const blocker = useBlocker({ shouldBlockFn: () => composer.dirty, enableBeforeUnload: composer.dirty, withResolver: true })
+  const savedRef = useRef(false)
+  const blocker = useBlocker({ shouldBlockFn: () => composer.dirty && !savedRef.current, enableBeforeUnload: composer.dirty && !savedRef.current, withResolver: true })
   const fileInput = useRef<HTMLInputElement>(null)
   const [discardIntent, setDiscardIntent] = useState<'close' | 'navigate' | null>(null)
 
@@ -48,7 +49,13 @@ export function PostComposer({ initial, postId, onCancel, onSaved, registerClose
     else onCancel()
   }
   const save = async (): Promise<void> => {
-    try { await composer.submit(postId); toast.success(postId ? 'Post updated.' : 'Post published.'); onSaved() }
+    try {
+      await composer.submit(postId)
+      savedRef.current = true
+      if (blocker.status === 'blocked') blocker.reset()
+      toast.success(postId ? 'Post updated.' : 'Post published.')
+      onSaved()
+    }
     catch (cause) { toast.error(errorMessage(cause, 'Post could not be saved.')) }
   }
   const removeImage = async (index: number): Promise<void> => {
