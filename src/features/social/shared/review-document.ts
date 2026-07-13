@@ -87,8 +87,8 @@ const parseSafeHttpsUrl = (value: string): URL => {
   let url: URL
   try {
     url = new URL(value)
-  } catch (error) {
-    throw new TypeError('Media URL must be a valid HTTPS URL.', { cause: error })
+  } catch {
+    throw new TypeError('Media URL must be a valid HTTPS URL.')
   }
 
   if (url.protocol !== 'https:' || url.username !== '' || url.password !== '') {
