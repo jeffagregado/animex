@@ -1,0 +1,298 @@
+import { z } from 'zod'
+
+import {
+  animeFormatSchema,
+  animeSeasonSchema,
+  slugifyAnimeTitle,
+  type AnimeDate,
+  type AnimeFormat,
+  type AnimeSeason,
+  type AnimeTitles,
+} from '../../discover/shared/discover-contracts'
+
+export const ANIME_RELATED_LIMIT = 5 as const
+export const ANIME_RECOMMENDATIONS_LIMIT = 5 as const
+export const ANIME_PEOPLE_PER_PAGE = 24 as const
+export const ANIME_REWATCHES_PER_PAGE = 20 as const
+export const ANIME_DETAIL_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+export const animeDetailTabSchema = z.enum(['overview', 'reviews', 'characters', 'staff'])
+export const animePeopleKindSchema = z.enum(['characters', 'staff'])
+export const animeStatusSchema = z.enum(['watching', 'planned', 'dropped', 'completed', 'rewatched'])
+export const animeScoreSchema = z.number().min(0).max(10).multipleOf(0.1).nullable()
+
+export type AnimeDetailTab = z.infer<typeof animeDetailTabSchema>
+export type AnimePeopleKind = z.infer<typeof animePeopleKindSchema>
+export type AnimeStatus = z.infer<typeof animeStatusSchema>
+export type AnimeScore = z.infer<typeof animeScoreSchema>
+
+const positiveSafeIntegerSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
+
+/** Validates canonical AniList identity. */
+export const parseAnilistId = (value: unknown): number => {
+  const result = positiveSafeIntegerSchema.safeParse(value)
+  if (!result.success) {
+    throw new RangeError('AniList ID must be a positive safe integer.', { cause: result.error })
+  }
+  return result.data
+}
+
+/** Validates one-based pagination input. */
+export const parseAnimePage = (value: unknown): number => {
+  const result = positiveSafeIntegerSchema.safeParse(value)
+  if (!result.success) {
+    throw new RangeError('Page must be a positive safe integer.', { cause: result.error })
+  }
+  return result.data
+}
+
+/** Converts untrusted URL search state to one supported tab. */
+export const normalizeAnimeDetailTab = (value: unknown): AnimeDetailTab => {
+  const result = animeDetailTabSchema.safeParse(value)
+  return result.success ? result.data : 'overview'
+}
+
+/** Builds canonical detail URL from validated identity and real title. */
+export const createCanonicalAnimePath = (
+  anilistId: number,
+  title: string,
+  tab: AnimeDetailTab,
+): string => {
+  const id = parseAnilistId(anilistId)
+  const slug = encodeURIComponent(slugifyAnimeTitle(title))
+  const path = `/anime/${id}/${slug}`
+  return tab === 'overview' ? path : `${path}?tab=${tab}`
+}
+
+const animeDateSchema: z.ZodType<AnimeDate> = z.object({
+  year: z.number().int().nullable(),
+  month: z.number().int().min(1).max(12).nullable(),
+  day: z.number().int().min(1).max(31).nullable(),
+}).strict()
+
+const animeTitlesSchema: z.ZodType<AnimeTitles> = z.object({
+  display: z.string().trim().min(1),
+  english: z.string().trim().min(1).nullable(),
+  romaji: z.string().trim().min(1).nullable(),
+  native: z.string().trim().min(1).nullable(),
+}).strict()
+
+const nullableHttpsUrlSchema = z.url({ protocol: /^https$/ }).nullable()
+const animeMediaStatusSchema = z.enum([
+  'FINISHED',
+  'RELEASING',
+  'NOT_YET_RELEASED',
+  'CANCELLED',
+  'HIATUS',
+])
+
+export type AnimeMediaStatus = z.infer<typeof animeMediaStatusSchema>
+
+export interface AnimeDetailListItem {
+  anilistId: number
+  slug: string
+  title: string
+  coverImageUrl: string | null
+}
+
+const animeDetailListItemSchema: z.ZodType<AnimeDetailListItem> = z.object({
+  anilistId: positiveSafeIntegerSchema,
+  slug: z.string().min(1),
+  title: z.string().trim().min(1),
+  coverImageUrl: nullableHttpsUrlSchema,
+}).strict()
+
+export interface AnimeStudio {
+  name: string
+  siteUrl: string | null
+}
+
+const animeStudioSchema: z.ZodType<AnimeStudio> = z.object({
+  name: z.string().trim().min(1),
+  siteUrl: nullableHttpsUrlSchema,
+}).strict()
+
+export interface AnimeTrailer {
+  youtubeId: string
+  thumbnailUrl: string | null
+}
+
+const animeTrailerSchema: z.ZodType<AnimeTrailer> = z.object({
+  youtubeId: z.string().trim().min(1),
+  thumbnailUrl: nullableHttpsUrlSchema,
+}).strict()
+
+export interface AnimeExternalLink {
+  site: string
+  url: string
+}
+
+const animeExternalLinkSchema: z.ZodType<AnimeExternalLink> = z.object({
+  site: z.string().trim().min(1),
+  url: z.url({ protocol: /^https$/ }),
+}).strict()
+
+export interface AnimeDetail {
+  anilistId: number
+  slug: string
+  titles: AnimeTitles
+  coverImageUrl: string | null
+  bannerImageUrl: string | null
+  synopsis: string | null
+  format: AnimeFormat | null
+  status: AnimeMediaStatus | null
+  source: string | null
+  season: AnimeSeason | null
+  seasonYear: number | null
+  episodes: number | null
+  durationMinutes: number | null
+  startDate: AnimeDate | null
+  endDate: AnimeDate | null
+  genres: string[]
+  mainStudio: AnimeStudio | null
+  related: AnimeDetailListItem[]
+  recommendations: AnimeDetailListItem[]
+  trailer: AnimeTrailer | null
+  externalLinks: AnimeExternalLink[]
+}
+
+export const animeDetailSchema: z.ZodType<AnimeDetail> = z.object({
+  anilistId: positiveSafeIntegerSchema,
+  slug: z.string().min(1),
+  titles: animeTitlesSchema,
+  coverImageUrl: nullableHttpsUrlSchema,
+  bannerImageUrl: nullableHttpsUrlSchema,
+  synopsis: z.string().trim().min(1).nullable(),
+  format: animeFormatSchema.nullable(),
+  status: animeMediaStatusSchema.nullable(),
+  source: z.string().trim().min(1).nullable(),
+  season: animeSeasonSchema.nullable(),
+  seasonYear: z.number().int().positive().nullable(),
+  episodes: z.number().int().nonnegative().nullable(),
+  durationMinutes: z.number().int().positive().nullable(),
+  startDate: animeDateSchema.nullable(),
+  endDate: animeDateSchema.nullable(),
+  genres: z.array(z.string().trim().min(1)),
+  mainStudio: animeStudioSchema.nullable(),
+  related: z.array(animeDetailListItemSchema).max(ANIME_RELATED_LIMIT),
+  recommendations: z.array(animeDetailListItemSchema).max(ANIME_RECOMMENDATIONS_LIMIT),
+  trailer: animeTrailerSchema.nullable(),
+  externalLinks: z.array(animeExternalLinkSchema),
+}).strict()
+
+export interface AnimeVoiceActor {
+  anilistId: number
+  name: string
+  imageUrl: string | null
+  language: 'Japanese'
+}
+
+export interface AnimeCharacter {
+  anilistId: number
+  name: string
+  role: 'MAIN' | 'SUPPORTING' | 'BACKGROUND'
+  imageUrl: string | null
+  japaneseVoiceActor: AnimeVoiceActor | null
+}
+
+export interface AnimeStaff {
+  anilistId: number
+  name: string
+  role: string
+  imageUrl: string | null
+}
+
+export interface AnimePeoplePage<T> {
+  items: T[]
+  currentPage: number
+  hasNextPage: boolean
+  perPage: 24
+}
+
+export const animePeoplePageSchema = z.object({
+  items: z.array(z.unknown()),
+  currentPage: positiveSafeIntegerSchema,
+  hasNextPage: z.boolean(),
+  perPage: z.literal(ANIME_PEOPLE_PER_PAGE),
+}).strict()
+
+export interface AnimeDetailCacheEntry {
+  detail: AnimeDetail
+  refreshedAt: number
+  expiresAt: number
+}
+
+export type AnimeDetailErrorCode = 'UPSTREAM' | 'RATE_LIMITED'
+export type AnimePaginationErrorCode = 'UPSTREAM' | 'RATE_LIMITED'
+
+export type PublicAnimeDetailState =
+  | { status: 'loading' }
+  | { status: 'empty' }
+  | { status: 'ready'; entry: AnimeDetailCacheEntry }
+  | { status: 'not-found'; code: 'NOT_FOUND'; message: string }
+  | { status: 'error'; code: AnimeDetailErrorCode; message: string; retryAfterSeconds: number | null }
+  | { status: 'pagination-error'; code: AnimePaginationErrorCode; message: string; page: number; retryAfterSeconds: number | null }
+
+const messageSchema = z.string().trim().min(1)
+export const publicAnimeDetailStateSchema: z.ZodType<PublicAnimeDetailState> = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('loading') }).strict(),
+  z.object({ status: z.literal('empty') }).strict(),
+  z.object({ status: z.literal('ready'), entry: z.object({ detail: animeDetailSchema, refreshedAt: z.number(), expiresAt: z.number() }).strict() }).strict(),
+  z.object({ status: z.literal('not-found'), code: z.literal('NOT_FOUND'), message: messageSchema }).strict(),
+  z.object({ status: z.literal('error'), code: z.enum(['UPSTREAM', 'RATE_LIMITED']), message: messageSchema, retryAfterSeconds: z.number().int().nonnegative().nullable() }).strict(),
+  z.object({ status: z.literal('pagination-error'), code: z.enum(['UPSTREAM', 'RATE_LIMITED']), message: messageSchema, page: positiveSafeIntegerSchema, retryAfterSeconds: z.number().int().nonnegative().nullable() }).strict(),
+])
+
+export interface UserAnimeEntry {
+  anilistId: number
+  status: AnimeStatus
+  score: AnimeScore
+  isFavorite: boolean
+  favoriteChangedAt: number | null
+  rewatchCount: number
+  createdAt: number
+  updatedAt: number
+}
+
+export type AnimeMilestoneKind = 'started' | 'completed' | 'dropped' | 'rewatched'
+
+export interface AnimeMilestone {
+  anilistId: number
+  kind: AnimeMilestoneKind
+  settledAt: number
+}
+
+export interface AnimeRewatchEntry {
+  id: string
+  anilistId: number
+  completedAt: number
+}
+
+export interface AnimeRewatchPage {
+  items: AnimeRewatchEntry[]
+  currentPage: number
+  hasNextPage: boolean
+  perPage: 20
+}
+
+export interface UserAnimeMutationInput {
+  anilistId: number
+  status: AnimeStatus
+  score: AnimeScore
+}
+
+export const userAnimeMutationInputSchema: z.ZodType<UserAnimeMutationInput> = z.object({
+  anilistId: positiveSafeIntegerSchema,
+  status: animeStatusSchema,
+  score: animeScoreSchema,
+}).strict()
+
+export interface SetAnimeStatusInput { anilistId: number; status: AnimeStatus }
+export interface SetAnimeScoreInput { anilistId: number; score: AnimeScore }
+export interface ToggleAnimeFavoriteInput { anilistId: number }
+export interface RecordAnimeRewatchInput { anilistId: number; completedAt: number }
+export interface RemoveLatestAnimeRewatchInput { anilistId: number }
+
+export type UserAnimeMutationResult =
+  | { status: 'saved'; entry: UserAnimeEntry }
+  | { status: 'removed'; anilistId: number }
