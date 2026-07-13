@@ -37,6 +37,6 @@ describe('FeedOwnerActions', () => {
   it('binds milestone visibility into owner selector', async () => {
     render(<FeedOwnerActions card={{ id: 'milestone-card', kind: 'rewatched', author, anime, settledAt: 1, visibility: 'followers' }} onChanged={() => undefined} onEdit={() => undefined} />)
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
-    expect((await screen.findByRole('combobox', { name: 'Change visibility' })).textContent).toContain('followers')
+    expect((await screen.findByRole('combobox', { name: 'Change visibility' })).textContent).toContain('Followers')
   })
 })

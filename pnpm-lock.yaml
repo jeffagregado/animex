@@ -26,9 +26,6 @@ importers:
       '@lexical/rich-text':
         specifier: ^0.47.0
         version: 0.47.0(typescript@6.0.3)
-      '@lexical/utils':
-        specifier: ^0.47.0
-        version: 0.47.0(typescript@6.0.3)
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.3.1(vite@8.1.0(@types/node@22.20.0)(esbuild@0.27.0)(jiti@2.7.0))

@@ -5,6 +5,7 @@ import { ImagePlusIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select'
+import { getVisibilityLabel } from '#/features/social/visibility'
 import { POST_IMAGE_LIMIT, POST_TEXT_LIMIT, type Visibility } from '../social/shared/social-contracts'
 import { PostImageGrid } from './post-image-grid'
 import { usePostComposer } from './use-post-composer'
@@ -84,8 +85,8 @@ export function PostComposer({ initial, postId, onCancel, onSaved, registerClose
         <button className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-cyan-300/40 font-bold text-cyan-200 hover:bg-cyan-300/10 focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-50" disabled={composer.submitting || composer.images.length >= POST_IMAGE_LIMIT} onClick={() => fileInput.current?.click()} type="button"><ImagePlusIcon className="size-5" />Add images</button>
         <input accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" disabled={composer.submitting} multiple onChange={(event) => { const files = Array.from(event.target.files ?? []).slice(0, POST_IMAGE_LIMIT - composer.images.length); void uploadFiles(files); event.target.value = '' }} ref={fileInput} type="file" />
         <Select disabled={composer.submitting} onValueChange={(value) => { if (value) composer.setVisibility(value as Visibility) }} value={composer.visibility}>
-          <SelectTrigger aria-label="Post visibility"><SelectValue /></SelectTrigger>
-          <SelectContent>{(['public', 'followers', 'private'] as Visibility[]).map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
+          <SelectTrigger aria-label="Post visibility"><SelectValue>{getVisibilityLabel(composer.visibility)}</SelectValue></SelectTrigger>
+          <SelectContent>{(['public', 'followers', 'private'] as Visibility[]).map((value) => <SelectItem key={value} value={value}>{getVisibilityLabel(value)}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <label className="flex min-h-11 items-center gap-3 rounded-lg border border-white/10 px-3"><input checked={composer.hasSpoiler} className="size-5 accent-cyan-300" disabled={composer.submitting} onChange={(event) => composer.setHasSpoiler(event.target.checked)} type="checkbox" /><span>Hide whole Post as spoiler</span></label>

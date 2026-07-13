@@ -1,28 +1,43 @@
-# Anime Detail Controls Design QA
+# Phase 5 Design QA
 
-Result: PASS.
+Final result: blocked
 
-Source: `docs/visual/anime-details/anime-details-controls-desktop-v2.png`.
+## Visual truth
 
-Implementation evidence:
+- Home desktop: `docs/visual/home/home-desktop-feed.png`
+- Home mobile: `docs/visual/home/home-mobile-feed.png`
+- Review Creation: `docs/visual/reviews/review-creation-desktop-frieren.png`, `review-creation-mobile-frieren.png`
+- Review Detail: `docs/visual/reviews/review-detail-desktop-frieren.png`, `review-detail-mobile-frieren.png`
 
-- Desktop public state: `.superpowers/sdd/browser/anime-controls-public-1280-default.png`.
-- Desktop control focus: `.superpowers/sdd/browser/anime-controls-public-1280-crop.png`.
-- Hover captures: `.superpowers/sdd/browser/anime-controls-public-1280-status-hover-final.png`, `.superpowers/sdd/browser/anime-controls-public-1280-score-hover-final.png`, and `.superpowers/sdd/browser/anime-controls-public-1280-favorite-hover-final.png`.
-- Tablet: `.superpowers/sdd/browser/anime-controls-public-768-final.png`; viewport and page width are both 768 px.
-- Mobile: browser geometry at 390 px shows 358 px controls at x=16 with no horizontal overflow. The in-app browser screenshot command timed out at this width.
+## Browser evidence
 
-Comparison:
+- Home: `docs/visual/qa/phase5/home-desktop-1280.png`, `home-tablet-768.png`, `home-mobile-390.png`
+- Anime Reviews: `docs/visual/qa/phase5/anime-reviews-desktop-1280.png`, `anime-reviews-tablet-768.png`
+- Select states: `anime-reviews-desktop-sort-open.png`, `anime-reviews-desktop-sort-hover.png`, `anime-reviews-mobile-sort-open.png`, `anime-reviews-mobile-sort-hover.png`
 
-- Status and Score use the approved label/value hierarchy, state dot or star, and compact chevrons.
-- Favorite and owner-only Rewatch History share the approved dark bordered surface and height.
-- Public visitors receive matching facades and cannot mount private Select, Number Field, queries, or mutations.
-- Hover and focus styles remain dark with cyan border/accent treatment. No native white or browser-blue state appears.
-- Controls stay one row at 1280 and 768 px, then stack at 390 px without overflow.
+Viewports: 1280 x 900, 768 x 1024, 390 x 844. Theme: dark. Browser state: signed out, empty Global feed, no public Reviews.
 
-History:
+## Comparison
 
-- Initial public facades were plain centered links. They were replaced with the approved field-style hierarchy before final QA.
-- Review found explicit zero persistence and range-message defects. Both received regression coverage and fixes before this PASS.
+Full-view Home comparisons used the approved desktop/mobile images and matching browser captures in one comparison input. The visual system matches: dark navy surfaces, cyan state color, coral actions, white hierarchy, image-led anime cards, bordered feed surfaces, and responsive bottom navigation. Exact density cannot be scored because the approved references show a populated signed-in feed while the available browser state is signed out and empty.
 
-Authenticated visual capture was unavailable in the signed-out browser session. Authenticated structure, labels, score behavior, and Rewatch visibility are covered by integration tests and use the same verified control classes.
+Focused Anime Reviews checks cover the rating panel and Base UI sort menu. Default, open, selected, and pointer-hover states remain dark/cyan with no native white or browser-blue surface. The selected label is user-facing (`Newest`, `Highest Rating`, `Lowest Rating`). No horizontal overflow occurred at any viewport.
+
+Fonts and typography, spacing, color tokens, image crops, icons, and app copy are consistent in the comparable public states. Console error/warning audit was empty. Signed-out direct Review create/edit routes redirect to Home after auth resolution. Malformed feed IDs render the explicit not-found state.
+
+## Blocker
+
+Review Creation and Review Detail cannot be browser-rendered against their approved references without a complete authenticated development account and a published Review record. Signed-in Post publishing, upload lifecycle, owner menus, Review draft/publish/edit, private/follower visibility, and pagination-above-page-size also remain browser-blocked by the same missing test state. Their behavior is covered by integration/component tests, but that does not satisfy visual comparison.
+
+## Comparison history
+
+- First pass found no comparable P0/P1/P2 visual mismatch.
+- Pointer-hover inspection exposed raw sort values in the trigger. The trigger now renders user-facing labels, and focused tests plus a browser reload confirmed `Newest`.
+- Remaining blocker is test-state access, not an unresolved visible defect.
+
+## Next validation
+
+- Sign in with a complete development QA account.
+- Create one draft and one published Review with image, video card, list, quote, formatting, and spoiler blocks.
+- Compare Review Creation and Detail at 1280 and 390 against the approved references.
+- Exercise Post upload cleanup, visibility, owner actions, Review pagination, and feed pagination with real records.

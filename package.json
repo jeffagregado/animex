@@ -19,7 +19,6 @@
     "@lexical/list": "^0.47.0",
     "@lexical/react": "^0.47.0",
     "@lexical/rich-text": "^0.47.0",
-    "@lexical/utils": "^0.47.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "latest",
     "@tanstack/react-form": "latest",

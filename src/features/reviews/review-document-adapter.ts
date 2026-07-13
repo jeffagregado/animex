@@ -1,8 +1,6 @@
 import { parseReviewDocument, type ReviewDocumentV1 } from '#/features/social/shared/review-document'
 import { reviewDetailSchema, type ReviewDetail } from '#/features/social/shared/social-contracts'
 
-type SerializedEditorState = ReviewDocumentV1['editorState']
-
 /** Builds canonical empty Lexical state because empty roots cannot be reapplied safely. */
 export const createEmptyReviewDocument = (): ReviewDocumentV1 => parseReviewDocument({
   version: 1,
@@ -49,6 +47,3 @@ export const parseReviewWireDetail = (value: unknown): ReviewDetail => {
   const { bodyJson, ...fields } = value
   return reviewDetailSchema.parse({ ...fields, body: parseReviewBodyJson(bodyJson) })
 }
-
-/** Returns Lexical payload only when a validated document has root content. */
-export const getReviewInitialEditorState = (document: ReviewDocumentV1): SerializedEditorState | null => document.editorState.root.children.length === 0 ? null : document.editorState

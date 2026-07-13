@@ -48,7 +48,7 @@ export function ReviewEditor({ document, onChange, onError, onLimitExceeded }: R
 }
 
 /** Uses callback initialization only for truly empty serialized roots. */
-export const getEditorInitialState = (document: ReviewDocumentV1): InitialEditorStateType => document.editorState.root.children.length > 0
+const getEditorInitialState = (document: ReviewDocumentV1): InitialEditorStateType => document.editorState.root.children.length > 0
   ? JSON.stringify(document.editorState)
   : () => { $getRoot().append($createParagraphNode()) }
 
@@ -86,7 +86,7 @@ export const acceptReviewEditorChange = ({ editor, lastValid, onChange, onError,
 const restoreReviewEditorState = (editor: ReviewEditorChange['editor'], document: ReviewDocumentV1): void => editor.setEditorState(editor.parseEditorState(JSON.stringify(document.editorState)), { tag: 'review-state-revert' })
 
 /** Counts attempted visible content before strict bounds reject it. */
-export const getSerializedVisibleTextLength = (value: unknown): number => {
+const getSerializedVisibleTextLength = (value: unknown): number => {
   if (Array.isArray(value)) return value.reduce((sum, item) => sum + getSerializedVisibleTextLength(item), 0)
   if (typeof value !== 'object' || value === null) return 0
   const node = value as Record<string, unknown>

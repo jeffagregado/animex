@@ -26,8 +26,12 @@ export class SpoilerNode extends ElementNode {
 
   updateDOM(): boolean { return false }
   exportJSON(): SerializedSpoilerNode { return { ...super.exportJSON(), type: 'spoiler', version: 1 } }
+  // Lexical calls these overrides through its node runtime.
+  // fallow-ignore-next-line unused-class-member
   canBeEmpty(): boolean { return false }
+  // fallow-ignore-next-line unused-class-member
   canInsertTextBefore(): boolean { return false }
+  // fallow-ignore-next-line unused-class-member
   canInsertTextAfter(): boolean { return false }
 }
 

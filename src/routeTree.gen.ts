@@ -21,13 +21,18 @@ import { Route as AuthOauthCallbackRouteImport } from './routes/auth/oauth-callb
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as PublicHomeRouteImport } from './routes/_public/home'
 import { Route as PublicDiscoverRouteImport } from './routes/_public/discover'
+import { Route as PublicProtectedRouteRouteImport } from './routes/_public/_protected/route'
 import { Route as ApiProfileStateRouteImport } from './routes/api/profile/state'
 import { Route as ApiProfileCompleteRouteImport } from './routes/api/profile/complete'
 import { Route as ApiProfileCheckUsernameRouteImport } from './routes/api/profile/check-username'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as PublicReviewsReviewIdRouteImport } from './routes/_public/reviews/$reviewId'
+import { Route as PublicFeedFeedCardIdRouteImport } from './routes/_public/feed/$feedCardId'
 import { Route as PublicAnimeAnilistIdRouteRouteImport } from './routes/_public/anime/$anilistId/route'
 import { Route as PublicAnimeAnilistIdIndexRouteImport } from './routes/_public/anime/$anilistId/index'
 import { Route as PublicAnimeAnilistIdSlugRouteRouteImport } from './routes/_public/anime/$anilistId/$slug/route'
+import { Route as PublicProtectedReviewsReviewIdEditRouteImport } from './routes/_public/_protected/reviews/$reviewId/edit'
+import { Route as PublicProtectedAnimeAnilistIdSlugReviewsNewRouteImport } from './routes/_public/_protected/anime/$anilistId/$slug/reviews/new'
 
 const PublicRouteRoute = PublicRouteRouteImport.update({
   id: '/_public',
@@ -88,6 +93,10 @@ const PublicDiscoverRoute = PublicDiscoverRouteImport.update({
   path: '/discover',
   getParentRoute: () => PublicRouteRoute,
 } as any)
+const PublicProtectedRouteRoute = PublicProtectedRouteRouteImport.update({
+  id: '/_protected',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
 const ApiProfileStateRoute = ApiProfileStateRouteImport.update({
   id: '/api/profile/state',
   path: '/api/profile/state',
@@ -108,6 +117,16 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PublicReviewsReviewIdRoute = PublicReviewsReviewIdRouteImport.update({
+  id: '/reviews/$reviewId',
+  path: '/reviews/$reviewId',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicFeedFeedCardIdRoute = PublicFeedFeedCardIdRouteImport.update({
+  id: '/feed/$feedCardId',
+  path: '/feed/$feedCardId',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
 const PublicAnimeAnilistIdRouteRoute =
   PublicAnimeAnilistIdRouteRouteImport.update({
     id: '/anime/$anilistId',
@@ -126,6 +145,18 @@ const PublicAnimeAnilistIdSlugRouteRoute =
     path: '/$slug',
     getParentRoute: () => PublicAnimeAnilistIdRouteRoute,
   } as any)
+const PublicProtectedReviewsReviewIdEditRoute =
+  PublicProtectedReviewsReviewIdEditRouteImport.update({
+    id: '/reviews/$reviewId/edit',
+    path: '/reviews/$reviewId/edit',
+    getParentRoute: () => PublicProtectedRouteRoute,
+  } as any)
+const PublicProtectedAnimeAnilistIdSlugReviewsNewRoute =
+  PublicProtectedAnimeAnilistIdSlugReviewsNewRouteImport.update({
+    id: '/anime/$anilistId/$slug/reviews/new',
+    path: '/anime/$anilistId/$slug/reviews/new',
+    getParentRoute: () => PublicProtectedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -140,12 +171,16 @@ export interface FileRoutesByFullPath {
   '/auth/username': typeof AuthUsernameRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/anime/$anilistId': typeof PublicAnimeAnilistIdRouteRouteWithChildren
+  '/feed/$feedCardId': typeof PublicFeedFeedCardIdRoute
+  '/reviews/$reviewId': typeof PublicReviewsReviewIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
   '/anime/$anilistId/$slug': typeof PublicAnimeAnilistIdSlugRouteRoute
   '/anime/$anilistId/': typeof PublicAnimeAnilistIdIndexRoute
+  '/reviews/$reviewId/edit': typeof PublicProtectedReviewsReviewIdEditRoute
+  '/anime/$anilistId/$slug/reviews/new': typeof PublicProtectedAnimeAnilistIdSlugReviewsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -159,17 +194,22 @@ export interface FileRoutesByTo {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/auth/username': typeof AuthUsernameRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
+  '/feed/$feedCardId': typeof PublicFeedFeedCardIdRoute
+  '/reviews/$reviewId': typeof PublicReviewsReviewIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
   '/anime/$anilistId/$slug': typeof PublicAnimeAnilistIdSlugRouteRoute
   '/anime/$anilistId': typeof PublicAnimeAnilistIdIndexRoute
+  '/reviews/$reviewId/edit': typeof PublicProtectedReviewsReviewIdEditRoute
+  '/anime/$anilistId/$slug/reviews/new': typeof PublicProtectedAnimeAnilistIdSlugReviewsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_public': typeof PublicRouteRouteWithChildren
+  '/_public/_protected': typeof PublicProtectedRouteRouteWithChildren
   '/_public/discover': typeof PublicDiscoverRoute
   '/_public/home': typeof PublicHomeRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
@@ -181,12 +221,16 @@ export interface FileRoutesById {
   '/auth/username': typeof AuthUsernameRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/_public/anime/$anilistId': typeof PublicAnimeAnilistIdRouteRouteWithChildren
+  '/_public/feed/$feedCardId': typeof PublicFeedFeedCardIdRoute
+  '/_public/reviews/$reviewId': typeof PublicReviewsReviewIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
   '/_public/anime/$anilistId/$slug': typeof PublicAnimeAnilistIdSlugRouteRoute
   '/_public/anime/$anilistId/': typeof PublicAnimeAnilistIdIndexRoute
+  '/_public/_protected/reviews/$reviewId/edit': typeof PublicProtectedReviewsReviewIdEditRoute
+  '/_public/_protected/anime/$anilistId/$slug/reviews/new': typeof PublicProtectedAnimeAnilistIdSlugReviewsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -203,12 +247,16 @@ export interface FileRouteTypes {
     | '/auth/username'
     | '/auth/verify-email'
     | '/anime/$anilistId'
+    | '/feed/$feedCardId'
+    | '/reviews/$reviewId'
     | '/api/auth/$'
     | '/api/profile/check-username'
     | '/api/profile/complete'
     | '/api/profile/state'
     | '/anime/$anilistId/$slug'
     | '/anime/$anilistId/'
+    | '/reviews/$reviewId/edit'
+    | '/anime/$anilistId/$slug/reviews/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -222,16 +270,21 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/auth/username'
     | '/auth/verify-email'
+    | '/feed/$feedCardId'
+    | '/reviews/$reviewId'
     | '/api/auth/$'
     | '/api/profile/check-username'
     | '/api/profile/complete'
     | '/api/profile/state'
     | '/anime/$anilistId/$slug'
     | '/anime/$anilistId'
+    | '/reviews/$reviewId/edit'
+    | '/anime/$anilistId/$slug/reviews/new'
   id:
     | '__root__'
     | '/'
     | '/_public'
+    | '/_public/_protected'
     | '/_public/discover'
     | '/_public/home'
     | '/auth/forgot-password'
@@ -243,12 +296,16 @@ export interface FileRouteTypes {
     | '/auth/username'
     | '/auth/verify-email'
     | '/_public/anime/$anilistId'
+    | '/_public/feed/$feedCardId'
+    | '/_public/reviews/$reviewId'
     | '/api/auth/$'
     | '/api/profile/check-username'
     | '/api/profile/complete'
     | '/api/profile/state'
     | '/_public/anime/$anilistId/$slug'
     | '/_public/anime/$anilistId/'
+    | '/_public/_protected/reviews/$reviewId/edit'
+    | '/_public/_protected/anime/$anilistId/$slug/reviews/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -354,6 +411,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicDiscoverRouteImport
       parentRoute: typeof PublicRouteRoute
     }
+    '/_public/_protected': {
+      id: '/_public/_protected'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof PublicProtectedRouteRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
     '/api/profile/state': {
       id: '/api/profile/state'
       path: '/api/profile/state'
@@ -382,6 +446,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_public/reviews/$reviewId': {
+      id: '/_public/reviews/$reviewId'
+      path: '/reviews/$reviewId'
+      fullPath: '/reviews/$reviewId'
+      preLoaderRoute: typeof PublicReviewsReviewIdRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/feed/$feedCardId': {
+      id: '/_public/feed/$feedCardId'
+      path: '/feed/$feedCardId'
+      fullPath: '/feed/$feedCardId'
+      preLoaderRoute: typeof PublicFeedFeedCardIdRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
     '/_public/anime/$anilistId': {
       id: '/_public/anime/$anilistId'
       path: '/anime/$anilistId'
@@ -403,8 +481,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicAnimeAnilistIdSlugRouteRouteImport
       parentRoute: typeof PublicAnimeAnilistIdRouteRoute
     }
+    '/_public/_protected/reviews/$reviewId/edit': {
+      id: '/_public/_protected/reviews/$reviewId/edit'
+      path: '/reviews/$reviewId/edit'
+      fullPath: '/reviews/$reviewId/edit'
+      preLoaderRoute: typeof PublicProtectedReviewsReviewIdEditRouteImport
+      parentRoute: typeof PublicProtectedRouteRoute
+    }
+    '/_public/_protected/anime/$anilistId/$slug/reviews/new': {
+      id: '/_public/_protected/anime/$anilistId/$slug/reviews/new'
+      path: '/anime/$anilistId/$slug/reviews/new'
+      fullPath: '/anime/$anilistId/$slug/reviews/new'
+      preLoaderRoute: typeof PublicProtectedAnimeAnilistIdSlugReviewsNewRouteImport
+      parentRoute: typeof PublicProtectedRouteRoute
+    }
   }
 }
+
+interface PublicProtectedRouteRouteChildren {
+  PublicProtectedReviewsReviewIdEditRoute: typeof PublicProtectedReviewsReviewIdEditRoute
+  PublicProtectedAnimeAnilistIdSlugReviewsNewRoute: typeof PublicProtectedAnimeAnilistIdSlugReviewsNewRoute
+}
+
+const PublicProtectedRouteRouteChildren: PublicProtectedRouteRouteChildren = {
+  PublicProtectedReviewsReviewIdEditRoute:
+    PublicProtectedReviewsReviewIdEditRoute,
+  PublicProtectedAnimeAnilistIdSlugReviewsNewRoute:
+    PublicProtectedAnimeAnilistIdSlugReviewsNewRoute,
+}
+
+const PublicProtectedRouteRouteWithChildren =
+  PublicProtectedRouteRoute._addFileChildren(PublicProtectedRouteRouteChildren)
 
 interface PublicAnimeAnilistIdRouteRouteChildren {
   PublicAnimeAnilistIdSlugRouteRoute: typeof PublicAnimeAnilistIdSlugRouteRoute
@@ -423,15 +530,21 @@ const PublicAnimeAnilistIdRouteRouteWithChildren =
   )
 
 interface PublicRouteRouteChildren {
+  PublicProtectedRouteRoute: typeof PublicProtectedRouteRouteWithChildren
   PublicDiscoverRoute: typeof PublicDiscoverRoute
   PublicHomeRoute: typeof PublicHomeRoute
   PublicAnimeAnilistIdRouteRoute: typeof PublicAnimeAnilistIdRouteRouteWithChildren
+  PublicFeedFeedCardIdRoute: typeof PublicFeedFeedCardIdRoute
+  PublicReviewsReviewIdRoute: typeof PublicReviewsReviewIdRoute
 }
 
 const PublicRouteRouteChildren: PublicRouteRouteChildren = {
+  PublicProtectedRouteRoute: PublicProtectedRouteRouteWithChildren,
   PublicDiscoverRoute: PublicDiscoverRoute,
   PublicHomeRoute: PublicHomeRoute,
   PublicAnimeAnilistIdRouteRoute: PublicAnimeAnilistIdRouteRouteWithChildren,
+  PublicFeedFeedCardIdRoute: PublicFeedFeedCardIdRoute,
+  PublicReviewsReviewIdRoute: PublicReviewsReviewIdRoute,
 }
 
 const PublicRouteRouteWithChildren = PublicRouteRoute._addFileChildren(

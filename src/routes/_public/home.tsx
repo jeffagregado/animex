@@ -12,7 +12,7 @@ export const Route = createFileRoute('/_public/home')({
 })
 
 /** Normalizes stable Home tab/composer URL state. */
-export function normalizeHomeSearch(search: Record<string, unknown>): HomeFeedSearch {
+function normalizeHomeSearch(search: Record<string, unknown>): HomeFeedSearch {
   const feed = search.feed === 'following' || search.feed === 'global' ? search.feed : 'home'
   return { feed, compose: search.compose === true || search.compose === 'true' }
 }

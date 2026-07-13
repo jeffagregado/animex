@@ -1,4 +1,4 @@
-import { $applyNodeReplacement, DecoratorNode, type EditorConfig, type LexicalNode, type NodeKey, type SerializedLexicalNode } from 'lexical'
+import { $applyNodeReplacement, DecoratorNode, type EditorConfig, type NodeKey, type SerializedLexicalNode } from 'lexical'
 import type { JSX } from 'react'
 
 export type SerializedReviewImageNode = SerializedLexicalNode & { alt: string; type: 'review-image'; url: string; version: 1 }
@@ -26,4 +26,3 @@ export class ReviewImageNode extends DecoratorNode<JSX.Element> {
 }
 
 export const $createReviewImageNode = (url: string, alt: string): ReviewImageNode => $applyNodeReplacement(new ReviewImageNode(url, alt))
-export const $isReviewImageNode = (node: LexicalNode | null | undefined): node is ReviewImageNode => node instanceof ReviewImageNode

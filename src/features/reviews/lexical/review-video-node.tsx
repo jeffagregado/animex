@@ -1,4 +1,4 @@
-import { $applyNodeReplacement, DecoratorNode, type EditorConfig, type LexicalNode, type NodeKey, type SerializedLexicalNode } from 'lexical'
+import { $applyNodeReplacement, DecoratorNode, type EditorConfig, type NodeKey, type SerializedLexicalNode } from 'lexical'
 import { ExternalLinkIcon, PlayIcon } from 'lucide-react'
 import type { JSX } from 'react'
 
@@ -31,4 +31,3 @@ export class ReviewVideoNode extends DecoratorNode<JSX.Element> {
 }
 
 export const $createReviewVideoNode = (url: string, provider: VideoProvider, label: string | undefined): ReviewVideoNode => $applyNodeReplacement(new ReviewVideoNode(url, provider, label))
-export const $isReviewVideoNode = (node: LexicalNode | null | undefined): node is ReviewVideoNode => node instanceof ReviewVideoNode

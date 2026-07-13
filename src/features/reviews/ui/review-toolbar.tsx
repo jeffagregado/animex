@@ -21,8 +21,6 @@ import { $createReviewImageNode } from '../lexical/review-image-node'
 import { $createSpoilerNode, $isSpoilerNode } from '../lexical/spoiler-node'
 import { $createReviewVideoNode } from '../lexical/review-video-node'
 
-export const REVIEW_TOOLBAR_ACTIONS = ['H2', 'H3', 'Quote', 'Bulleted list', 'Numbered list', 'Bold', 'Italic', 'Underline', 'Strikethrough', 'Image', 'Video', 'Spoiler', 'Undo', 'Redo'] as const
-
 type MediaDialog = 'image' | 'video' | null
 
 /** Dispatches only approved Review editor commands. */
