@@ -159,9 +159,27 @@ describe('social Convex integration', () => {
     await owner.client.mutation(socialApi.reviews.saveDraft, {
       anilistId: 2, requestId: 'collision', rating: null, summary: '', summaryHasSpoiler: false, bodyJson, visibility: 'private',
     })
+    await expect(owner.client.mutation(socialApi.reviews.saveDraft, {
+      anilistId: 1, requestId: 'collision', rating: null, summary: '', summaryHasSpoiler: false, bodyJson, visibility: 'private',
+    })).rejects.toThrow('collision')
     await expect(owner.client.mutation(socialApi.reviews.publish, {
       anilistId: 1, requestId: 'collision', rating: 90, summary: 'Collision', summaryHasSpoiler: false, bodyJson, visibility: 'public',
     })).rejects.toThrow('collision')
+  }, 20_000)
+
+  test('rejects Post update request collisions across owned Posts', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'post-collision-owner')
+    const firstId = await owner.client.mutation(socialApi.posts.create, {
+      requestId: 'post-request-a', text: 'First', imageIds: [], hasSpoiler: false, visibility: 'public',
+    })
+    const secondId = await owner.client.mutation(socialApi.posts.create, {
+      requestId: 'post-request-b', text: 'Second', imageIds: [], hasSpoiler: false, visibility: 'public',
+    })
+    await expect(owner.client.mutation(socialApi.posts.update, {
+      postId: secondId, requestId: 'post-request-a', text: 'Collision', imageIds: [], hasSpoiler: false, visibility: 'public',
+    })).rejects.toThrow('collision')
+    expect(await t.run(async (ctx) => await ctx.db.get('posts', firstId))).not.toBeNull()
   }, 20_000)
 
   test('requires cached anime for every Review lifecycle mutation', async () => {
@@ -200,8 +218,8 @@ describe('social Convex integration', () => {
     const other = await createOwner(t, 'paged-global')
     const occurredAt = 1_000
     await t.run(async (ctx) => {
-      for (const [profileId, prefix] of [[owner.profileId, 'own'], [other.profileId, 'global']] as const) {
-        for (let index = 1; index <= 25; index += 1) {
+      for (let index = 1; index <= 25; index += 1) {
+        for (const [profileId, prefix] of [[owner.profileId, 'own'], [other.profileId, 'global']] as const) {
           const postId = await ctx.db.insert('posts', {
             userId: profileId, requestId: `${prefix}-${index}`, text: `${prefix}-${index}`, hasSpoiler: false,
             visibility: 'public', imageIds: [], createdAt: occurredAt, updatedAt: occurredAt,
@@ -233,6 +251,50 @@ describe('social Convex integration', () => {
       expect(items[index]?.author.username).toBe(expected)
     }
   }, 30_000)
+
+  test('advances Home through an all-owner raw batch and continues with later Global cards', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'prefix-owner')
+    const other = await createOwner(t, 'prefix-global')
+    await t.run(async (ctx) => {
+      for (let index = 1; index <= 25; index += 1) {
+        const postId = await ctx.db.insert('posts', {
+          userId: owner.profileId, requestId: `prefix-own-${index}`, text: `own-${index}`, hasSpoiler: false,
+          visibility: 'public', imageIds: [], createdAt: index, updatedAt: index,
+        })
+        await ctx.db.insert('feedCards', {
+          sourceKey: `post:${postId}`, kind: 'post', userId: owner.profileId, sourceId: postId,
+          visibility: 'public', active: true, orderKey: String(index).padStart(4, '0'), occurredAt: index, updatedAt: index,
+        })
+      }
+      for (let index = 26; index <= 28; index += 1) {
+        const postId = await ctx.db.insert('posts', {
+          userId: other.profileId, requestId: `prefix-global-${index}`, text: `global-${index}`, hasSpoiler: false,
+          visibility: 'public', imageIds: [], createdAt: index, updatedAt: index,
+        })
+        await ctx.db.insert('feedCards', {
+          sourceKey: `post:${postId}`, kind: 'post', userId: other.profileId, sourceId: postId,
+          visibility: 'public', active: true, orderKey: String(index).padStart(4, '0'), occurredAt: index, updatedAt: index,
+        })
+      }
+    })
+
+    const first = await owner.client.query(socialApi.feed.listHome, { cursor: null })
+    expect(first.items).toHaveLength(20)
+    expect(first.items.every((item: { author: { username: string } }) => item.author.username === 'prefix-owner')).toBe(true)
+    const second = await owner.client.query(socialApi.feed.listHome, { cursor: first.cursor })
+    expect(second.items.some((item: { author: { username: string } }) => item.author.username === 'prefix-global')).toBe(true)
+    expect(new Set([...first.items, ...second.items].map((item: { id: string }) => item.id)).size).toBe(first.items.length + second.items.length)
+  }, 30_000)
+
+  test('rejects malformed stored Review stats before returning them', async () => {
+    const t = createHarness()
+    await insertAnime(t, 1)
+    await t.run(async (ctx) => {
+      await ctx.db.insert('animeReviewStats', { anilistId: 1, count: 1, ratingSum: 90, bands: [1, 0, 0, 0, 0, 0, 0, 0, 0], updatedAt: Date.now() })
+    })
+    await expect(t.query(socialApi.reviews.getStats, { anilistId: 1 })).rejects.toThrow()
+  })
 
   test('paginates 25 public Reviews plus one private owner Review exactly once', async () => {
     const t = createHarness()

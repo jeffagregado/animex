@@ -80,26 +80,21 @@ const readOwn = async (ctx: QueryCtx, userId: Id<'users'>, anchor: string | null
     return anchor === null ? base : base.gt('orderKey', anchor)
   }).take(FEED_PAGE_SIZE + 1)
 
-type HomeGlobalPage = { cards: Doc<'feedCards'>[]; anchors: string[]; scannedAnchor: string | null; terminal: boolean }
+type HomeGlobalPage = { cards: Doc<'feedCards'>[]; resumeAnchors: Array<string | null>; scannedAnchor: string | null; terminal: boolean }
 
 const readHomeGlobal = async (ctx: QueryCtx, viewerId: Id<'users'>, anchor: string | null): Promise<HomeGlobalPage> => {
+  const raw = await readGlobal(ctx, anchor)
   const cards: Doc<'feedCards'>[] = []
-  const anchors: string[] = []
-  let scannedAnchor = anchor
-  let terminal = false
-  while (cards.length < FEED_PAGE_SIZE + 1 && !terminal) {
-    const batch = await readGlobal(ctx, scannedAnchor)
-    for (const card of batch) {
-      scannedAnchor = card.orderKey
-      if (card.userId !== viewerId) {
-        cards.push(card)
-        anchors.push(card.orderKey)
-        if (cards.length === FEED_PAGE_SIZE + 1) break
-      }
+  const resumeAnchors: Array<string | null> = []
+  let previousAnchor = anchor
+  for (const card of raw) {
+    if (card.userId !== viewerId) {
+      cards.push(card)
+      resumeAnchors.push(previousAnchor)
     }
-    terminal = batch.length < FEED_PAGE_SIZE + 1
+    previousAnchor = card.orderKey
   }
-  return { cards, anchors, scannedAnchor, terminal }
+  return { cards, resumeAnchors, scannedAnchor: previousAnchor, terminal: raw.length < FEED_PAGE_SIZE + 1 }
 }
 
 const listGlobalPage = async (ctx: QueryCtx, cursor: string | null, viewerId: Id<'users'> | null, view: FeedView) => {
@@ -114,9 +109,8 @@ const listGlobalPage = async (ctx: QueryCtx, cursor: string | null, viewerId: Id
 }
 
 const getHomeGlobalAnchor = (page: HomeGlobalPage, consumed: number, current: string | null): string | null => {
-  if (consumed === page.cards.length && page.terminal) return page.scannedAnchor
-  if (consumed === 0) return current
-  return page.anchors[consumed - 1] ?? current
+  if (consumed < page.cards.length) return page.resumeAnchors[consumed] ?? current
+  return page.scannedAnchor
 }
 
 const hasHomeItems = (ownCount: number, ownConsumed: number, globalPage: HomeGlobalPage, globalConsumed: number): boolean => {

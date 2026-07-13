@@ -161,6 +161,9 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx)
     const post = await readOwnedPost(ctx, args.postId, profile._id)
+    const requestId = assertRequestId(args.requestId)
+    const requestMatches = await ctx.db.query('posts').withIndex('by_user_request', (q) => q.eq('userId', profile._id).eq('requestId', requestId)).take(2)
+    if (requestMatches.length > 1 || (requestMatches[0] && requestMatches[0]._id !== post._id)) return fail('POST_REQUEST_COLLISION', 'Post request collision with another Post.')
     const normalized = normalizePostContent(args.text, args.imageIds)
     updatePostInputSchema.parse({ ...args, postId: String(args.postId), imageIds: args.imageIds.map(String) })
     const images = await readOwnedImages(ctx, args.imageIds, profile._id, post._id)
@@ -171,7 +174,7 @@ export const update = mutation({
     await Promise.all(removed.map(async (image) => { if (image) await removeImage(ctx, image) }))
     const now = Date.now()
     await Promise.all(images.map((image, order) => ctx.db.patch('postImages', image._id, { state: 'attached', postId: post._id, order, updatedAt: now })))
-    await ctx.db.patch('posts', post._id, { requestId: assertRequestId(args.requestId), text: normalized.text, imageIds: args.imageIds, hasSpoiler: args.hasSpoiler, visibility: args.visibility, updatedAt: now })
+    await ctx.db.patch('posts', post._id, { requestId, text: normalized.text, imageIds: args.imageIds, hasSpoiler: args.hasSpoiler, visibility: args.visibility, updatedAt: now })
     const updated = await ctx.db.get('posts', post._id)
     if (!updated) return fail('POST_WRITE_FAILED', 'Post update failed.')
     await upsertPostCard(ctx, updated, true)

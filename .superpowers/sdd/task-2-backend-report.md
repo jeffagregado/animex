@@ -11,6 +11,7 @@ Status: DONE
 - `convex/feed.ts`: Global/Home/Following reads, source hydration, composite cursors, milestone activity operations/backfill.
 - `convex/socialPolicy.ts`, `convex/feedPolicy.ts`: pure visibility, upload, aggregate, ordering, cursor policy.
 - `convex/userAnime.ts`: atomic Completed/Rewatched feed projection create, bump, rollback, suppression.
+- `src/features/social/shared/feed-ranking.ts`: controller-approved shared-helper lock release for cross-page 2:1 cycle state.
 - Focused sibling tests: policy, Convex social integration, milestone projection integration.
 
 ## RED Evidence
@@ -22,12 +23,13 @@ Status: DONE
 - Request-ID tracer failed with `assertRequestId is not a function` before implementation.
 - Review-fix RED run: 9 failures covering `bodyJson`, projection deletion, cursor state, request collisions, cache enforcement, pending upload cleanup, Home pagination, Review pagination, and public `v.any()`.
 - Pure cursor/storage tests failed before cycle state, bound Review cursors, and authoritative metadata validation existed.
+- Second-review RED run failed on one-batch Home scanning, Draft/Post request collisions, and malformed Review stats.
 
 ## GREEN Evidence
 
 - Focused policy/validator tests: 5 files, 23 tests passed.
-- Focused integration tests: 2 files, 12 tests passed.
-- `pnpm test`: 51 files passed, 2 skipped; 391 tests passed, 3 skipped.
+- Focused social integration tests: 12 tests passed.
+- `pnpm test`: 51 files passed, 2 skipped; 394 tests passed, 3 skipped.
 - `pnpm exec tsc --noEmit`: exit 0.
 - `pnpm exec convex dev --once --typecheck=disable`: functions ready; exit 0.
 - `pnpm exec fallow audit --base HEAD --gate new-only --format json --quiet`: PASS; zero introduced dead code, complexity, or duplication.
@@ -48,5 +50,7 @@ Status: DONE
 ## Concerns
 
 - Generated Convex API files intentionally excluded; controller integration must regenerate once all workers finish.
+- Controller explicitly accepted the shared feed-ranking helper lock release used by the backend cursor fix.
+- Convex 1.41 has no tuple validator; the wire shape remains `number[]`, while every returned stats object is parsed by shared `reviewStatsSchema` for exact ten-band and numeric invariants.
 - `convex-test` lacks `storageGetMetadata`; upload metadata policy is pure-tested and live bundle/push passed, but real registration syscall was not invoked by integration test.
 - Controller-owned one-line shared validator compatibility fix was required for Convex typecheck and is excluded from this commit.

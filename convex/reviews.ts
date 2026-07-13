@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
-import { ANIME_REVIEWS_PAGE_SIZE, reviewDraftInputSchema, reviewPublishInputSchema, type ReviewSort } from '../src/features/social/shared/social-contracts'
+import { ANIME_REVIEWS_PAGE_SIZE, reviewDraftInputSchema, reviewPublishInputSchema, reviewStatsSchema, type ReviewSort } from '../src/features/social/shared/social-contracts'
 import { createReviewStats, parseReviewDocument, validateDraftReview, validatePublishedReview } from '../src/features/social/shared/review-document'
 import type { Doc, Id } from './_generated/dataModel'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
@@ -25,7 +25,10 @@ const reviewListFields = {
 const reviewListValidator = v.object(reviewListFields)
 const reviewDetailValidator = v.object({ ...reviewListFields, bodyJson: v.string() })
 const reviewPageValidator = v.object({ items: v.array(reviewListValidator), cursor: v.union(v.string(), v.null()), hasMore: v.boolean() })
-const statsValidator = v.object({ count: v.number(), average: v.union(v.number(), v.null()), bands: v.array(v.number()) })
+const statsValidator = v.object({
+  count: v.number(), average: v.union(v.number(), v.null()),
+  bands: v.array(v.number()),
+})
 
 const fail = (code: string, message: string): never => { throw new ConvexError({ code, message }) }
 
@@ -159,6 +162,8 @@ export const saveDraft = mutation({
     const parsed = validateDraftReview(body.body, args.rating, args.summary)
     const requestId = assertRequestId(args.requestId)
     const existing = await readMine(ctx, profile._id, args.anilistId)
+    const requestMatches = await ctx.db.query('reviews').withIndex('by_user_request', (q) => q.eq('userId', profile._id).eq('requestId', requestId)).take(2)
+    if (requestMatches.length > 1 || (requestMatches[0] && requestMatches[0]._id !== existing?._id)) return fail('REVIEW_REQUEST_COLLISION', 'Review request collision with another Anime or Review.')
     if (existing?.state === 'published') return fail('REVIEW_ALREADY_PUBLISHED', 'Published Review must be edited, not saved as Draft.')
     const now = Date.now()
     if (existing) {
@@ -255,6 +260,12 @@ const getPersonalReviewStats = (own: Doc<'reviews'> | null) => {
   return { rating: own.rating, bands: createReviewStats([own.rating]).bands }
 }
 
+const parseBuiltReviewStats = (value: unknown) => {
+  const parsed = reviewStatsSchema.safeParse(value)
+  if (!parsed.success) return fail('REVIEW_STATS_CORRUPT', `Review stats are invalid: ${parsed.error.message}`)
+  return parsed.data
+}
+
 const buildReviewStats = (aggregate: Doc<'animeReviewStats'> | null, own: Doc<'reviews'> | null) => {
   const bands = [...(aggregate?.bands ?? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])]
   let count = aggregate?.count ?? 0
@@ -265,7 +276,7 @@ const buildReviewStats = (aggregate: Doc<'animeReviewStats'> | null, own: Doc<'r
     sum += personal.rating
     personal.bands.forEach((value, index) => { bands[index] += value })
   }
-  return { count, average: count === 0 ? null : Math.round((sum / count) * 10) / 10, bands }
+  return parseBuiltReviewStats({ count, average: count === 0 ? null : Math.round((sum / count) * 10) / 10, bands })
 }
 
 const getOwnReviewPageItem = (own: Doc<'reviews'> | null, key: ReviewOrderKey) => own?.state === 'published' && own.visibility !== 'public'
