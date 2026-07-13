@@ -22,6 +22,14 @@ const deps = (bodies: unknown[]): AniListDependencies => ({
   fetch: async () => new Response(JSON.stringify(bodies.shift()), { status: 200 }),
   delay: async () => {}, warn: () => {}, now: () => 0,
 })
+const responseDeps = (responses: Response[]): AniListDependencies => ({
+  fetch: async () => {
+    const response = responses.shift()
+    if (!response) throw new Error('Unexpected request.')
+    return response
+  },
+  delay: async () => {}, warn: () => {}, now: () => 0,
+})
 const emptyPeople = (kind: 'characters' | 'staff') => ({ data: { Media: { [kind]: { pageInfo: { currentPage: 1, hasNextPage: false }, edges: [] } } } })
 
 describe('anime detail AniList normalization', () => {
@@ -39,6 +47,13 @@ describe('anime detail AniList normalization', () => {
   test('distinguishes a missing anime and rejects malformed provider data', async () => {
     await expect(fetchAnimeDetailFromAniList(52991, deps([{ data: { Media: null } }]))).resolves.toBeNull()
     await expect(fetchAnimeDetailFromAniList(52991, deps([{ data: { Media: { id: 'bad' } } }]))).rejects.toMatchObject({ code: 'UPSTREAM' })
+  })
+
+  test('treats valid AniList 404 detail and people payloads as not found', async () => {
+    const notFound = () => new Response(JSON.stringify({ data: { Media: null } }), { status: 404 })
+
+    await expect(fetchAnimeDetailFromAniList(999_999, responseDeps([notFound()]))).resolves.toBeNull()
+    await expect(fetchAnimePeoplePageFromAniList(999_999, 'characters', 1, responseDeps([notFound()]))).resolves.toBeNull()
   })
 
   test('normalizes exactly 24 characters and selects Japanese voice actors', async () => {

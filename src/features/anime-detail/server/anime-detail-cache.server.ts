@@ -35,6 +35,7 @@ export interface AnimeDetailCacheDependencies {
   writeToken: string
   createLeaseId: () => string
   delay: (milliseconds: number) => Promise<void>
+  warn: (message: string) => void
   fetchDetail: (anilistId: number) => Promise<{ detail: AnimeDetail; summary: AnimeSummary } | null>
   fetchPeople: (anilistId: number, kind: AnimePeopleKind, page: number) => Promise<PeoplePage | null>
 }
@@ -47,8 +48,17 @@ const ready = (read: CacheRead<AnimeDetail>): PublicAnimeDetailState | null => r
   ? { status: 'ready', entry: { detail: read.entry.payload, refreshedAt: read.entry.refreshedAt, expiresAt: read.entry.expiresAt } }
   : null
 
-const release = async (dependencies: AnimeDetailCacheDependencies, key: string, leaseId: string): Promise<void> => {
-  try { await dependencies.client.releaseLease(key, leaseId, dependencies.writeToken) } catch { /* Preserve primary failure. */ }
+const releaseLease = async (dependencies: AnimeDetailCacheDependencies, key: string, leaseId: string): Promise<void> => {
+  const released = await dependencies.client.releaseLease(key, leaseId, dependencies.writeToken)
+  if (!released) throw new TypeError('Anime detail cache lease was not released.')
+}
+
+const releasePreservingError = async (dependencies: AnimeDetailCacheDependencies, key: string, leaseId: string): Promise<void> => {
+  try {
+    await releaseLease(dependencies, key, leaseId)
+  } catch {
+    dependencies.warn('Anime detail cache lease release failed while preserving the primary error.')
+  }
 }
 
 /** Reads or refreshes one public detail without serving expired data. */
@@ -73,14 +83,18 @@ export const getAnimeDetailServer = async (anilistId: number, dependencies: Anim
   try {
     const fetched = await dependencies.fetchDetail(id)
     if (fetched === null) {
-      await release(dependencies, key, leaseId)
+      try {
+        await releaseLease(dependencies, key, leaseId)
+      } catch (error) {
+        return errorState(error)
+      }
       return { status: 'not-found', code: 'NOT_FOUND', message: 'Anime was not found.' }
     }
     await dependencies.client.commitDetail(leaseId, fetched.summary, fetched.detail, dependencies.writeToken)
     const reread = ready(await dependencies.client.readDetail(id))
     return reread ?? errorState(new Error('Committed detail was unavailable.'))
   } catch (error) {
-    await release(dependencies, key, leaseId)
+    await releasePreservingError(dependencies, key, leaseId)
     return errorState(error)
   }
 }
@@ -118,13 +132,21 @@ export const getAnimePeoplePageServer = async (anilistId: number, kind: AnimePeo
   }
   try {
     const fetched = await dependencies.fetchPeople(id, kind, validPage)
-    if (fetched === null) { await release(dependencies, key, leaseId); return { status: 'not-found' } }
+    if (fetched === null) {
+      try {
+        await releaseLease(dependencies, key, leaseId)
+      } catch (error) {
+        const state = errorState(error)
+        return state.status === 'error' ? state : { status: 'error', code: 'UPSTREAM', message: 'Anime people page is temporarily unavailable.', retryAfterSeconds: null }
+      }
+      return { status: 'not-found' }
+    }
     await dependencies.client.commitPeoplePage(id, kind, validPage, fetched, leaseId, dependencies.writeToken)
     const reread = await dependencies.client.readPeoplePage(id, kind, validPage)
     if (reread.status !== 'fresh') throw new TypeError('Committed anime people page was unavailable.')
     return { status: 'ready', page: reread.entry.payload }
   } catch (error) {
-    await release(dependencies, key, leaseId)
+    await releasePreservingError(dependencies, key, leaseId)
     const state = errorState(error)
     return state.status === 'error' ? state : { status: 'error', code: 'UPSTREAM', message: 'Anime people page is temporarily unavailable.', retryAfterSeconds: null }
   }
@@ -150,6 +172,7 @@ export const createAnimeDetailCacheDependencies = (): AnimeDetailCacheDependenci
   return {
     client, writeToken: requireEnv('DISCOVER_CACHE_WRITE_TOKEN'), createLeaseId: () => crypto.randomUUID(),
     delay: async (milliseconds) => await new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds)),
+    warn: (message) => console.warn(message),
     fetchDetail: async (anilistId) => await fetchAnimeDetailCachePayload(anilistId, createAniListDependencies()),
     fetchPeople: async (anilistId, kind, page) => await fetchAnimePeoplePageFromAniList(anilistId, kind, page, createAniListDependencies()),
   }

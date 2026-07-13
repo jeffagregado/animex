@@ -59,8 +59,12 @@ const fetchResponse = async (document: string, variables: Record<string, unknown
   }
 }
 
-/** Sends one sanitized, bounded-retry AniList GraphQL POST request. */
-export const requestAniList = async (document: string, variables: Record<string, unknown>, dependencies: AniListDependencies): Promise<unknown> => {
+const requestAniListWithNotFoundPolicy = async (
+  document: string,
+  variables: Record<string, unknown>,
+  dependencies: AniListDependencies,
+  allowNotFoundBody: boolean,
+): Promise<unknown> => {
   for (let attempt = 1; attempt <= ANILIST_MAX_ATTEMPTS; attempt += 1) {
     const response = await fetchResponse(document, variables, dependencies)
     if (response === null || response.status >= 500) {
@@ -78,7 +82,7 @@ export const requestAniList = async (document: string, variables: Record<string,
       warnRetry(attempt, dependencies)
       continue
     }
-    if (!response.ok) throw upstreamError()
+    if (!response.ok && !(allowNotFoundBody && response.status === 404)) throw upstreamError()
     let body: unknown
     try {
       body = await response.json()
@@ -89,4 +93,14 @@ export const requestAniList = async (document: string, variables: Record<string,
     return body
   }
   throw upstreamError()
+}
+
+/** Sends one sanitized, bounded-retry AniList GraphQL POST request. */
+export const requestAniList = async (document: string, variables: Record<string, unknown>, dependencies: AniListDependencies): Promise<unknown> => {
+  return await requestAniListWithNotFoundPolicy(document, variables, dependencies, false)
+}
+
+/** Allows a valid 404 body so detail normalizers can own not-found semantics. */
+export const requestAniListAllowingNotFound = async (document: string, variables: Record<string, unknown>, dependencies: AniListDependencies): Promise<unknown> => {
+  return await requestAniListWithNotFoundPolicy(document, variables, dependencies, true)
 }

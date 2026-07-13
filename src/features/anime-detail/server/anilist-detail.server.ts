@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { AniListRequestError, requestAniList, type AniListDependencies } from '../../../lib/anilist-client.server'
+import { AniListRequestError, requestAniListAllowingNotFound, type AniListDependencies } from '../../../lib/anilist-client.server'
 import { animeFormatSchema, slugifyAnimeTitle } from '../../discover/shared/discover-contracts'
 import { type AnimeSummary } from '../../discover/shared/discover-contracts'
 import {
@@ -56,7 +56,7 @@ const listItem = (media: z.infer<typeof listMediaSchema>): AnimeDetailListItem =
 
 /** Fetches and strictly normalizes public anime metadata. */
 export const fetchAnimeDetailCachePayload = async (anilistId: number, dependencies: AniListDependencies): Promise<{ detail: AnimeDetail; summary: AnimeSummary } | null> => {
-  const body = await requestAniList(detailDocument, { id: parseAnilistId(anilistId) }, dependencies)
+  const body = await requestAniListAllowingNotFound(detailDocument, { id: parseAnilistId(anilistId) }, dependencies)
   const parsed = detailResponseSchema.safeParse(body)
   if (!parsed.success) throw new AniListRequestError('UPSTREAM', 'AniList is temporarily unavailable.', null)
   const media = parsed.data.data.Media
@@ -107,7 +107,7 @@ const pageSchema = z.object({ pageInfo: z.object({ currentPage: z.number().int()
 export const fetchAnimePeoplePageFromAniList = async (anilistId: number, kind: AnimePeopleKind, page: number, dependencies: AniListDependencies): Promise<AnimePeoplePage<AnimeCharacter> | AnimePeoplePage<AnimeStaff> | null> => {
   const validId = parseAnilistId(anilistId)
   const validPage = parseAnimePage(page)
-  const body = await requestAniList(kind === 'characters' ? characterDocument : staffDocument, { id: validId, page: validPage, perPage: ANIME_PEOPLE_PER_PAGE }, dependencies)
+  const body = await requestAniListAllowingNotFound(kind === 'characters' ? characterDocument : staffDocument, { id: validId, page: validPage, perPage: ANIME_PEOPLE_PER_PAGE }, dependencies)
   const response = peopleResponseSchema.safeParse(body)
   if (!response.success) throw new AniListRequestError('UPSTREAM', 'AniList is temporarily unavailable.', null)
   if (response.data.data.Media === null) return null

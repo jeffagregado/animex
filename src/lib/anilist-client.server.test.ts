@@ -38,4 +38,10 @@ describe('AniList client', () => {
       retryAfterSeconds: null,
     })
   })
+
+  test('keeps generic Discover requests strict on HTTP 404', async () => {
+    await expect(requestAniList('query Test { Media { id } }', {}, dependencies([
+      new Response(JSON.stringify({ data: { Media: null } }), { status: 404 }),
+    ]))).rejects.toMatchObject({ code: 'UPSTREAM' })
+  })
 })
