@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AnimeSummary } from '../shared/discover-contracts'
 import { DiscoverWeeklyList } from './discover-weekly-list'
+
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, params }: { children: React.ReactNode; params: { anilistId: string; slug: string } }) => <a href={`/anime/${params.anilistId}/${params.slug}`}>{children}</a>,
+}))
 
 const anime: AnimeSummary = {
   anilistId: 1,
@@ -27,6 +31,11 @@ const anime: AnimeSummary = {
 afterEach(cleanup)
 
 describe('DiscoverWeeklyList', () => {
+  it.each(['desktop', 'mobile'] as const)('links the %s row to its canonical anime route', (variant) => {
+    render(<DiscoverWeeklyList items={[anime]} variant={variant} />)
+
+    expect(screen.getByRole('link', { name: /Frieren/ }).getAttribute('href')).toBe('/anime/1/frieren')
+  })
   it('matches the desktop weekly row content and metric hierarchy', () => {
     render(<DiscoverWeeklyList items={[anime]} variant="desktop" />)
 

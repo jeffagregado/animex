@@ -29,6 +29,10 @@ vi.mock('../server/discover.functions', () => ({
   searchAnime: serverMocks.searchAnime,
 }))
 
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, params }: { children: React.ReactNode; params: { anilistId: string; slug: string } }) => <a href={`/anime/${params.anilistId}/${params.slug}`}>{children}</a>,
+}))
+
 const searchState: DiscoverUrlSearchState = { query: 'frieren', genre: null, format: null, season: null, year: null, sort: 'relevance' }
 const anime: AnimeSummary = {
   anilistId: 1, slug: 'frieren', titles: { display: 'Frieren', english: 'Frieren', romaji: 'Sousou no Frieren', native: null }, coverImageUrl: 'https://example.test/frieren.jpg', bannerImageUrl: null, format: 'TV', season: 'FALL', seasonYear: 2023, episodes: 28, genres: ['Adventure'], popularity: 1, averageScore: 90, trending: 2, startDate: null, nextAiringAt: null,
@@ -49,6 +53,13 @@ afterEach(() => {
 })
 
 describe('DiscoverSearchResults', () => {
+  it('links a search result to its canonical anime route', async () => {
+    serverMocks.searchAnime.mockResolvedValueOnce(page([anime], 1, false))
+
+    renderResults()
+
+    expect((await screen.findByRole('link', { name: /Frieren/ })).getAttribute('href')).toBe('/anime/1/frieren')
+  })
   it('renders an average score badge', async () => {
     serverMocks.searchAnime.mockResolvedValueOnce(page([anime], 1, false))
 

@@ -6,6 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AnimeSummary } from '../shared/discover-contracts'
 import { DiscoverSectionRail } from './discover-section'
 
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, params }: { children: React.ReactNode; params: { anilistId: string; slug: string } }) => <a href={`/anime/${params.anilistId}/${params.slug}`}>{children}</a>,
+}))
+
 const anime: AnimeSummary = {
   anilistId: 1, slug: 'frieren', titles: { display: 'Frieren', english: 'Frieren', romaji: 'Sousou no Frieren', native: null }, coverImageUrl: 'https://example.test/first.jpg', bannerImageUrl: null, format: 'TV', season: 'FALL', seasonYear: 2023, episodes: 28, genres: ['Adventure'], popularity: 1, averageScore: 90, trending: 2, startDate: null, nextAiringAt: null,
 }
@@ -15,6 +19,11 @@ afterEach(() => {
 })
 
 describe('DiscoverSectionRail', () => {
+  it('links a rail card to its canonical anime route', () => {
+    render(<DiscoverSectionRail title="Trending Anime" state={{ status: 'ready', section: { key: 'trending', items: [anime], refreshedAt: 1, expiresAt: 2 } }} onRetry={vi.fn()} isRetrying={false} retryError={null} />)
+
+    expect(screen.getByRole('link', { name: /Frieren/ }).getAttribute('href')).toBe('/anime/1/frieren')
+  })
   it('shows a clear section error and retries only that section', () => {
     const onRetry = vi.fn()
 

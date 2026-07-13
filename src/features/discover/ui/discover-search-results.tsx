@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { ImageOff, LoaderCircle } from 'lucide-react'
 
 import { searchAnime } from '../server/discover.functions'
@@ -61,7 +62,7 @@ function SearchResultCard({ anime }: SearchResultCardProps) {
     setHasImageError(false)
   }, [imageUrl])
 
-  return <article className="relative flex min-w-0 gap-3 rounded-lg border border-border bg-card p-3"><div className="h-20 w-14 shrink-0 overflow-hidden rounded bg-muted">{imageUrl !== null && !hasImageError ? <img className="size-full object-cover" src={imageUrl} alt={`${anime.titles.display} cover`} onError={() => setHasImageError(true)} /> : <span className="flex size-full flex-col items-center justify-center gap-1 text-center text-[10px] text-muted-foreground"><ImageOff aria-hidden="true" className="size-4" />Image unavailable</span>}</div><div className="min-w-0 flex-1 pr-12"><h3 className="truncate font-bold">{anime.titles.display}</h3><p className="mt-1 text-sm text-muted-foreground">{anime.format?.replaceAll('_', ' ') ?? 'Anime'} · {anime.seasonYear ?? 'TBA'}</p><p className="mt-1 truncate text-xs text-muted-foreground">{anime.genres.join(' · ')}</p></div><span aria-label={scoreLabel} className="absolute right-3 top-3 rounded bg-muted px-1.5 py-0.5 text-xs font-bold tabular-nums">{score}</span></article>
+  return <Link to="/anime/$anilistId/$slug" params={{ anilistId: String(anime.anilistId), slug: anime.slug }} className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"><article className="relative flex min-w-0 gap-3 rounded-lg border border-border bg-card p-3"><div className="h-20 w-14 shrink-0 overflow-hidden rounded bg-muted">{imageUrl !== null && !hasImageError ? <img className="size-full object-cover" src={imageUrl} alt={`${anime.titles.display} cover`} onError={() => setHasImageError(true)} /> : <span className="flex size-full flex-col items-center justify-center gap-1 text-center text-[10px] text-muted-foreground"><ImageOff aria-hidden="true" className="size-4" />Image unavailable</span>}</div><div className="min-w-0 flex-1 pr-12"><h3 className="truncate font-bold">{anime.titles.display}</h3><p className="mt-1 text-sm text-muted-foreground">{anime.format?.replaceAll('_', ' ') ?? 'Anime'} · {anime.seasonYear ?? 'TBA'}</p><p className="mt-1 truncate text-xs text-muted-foreground">{anime.genres.join(' · ')}</p></div><span aria-label={scoreLabel} className="absolute right-3 top-3 rounded bg-muted px-1.5 py-0.5 text-xs font-bold tabular-nums">{score}</span></article></Link>
 }
 
 /** Uses guarded infinite pagination for a valid URL search/filter state. */

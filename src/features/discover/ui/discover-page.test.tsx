@@ -15,6 +15,10 @@ vi.mock('../server/discover.functions', () => ({
   searchAnime: serverMocks.searchAnime,
 }))
 
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, params }: { children: React.ReactNode; params: { anilistId: string; slug: string } }) => <a href={`/anime/${params.anilistId}/${params.slug}`}>{children}</a>,
+}))
+
 const searchState: DiscoverUrlSearchState = { query: null, genre: null, format: null, season: null, year: null, sort: 'relevance' }
 const anime: AnimeSummary = {
   anilistId: 1, slug: 'frieren', titles: { display: 'Frieren', english: 'Frieren', romaji: 'Sousou no Frieren', native: null }, coverImageUrl: 'https://example.test/frieren.jpg', bannerImageUrl: null, format: 'TV', season: 'FALL', seasonYear: 2023, episodes: 28, genres: ['Adventure'], popularity: 1, averageScore: 90, trending: 2, startDate: null, nextAiringAt: null,
@@ -43,7 +47,7 @@ describe('DiscoverPage', () => {
     expect(screen.getAllByText('Manga lists later')).toHaveLength(2)
   })
 
-  it('keeps poster cards display-only and shows an explicit image failure state', () => {
+  it('links poster cards and shows an explicit image failure state', () => {
     renderPage(data, false)
 
     const image = screen.getAllByAltText('Frieren cover')[0]
@@ -51,7 +55,7 @@ describe('DiscoverPage', () => {
     fireEvent.error(image)
     expect(screen.getAllByText('Image unavailable').length).toBeGreaterThan(0)
     expect(card).toBeTruthy()
-    expect(card?.querySelector('a,button') ?? null).toBeNull()
+    expect(card?.closest('a')?.getAttribute('href')).toBe('/anime/1/frieren')
   })
 
   it('renders rail skeletons while page data is loading', () => {
