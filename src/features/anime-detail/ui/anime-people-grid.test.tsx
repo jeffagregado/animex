@@ -21,12 +21,16 @@ describe('AnimePeopleGrid', () => {
     expect(screen.getByText('End of characters.')).toBeTruthy()
   })
 
-  it('deduplicates appended pages and removes Load more at terminal page', async () => {
-    server.getAnimePeoplePage.mockResolvedValueOnce({ status: 'ready', page: { items: [character(1, 'Frieren'), character(2, 'Fern')], currentPage: 2, hasNextPage: false, perPage: 24 } })
-    render(<AnimePeopleGrid anilistId={1} initialPage={{ items: [character(1, 'Frieren')], currentPage: 1, hasNextPage: true, perPage: 24 }} kind="characters" />)
+  it('renders duplicate people IDs once across initial and appended pages', async () => {
+    server.getAnimePeoplePage.mockResolvedValueOnce({ status: 'ready', page: { items: [character(1, 'Frieren'), character(2, 'Fern'), character(2, 'Fern duplicate')], currentPage: 2, hasNextPage: false, perPage: 24 } })
+    render(<AnimePeopleGrid anilistId={1} initialPage={{ items: [character(1, 'Frieren'), character(1, 'Frieren duplicate')], currentPage: 1, hasNextPage: true, perPage: 24 }} kind="characters" />)
+    expect(screen.getAllByRole('article')).toHaveLength(1)
+    expect(screen.getByText('Frieren')).toBeTruthy()
+    expect(screen.queryByText('Frieren duplicate')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
     await screen.findByText('Fern')
-    expect(screen.getAllByText('Frieren')).toHaveLength(1)
+    expect(screen.getAllByRole('article')).toHaveLength(2)
+    expect(screen.queryByText('Fern duplicate')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull()
   })
 

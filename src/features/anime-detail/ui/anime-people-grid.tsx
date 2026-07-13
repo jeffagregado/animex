@@ -9,7 +9,7 @@ type AnimePeopleGridProps = { anilistId: number; initialPage: AnimePeoplePage<Pe
 
 /** Appends deduplicated people pages while keeping successful cards on failure. */
 export function AnimePeopleGrid({ anilistId, initialPage, kind }: AnimePeopleGridProps) {
-  const [items, setItems] = useState<Person[]>(initialPage.items)
+  const [items, setItems] = useState<Person[]>(() => uniquePeople(initialPage.items))
   const [page, setPage] = useState(initialPage.currentPage)
   const [hasNextPage, setHasNextPage] = useState(initialPage.hasNextPage)
   const [pending, setPending] = useState(false)
@@ -21,7 +21,7 @@ export function AnimePeopleGrid({ anilistId, initialPage, kind }: AnimePeopleGri
       const state = await getAnimePeoplePage({ data: { anilistId, kind, page: page + 1 } })
       if (state.status !== 'ready') throw new Error(state.status === 'error' ? state.message : 'People page unavailable.')
       const next = state.page
-      setItems((current) => [...current, ...next.items.filter((item) => !current.some((existing) => existing.anilistId === item.anilistId))])
+      setItems((current) => uniquePeople([...current, ...next.items]))
       setPage(next.currentPage); setHasNextPage(next.hasNextPage)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'People page request failed.')
@@ -29,6 +29,16 @@ export function AnimePeopleGrid({ anilistId, initialPage, kind }: AnimePeopleGri
   }
 
   return <div>{kind === 'staff' ? <h2 className="mb-4 text-sm font-black uppercase tracking-wide text-cyan-300">Primary Production</h2> : null}{items.length === 0 ? <p className="rounded-xl border border-border bg-card/60 p-8 text-center text-muted-foreground">No {kind} available.</p> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{items.map((item) => <PersonCard item={item} kind={kind} key={item.anilistId} />)}</div>}{error ? <div className="mt-5 rounded-lg border border-red-400/40 bg-red-400/10 p-4" role="alert"><p>{error}</p><button className="mt-3 min-h-11 rounded-lg border border-border px-4 font-bold" disabled={pending} onClick={() => void loadMore()} type="button">Retry</button></div> : null}{hasNextPage && error === null ? <button className="mx-auto mt-6 block min-h-11 rounded-lg border border-cyan-300 px-6 font-black text-cyan-300 disabled:opacity-50" disabled={pending} onClick={() => void loadMore()} type="button">{pending ? 'Loading…' : 'Load more'}</button> : null}{!hasNextPage && items.length > 0 ? <p className="mt-5 text-center text-sm text-muted-foreground">End of {kind}.</p> : null}</div>
+}
+
+/** Keeps first provider occurrence for each AniList person ID. */
+function uniquePeople(items: Person[]): Person[] {
+  const ids = new Set<number>()
+  return items.filter((item) => {
+    if (ids.has(item.anilistId)) return false
+    ids.add(item.anilistId)
+    return true
+  })
 }
 
 function PersonCard({ item, kind }: { item: Person; kind: AnimePeopleKind }) {
