@@ -7,15 +7,24 @@ import {
   ANIME_RELATED_LIMIT,
   ANIME_REWATCHES_PER_PAGE,
   animeDetailSchema,
-  animePeoplePageSchema,
+  animeCharacterPageSchema,
+  animeMilestoneSchema,
+  animeRewatchPageSchema,
   animeScoreSchema,
+  animeStaffPageSchema,
   animeStatusSchema,
+  recordAnimeRewatchInputSchema,
+  removeLatestAnimeRewatchInputSchema,
+  setAnimeFavoriteInputSchema,
+  setAnimeScoreInputSchema,
+  setAnimeStatusInputSchema,
   createCanonicalAnimePath,
   normalizeAnimeDetailTab,
   parseAnilistId,
   parseAnimePage,
   publicAnimeDetailStateSchema,
-  userAnimeMutationInputSchema,
+  userAnimeEntrySchema,
+  userAnimeMutationResultSchema,
   type AnimeCharacter,
   type AnimePeoplePage,
 } from './anime-detail-contracts'
@@ -89,8 +98,11 @@ describe('anime detail contracts', () => {
     const character: AnimeCharacter = { anilistId: 1, name: 'Frieren', role: 'MAIN', imageUrl: null, japaneseVoiceActor: null }
     const page: AnimePeoplePage<AnimeCharacter> = { items: [character], currentPage: 1, hasNextPage: false, perPage: 24 }
 
-    expect(animePeoplePageSchema.parse(page)).toEqual(page)
-    expect(() => animePeoplePageSchema.parse({ ...page, perPage: 25 })).toThrow()
+    expect(animeCharacterPageSchema.parse(page)).toEqual(page)
+    expect(() => animeCharacterPageSchema.parse({ ...page, perPage: 25 })).toThrow()
+    expect(() => animeCharacterPageSchema.parse({ ...page, items: [{ ...character, japaneseVoiceActor: { anilistId: 2, name: 'Atsumi Tanezaki', imageUrl: null, language: 'English' } }] })).toThrow()
+    expect(() => animeCharacterPageSchema.parse({ ...page, items: Array.from({ length: 25 }, () => character) })).toThrow()
+    expect(() => animeStaffPageSchema.parse({ ...page, items: [{ anilistId: 2, name: 'Keiichirou Saitou', role: 42, imageUrl: null }] })).toThrow()
     expectTypeOf(page.items).toEqualTypeOf<AnimeCharacter[]>()
   })
 
@@ -104,9 +116,29 @@ describe('anime detail contracts', () => {
     expect(() => animeScoreSchema.parse(8.25)).toThrow()
   })
 
-  test('rejects auth identity and unknown fields in client mutation inputs', () => {
-    expect(userAnimeMutationInputSchema.parse({ anilistId: 52991, status: 'watching', score: 9.5 })).toEqual({ anilistId: 52991, status: 'watching', score: 9.5 })
-    expect(() => userAnimeMutationInputSchema.parse({ anilistId: 52991, status: 'watching', score: null, userId: 'leak' })).toThrow()
+  test('validates exact identity-free mutation inputs', () => {
+    expect(setAnimeStatusInputSchema.parse({ anilistId: 52991, status: 'watching' })).toEqual({ anilistId: 52991, status: 'watching' })
+    expect(setAnimeScoreInputSchema.parse({ anilistId: 52991, score: null })).toEqual({ anilistId: 52991, score: null })
+    expect(setAnimeFavoriteInputSchema.parse({ anilistId: 52991, isFavorite: false })).toEqual({ anilistId: 52991, isFavorite: false })
+    expect(recordAnimeRewatchInputSchema.parse({ anilistId: 52991 })).toEqual({ anilistId: 52991 })
+    expect(removeLatestAnimeRewatchInputSchema.parse({ anilistId: 52991 })).toEqual({ anilistId: 52991 })
+    expect(() => setAnimeStatusInputSchema.parse({ anilistId: 52991, status: 'watching', userId: 'leak' })).toThrow()
+    expect(() => setAnimeFavoriteInputSchema.parse({ anilistId: 52991 })).toThrow()
+    expect(() => recordAnimeRewatchInputSchema.parse({ anilistId: 52991, completedAt: 1 })).toThrow()
+  })
+
+  test('validates user entry, milestone, rewatch page, and mutation result semantics', () => {
+    const entry = { anilistId: 52991, status: 'completed', score: 9.5, isFavorite: true, favoriteChangedAt: 10, rewatchCount: 1, createdAt: 1, updatedAt: 10 }
+    const milestone = { anilistId: 52991, kind: 'completed', settledAt: 10 }
+    const rewatch = { id: 'rewatch-1', anilistId: 52991, completedAt: 10 }
+
+    expect(userAnimeEntrySchema.parse(entry)).toEqual(entry)
+    expect(animeMilestoneSchema.parse(milestone)).toEqual(milestone)
+    expect(animeRewatchPageSchema.parse({ items: [rewatch], currentPage: 1, hasNextPage: false, perPage: 20 }).items).toEqual([rewatch])
+    expect(userAnimeMutationResultSchema.parse({ status: 'saved', entry })).toEqual({ status: 'saved', entry })
+    expect(() => animeMilestoneSchema.parse({ ...milestone, kind: 'started' })).toThrow()
+    expect(() => animeRewatchPageSchema.parse({ items: Array.from({ length: 21 }, () => rewatch), currentPage: 1, hasNextPage: false, perPage: 20 })).toThrow()
+    expect(() => userAnimeEntrySchema.parse({ ...entry, updatedAt: Number.POSITIVE_INFINITY })).toThrow()
   })
 
   test.each([
@@ -118,5 +150,14 @@ describe('anime detail contracts', () => {
     { status: 'pagination-error', code: 'UPSTREAM', message: 'Page failed.', page: 2, retryAfterSeconds: null },
   ])('validates serialized public state %#', (state) => {
     expect(publicAnimeDetailStateSchema.parse(state)).toEqual(state)
+  })
+
+  test('requires finite nonnegative cache timestamps and exact 24-hour expiry', () => {
+    const entry = { detail: validDetail, refreshedAt: 1_000, expiresAt: 1_000 + ANIME_DETAIL_CACHE_TTL_MS }
+
+    expect(publicAnimeDetailStateSchema.parse({ status: 'ready', entry })).toEqual({ status: 'ready', entry })
+    expect(() => publicAnimeDetailStateSchema.parse({ status: 'ready', entry: { ...entry, refreshedAt: -1 } })).toThrow()
+    expect(() => publicAnimeDetailStateSchema.parse({ status: 'ready', entry: { ...entry, expiresAt: Number.POSITIVE_INFINITY } })).toThrow()
+    expect(() => publicAnimeDetailStateSchema.parse({ status: 'ready', entry: { ...entry, expiresAt: entry.expiresAt + 1 } })).toThrow()
   })
 })
