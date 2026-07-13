@@ -711,9 +711,13 @@ Status: IN PROGRESS on `jeff-cx/phase-5-feed-reviews`.
 - [x] Lock shared contracts and RED validator/integration coverage. Owner: contract worker.
 - [x] Add Convex schema, Posts, Reviews, feed projection, metrics, storage, milestone projection. Owner: backend worker.
 - [x] Add protected routes, editor/renderer, Review Detail, Anime Reviews. Owner: review UI worker.
-- [ ] Replace Home mocks with feed, Composer, card lifecycle, responsive states. Owner: feed UI worker.
-- [ ] Integrate generated routes/types; run focused and full gates. Owner: controller.
-- [ ] Run spec/thermo review, responsive browser QA, docs/data-flow pass. Owner: reviewer + QA + docs mapper.
+- [x] Replace Home mocks with feed, Composer, card lifecycle, responsive states. Owner: feed UI worker.
+- [x] Integrate generated routes/types; `src/routeTree.gen.ts` includes Phase 5 routes and `pnpm exec tsc --noEmit` passes. Owner: controller.
+- [x] Run focused and full test/build gates: 75 files passed / 2 skipped; 478 tests passed / 3 skipped; TypeScript, client + SSR build, and `pnpm exec convex dev --once` pass. Owner: controller.
+- [x] Complete dev milestone projection backfill: one cursor page, `isDone: true`, `processedCount: 2`, `verifiedCount: 2` (2/2). Owner: controller.
+- [ ] Resolve Fallow new-only audit: no introduced dead-code or duplication, but one introduced `AnimeReviewsContent` complexity finding remains; five inherited complexity findings and the inherited `react-dom` test-only dependency warning remain. Owner: controller.
+- [x] Sync current-state docs and data-flow notes. Owner: docs mapper.
+- [ ] Complete spec/thermo review and responsive browser QA. Signed-in Review Creation/Detail, Post publishing/upload/owner actions, visibility, and pagination-above-page-size remain browser-blocked without a complete authenticated dev account and published Review; see `design-qa.md`. Owner: reviewer + QA.
 - [ ] Commit verified Phase 5 and stop for user review. Owner: controller.
 
 ## Optional Backlog

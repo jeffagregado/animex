@@ -2,6 +2,8 @@
 
 Dev-only runbook. Projects authoritative `animeMilestones` into `feedCards`. Mutation idempotent. Removed activity stays inactive.
 
+Current dev verification: the null-cursor run completes in one page with `isDone: true`, `processedCount: 2`, and `verifiedCount: 2` (exact 2/2 source/projection records).
+
 ## Run
 
 Push current Convex code:
