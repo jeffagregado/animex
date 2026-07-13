@@ -1,7 +1,5 @@
 import { describe, expect, test } from 'vitest'
 
-import { AniListRequestError } from '../../../lib/anilist-client.server'
-import { type AnimeDetailCacheDependencies } from './anime-detail-cache.server'
 import {
   animeDetailGetInputSchema,
   animePeopleGetInputSchema,
@@ -20,17 +18,6 @@ const detail = {
   charactersPage: emptyPage, staffPage: emptyPage,
 }
 
-const dependencies = (): AnimeDetailCacheDependencies => ({
-  client: {
-    readDetail: async () => ({ status: 'fresh', entry: { payload: detail, refreshedAt: 1, expiresAt: 86_400_001 } }),
-    readPeoplePage: async () => ({ status: 'missing', entry: null }),
-    acquireLease: async () => ({ acquired: true, leaseUntil: 30_000 }),
-    commitDetail: async () => {}, commitPeoplePage: async () => {}, releaseLease: async () => true,
-  },
-  writeToken: 'token', createLeaseId: () => 'lease', delay: async () => {}, warn: () => {},
-  fetchDetail: async () => null, fetchPeople: async () => null,
-})
-
 const expectSerializable = (value: unknown): void => {
   expect(JSON.parse(JSON.stringify(value))).toEqual(value)
 }
@@ -46,58 +33,62 @@ describe('anime detail GET functions', () => {
   })
 
   test('returns serializable ready and not-found states', async () => {
-    const ready = await runAnimeDetailGet({ anilistId: 1 }, dependencies())
+    const ready = await runAnimeDetailGet({ anilistId: 1 }, async () => ({
+      status: 'ready',
+      entry: { detail, refreshedAt: 1, expiresAt: 86_400_001 },
+    }))
     expect(ready).toMatchObject({ status: 'ready', entry: { detail } })
     expectSerializable(ready)
 
-    const missing = dependencies()
-    missing.client.readDetail = async () => ({ status: 'missing', entry: null })
-    const notFound = await runAnimeDetailGet({ anilistId: 1 }, missing)
+    const notFound = await runAnimeDetailGet({ anilistId: 1 }, async () => ({
+      status: 'not-found', code: 'NOT_FOUND', message: 'Anime was not found.',
+    }))
     expect(notFound).toMatchObject({ status: 'not-found', code: 'NOT_FOUND' })
     expectSerializable(notFound)
   })
 
   test('returns serializable upstream and rate-limit states', async () => {
-    const unavailable = dependencies()
-    unavailable.client.readDetail = async () => { throw new Error('cache unavailable') }
-    const upstream = await runAnimeDetailGet({ anilistId: 1 }, unavailable)
+    const upstream = await runAnimeDetailGet({ anilistId: 1 }, async () => ({
+      status: 'error', code: 'UPSTREAM', message: 'Anime detail is temporarily unavailable.', retryAfterSeconds: null,
+    }))
     expect(upstream).toMatchObject({ status: 'error', code: 'UPSTREAM' })
     expectSerializable(upstream)
 
-    const limited = dependencies()
-    limited.client.readDetail = async () => ({ status: 'missing', entry: null })
-    limited.fetchDetail = async () => { throw new AniListRequestError('RATE_LIMITED', 'AniList rate limit exceeded.', 12) }
-    const rateLimited = await runAnimeDetailGet({ anilistId: 1 }, limited)
+    const rateLimited = await runAnimeDetailGet({ anilistId: 1 }, async () => ({
+      status: 'error', code: 'RATE_LIMITED', message: 'AniList rate limit exceeded.', retryAfterSeconds: 12,
+    }))
     expect(rateLimited).toMatchObject({ status: 'error', code: 'RATE_LIMITED', retryAfterSeconds: 12 })
     expectSerializable(rateLimited)
   })
 
   test('returns serializable people-page ready and not-found states', async () => {
-    const readyDependencies = dependencies()
-    readyDependencies.client.readPeoplePage = async () => ({
-      status: 'fresh',
-      entry: { payload: emptyPage, refreshedAt: 1, expiresAt: 86_400_001 },
-    })
-    const ready = await runAnimePeopleGet({ anilistId: 1, kind: 'characters', page: 1 }, readyDependencies)
+    const ready = await runAnimePeopleGet(
+      { anilistId: 1, kind: 'characters', page: 1 },
+      async () => ({ status: 'ready', page: emptyPage }),
+    )
     expect(ready).toEqual({ status: 'ready', page: emptyPage })
     expectSerializable(ready)
 
-    const missingDependencies = dependencies()
-    const notFound = await runAnimePeopleGet({ anilistId: 1, kind: 'staff', page: 2 }, missingDependencies)
+    const notFound = await runAnimePeopleGet(
+      { anilistId: 1, kind: 'staff', page: 2 },
+      async () => ({ status: 'not-found' }),
+    )
     expect(notFound).toEqual({ status: 'not-found' })
     expectSerializable(notFound)
   })
 
   test('returns serializable people-page upstream and rate-limit states', async () => {
-    const unavailable = dependencies()
-    unavailable.client.readPeoplePage = async () => { throw new Error('cache unavailable') }
-    const upstream = await runAnimePeopleGet({ anilistId: 1, kind: 'characters', page: 1 }, unavailable)
+    const upstream = await runAnimePeopleGet(
+      { anilistId: 1, kind: 'characters', page: 1 },
+      async () => ({ status: 'error', code: 'UPSTREAM', message: 'Anime people page is temporarily unavailable.', retryAfterSeconds: null }),
+    )
     expect(upstream).toMatchObject({ status: 'error', code: 'UPSTREAM' })
     expectSerializable(upstream)
 
-    const limited = dependencies()
-    limited.fetchPeople = async () => { throw new AniListRequestError('RATE_LIMITED', 'AniList rate limit exceeded.', 12) }
-    const rateLimited = await runAnimePeopleGet({ anilistId: 1, kind: 'staff', page: 2 }, limited)
+    const rateLimited = await runAnimePeopleGet(
+      { anilistId: 1, kind: 'staff', page: 2 },
+      async () => ({ status: 'error', code: 'RATE_LIMITED', message: 'AniList rate limit exceeded.', retryAfterSeconds: 12 }),
+    )
     expect(rateLimited).toMatchObject({ status: 'error', code: 'RATE_LIMITED', retryAfterSeconds: 12 })
     expectSerializable(rateLimited)
   })
