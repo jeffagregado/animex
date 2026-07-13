@@ -25,6 +25,9 @@ import { Route as ApiProfileStateRouteImport } from './routes/api/profile/state'
 import { Route as ApiProfileCompleteRouteImport } from './routes/api/profile/complete'
 import { Route as ApiProfileCheckUsernameRouteImport } from './routes/api/profile/check-username'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as PublicAnimeAnilistIdRouteRouteImport } from './routes/_public/anime/$anilistId/route'
+import { Route as PublicAnimeAnilistIdIndexRouteImport } from './routes/_public/anime/$anilistId/index'
+import { Route as PublicAnimeAnilistIdSlugRouteRouteImport } from './routes/_public/anime/$anilistId/$slug/route'
 
 const PublicRouteRoute = PublicRouteRouteImport.update({
   id: '/_public',
@@ -105,6 +108,24 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PublicAnimeAnilistIdRouteRoute =
+  PublicAnimeAnilistIdRouteRouteImport.update({
+    id: '/anime/$anilistId',
+    path: '/anime/$anilistId',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicAnimeAnilistIdIndexRoute =
+  PublicAnimeAnilistIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => PublicAnimeAnilistIdRouteRoute,
+  } as any)
+const PublicAnimeAnilistIdSlugRouteRoute =
+  PublicAnimeAnilistIdSlugRouteRouteImport.update({
+    id: '/$slug',
+    path: '/$slug',
+    getParentRoute: () => PublicAnimeAnilistIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -118,10 +139,13 @@ export interface FileRoutesByFullPath {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/auth/username': typeof AuthUsernameRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
+  '/anime/$anilistId': typeof PublicAnimeAnilistIdRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
+  '/anime/$anilistId/$slug': typeof PublicAnimeAnilistIdSlugRouteRoute
+  '/anime/$anilistId/': typeof PublicAnimeAnilistIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -139,6 +163,8 @@ export interface FileRoutesByTo {
   '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
+  '/anime/$anilistId/$slug': typeof PublicAnimeAnilistIdSlugRouteRoute
+  '/anime/$anilistId': typeof PublicAnimeAnilistIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -154,10 +180,13 @@ export interface FileRoutesById {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/auth/username': typeof AuthUsernameRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
+  '/_public/anime/$anilistId': typeof PublicAnimeAnilistIdRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/profile/check-username': typeof ApiProfileCheckUsernameRoute
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
+  '/_public/anime/$anilistId/$slug': typeof PublicAnimeAnilistIdSlugRouteRoute
+  '/_public/anime/$anilistId/': typeof PublicAnimeAnilistIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -173,10 +202,13 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/auth/username'
     | '/auth/verify-email'
+    | '/anime/$anilistId'
     | '/api/auth/$'
     | '/api/profile/check-username'
     | '/api/profile/complete'
     | '/api/profile/state'
+    | '/anime/$anilistId/$slug'
+    | '/anime/$anilistId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -194,6 +226,8 @@ export interface FileRouteTypes {
     | '/api/profile/check-username'
     | '/api/profile/complete'
     | '/api/profile/state'
+    | '/anime/$anilistId/$slug'
+    | '/anime/$anilistId'
   id:
     | '__root__'
     | '/'
@@ -208,10 +242,13 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/auth/username'
     | '/auth/verify-email'
+    | '/_public/anime/$anilistId'
     | '/api/auth/$'
     | '/api/profile/check-username'
     | '/api/profile/complete'
     | '/api/profile/state'
+    | '/_public/anime/$anilistId/$slug'
+    | '/_public/anime/$anilistId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -345,17 +382,56 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_public/anime/$anilistId': {
+      id: '/_public/anime/$anilistId'
+      path: '/anime/$anilistId'
+      fullPath: '/anime/$anilistId'
+      preLoaderRoute: typeof PublicAnimeAnilistIdRouteRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/anime/$anilistId/': {
+      id: '/_public/anime/$anilistId/'
+      path: '/'
+      fullPath: '/anime/$anilistId/'
+      preLoaderRoute: typeof PublicAnimeAnilistIdIndexRouteImport
+      parentRoute: typeof PublicAnimeAnilistIdRouteRoute
+    }
+    '/_public/anime/$anilistId/$slug': {
+      id: '/_public/anime/$anilistId/$slug'
+      path: '/$slug'
+      fullPath: '/anime/$anilistId/$slug'
+      preLoaderRoute: typeof PublicAnimeAnilistIdSlugRouteRouteImport
+      parentRoute: typeof PublicAnimeAnilistIdRouteRoute
+    }
   }
 }
+
+interface PublicAnimeAnilistIdRouteRouteChildren {
+  PublicAnimeAnilistIdSlugRouteRoute: typeof PublicAnimeAnilistIdSlugRouteRoute
+  PublicAnimeAnilistIdIndexRoute: typeof PublicAnimeAnilistIdIndexRoute
+}
+
+const PublicAnimeAnilistIdRouteRouteChildren: PublicAnimeAnilistIdRouteRouteChildren =
+  {
+    PublicAnimeAnilistIdSlugRouteRoute: PublicAnimeAnilistIdSlugRouteRoute,
+    PublicAnimeAnilistIdIndexRoute: PublicAnimeAnilistIdIndexRoute,
+  }
+
+const PublicAnimeAnilistIdRouteRouteWithChildren =
+  PublicAnimeAnilistIdRouteRoute._addFileChildren(
+    PublicAnimeAnilistIdRouteRouteChildren,
+  )
 
 interface PublicRouteRouteChildren {
   PublicDiscoverRoute: typeof PublicDiscoverRoute
   PublicHomeRoute: typeof PublicHomeRoute
+  PublicAnimeAnilistIdRouteRoute: typeof PublicAnimeAnilistIdRouteRouteWithChildren
 }
 
 const PublicRouteRouteChildren: PublicRouteRouteChildren = {
   PublicDiscoverRoute: PublicDiscoverRoute,
   PublicHomeRoute: PublicHomeRoute,
+  PublicAnimeAnilistIdRouteRoute: PublicAnimeAnilistIdRouteRouteWithChildren,
 }
 
 const PublicRouteRouteWithChildren = PublicRouteRoute._addFileChildren(
