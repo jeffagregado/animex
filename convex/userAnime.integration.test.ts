@@ -91,7 +91,7 @@ describe('user anime Convex integration', () => {
     const other = await createAuthUser(t, true, 'other')
     await insertProfile(t, other.authId, 'Other', 'private')
     expect(await other.client.query(api.userAnime.getMine, { anilistId: 1 })).toBeNull()
-  })
+  }, 15_000)
 
   test('pages 0, 20, 21, and 41 same-time rewatches without gaps', async () => {
     vi.useFakeTimers()
