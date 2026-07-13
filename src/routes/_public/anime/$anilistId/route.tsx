@@ -19,6 +19,16 @@ export const animeDetailQueryOptions = (anilistId: number) => queryOptions({
   staleTime: ANIME_DETAIL_STALE_TIME_MS,
 })
 
+type AnimeDetailEnsureClient = {
+  ensureQueryData: (options: ReturnType<typeof animeDetailQueryOptions>) => Promise<PublicAnimeDetailState>
+}
+
+/** Awaits parent-equivalent detail hydration without relying on loader ordering. */
+export const ensureAnimeDetailChildData = async (
+  queryClient: AnimeDetailEnsureClient,
+  anilistIdParam: string,
+): Promise<PublicAnimeDetailState> => await queryClient.ensureQueryData(animeDetailQueryOptions(parseAnimeRouteId(anilistIdParam)))
+
 export const Route = createFileRoute('/_public/anime/$anilistId')({
   params: { parse: (params) => ({ anilistId: String(parseAnimeRouteId(params.anilistId)) }) },
   loader: async ({ context, params }) => await context.queryClient.ensureQueryData(animeDetailQueryOptions(parseAnimeRouteId(params.anilistId))),

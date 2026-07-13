@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 
 import { AnimeDetailPage } from '#/features/anime-detail/ui/anime-detail-page'
 import { createCanonicalAnimePath, normalizeAnimeDetailTab, type AnimeDetailTab, type PublicAnimeDetailState } from '#/features/anime-detail/shared/anime-detail-contracts'
+import { ensureAnimeDetailChildData } from '../route'
 
 type AnimeDetailSearch = { tab?: Exclude<AnimeDetailTab, 'overview'> }
 
@@ -21,8 +22,8 @@ export const getStaleSlugRedirectHref = (state: PublicAnimeDetailState, slug: st
 
 export const Route = createFileRoute('/_public/anime/$anilistId/$slug')({
   validateSearch: (search) => serializeAnimeTab(search.tab),
-  loader: ({ params, location, context }) => {
-    const state = context.queryClient.getQueryData(['anime-detail', Number(params.anilistId)]) as PublicAnimeDetailState
+  loader: async ({ params, location, context }) => {
+    const state = await ensureAnimeDetailChildData(context.queryClient, params.anilistId)
     const href = getStaleSlugRedirectHref(state, params.slug, location.searchStr)
     if (href) throw redirect({ href, replace: true })
     return null

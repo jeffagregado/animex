@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { parseAnimeRouteId } from './$anilistId/route'
+import { ensureAnimeDetailChildData, parseAnimeRouteId } from './$anilistId/route'
 import { getAnimeTabNavigationOptions, getStaleSlugRedirectHref, serializeAnimeTab } from './$anilistId/$slug/route'
 import { getMissingSlugRedirectHref } from './$anilistId/index'
 import type { PublicAnimeDetailState } from '#/features/anime-detail/shared/anime-detail-contracts'
@@ -28,5 +28,16 @@ describe('anime detail route state', () => {
   it('creates scroll-stable tab navigation options', () => {
     expect(getAnimeTabNavigationOptions('overview')).toEqual({ search: {}, resetScroll: false })
     expect(getAnimeTabNavigationOptions('characters')).toEqual({ search: { tab: 'characters' }, resetScroll: false })
+  })
+
+  it('awaits detail data when child loader starts with an empty query cache', async () => {
+    const ready = { status: 'ready', entry: { detail: { anilistId: 1 } } }
+    const queryClient = { ensureQueryData: vi.fn().mockResolvedValue(ready) }
+    await expect(ensureAnimeDetailChildData(queryClient, '1')).resolves.toBe(ready)
+    expect(queryClient.ensureQueryData).toHaveBeenCalledOnce()
+
+    const error = { status: 'error', code: 'UPSTREAM', message: 'Down', retryAfterSeconds: null }
+    queryClient.ensureQueryData.mockResolvedValueOnce(error)
+    await expect(ensureAnimeDetailChildData(queryClient, '1')).resolves.toBe(error)
   })
 })
