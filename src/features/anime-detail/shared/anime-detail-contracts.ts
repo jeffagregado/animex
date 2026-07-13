@@ -14,6 +14,7 @@ export const ANIME_RELATED_LIMIT = 5 as const
 export const ANIME_RECOMMENDATIONS_LIMIT = 5 as const
 export const ANIME_PEOPLE_PER_PAGE = 24 as const
 export const ANIME_REWATCHES_PER_PAGE = 20 as const
+export const ANIME_EXTERNAL_LINKS_LIMIT = 8 as const
 export const ANIME_DETAIL_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 export const animeDetailTabSchema = z.enum(['overview', 'reviews', 'characters', 'staff'])
@@ -93,6 +94,8 @@ export interface AnimeDetailListItem {
   slug: string
   title: string
   coverImageUrl: string | null
+  format: AnimeFormat | null
+  seasonYear: number | null
 }
 
 const animeDetailListItemSchema: z.ZodType<AnimeDetailListItem> = z.object({
@@ -100,6 +103,8 @@ const animeDetailListItemSchema: z.ZodType<AnimeDetailListItem> = z.object({
   slug: z.string().min(1),
   title: z.string().trim().min(1),
   coverImageUrl: nullableHttpsUrlSchema,
+  format: animeFormatSchema.nullable(),
+  seasonYear: z.number().int().positive().nullable(),
 }).strict()
 
 export interface AnimeStudio {
@@ -130,54 +135,6 @@ export interface AnimeExternalLink {
 const animeExternalLinkSchema: z.ZodType<AnimeExternalLink> = z.object({
   site: z.string().trim().min(1),
   url: z.url({ protocol: /^https$/ }),
-}).strict()
-
-export interface AnimeDetail {
-  anilistId: number
-  slug: string
-  titles: AnimeTitles
-  coverImageUrl: string | null
-  bannerImageUrl: string | null
-  synopsis: string | null
-  format: AnimeFormat | null
-  status: AnimeMediaStatus | null
-  source: string | null
-  season: AnimeSeason | null
-  seasonYear: number | null
-  episodes: number | null
-  durationMinutes: number | null
-  startDate: AnimeDate | null
-  endDate: AnimeDate | null
-  genres: string[]
-  mainStudio: AnimeStudio | null
-  related: AnimeDetailListItem[]
-  recommendations: AnimeDetailListItem[]
-  trailer: AnimeTrailer | null
-  externalLinks: AnimeExternalLink[]
-}
-
-export const animeDetailSchema: z.ZodType<AnimeDetail> = z.object({
-  anilistId: positiveSafeIntegerSchema,
-  slug: z.string().min(1),
-  titles: animeTitlesSchema,
-  coverImageUrl: nullableHttpsUrlSchema,
-  bannerImageUrl: nullableHttpsUrlSchema,
-  synopsis: z.string().trim().min(1).nullable(),
-  format: animeFormatSchema.nullable(),
-  status: animeMediaStatusSchema.nullable(),
-  source: z.string().trim().min(1).nullable(),
-  season: animeSeasonSchema.nullable(),
-  seasonYear: z.number().int().positive().nullable(),
-  episodes: z.number().int().nonnegative().nullable(),
-  durationMinutes: z.number().int().positive().nullable(),
-  startDate: animeDateSchema.nullable(),
-  endDate: animeDateSchema.nullable(),
-  genres: z.array(z.string().trim().min(1)),
-  mainStudio: animeStudioSchema.nullable(),
-  related: z.array(animeDetailListItemSchema).max(ANIME_RELATED_LIMIT),
-  recommendations: z.array(animeDetailListItemSchema).max(ANIME_RECOMMENDATIONS_LIMIT),
-  trailer: animeTrailerSchema.nullable(),
-  externalLinks: z.array(animeExternalLinkSchema),
 }).strict()
 
 export interface AnimeVoiceActor {
@@ -240,6 +197,66 @@ const createAnimePeoplePageSchema = <T>(itemSchema: z.ZodType<T>): z.ZodType<Ani
 
 export const animeCharacterPageSchema = createAnimePeoplePageSchema(animeCharacterSchema)
 export const animeStaffPageSchema = createAnimePeoplePageSchema(animeStaffSchema)
+const initialAnimeCharacterPageSchema = animeCharacterPageSchema.refine(
+  (page) => page.currentPage === 1,
+  { error: 'Initial Characters page must be page 1.', path: ['currentPage'] },
+)
+const initialAnimeStaffPageSchema = animeStaffPageSchema.refine(
+  (page) => page.currentPage === 1,
+  { error: 'Initial Staff page must be page 1.', path: ['currentPage'] },
+)
+
+export interface AnimeDetail {
+  anilistId: number
+  slug: string
+  titles: AnimeTitles
+  coverImageUrl: string | null
+  bannerImageUrl: string | null
+  synopsis: string | null
+  format: AnimeFormat | null
+  status: AnimeMediaStatus | null
+  source: string | null
+  season: AnimeSeason | null
+  seasonYear: number | null
+  episodes: number | null
+  durationMinutes: number | null
+  startDate: AnimeDate | null
+  endDate: AnimeDate | null
+  genres: string[]
+  mainStudio: AnimeStudio | null
+  related: AnimeDetailListItem[]
+  recommendations: AnimeDetailListItem[]
+  trailer: AnimeTrailer | null
+  externalLinks: AnimeExternalLink[]
+  charactersPage: AnimePeoplePage<AnimeCharacter>
+  staffPage: AnimePeoplePage<AnimeStaff>
+}
+
+export const animeDetailSchema: z.ZodType<AnimeDetail> = z.object({
+  anilistId: positiveSafeIntegerSchema,
+  slug: z.string().min(1),
+  titles: animeTitlesSchema,
+  coverImageUrl: nullableHttpsUrlSchema,
+  bannerImageUrl: nullableHttpsUrlSchema,
+  synopsis: z.string().trim().min(1).nullable(),
+  format: animeFormatSchema.nullable(),
+  status: animeMediaStatusSchema.nullable(),
+  source: z.string().trim().min(1).nullable(),
+  season: animeSeasonSchema.nullable(),
+  seasonYear: z.number().int().positive().nullable(),
+  episodes: z.number().int().nonnegative().nullable(),
+  durationMinutes: z.number().int().positive().nullable(),
+  startDate: animeDateSchema.nullable(),
+  endDate: animeDateSchema.nullable(),
+  genres: z.array(z.string().trim().min(1)),
+  mainStudio: animeStudioSchema.nullable(),
+  related: z.array(animeDetailListItemSchema).max(ANIME_RELATED_LIMIT),
+  recommendations: z.array(animeDetailListItemSchema).max(ANIME_RECOMMENDATIONS_LIMIT),
+  trailer: animeTrailerSchema.nullable(),
+  externalLinks: z.array(animeExternalLinkSchema).max(ANIME_EXTERNAL_LINKS_LIMIT),
+  charactersPage: initialAnimeCharacterPageSchema,
+  staffPage: initialAnimeStaffPageSchema,
+}).strict()
 
 export interface AnimeDetailCacheEntry {
   detail: AnimeDetail
@@ -280,7 +297,7 @@ export const publicAnimeDetailStateSchema: z.ZodType<PublicAnimeDetailState> = z
 
 export interface UserAnimeEntry {
   anilistId: number
-  status: AnimeStatus
+  status: AnimeStatus | null
   score: AnimeScore
   isFavorite: boolean
   favoriteChangedAt: number | null
@@ -313,7 +330,7 @@ export interface AnimeRewatchPage {
 
 export const userAnimeEntrySchema: z.ZodType<UserAnimeEntry> = z.object({
   anilistId: positiveSafeIntegerSchema,
-  status: animeStatusSchema,
+  status: animeStatusSchema.nullable(),
   score: animeScoreSchema,
   isFavorite: z.boolean(),
   favoriteChangedAt: timestampSchema.nullable(),

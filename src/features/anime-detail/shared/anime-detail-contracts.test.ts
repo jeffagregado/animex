@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, test } from 'vitest'
 
 import {
   ANIME_DETAIL_CACHE_TTL_MS,
+  ANIME_EXTERNAL_LINKS_LIMIT,
   ANIME_PEOPLE_PER_PAGE,
   ANIME_RECOMMENDATIONS_LIMIT,
   ANIME_RELATED_LIMIT,
@@ -51,6 +52,8 @@ const validDetail = {
   recommendations: [],
   trailer: { youtubeId: 'Iwr1aLEDpe4', thumbnailUrl: 'https://img.youtube.com/frieren.jpg' },
   externalLinks: [{ site: 'Official Site', url: 'https://frieren-anime.jp/' }],
+  charactersPage: { items: [], currentPage: 1, hasNextPage: false, perPage: 24 },
+  staffPage: { items: [], currentPage: 1, hasNextPage: false, perPage: 24 },
 }
 
 describe('anime detail contracts', () => {
@@ -59,6 +62,7 @@ describe('anime detail contracts', () => {
     expect(ANIME_RECOMMENDATIONS_LIMIT).toBe(5)
     expect(ANIME_PEOPLE_PER_PAGE).toBe(24)
     expect(ANIME_REWATCHES_PER_PAGE).toBe(20)
+    expect(ANIME_EXTERNAL_LINKS_LIMIT).toBe(8)
     expect(ANIME_DETAIL_CACHE_TTL_MS).toBe(24 * 60 * 60 * 1000)
   })
 
@@ -89,9 +93,17 @@ describe('anime detail contracts', () => {
 
   test('validates serializable full detail metadata and exact caps', () => {
     expect(animeDetailSchema.parse(validDetail)).toEqual(validDetail)
-    expect(() => animeDetailSchema.parse({ ...validDetail, related: Array.from({ length: 6 }, () => ({ anilistId: 1, slug: 'x', title: 'X', coverImageUrl: null })) })).toThrow()
-    expect(() => animeDetailSchema.parse({ ...validDetail, recommendations: Array.from({ length: 6 }, () => ({ anilistId: 1, slug: 'x', title: 'X', coverImageUrl: null })) })).toThrow()
+    const compactItem = { anilistId: 1, slug: 'x', title: 'X', coverImageUrl: null, format: 'TV', seasonYear: 2026 }
+    expect(animeDetailSchema.parse({ ...validDetail, related: [compactItem] }).related).toEqual([compactItem])
+    expect(() => animeDetailSchema.parse({ ...validDetail, related: Array.from({ length: 6 }, () => compactItem) })).toThrow()
+    expect(() => animeDetailSchema.parse({ ...validDetail, recommendations: Array.from({ length: 6 }, () => compactItem) })).toThrow()
+    expect(() => animeDetailSchema.parse({ ...validDetail, related: [{ anilistId: 1, slug: 'x', title: 'X', coverImageUrl: null }] })).toThrow()
     expect(() => animeDetailSchema.parse({ ...validDetail, externalLinks: [{ site: 'Bad', url: 'http://example.com' }] })).toThrow()
+    expect(() => animeDetailSchema.parse({ ...validDetail, externalLinks: Array.from({ length: 9 }, (_, index) => ({ site: `Site ${index}`, url: `https://example.com/${index}` })) })).toThrow()
+    expect(() => animeDetailSchema.parse({ ...validDetail, charactersPage: { ...validDetail.charactersPage, currentPage: 2 } })).toThrow()
+    expect(() => animeDetailSchema.parse({ ...validDetail, staffPage: { ...validDetail.staffPage, items: Array.from({ length: 25 }, () => ({ anilistId: 2, name: 'Staff', role: 'Director', imageUrl: null })) } })).toThrow()
+    const { charactersPage: _charactersPage, ...missingCharacters } = validDetail
+    expect(() => animeDetailSchema.parse(missingCharacters)).toThrow()
   })
 
   test('locks generic people pages to 24 and validates character data', () => {
@@ -128,7 +140,7 @@ describe('anime detail contracts', () => {
   })
 
   test('validates user entry, milestone, rewatch page, and mutation result semantics', () => {
-    const entry = { anilistId: 52991, status: 'completed', score: 9.5, isFavorite: true, favoriteChangedAt: 10, rewatchCount: 1, createdAt: 1, updatedAt: 10 }
+    const entry = { anilistId: 52991, status: null, score: 9.5, isFavorite: true, favoriteChangedAt: 10, rewatchCount: 1, createdAt: 1, updatedAt: 10 }
     const milestone = { anilistId: 52991, kind: 'completed', settledAt: 10 }
     const rewatch = { id: 'rewatch-1', anilistId: 52991, completedAt: 10 }
 
