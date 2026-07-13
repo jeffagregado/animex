@@ -323,9 +323,17 @@ export interface AnimeRewatchEntry {
 
 export interface AnimeRewatchPage {
   items: AnimeRewatchEntry[]
-  currentPage: number
-  hasNextPage: boolean
+  continueCursor: string
+  isDone: boolean
   perPage: 20
+}
+
+export interface AnimeRewatchPageInput {
+  anilistId: number
+  paginationOpts: {
+    numItems: 20
+    cursor: string | null
+  }
 }
 
 export const userAnimeEntrySchema: z.ZodType<UserAnimeEntry> = z.object({
@@ -353,9 +361,17 @@ export const animeRewatchEntrySchema: z.ZodType<AnimeRewatchEntry> = z.object({
 
 export const animeRewatchPageSchema: z.ZodType<AnimeRewatchPage> = z.object({
   items: z.array(animeRewatchEntrySchema).max(ANIME_REWATCHES_PER_PAGE),
-  currentPage: positiveSafeIntegerSchema,
-  hasNextPage: z.boolean(),
+  continueCursor: z.string(),
+  isDone: z.boolean(),
   perPage: z.literal(ANIME_REWATCHES_PER_PAGE),
+}).strict()
+
+export const animeRewatchPageInputSchema: z.ZodType<AnimeRewatchPageInput> = z.object({
+  anilistId: positiveSafeIntegerSchema,
+  paginationOpts: z.object({
+    numItems: z.literal(ANIME_REWATCHES_PER_PAGE),
+    cursor: z.string().nullable(),
+  }).strict(),
 }).strict()
 
 export interface SetAnimeStatusInput { anilistId: number; status: AnimeStatus }

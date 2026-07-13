@@ -10,6 +10,7 @@ import {
   animeDetailSchema,
   animeCharacterPageSchema,
   animeMilestoneSchema,
+  animeRewatchPageInputSchema,
   animeRewatchPageSchema,
   animeScoreSchema,
   animeStaffPageSchema,
@@ -139,6 +140,16 @@ describe('anime detail contracts', () => {
     expect(() => recordAnimeRewatchInputSchema.parse({ anilistId: 52991, completedAt: 1 })).toThrow()
   })
 
+  test('validates strict cursor-based rewatch pagination input', () => {
+    const input = { anilistId: 52991, paginationOpts: { numItems: 20, cursor: null } }
+
+    expect(animeRewatchPageInputSchema.parse(input)).toEqual(input)
+    expect(animeRewatchPageInputSchema.parse({ ...input, paginationOpts: { ...input.paginationOpts, cursor: 'next-page' } }).paginationOpts.cursor).toBe('next-page')
+    expect(() => animeRewatchPageInputSchema.parse({ ...input, userId: 'leak' })).toThrow()
+    expect(() => animeRewatchPageInputSchema.parse({ ...input, paginationOpts: { ...input.paginationOpts, numItems: 21 } })).toThrow()
+    expect(() => animeRewatchPageInputSchema.parse({ ...input, paginationOpts: { ...input.paginationOpts, endCursor: null } })).toThrow()
+  })
+
   test('validates user entry, milestone, rewatch page, and mutation result semantics', () => {
     const entry = { anilistId: 52991, status: null, score: 9.5, isFavorite: true, favoriteChangedAt: 10, rewatchCount: 1, createdAt: 1, updatedAt: 10 }
     const milestone = { anilistId: 52991, kind: 'completed', settledAt: 10 }
@@ -146,10 +157,12 @@ describe('anime detail contracts', () => {
 
     expect(userAnimeEntrySchema.parse(entry)).toEqual(entry)
     expect(animeMilestoneSchema.parse(milestone)).toEqual(milestone)
-    expect(animeRewatchPageSchema.parse({ items: [rewatch], currentPage: 1, hasNextPage: false, perPage: 20 }).items).toEqual([rewatch])
+    expect(animeRewatchPageSchema.parse({ items: [rewatch], continueCursor: 'next-page', isDone: false, perPage: 20 }).items).toEqual([rewatch])
     expect(userAnimeMutationResultSchema.parse({ status: 'saved', entry })).toEqual({ status: 'saved', entry })
     expect(() => animeMilestoneSchema.parse({ ...milestone, kind: 'started' })).toThrow()
-    expect(() => animeRewatchPageSchema.parse({ items: Array.from({ length: 21 }, () => rewatch), currentPage: 1, hasNextPage: false, perPage: 20 })).toThrow()
+    expect(() => animeRewatchPageSchema.parse({ items: Array.from({ length: 21 }, () => rewatch), continueCursor: 'done', isDone: true, perPage: 20 })).toThrow()
+    expect(() => animeRewatchPageSchema.parse({ items: [rewatch], continueCursor: null, isDone: true, perPage: 20 })).toThrow()
+    expect(() => animeRewatchPageSchema.parse({ items: [{ ...rewatch, extra: true }], continueCursor: 'done', isDone: true, perPage: 20 })).toThrow()
     expect(() => userAnimeEntrySchema.parse({ ...entry, updatedAt: Number.POSITIVE_INFINITY })).toThrow()
   })
 
