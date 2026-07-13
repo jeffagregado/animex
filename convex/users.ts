@@ -142,6 +142,13 @@ export const requireProfile = async (ctx: UserCtx) => {
   return { authUser, profile }
 }
 
+/** Resolves optional viewer profile without requiring authentication. */
+export const getOptionalProfile = async (ctx: UserCtx) => {
+  const authUser = await authComponent.safeGetAuthUser(ctx)
+  if (!authUser) return null
+  return await readProfileByAuthId(ctx, authUser._id)
+}
+
 const requireProfileUsername = (username: string): string => {
   validateUsername(username)
   return username

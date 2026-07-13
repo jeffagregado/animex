@@ -145,6 +145,55 @@ export default defineSchema({
     visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
     occurredAt: v.number(), updatedAt: v.number(),
   }).index('by_user_anime_kind', ['userId', 'anilistId', 'kind']),
+  posts: defineTable({
+    userId: v.id('users'), requestId: v.string(), text: v.string(), hasSpoiler: v.boolean(),
+    visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
+    imageIds: v.array(v.id('postImages')), createdAt: v.number(), updatedAt: v.number(),
+  })
+    .index('by_user_request', ['userId', 'requestId'])
+    .index('by_user_created_at', ['userId', 'createdAt']),
+  postImages: defineTable({
+    ownerId: v.id('users'), claimId: v.string(), storageId: v.optional(v.id('_storage')),
+    mimeType: v.string(), size: v.number(), width: v.number(), height: v.number(),
+    state: v.union(v.literal('pending'), v.literal('attached')),
+    postId: v.optional(v.id('posts')), order: v.optional(v.number()), createdAt: v.number(), updatedAt: v.number(),
+  })
+    .index('by_owner_claim', ['ownerId', 'claimId'])
+    .index('by_owner_state', ['ownerId', 'state'])
+    .index('by_post_order', ['postId', 'order'])
+    .index('by_storage_id', ['storageId']),
+  reviews: defineTable({
+    userId: v.id('users'), anilistId: v.number(), requestId: v.string(),
+    state: v.union(v.literal('draft'), v.literal('published')), rating: v.union(v.number(), v.null()),
+    summary: v.string(), summaryHasSpoiler: v.boolean(), bodyJson: v.string(),
+    visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
+    publishedAt: v.optional(v.number()), updatedAt: v.number(), activityState: v.union(v.literal('active'), v.literal('deleted')),
+    newestOrderKey: v.string(), highRatingOrderKey: v.string(), lowRatingOrderKey: v.string(),
+  })
+    .index('by_user_anime', ['userId', 'anilistId'])
+    .index('by_user_request', ['userId', 'requestId'])
+    .index('by_anime_state_visibility_newest', ['anilistId', 'state', 'visibility', 'newestOrderKey'])
+    .index('by_anime_state_visibility_high_rating', ['anilistId', 'state', 'visibility', 'highRatingOrderKey'])
+    .index('by_anime_state_visibility_low_rating', ['anilistId', 'state', 'visibility', 'lowRatingOrderKey']),
+  feedCards: defineTable({
+    sourceKey: v.string(), kind: v.union(v.literal('post'), v.literal('review'), v.literal('completed'), v.literal('rewatched')),
+    userId: v.id('users'), sourceId: v.optional(v.string()), anilistId: v.optional(v.number()),
+    visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
+    active: v.boolean(), orderKey: v.string(), occurredAt: v.number(), updatedAt: v.number(),
+  })
+    .index('by_source_key', ['sourceKey'])
+    .index('by_public_active_order', ['visibility', 'active', 'orderKey'])
+    .index('by_user_active_order', ['userId', 'active', 'orderKey'])
+    .index('by_user_source', ['userId', 'sourceKey']),
+  follows: defineTable({
+    followerId: v.id('users'), followingId: v.id('users'), createdAt: v.number(),
+  })
+    .index('by_follower_following', ['followerId', 'followingId'])
+    .index('by_following_follower', ['followingId', 'followerId']),
+  animeReviewStats: defineTable({
+    anilistId: v.number(), count: v.number(), ratingSum: v.number(),
+    bands: v.array(v.number()), updatedAt: v.number(),
+  }).index('by_anilist_id', ['anilistId']),
   discoverSectionCache: defineTable({
     key: v.union(
       v.literal('trending'),

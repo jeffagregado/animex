@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 
 import { type Doc, type Id } from './_generated/dataModel'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { removeMilestoneCard, upsertMilestoneCard } from './feed'
 import { requireProfile } from './users'
 import {
   applyFavorite,
@@ -77,9 +78,11 @@ const readMilestone = async (ctx: UserCtx, userId: Id<'users'>, anilistId: numbe
 /** Creates a milestone once, copying current profile visibility only at creation. */
 const createMilestoneOnce = async (ctx: MutationCtx, profile: Profile, anilistId: number, kind: 'completed' | 'rewatched', now: number) => {
   const existing = await readMilestone(ctx, profile._id, anilistId, kind)
-  if (existing) return existing
+  if (existing) { await upsertMilestoneCard(ctx, existing, false); return existing }
   const id = await ctx.db.insert('animeMilestones', createMilestoneInsert(profile._id, anilistId, kind, profile.visibility, now))
-  return await ctx.db.get('animeMilestones', id)
+  const milestone = await ctx.db.get('animeMilestones', id)
+  if (milestone) await upsertMilestoneCard(ctx, milestone, true)
+  return milestone
 }
 
 /** Records one rewatch and creates or bumps its single milestone. */
@@ -87,8 +90,11 @@ const addRewatch = async (ctx: MutationCtx, profile: Profile, entry: Doc<'userAn
   const sequence = entry.lastRewatchSequence + 1
   await ctx.db.insert('animeRewatchEntries', { entryId: entry._id, userId: profile._id, anilistId: entry.anilistId, completedAt: now, sequence })
   const milestone = await readMilestone(ctx, profile._id, entry.anilistId, 'rewatched')
-  if (milestone) await ctx.db.patch(milestone._id, createMilestoneTimestampPatch(now))
-  else await createMilestoneOnce(ctx, profile, entry.anilistId, 'rewatched', now)
+  if (milestone) {
+    await ctx.db.patch(milestone._id, createMilestoneTimestampPatch(now))
+    const updated = await ctx.db.get('animeMilestones', milestone._id)
+    if (updated) await upsertMilestoneCard(ctx, updated, true)
+  } else await createMilestoneOnce(ctx, profile, entry.anilistId, 'rewatched', now)
   await ctx.db.patch(entry._id, { rewatchCount: entry.rewatchCount + 1, lastRewatchSequence: sequence, updatedAt: now })
 }
 
@@ -157,6 +163,7 @@ export const setScore = mutation({
     const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
     const status = entry.score === null && score !== null && entry.status === null ? 'watching' : entry.status
     await ctx.db.patch(entry._id, { score, status, updatedAt: now })
+    const completion = await readMilestone(ctx, profile._id, args.anilistId, 'completed'); if (completion) await upsertMilestoneCard(ctx, completion, false)
     const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
   },
 })
@@ -191,8 +198,11 @@ export const removeLatestRewatch = mutation({
     if (!history[0]) throw new ConvexError({ code: 'REWATCH_NOT_FOUND', message: 'No rewatch exists to remove.' })
     const now = Date.now(); const rollback = rollbackRewatch(history.map((item) => item.completedAt), entry.status as AnimeStatus | null); await ctx.db.delete(history[0]._id)
     const milestone = await readMilestone(ctx, profile._id, args.anilistId, 'rewatched')
-    if (milestone && rollback.milestoneAt === null) await ctx.db.delete(milestone._id)
-    else if (milestone && rollback.milestoneAt !== null) await ctx.db.patch(milestone._id, { ...createMilestoneTimestampPatch(now), occurredAt: rollback.milestoneAt })
+    if (milestone && rollback.milestoneAt === null) { await ctx.db.delete(milestone._id); await removeMilestoneCard(ctx, profile._id, args.anilistId, 'rewatched') }
+    else if (milestone && rollback.milestoneAt !== null) {
+      await ctx.db.patch(milestone._id, { ...createMilestoneTimestampPatch(now), occurredAt: rollback.milestoneAt })
+      const updated = await ctx.db.get('animeMilestones', milestone._id); if (updated) await upsertMilestoneCard(ctx, updated, false)
+    }
     await ctx.db.patch(entry._id, { rewatchCount: Math.max(0, entry.rewatchCount - 1), status: rollback.nextStatus, updatedAt: now })
     const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
   },

@@ -7,7 +7,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { api, components } from './_generated/api'
 import schema from './schema'
 
-const modules = import.meta.glob('./**/*.ts')
+const modules = import.meta.glob(['./_generated/**/*.*', './userAnime.ts'])
 const createHarness = () => {
   const t = convexTest(schema, modules)
   betterAuthTest.register(t)
@@ -84,9 +84,13 @@ describe('user anime Convex integration', () => {
     const afterRollback = await t.run(async (ctx) => ({
       completion: await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', ownerProfileId).eq('anilistId', 1).eq('kind', 'completed')).unique(),
       rewatch: await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', ownerProfileId).eq('anilistId', 1).eq('kind', 'rewatched')).unique(),
+      completionCard: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `completed:${ownerProfileId}:1`)).unique(),
+      rewatchCard: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `rewatched:${ownerProfileId}:1`)).unique(),
     }))
     expect(afterRollback.completion).not.toBeNull()
     expect(afterRollback.rewatch).toBeNull()
+    expect(afterRollback.completionCard?.active).toBe(true)
+    expect(afterRollback.rewatchCard?.active).toBe(false)
 
     const other = await createAuthUser(t, true, 'other')
     await insertProfile(t, other.authId, 'Other', 'private')
