@@ -710,7 +710,7 @@ Status: IN PROGRESS on `jeff-cx/phase-5-feed-reviews`.
 - [x] Generate, inspect, approve Review Creation and Review Detail desktop/mobile references. Owner: controller.
 - [x] Lock shared contracts and RED validator/integration coverage. Owner: contract worker.
 - [x] Add Convex schema, Posts, Reviews, feed projection, metrics, storage, milestone projection. Owner: backend worker.
-- [ ] Add protected routes, editor/renderer, Review Detail, Anime Reviews. Owner: review UI worker.
+- [x] Add protected routes, editor/renderer, Review Detail, Anime Reviews. Owner: review UI worker.
 - [ ] Replace Home mocks with feed, Composer, card lifecycle, responsive states. Owner: feed UI worker.
 - [ ] Integrate generated routes/types; run focused and full gates. Owner: controller.
 - [ ] Run spec/thermo review, responsive browser QA, docs/data-flow pass. Owner: reviewer + QA + docs mapper.
