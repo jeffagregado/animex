@@ -39,6 +39,17 @@ const requireCachedAnime = async (ctx: QueryCtx | MutationCtx, anilistId: number
 }
 
 type FeedAuthor = Awaited<ReturnType<typeof getAuthor>>
+type MilestoneRead = { mode: 'direct'; viewerId: Id<'users'> | null } | { mode: 'owner' } | { mode: 'public' }
+
+/** Identifies milestone projections. */
+const isMilestoneCard = (card: Doc<'feedCards'>): boolean => card.kind === 'completed' || card.kind === 'rewatched'
+
+/** Applies lane-specific source visibility. */
+const canReadMilestone = (milestone: Doc<'animeMilestones'>, read: MilestoneRead): boolean => {
+  if (read.mode === 'public') return milestone.visibility === 'public'
+  if (read.mode === 'direct') return canReadSocialRecord(milestone.visibility, read.viewerId, milestone.userId)
+  return true
+}
 
 const resolvePostCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, author: FeedAuthor): Promise<FeedCard> => {
   const postId = card.sourceId ? ctx.db.normalizeId('posts', card.sourceId) : null
@@ -60,16 +71,19 @@ const resolveReviewCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, author: 
   return { id: card._id, reviewId: review._id, kind: 'review', author, anime: await getAnime(ctx, review.anilistId), rating: review.rating, summary: review.summary, summaryHasSpoiler: review.summaryHasSpoiler, visibility: review.visibility, publishedAt: review.publishedAt, updatedAt: review.updatedAt }
 }
 
-const resolveMilestoneCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, author: FeedAuthor): Promise<FeedCard> => {
+const resolveMilestoneCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: MilestoneRead): Promise<FeedCard | null> => {
   if (card.anilistId === undefined || (card.kind !== 'completed' && card.kind !== 'rewatched')) return fail('FEED_SOURCE_MISSING', 'Feed milestone source is missing.')
-  return { id: card._id, kind: card.kind, author, anime: await getAnime(ctx, card.anilistId), settledAt: card.occurredAt, visibility: card.visibility }
+  if (card.sourceKey !== `${card.kind}:${card.userId}:${card.anilistId}`) return null
+  const milestone = await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', card.userId).eq('anilistId', card.anilistId as number).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
+  if (!milestone || !canReadMilestone(milestone, read)) return null
+  return { id: card._id, kind: milestone.kind, author: await getAuthor(ctx, milestone.userId), anime: await getAnime(ctx, milestone.anilistId), settledAt: milestone.occurredAt, visibility: milestone.visibility }
 }
 
-const resolveCard = async (ctx: QueryCtx, card: Doc<'feedCards'>): Promise<FeedCard> => {
+const resolveCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, milestoneRead: MilestoneRead): Promise<FeedCard | null> => {
+  if (isMilestoneCard(card)) return await resolveMilestoneCard(ctx, card, milestoneRead)
   const author = await getAuthor(ctx, card.userId)
   if (card.kind === 'post') return await resolvePostCard(ctx, card, author)
-  if (card.kind === 'review') return await resolveReviewCard(ctx, card, author)
-  return await resolveMilestoneCard(ctx, card, author)
+  return await resolveReviewCard(ctx, card, author)
 }
 
 const readGlobal = async (ctx: QueryCtx, anchor: string | null) => await ctx.db.query('feedCards')
@@ -85,6 +99,33 @@ const readOwn = async (ctx: QueryCtx, userId: Id<'users'>, anchor: string | null
   }).take(FEED_PAGE_SIZE + 1)
 
 type HomeGlobalPage = { cards: Doc<'feedCards'>[]; resumeAnchors: Array<string | null>; scannedAnchor: string | null; terminal: boolean }
+type ResolvedFeedPage = { items: FeedCard[]; resumeAnchors: Array<string | null>; scannedAnchor: string | null; terminal: boolean }
+
+/** Tracks raw anchors around one bounded batch. */
+const createRawPage = (cards: Doc<'feedCards'>[], anchor: string | null): HomeGlobalPage => {
+  const resumeAnchors: Array<string | null> = []
+  let previousAnchor = anchor
+  for (const card of cards) {
+    resumeAnchors.push(previousAnchor)
+    previousAnchor = card.orderKey
+  }
+  return { cards, resumeAnchors, scannedAnchor: previousAnchor, terminal: cards.length < FEED_PAGE_SIZE + 1 }
+}
+
+/** Resolves source-backed cards while preserving anchors. */
+const resolveFeedPage = async (ctx: QueryCtx, page: HomeGlobalPage, read: MilestoneRead): Promise<ResolvedFeedPage> => {
+  const items: FeedCard[] = []
+  const resumeAnchors: Array<string | null> = []
+  const resolved = await Promise.all(page.cards.map(async (card) => await resolveCard(ctx, card, read)))
+  for (let index = 0; index < resolved.length; index += 1) {
+    const item = resolved[index]
+    if (item) {
+      items.push(item)
+      resumeAnchors.push(page.resumeAnchors[index] ?? null)
+    }
+  }
+  return { items, resumeAnchors, scannedAnchor: page.scannedAnchor, terminal: page.terminal }
+}
 
 const readHomeGlobal = async (ctx: QueryCtx, viewerId: Id<'users'>, anchor: string | null): Promise<HomeGlobalPage> => {
   const raw = await readGlobal(ctx, anchor)
@@ -104,37 +145,40 @@ const readHomeGlobal = async (ctx: QueryCtx, viewerId: Id<'users'>, anchor: stri
 const listGlobalPage = async (ctx: QueryCtx, cursor: string | null, viewerId: Id<'users'> | null, view: FeedView) => {
   const anchors = decodeFeedCursor(cursor, view, viewerId)
   const candidates = await readGlobal(ctx, anchors.globalAnchor)
-  const page = candidates.slice(0, FEED_PAGE_SIZE)
+  const page = await resolveFeedPage(ctx, createRawPage(candidates, anchors.globalAnchor), { mode: 'public' })
+  const items = page.items.slice(0, FEED_PAGE_SIZE)
+  const hasMore = page.items.length > FEED_PAGE_SIZE || !page.terminal
+  const globalAnchor = getPageAnchor(page, items.length, anchors.globalAnchor)
   return {
-    items: await Promise.all(page.map((card) => resolveCard(ctx, card))),
-    cursor: candidates.length > FEED_PAGE_SIZE ? encodeFeedCursor({ view, viewerId, prioritizedAnchor: null, globalAnchor: page.at(-1)?.orderKey ?? null, cycleIndex: 0 }) : null,
-    hasMore: candidates.length > FEED_PAGE_SIZE,
+    items,
+    cursor: hasMore ? encodeFeedCursor({ view, viewerId, prioritizedAnchor: null, globalAnchor, cycleIndex: 0 }) : null,
+    hasMore,
   }
 }
 
-const getHomeGlobalAnchor = (page: HomeGlobalPage, consumed: number, current: string | null): string | null => {
-  if (consumed < page.cards.length) return page.resumeAnchors[consumed] ?? current
+/** Advances through consumed and suppressed projections. */
+const getPageAnchor = (page: ResolvedFeedPage, consumed: number, current: string | null): string | null => {
+  if (consumed < page.items.length) return page.resumeAnchors[consumed] ?? current
   return page.scannedAnchor
 }
 
-const hasHomeItems = (ownCount: number, ownConsumed: number, globalPage: HomeGlobalPage, globalConsumed: number): boolean => {
-  if (ownCount > ownConsumed) return true
-  if (globalPage.cards.length > globalConsumed) return true
-  return !globalPage.terminal
+/** Detects remaining Home lane work. */
+const hasHomeItems = (ownPage: ResolvedFeedPage, ownConsumed: number, globalPage: ResolvedFeedPage, globalConsumed: number): boolean => {
+  if (ownPage.items.length > ownConsumed || !ownPage.terminal) return true
+  return globalPage.items.length > globalConsumed || !globalPage.terminal
 }
 
 const listHomePage = async (ctx: QueryCtx, cursor: string | null, viewerId: Id<'users'>) => {
   const anchors = decodeFeedCursor(cursor, 'home', viewerId)
-  const [own, globalPage] = await Promise.all([readOwn(ctx, viewerId, anchors.prioritizedAnchor), readHomeGlobal(ctx, viewerId, anchors.globalAnchor)])
-  const global = globalPage.cards
-  const [ownDtos, globalDtos] = await Promise.all([
-    Promise.all(own.slice(0, FEED_PAGE_SIZE).map((card) => resolveCard(ctx, card))),
-    Promise.all(global.slice(0, FEED_PAGE_SIZE).map((card) => resolveCard(ctx, card))),
+  const [own, global] = await Promise.all([readOwn(ctx, viewerId, anchors.prioritizedAnchor), readHomeGlobal(ctx, viewerId, anchors.globalAnchor)])
+  const [ownPage, globalPage] = await Promise.all([
+    resolveFeedPage(ctx, createRawPage(own, anchors.prioritizedAnchor), { mode: 'owner' }),
+    resolveFeedPage(ctx, global, { mode: 'public' }),
   ])
-  const merged = mergeFeedCards(ownDtos, globalDtos, FEED_PAGE_SIZE, anchors.cycleIndex)
-  const prioritizedAnchor = merged.prioritizedConsumed > 0 ? own[merged.prioritizedConsumed - 1]?.orderKey ?? anchors.prioritizedAnchor : anchors.prioritizedAnchor
-  const globalAnchor = getHomeGlobalAnchor(globalPage, merged.globalConsumed, anchors.globalAnchor)
-  const hasMore = hasHomeItems(own.length, merged.prioritizedConsumed, globalPage, merged.globalConsumed)
+  const merged = mergeFeedCards(ownPage.items, globalPage.items, FEED_PAGE_SIZE, anchors.cycleIndex)
+  const prioritizedAnchor = getPageAnchor(ownPage, merged.prioritizedConsumed, anchors.prioritizedAnchor)
+  const globalAnchor = getPageAnchor(globalPage, merged.globalConsumed, anchors.globalAnchor)
+  const hasMore = hasHomeItems(ownPage, merged.prioritizedConsumed, globalPage, merged.globalConsumed)
   return { items: merged.items, cursor: hasMore ? encodeFeedCursor({ view: 'home', viewerId, prioritizedAnchor, globalAnchor, cycleIndex: merged.nextCycleIndex }) : null, hasMore }
 }
 
@@ -163,14 +207,21 @@ export const listFollowing = query({
   },
 })
 
+/** Resolves a card using authoritative direct-read access. */
+const resolveDirectCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, viewerId: Id<'users'> | null): Promise<FeedCard | null> => {
+  if (isMilestoneCard(card)) return await resolveMilestoneCard(ctx, card, { mode: 'direct', viewerId })
+  if (!canReadSocialRecord(card.visibility, viewerId, card.userId)) return null
+  return await resolveCard(ctx, card, { mode: 'direct', viewerId })
+}
+
 export const getById = query({
   args: { cardId: v.string() }, returns: v.union(feedCardValidator, v.null()),
   handler: async (ctx, args) => {
     const cardId = ctx.db.normalizeId('feedCards', args.cardId)
     if (!cardId) return null
     const [card, viewer] = await Promise.all([ctx.db.get('feedCards', cardId), getOptionalProfile(ctx)])
-    if (!card || !card.active || !canReadSocialRecord(card.visibility, viewer?._id ?? null, card.userId)) return null
-    return await resolveCard(ctx, card)
+    if (!card || !card.active) return null
+    return await resolveDirectCard(ctx, card, viewer?._id ?? null)
   },
 })
 
@@ -223,15 +274,31 @@ export const removeActivity = mutation({
   },
 })
 
+/** Checks projection fields against milestone truth. */
+const matchesMilestoneProjection = (card: Doc<'feedCards'> | null, milestone: Doc<'animeMilestones'>, sourceKey: string): boolean => {
+  if (!card) return false
+  const fields = [
+    [card.kind, milestone.kind], [card.userId, milestone.userId], [card.anilistId, milestone.anilistId],
+    [card.visibility, milestone.visibility], [card.occurredAt, milestone.occurredAt], [card.updatedAt, milestone.updatedAt],
+    [card.orderKey, makeOrderKey(milestone.occurredAt, sourceKey)],
+  ]
+  return fields.every(([actual, expected]) => actual === expected)
+}
+
 export const projectMilestones = internalMutation({
   args: { paginationOpts: paginationOptsValidator },
-  returns: v.object({ continueCursor: v.string(), isDone: v.boolean() }),
+  returns: v.object({ continueCursor: v.string(), isDone: v.boolean(), processedCount: v.number(), verifiedCount: v.number() }),
   handler: async (ctx, args) => {
     const page = await ctx.db.query('animeMilestones').paginate(args.paginationOpts)
+    let verifiedCount = 0
     for (const milestone of page.page) {
       await requireCachedAnime(ctx, milestone.anilistId)
       await upsertMilestoneCard(ctx, milestone, false)
+      const sourceKey = `${milestone.kind}:${milestone.userId}:${milestone.anilistId}`
+      const card = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', sourceKey)).unique()
+      if (!matchesMilestoneProjection(card, milestone, sourceKey)) return fail('MILESTONE_PROJECTION_INVALID', `Milestone projection validation failed for ${sourceKey}.`)
+      verifiedCount += 1
     }
-    return { continueCursor: page.continueCursor, isDone: page.isDone }
+    return { continueCursor: page.continueCursor, isDone: page.isDone, processedCount: page.page.length, verifiedCount }
   },
 })

@@ -180,11 +180,16 @@ describe('social Convex integration', () => {
     const owner = await createOwner(t, 'milestone-owner')
     await insertAnime(t, 88)
     expect(await owner.client.query(socialApi.feed.getById, { cardId: 'not-a-convex-id' })).toBeNull()
-    const cardId = await t.run(async (ctx) => await ctx.db.insert('feedCards', {
-      sourceKey: `completed:${owner.profileId}:88`, kind: 'completed', userId: owner.profileId,
-      anilistId: 88, visibility: 'private', active: true, orderKey: '0000000000000001:test',
-      occurredAt: 1, updatedAt: 1,
-    }))
+    const cardId = await t.run(async (ctx) => {
+      await ctx.db.insert('animeMilestones', {
+        userId: owner.profileId, anilistId: 88, kind: 'completed', visibility: 'private', occurredAt: 1, updatedAt: 1,
+      })
+      return await ctx.db.insert('feedCards', {
+        sourceKey: `completed:${owner.profileId}:88`, kind: 'completed', userId: owner.profileId,
+        anilistId: 88, visibility: 'private', active: true, orderKey: '0000000000000001:test',
+        occurredAt: 1, updatedAt: 1,
+      })
+    })
     expect(await owner.client.query(socialApi.feed.getById, { cardId })).toMatchObject({
       id: cardId, kind: 'completed', visibility: 'private',
     })
