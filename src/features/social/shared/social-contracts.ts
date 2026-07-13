@@ -91,6 +91,7 @@ const milestoneFeedCardFields = {
   author: socialAuthorSchema,
   id: idSchema,
   settledAt: timestampSchema,
+  visibility: visibilitySchema,
 }
 
 const completedFeedCardSchema = z.object({ ...milestoneFeedCardFields, kind: z.literal('completed') }).strict()

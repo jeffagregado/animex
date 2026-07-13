@@ -15,8 +15,8 @@ const animeValidator = v.object({ anilistId: v.number(), slug: v.string(), title
 const feedCardValidator = v.union(
   v.object({ id: v.string(), postId: v.string(), kind: v.literal('post'), author: authorValidator, text: v.string(), imageIds: v.array(v.string()), imageUrls: v.array(v.string()), hasSpoiler: v.boolean(), visibility: visibilityValidator, createdAt: v.number(), updatedAt: v.number() }),
   v.object({ id: v.string(), reviewId: v.string(), kind: v.literal('review'), author: authorValidator, anime: animeValidator, rating: v.number(), summary: v.string(), summaryHasSpoiler: v.boolean(), visibility: visibilityValidator, publishedAt: v.number(), updatedAt: v.number() }),
-  v.object({ id: v.string(), kind: v.literal('completed'), author: authorValidator, anime: animeValidator, settledAt: v.number() }),
-  v.object({ id: v.string(), kind: v.literal('rewatched'), author: authorValidator, anime: animeValidator, settledAt: v.number() }),
+  v.object({ id: v.string(), kind: v.literal('completed'), author: authorValidator, anime: animeValidator, settledAt: v.number(), visibility: visibilityValidator }),
+  v.object({ id: v.string(), kind: v.literal('rewatched'), author: authorValidator, anime: animeValidator, settledAt: v.number(), visibility: visibilityValidator }),
 )
 const feedPageValidator = v.object({ items: v.array(feedCardValidator), cursor: v.union(v.string(), v.null()), hasMore: v.boolean() })
 const fail = (code: string, message: string): never => { throw new ConvexError({ code, message }) }
@@ -62,7 +62,7 @@ const resolveReviewCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, author: 
 
 const resolveMilestoneCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, author: FeedAuthor): Promise<FeedCard> => {
   if (card.anilistId === undefined || (card.kind !== 'completed' && card.kind !== 'rewatched')) return fail('FEED_SOURCE_MISSING', 'Feed milestone source is missing.')
-  return { id: card._id, kind: card.kind, author, anime: await getAnime(ctx, card.anilistId), settledAt: card.occurredAt }
+  return { id: card._id, kind: card.kind, author, anime: await getAnime(ctx, card.anilistId), settledAt: card.occurredAt, visibility: card.visibility }
 }
 
 const resolveCard = async (ctx: QueryCtx, card: Doc<'feedCards'>): Promise<FeedCard> => {
@@ -164,9 +164,11 @@ export const listFollowing = query({
 })
 
 export const getById = query({
-  args: { cardId: v.id('feedCards') }, returns: v.union(feedCardValidator, v.null()),
+  args: { cardId: v.string() }, returns: v.union(feedCardValidator, v.null()),
   handler: async (ctx, args) => {
-    const [card, viewer] = await Promise.all([ctx.db.get('feedCards', args.cardId), getOptionalProfile(ctx)])
+    const cardId = ctx.db.normalizeId('feedCards', args.cardId)
+    if (!cardId) return null
+    const [card, viewer] = await Promise.all([ctx.db.get('feedCards', cardId), getOptionalProfile(ctx)])
     if (!card || !card.active || !canReadSocialRecord(card.visibility, viewer?._id ?? null, card.userId)) return null
     return await resolveCard(ctx, card)
   },

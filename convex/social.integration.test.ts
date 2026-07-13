@@ -156,6 +156,21 @@ describe('social Convex integration', () => {
     expect(home.items.slice(0, 2).every((item: { author: { username: string } }) => item.author.username === 'feed-owner')).toBe(true)
   }, 20_000)
 
+  test('returns null for malformed direct feed IDs and exposes milestone visibility', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'milestone-owner')
+    await insertAnime(t, 88)
+    expect(await owner.client.query(socialApi.feed.getById, { cardId: 'not-a-convex-id' })).toBeNull()
+    const cardId = await t.run(async (ctx) => await ctx.db.insert('feedCards', {
+      sourceKey: `completed:${owner.profileId}:88`, kind: 'completed', userId: owner.profileId,
+      anilistId: 88, visibility: 'private', active: true, orderKey: '0000000000000001:test',
+      occurredAt: 1, updatedAt: 1,
+    }))
+    expect(await owner.client.query(socialApi.feed.getById, { cardId })).toMatchObject({
+      id: cardId, kind: 'completed', visibility: 'private',
+    })
+  })
+
   test('rejects publish request collisions across anime and Draft intent', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'collision-owner')
