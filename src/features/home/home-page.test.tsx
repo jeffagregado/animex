@@ -1,16 +1,31 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { getFunctionName } from 'convex/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { type AuthState } from '../auth/profile-actions'
+import type { AnimeSummary, DiscoverPageData } from '../discover/shared/discover-contracts'
 import { PublicAuthStateProvider } from '../shell/public-auth-context'
 import { HomePage } from './home-page'
+import { HomeWeeklyList } from './home-weekly-list'
 
 const convex = vi.hoisted(() => ({ authenticated: true, query: vi.fn(async (..._args: unknown[]) => ({ items: [], cursor: null, hasMore: false })), mutation: vi.fn(() => vi.fn()) }))
+const serverMocks = vi.hoisted(() => ({ refreshDiscoverSection: vi.fn() }))
 vi.mock('convex/react', () => ({ useConvexAuth: () => ({ isAuthenticated: convex.authenticated, isLoading: false }), useConvex: () => ({ query: convex.query }), useMutation: convex.mutation }))
-const home = <HomePage onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} />
+vi.mock('../discover/server/discover.functions', () => ({ refreshDiscoverSection: serverMocks.refreshDiscoverSection }))
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, to, params, className }: { children: React.ReactNode; to: string; params: Record<string, string>; className?: string }) => <a className={className} href={to.replace('$anilistId', params.anilistId).replace('$slug', params.slug)}>{children}</a>,
+}))
+
+const anime: AnimeSummary = {
+  anilistId: 1, slug: 'loader-anime', titles: { display: 'Loader Anime', english: 'Loader Anime', romaji: null, native: null }, coverImageUrl: 'https://example.test/loader.jpg', bannerImageUrl: null, format: 'TV', season: 'SUMMER', seasonYear: 2026, episodes: 12, genres: ['Action'], popularity: 100, averageScore: 80, trending: 90, startDate: null, nextAiringAt: null,
+}
+const ready = (key: 'trending' | 'seasonal' | 'recommendations' | 'upcoming', items: AnimeSummary[] = [anime]) => ({ status: 'ready' as const, section: { key, items, refreshedAt: 1, expiresAt: 2 } })
+const data: DiscoverPageData = { sections: { trending: ready('trending'), seasonal: ready('seasonal'), recommendations: ready('recommendations'), upcoming: ready('upcoming') } }
+const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+const home = <QueryClientProvider client={client}><HomePage data={data} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider>
 
 const mockAuthState = (state: AuthState): void => {
   vi.stubGlobal(
@@ -37,9 +52,55 @@ afterEach(() => {
   convex.authenticated = true
   convex.query.mockClear()
   convex.mutation.mockClear()
+  serverMocks.refreshDiscoverSection.mockReset()
 })
 
 describe('HomePage', () => {
+  it('renders Seasonal from hydrated Discover data with rail controls', () => {
+    mockAuthState({ status: 'signedOut' })
+
+    render(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)
+
+    expect(screen.getByText('Loader Anime')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Previous Seasonal Anime' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Next Seasonal Anime' })).toBeTruthy()
+  })
+
+  it('preserves Seasonal loading, empty, and image-error states', () => {
+    mockAuthState({ status: 'signedOut' })
+    const view = render(<PublicAuthStateProvider><QueryClientProvider client={client}><HomePage onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider></PublicAuthStateProvider>)
+    expect(screen.getByLabelText('Seasonal Anime loading')).toBeTruthy()
+
+    const emptyData: DiscoverPageData = { sections: { ...data.sections, seasonal: ready('seasonal', []) } }
+    view.rerender(<PublicAuthStateProvider><QueryClientProvider client={client}><HomePage data={emptyData} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider></PublicAuthStateProvider>)
+    expect(screen.getByText('No anime available in this section.')).toBeTruthy()
+
+    view.rerender(<PublicAuthStateProvider><QueryClientProvider client={client}><HomePage data={data} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider></PublicAuthStateProvider>)
+    fireEvent.error(screen.getByAltText('Loader Anime cover'))
+    expect(screen.getByText('Image unavailable')).toBeTruthy()
+  })
+
+  it('retries Seasonal through the shared section refresh path', async () => {
+    mockAuthState({ status: 'signedOut' })
+    const errorData: DiscoverPageData = { sections: { ...data.sections, seasonal: { status: 'error', key: 'seasonal', code: 'RATE_LIMITED', retryAfterSeconds: 12 } } }
+    serverMocks.refreshDiscoverSection.mockResolvedValueOnce(ready('seasonal'))
+
+    render(<PublicAuthStateProvider><QueryClientProvider client={client}><HomePage data={errorData} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider></PublicAuthStateProvider>)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Seasonal Anime' }))
+
+    await waitFor(() => expect(serverMocks.refreshDiscoverSection).toHaveBeenCalledWith({ data: 'seasonal' }))
+    expect(await screen.findByText('Loader Anime')).toBeTruthy()
+  })
+
+  it('adapts Trending state to the shared top-five weekly list', () => {
+    const weeklyItems = Array.from({ length: 6 }, (_, index) => ({ ...anime, anilistId: index + 1, slug: `anime-${index + 1}`, titles: { ...anime.titles, display: `Anime ${index + 1}` } }))
+
+    render(<HomeWeeklyList state={ready('trending', weeklyItems)} onRetry={vi.fn()} isRetrying={false} retryError={null} variant="desktop" />)
+
+    expect(screen.getByText('Anime 5')).toBeTruthy()
+    expect(screen.queryByText('Anime 6')).toBeNull()
+  })
+
   it('renders content without duplicating the public shell', () => {
     mockAuthState({
       status: 'signedOut',

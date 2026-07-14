@@ -1,13 +1,18 @@
 import { createFileRoute } from '@tanstack/react-router'
 
+import { getDiscoverPage } from '#/features/discover/server/discover.functions'
 import type { HomeFeedSearch } from '#/features/feed/feed-page'
 import { HomePage } from '#/features/home/home-page'
+
+/** Loads shared Discover sections through the existing server boundary. */
+const loadHomePage = async () => await getDiscoverPage()
 
 export const Route = createFileRoute('/_public/home')({
   validateSearch: (search): Partial<HomeFeedSearch> => {
     const normalized = normalizeHomeSearch(search)
     return { ...(search.feed === undefined ? {} : { feed: normalized.feed }), ...(search.compose === undefined ? {} : { compose: normalized.compose }) }
   },
+  loader: loadHomePage,
   component: HomeRoute,
 })
 
@@ -18,7 +23,8 @@ function normalizeHomeSearch(search: Record<string, unknown>): HomeFeedSearch {
 }
 
 function HomeRoute() {
+  const data = Route.useLoaderData()
   const search = normalizeHomeSearch(Route.useSearch())
   const navigate = Route.useNavigate()
-  return <HomePage search={search} onSearchChange={(next) => { void navigate({ search: next }) }} />
+  return <HomePage data={data} search={search} onSearchChange={(next) => { void navigate({ search: next }) }} />
 }

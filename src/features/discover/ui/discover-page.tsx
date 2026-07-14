@@ -1,68 +1,20 @@
-import { useRef, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
 import { BookOpen, Sparkles } from 'lucide-react'
 
-import { refreshDiscoverSection } from '../server/discover.functions'
-import { DISCOVER_GENRES, type DiscoverSectionKey, type DiscoverSectionState } from '../shared/discover-contracts'
+import { DISCOVER_GENRES } from '../shared/discover-contracts'
 import { DiscoverSearchFilters } from './discover-search-filters'
 import { DiscoverSearchResults } from './discover-search-results'
 import { DiscoverSectionRail } from './discover-section'
 import { DiscoverUpcomingList } from './discover-upcoming-list'
 import { DiscoverWeeklyList } from './discover-weekly-list'
 import type { DiscoverPageProps } from './discover-ui.types'
-
-const getRefreshErrorMessage = (error: unknown): string => error instanceof Error && error.message.length > 0 ? error.message : 'Refresh failed. Try again.'
-
-type SectionRefresher = {
-  retry: (key: DiscoverSectionKey) => void
-  isPending: boolean
-  isError: boolean
-  error: unknown
-}
-
-/** Isolates pending and error state for one discover section refresh. */
-function useSectionRefresher(onSuccess: (state: DiscoverSectionState) => void): SectionRefresher {
-  const activeKey = useRef<DiscoverSectionKey | null>(null)
-  const mutation = useMutation({
-    mutationFn: async (key: DiscoverSectionKey) => await refreshDiscoverSection({ data: key }),
-    onSuccess,
-    onSettled: () => {
-      activeKey.current = null
-    },
-  })
-  const retry = (key: DiscoverSectionKey): void => {
-    if (activeKey.current !== null) {
-      return
-    }
-    activeKey.current = key
-    mutation.mutate(key)
-  }
-  return { retry, isPending: mutation.isPending, isError: mutation.isError, error: mutation.error }
-}
+import { useDiscoverSections } from './use-discover-sections'
 
 /** Provides responsive Discover rails plus URL-controlled search. */
 export function DiscoverPage({ data, isLoading, searchState, onSearchStateChange }: DiscoverPageProps) {
-  const [overrides, setOverrides] = useState<Partial<Record<DiscoverSectionKey, DiscoverSectionState>>>({})
-  const applyRefresh = (state: DiscoverSectionState): void => {
-    const key = state.status === 'ready' ? state.section.key : state.key
-    setOverrides((current) => ({ ...current, [key]: state }))
-  }
-  const trendingRefresh = useSectionRefresher(applyRefresh)
-  const seasonalRefresh = useSectionRefresher(applyRefresh)
-  const recommendationRefresh = useSectionRefresher(applyRefresh)
-  const upcomingRefresh = useSectionRefresher(applyRefresh)
-  const getSection = (key: DiscoverSectionKey): DiscoverSectionState | undefined => overrides[key] ?? data?.sections[key]
-  const getRetryProps = (refresh: SectionRefresher): { isRetrying: boolean, retryError: string | null } => ({
-    isRetrying: refresh.isPending,
-    retryError: refresh.isError ? getRefreshErrorMessage(refresh.error) : null,
-  })
-  const trending = getSection('trending')
+  const discover = useDiscoverSections(data, isLoading)
+  const trending = discover.sections.trending
   const weeklyItems = trending?.status === 'ready' ? trending.section.items.slice(0, 5) : []
   const selectGenre = (genre: typeof DISCOVER_GENRES[number]): void => onSearchStateChange({ ...searchState, genre }, 'push')
-  const trendingRetry = getRetryProps(trendingRefresh)
-  const seasonalRetry = getRetryProps(seasonalRefresh)
-  const recommendationRetry = getRetryProps(recommendationRefresh)
-  const upcomingRetry = getRetryProps(upcomingRefresh)
 
   return (
     <main className="min-h-dvh overflow-x-clip bg-background text-foreground">
@@ -74,18 +26,18 @@ export function DiscoverPage({ data, isLoading, searchState, onSearchStateChange
           </header>
           <DiscoverSearchFilters searchState={searchState} onStateChange={onSearchStateChange} />
           <DiscoverSearchResults searchState={searchState} />
-          <DiscoverSectionRail title="Trending Anime" state={isLoading ? undefined : trending} onRetry={trendingRefresh.retry} {...trendingRetry} />
-          <DiscoverSectionRail title="Seasonal Anime" state={isLoading ? undefined : getSection('seasonal')} onRetry={seasonalRefresh.retry} {...seasonalRetry} />
+          <DiscoverSectionRail title="Trending Anime" state={trending} {...discover.retryProps.trending} />
+          <DiscoverSectionRail title="Seasonal Anime" state={discover.sections.seasonal} {...discover.retryProps.seasonal} />
           <section aria-labelledby="genres-heading" className="space-y-3">
             <h2 id="genres-heading" className="text-xl font-extrabold">Genres</h2>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {DISCOVER_GENRES.map((genre) => <button className="rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold outline-none transition hover:border-cyan-300 hover:bg-cyan-300/10 focus-visible:ring-2 focus-visible:ring-cyan-300" type="button" onClick={() => selectGenre(genre)} key={genre}>{genre}</button>)}
             </div>
           </section>
-          <DiscoverSectionRail title="Popular Recommendations" state={isLoading ? undefined : getSection('recommendations')} onRetry={recommendationRefresh.retry} {...recommendationRetry} />
+          <DiscoverSectionRail title="Popular Recommendations" state={discover.sections.recommendations} {...discover.retryProps.recommendations} />
           <div className="space-y-7 lg:hidden">
             <DiscoverWeeklyList items={weeklyItems} variant="mobile" />
-            <DiscoverUpcomingList state={isLoading ? undefined : getSection('upcoming')} onRetry={upcomingRefresh.retry} variant="mobile" {...upcomingRetry} />
+            <DiscoverUpcomingList state={discover.sections.upcoming} variant="mobile" {...discover.retryProps.upcoming} />
             <MangaPlaceholder />
           </div>
         </div>
@@ -97,7 +49,7 @@ export function DiscoverPage({ data, isLoading, searchState, onSearchStateChange
               {DISCOVER_GENRES.map((genre) => <button className="rounded border border-border px-2 py-2 text-left text-sm outline-none transition hover:bg-muted focus-visible:ring-2 focus-visible:ring-cyan-300" type="button" onClick={() => selectGenre(genre)} key={genre}>{genre}</button>)}
             </div>
           </section>
-          <section className="rounded-lg border border-border bg-card p-4"><DiscoverUpcomingList state={isLoading ? undefined : getSection('upcoming')} onRetry={upcomingRefresh.retry} variant="desktop" {...upcomingRetry} /></section>
+          <section className="rounded-lg border border-border bg-card p-4"><DiscoverUpcomingList state={discover.sections.upcoming} variant="desktop" {...discover.retryProps.upcoming} /></section>
           <MangaPlaceholder />
         </aside>
       </div>
