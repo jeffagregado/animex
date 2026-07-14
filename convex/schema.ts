@@ -6,6 +6,15 @@ const storedReviewRatingBandValidator = v.union(
   v.literal('40-49'), v.literal('30-39'), v.literal('20-29'), v.literal('10-19'), v.literal('0-9'), v.literal('none'),
 )
 
+const postMediaValidator = v.union(
+  v.object({ type: v.literal('image'), url: v.string(), description: v.union(v.string(), v.null()) }),
+  v.object({
+    type: v.literal('video'), url: v.string(),
+    provider: v.union(v.literal('youtube'), v.literal('vimeo'), v.literal('external')),
+    label: v.union(v.string(), v.null()),
+  }),
+)
+
 export default defineSchema({
   products: defineTable({
     title: v.string(),
@@ -156,10 +165,12 @@ export default defineSchema({
   posts: defineTable({
     userId: v.id('users'), requestId: v.string(), text: v.string(), hasSpoiler: v.boolean(),
     visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
-    imageIds: v.array(v.id('postImages')), createdAt: v.number(), updatedAt: v.number(),
+    imageIds: v.optional(v.array(v.id('postImages'))),
+    media: v.optional(v.union(postMediaValidator, v.null())), createdAt: v.number(), updatedAt: v.number(),
   })
     .index('by_user_request', ['userId', 'requestId'])
-    .index('by_user_created_at', ['userId', 'createdAt']),
+    .index('by_user_created_at', ['userId', 'createdAt'])
+    .index('by_created_at', ['createdAt']),
   postImages: defineTable({
     ownerId: v.id('users'), claimId: v.string(), storageId: v.optional(v.id('_storage')),
     mimeType: v.string(), size: v.number(), width: v.number(), height: v.number(),
@@ -169,7 +180,8 @@ export default defineSchema({
     .index('by_owner_claim', ['ownerId', 'claimId'])
     .index('by_owner_state', ['ownerId', 'state'])
     .index('by_post_order', ['postId', 'order'])
-    .index('by_storage_id', ['storageId']),
+    .index('by_storage_id', ['storageId'])
+    .index('by_created_at', ['createdAt']),
   reviews: defineTable({
     userId: v.id('users'), anilistId: v.number(), requestId: v.string(),
     state: v.union(v.literal('draft'), v.literal('published')), rating: v.union(v.number(), v.null()),
@@ -209,7 +221,8 @@ export default defineSchema({
     .index('by_source_key', ['sourceKey'])
     .index('by_public_active_order', ['visibility', 'active', 'orderKey'])
     .index('by_user_active_order', ['userId', 'active', 'orderKey'])
-    .index('by_user_source', ['userId', 'sourceKey']),
+    .index('by_user_source', ['userId', 'sourceKey'])
+    .index('by_kind_source', ['kind', 'sourceId']),
   follows: defineTable({
     followerId: v.id('users'), followingId: v.id('users'), createdAt: v.number(),
   })

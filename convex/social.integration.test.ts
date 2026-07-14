@@ -52,6 +52,34 @@ const body = {
 const bodyJson = JSON.stringify(body)
 
 describe('social Convex integration', () => {
+  test('accepts legacy imageIds and nullable external media during transition', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'transition-owner')
+    const imageId = await t.run(async (ctx) => await ctx.db.insert('postImages', {
+      ownerId: owner.profileId, claimId: 'transition-image', mimeType: 'image/png', size: 5,
+      width: 1, height: 1, state: 'pending', createdAt: Date.now(), updatedAt: Date.now(),
+    }))
+    const [legacyPostId, externalPostId] = await t.run(async (ctx) => {
+      const now = Date.now()
+      return await Promise.all([
+        ctx.db.insert('posts', {
+          userId: owner.profileId, requestId: 'transition-legacy', text: '', imageIds: [imageId],
+          hasSpoiler: false, visibility: 'public', createdAt: now, updatedAt: now,
+        }),
+        ctx.db.insert('posts', {
+          userId: owner.profileId, requestId: 'transition-external', text: '',
+          media: { type: 'image', url: 'https://example.com/image.jpg', description: null },
+          hasSpoiler: false, visibility: 'public', createdAt: now, updatedAt: now,
+        }),
+      ])
+    })
+
+    expect(await t.run(async (ctx) => await ctx.db.get('posts', legacyPostId))).toMatchObject({ imageIds: [imageId] })
+    expect(await t.run(async (ctx) => await ctx.db.get('posts', externalPostId))).toMatchObject({
+      media: { type: 'image', url: 'https://example.com/image.jpg', description: null },
+    })
+  })
+
   test('discovers latest Public Reviews without leaking viewer-owned visibility', async () => {
     const t = createHarness()
     const viewer = await createOwner(t, 'discovery-viewer')
