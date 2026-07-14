@@ -8,8 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import { reviewListItemSchema, type ReviewListItem } from '../social/shared/social-contracts'
 import { ReviewSummary } from '../reviews/ui/review-summary'
 
+type PublishedReviewListItem = Omit<ReviewListItem, 'state' | 'publishedAt'> & { state: 'published'; publishedAt: number }
+
 type LatestReviewsState = {
-  items: ReviewListItem[]
+  items: PublishedReviewListItem[]
   loading: boolean
   error: string | null
 }
@@ -25,7 +27,7 @@ export function HomeLatestReviews() {
     setState((current) => ({ ...current, loading: true, error: null }))
     void client.query(api.reviews.listLatestPublic, { limit: 5 }).then((raw) => {
       if (!active) return
-      const items = raw.map((item) => reviewListItemSchema.parse(item))
+      const items = raw.map(parseLatestReview)
       setState({ items, loading: false, error: null })
     }).catch((cause: unknown) => {
       if (!active) return
@@ -39,10 +41,22 @@ export function HomeLatestReviews() {
 }
 
 /** Renders one compact latest-Review row. */
-function LatestReviewRow({ review }: { review: ReviewListItem }) {
+function LatestReviewRow({ review }: { review: PublishedReviewListItem }) {
   const [imageFailed, setImageFailed] = useState(false)
-  const timestamp = review.publishedAt ?? review.updatedAt
+  const timestamp = review.publishedAt
   return <li className="py-3"><article className="flex min-w-0 gap-3"><div className="h-20 w-14 shrink-0 overflow-hidden rounded-md bg-muted">{review.anime.coverImageUrl !== null && !imageFailed ? <img alt={`${review.anime.title} cover`} className="size-full object-cover" onError={() => setImageFailed(true)} src={review.anime.coverImageUrl} /> : <span className="grid size-full place-items-center text-muted-foreground"><ImageOffIcon aria-label="Image unavailable" className="size-4" /></span>}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{review.author.displayName}</p><time className="text-xs text-muted-foreground" dateTime={new Date(timestamp).toISOString()}>{formatRelativeTime(timestamp, Date.now())}</time><ReviewSummary hasSpoiler={review.summaryHasSpoiler} summary={review.summary} variant="list" /><a aria-label={`Read ${review.anime.title} review by ${review.author.displayName}`} className="mt-2 inline-flex text-xs font-bold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/reviews/${review.id}`}>Read review</a></div></article></li>
+}
+
+/** Rejects non-published or dateless records before shared DTO parsing. */
+function parseLatestReview(value: unknown): PublishedReviewListItem {
+  if (typeof value !== 'object' || value === null || !('state' in value) || !('publishedAt' in value) || value.state !== 'published' || typeof value.publishedAt !== 'number') {
+    throw new TypeError('Latest Reviews requires published Reviews with publish times.')
+  }
+  const parsed = reviewListItemSchema.parse(value)
+  if (parsed.state !== 'published' || parsed.publishedAt === null) {
+    throw new TypeError('Latest Reviews requires published Reviews with publish times.')
+  }
+  return { ...parsed, state: 'published', publishedAt: parsed.publishedAt }
 }
 
 /** Formats compact relative timestamps without external date dependencies. */

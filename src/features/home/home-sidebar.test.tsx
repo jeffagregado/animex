@@ -90,6 +90,17 @@ describe('Home utility data states', () => {
     await waitFor(() => expect(mocks.query).toHaveBeenCalledTimes(3))
   })
 
+  it.each([
+    { state: 'draft', publishedAt: null },
+    { state: 'published', publishedAt: null },
+  ])('rejects a $state Review without published truth', async ({ state, publishedAt }) => {
+    mocks.query.mockResolvedValue([{ ...review, state, publishedAt }])
+    render(<HomeLatestReviews />)
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Latest Reviews requires published Reviews with publish times.')
+    expect(screen.queryByText('A patient and thoughtful journey.')).toBeNull()
+  })
+
   it('renders proportional List Progress and preserves it on refresh failure', async () => {
     mocks.query.mockResolvedValueOnce({ watching: 1, completed: 2, planned: 3, dropped: 4 }).mockRejectedValueOnce(new Error('Progress refresh failed.'))
     render(<HomeListProgress />)

@@ -9,14 +9,14 @@ afterEach(cleanup)
 
 describe('ReviewSummary', () => {
   it('starts spoiler summaries covered and reveals on intent', () => {
-    render(<ReviewSummary hasSpoiler summary="Fern learns the truth." />)
+    render(<ReviewSummary hasSpoiler summary="Fern learns the truth." variant="detail" />)
     expect(screen.queryByText('Fern learns the truth.')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Reveal summary spoiler' }))
     expect(screen.getByText('Fern learns the truth.')).toBeTruthy()
   })
 
   it('renders non-spoiler summaries immediately', () => {
-    render(<ReviewSummary hasSpoiler={false} summary="A patient journey." />)
+    render(<ReviewSummary hasSpoiler={false} summary="A patient journey." variant="detail" />)
     const summary = screen.getByText('A patient journey.')
     expect(summary.className).toContain('text-lg')
     expect(summary.className).toContain('italic')
@@ -42,13 +42,13 @@ describe('ReviewSummary', () => {
   })
 
   it('covers safely when spoiler status or summary content changes', () => {
-    const view = render(<ReviewSummary hasSpoiler={false} summary="Same summary" />)
+    const view = render(<ReviewSummary hasSpoiler={false} summary="Same summary" variant="detail" />)
     expect(screen.getByText('Same summary')).toBeTruthy()
-    view.rerender(<ReviewSummary hasSpoiler summary="Same summary" />)
+    view.rerender(<ReviewSummary hasSpoiler summary="Same summary" variant="detail" />)
     expect(screen.queryByText('Same summary')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Reveal summary spoiler' }))
     expect(screen.getByText('Same summary')).toBeTruthy()
-    view.rerender(<ReviewSummary hasSpoiler summary="Changed secret" />)
+    view.rerender(<ReviewSummary hasSpoiler summary="Changed secret" variant="detail" />)
     expect(screen.queryByText('Changed secret')).toBeNull()
   })
 })
