@@ -5,7 +5,6 @@ import {
   REVIEW_DOCUMENT_MAX_DEPTH,
   REVIEW_DOCUMENT_MAX_MEDIA,
   REVIEW_DOCUMENT_MAX_NODES,
-  REVIEW_DOCUMENT_MAX_URL_LENGTH,
   REVIEW_DOCUMENT_MAX_VISIBLE_TEXT,
   REVIEW_SUMMARY_LIMIT,
   createReviewStats,
@@ -13,6 +12,7 @@ import {
   validateDraftReview,
   validatePublishedReview,
 } from './review-document'
+import { EXTERNAL_MEDIA_URL_MAX_LENGTH, getVideoProvider } from './external-media'
 
 const text = (value: string, format = 0) => ({ detail: 0, format, mode: 'normal', style: '', text: value, type: 'text', version: 1 })
 const paragraph = (children: unknown[]) => ({ children, direction: null, format: '', indent: 0, textFormat: 0, textStyle: '', type: 'paragraph', version: 1 })
@@ -79,7 +79,7 @@ describe('review document validation', () => {
     expect(() => parseReviewDocument(document([{ type: 'review-image', version: 1, url: 'https://user:pass@images.example/a.jpg', alt: 'A' }]))).toThrow()
     expect(() => parseReviewDocument(document([{ type: 'review-image', version: 1, url: 'https://images.example/a.jpg', alt: '   ' }]))).toThrow()
     expect(() => parseReviewDocument(document([{ type: 'review-video', version: 1, url: 'https://youtu.be/x', provider: 'vimeo' }]))).toThrow()
-    expect(() => parseReviewDocument(document([{ type: 'review-video', version: 1, url: `https://example.com/${'x'.repeat(REVIEW_DOCUMENT_MAX_URL_LENGTH)}`, provider: 'external' }]))).toThrow()
+    expect(() => parseReviewDocument(document([{ type: 'review-video', version: 1, url: `https://example.com/${'x'.repeat(EXTERNAL_MEDIA_URL_MAX_LENGTH)}`, provider: 'external' }]))).toThrow()
   })
 
   test('rejects nested spoilers and excessive media, depth, node count, visible text, or UTF-8 bytes', () => {
@@ -124,7 +124,12 @@ describe('review document validation', () => {
     expect(REVIEW_DOCUMENT_MAX_DEPTH).toBe(8)
     expect(REVIEW_DOCUMENT_MAX_NODES).toBe(400)
     expect(REVIEW_DOCUMENT_MAX_BYTES).toBe(64 * 1024)
-    expect(REVIEW_DOCUMENT_MAX_URL_LENGTH).toBe(2_048)
+    expect(EXTERNAL_MEDIA_URL_MAX_LENGTH).toBe(2_048)
+  })
+
+  test('uses shared provider detection without changing Review behavior', () => {
+    expect(getVideoProvider('https://youtu.be/example')).toBe('youtube')
+    expect(() => parseReviewDocument(document([{ type: 'review-video', version: 1, url: 'https://youtu.be/example', provider: 'vimeo' }]))).toThrow('Video provider must match its URL.')
   })
 
   test('creates descending ten-band rating stats and rounds average to one decimal', () => {

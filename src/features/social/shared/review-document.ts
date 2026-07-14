@@ -1,12 +1,22 @@
 import { z } from 'zod'
 
+import {
+  EXTERNAL_MEDIA_URL_MAX_LENGTH,
+  externalMediaUrlSchema,
+  getVideoProvider,
+  videoProviderSchema,
+  type VideoProvider,
+} from './external-media'
+
+export { getVideoProvider, type VideoProvider } from './external-media'
+
 export const REVIEW_DOCUMENT_MAX_VISIBLE_TEXT = 2_500 as const
 export const REVIEW_SUMMARY_LIMIT = 280 as const
 export const REVIEW_DOCUMENT_MAX_MEDIA = 4 as const
 export const REVIEW_DOCUMENT_MAX_DEPTH = 8 as const
 export const REVIEW_DOCUMENT_MAX_NODES = 400 as const
 export const REVIEW_DOCUMENT_MAX_BYTES = 64 * 1024
-export const REVIEW_DOCUMENT_MAX_URL_LENGTH = 2_048 as const
+export const REVIEW_DOCUMENT_MAX_URL_LENGTH = EXTERNAL_MEDIA_URL_MAX_LENGTH
 
 type TextNode = {
   detail: 0
@@ -43,8 +53,6 @@ type ImageNode = { alt: string; type: 'review-image'; url: string; version: 1 }
 type VideoNode = { label?: string; provider: VideoProvider; type: 'review-video'; url: string; version: 1 }
 type ReviewNode = TextNode | LineBreakNode | ParagraphNode | HeadingNode | QuoteNode | ListNode | ListItemNode | SpoilerNode | ImageNode | VideoNode
 
-export type VideoProvider = 'youtube' | 'vimeo' | 'external'
-
 export interface ReviewDocumentV1 {
   version: 1
   editorState: {
@@ -78,56 +86,21 @@ const lineBreakNodeSchema: z.ZodType<LineBreakNode> = z.object({
   version: z.literal(1),
 }).strict()
 
-/** Validates HTTPS media links without credentials. */
-const parseSafeHttpsUrl = (value: string): URL => {
-  if (value.length > REVIEW_DOCUMENT_MAX_URL_LENGTH) {
-    throw new RangeError(`Media URL must not exceed ${REVIEW_DOCUMENT_MAX_URL_LENGTH} characters.`)
-  }
-
-  let url: URL
-  try {
-    url = new URL(value)
-  } catch {
-    throw new TypeError('Media URL must be a valid HTTPS URL.')
-  }
-
-  if (url.protocol !== 'https:' || url.username !== '' || url.password !== '') {
-    throw new TypeError('Media URL must use HTTPS without credentials.')
-  }
-  return url
-}
-
-/** Derives supported video provider from normalized hostname. */
-export const getVideoProvider = (value: string): VideoProvider => {
-  const hostname = parseSafeHttpsUrl(value).hostname.toLowerCase()
-  if (hostname === 'youtu.be' || hostname === 'youtube.com' || hostname.endsWith('.youtube.com')) return 'youtube'
-  if (hostname === 'vimeo.com' || hostname.endsWith('.vimeo.com')) return 'vimeo'
-  return 'external'
-}
-
-const safeHttpsUrlSchema = z.string().superRefine((value, context) => {
-  try {
-    parseSafeHttpsUrl(value)
-  } catch (error) {
-    context.addIssue({ code: 'custom', message: error instanceof Error ? error.message : 'Invalid media URL.' })
-  }
-})
-
 const imageNodeSchema: z.ZodType<ImageNode> = z.object({
   alt: z.string().trim().min(1),
   type: z.literal('review-image'),
-  url: safeHttpsUrlSchema,
+  url: externalMediaUrlSchema,
   version: z.literal(1),
 }).strict()
 
 const videoNodeSchema: z.ZodType<VideoNode> = z.object({
   label: z.string().trim().min(1).optional(),
-  provider: z.enum(['youtube', 'vimeo', 'external']),
+  provider: videoProviderSchema,
   type: z.literal('review-video'),
-  url: safeHttpsUrlSchema,
+  url: externalMediaUrlSchema,
   version: z.literal(1),
 }).strict().superRefine((node, context) => {
-  if (safeHttpsUrlSchema.safeParse(node.url).success && node.provider !== getVideoProvider(node.url)) {
+  if (externalMediaUrlSchema.safeParse(node.url).success && node.provider !== getVideoProvider(node.url)) {
     context.addIssue({ code: 'custom', message: 'Video provider must match its URL.', path: ['provider'] })
   }
 })

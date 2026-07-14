@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+import { animeFormatSchema, type AnimeFormat } from '#/features/discover/shared/discover-contracts'
+
+import { postMediaSchema, type PostMedia } from './external-media'
 import {
   REVIEW_SUMMARY_LIMIT,
   reviewDocumentSchema,
@@ -10,8 +13,6 @@ import {
 export const FEED_PAGE_SIZE = 20 as const
 export const ANIME_REVIEWS_PAGE_SIZE = 12 as const
 export const POST_TEXT_LIMIT = 280 as const
-export const POST_IMAGE_LIMIT = 4 as const
-export const POST_IMAGE_MAX_BYTES = 5 * 1024 * 1024
 export const REVIEW_RATING_DEFAULT = 50 as const
 export const REQUEST_ID_MAX_LENGTH = 128 as const
 
@@ -42,6 +43,11 @@ export interface SocialAnime {
   coverImageUrl: string | null
 }
 
+export interface ActivityAnime extends SocialAnime {
+  seasonYear: number | null
+  format: AnimeFormat | null
+}
+
 export const socialAuthorSchema: z.ZodType<SocialAuthor> = z.object({
   avatarUrl: nullableHttpsUrlSchema,
   displayName: z.string().trim().min(1).max(128),
@@ -56,14 +62,22 @@ export const socialAnimeSchema: z.ZodType<SocialAnime> = z.object({
   title: z.string().trim().min(1).max(256),
 }).strict()
 
+export const activityAnimeSchema: z.ZodType<ActivityAnime> = z.object({
+  anilistId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  coverImageUrl: nullableHttpsUrlSchema,
+  format: animeFormatSchema.nullable(),
+  seasonYear: z.number().int().positive().nullable(),
+  slug: z.string().trim().min(1).max(128),
+  title: z.string().trim().min(1).max(256),
+}).strict()
+
 const postFeedCardSchema = z.object({
   author: socialAuthorSchema,
   createdAt: timestampSchema,
   hasSpoiler: z.boolean(),
   id: idSchema,
-  imageIds: z.array(idSchema).max(POST_IMAGE_LIMIT),
-  imageUrls: z.array(z.url({ protocol: /^https$/ })).max(POST_IMAGE_LIMIT),
   kind: z.literal('post'),
+  media: postMediaSchema.nullable(),
   postId: idSchema,
   text: z.string().max(POST_TEXT_LIMIT),
   updatedAt: timestampSchema,
@@ -85,7 +99,7 @@ const reviewFeedCardSchema = z.object({
 }).strict()
 
 const milestoneFeedCardFields = {
-  anime: socialAnimeSchema,
+  anime: activityAnimeSchema,
   author: socialAuthorSchema,
   id: idSchema,
   settledAt: timestampSchema,
@@ -198,20 +212,20 @@ export const reviewPublishInputSchema: z.ZodType<ReviewPublishInput> = z.object(
 })
 
 export interface CreatePostInput {
-  requestId: string; text: string; imageIds: string[]; hasSpoiler: boolean; visibility: Visibility
+  requestId: string; text: string; media: PostMedia | null; hasSpoiler: boolean; visibility: Visibility
 }
 export interface UpdatePostInput extends CreatePostInput { postId: string }
 
 const postFields = {
   hasSpoiler: z.boolean(),
-  imageIds: z.array(idSchema).max(POST_IMAGE_LIMIT).refine((ids) => new Set(ids).size === ids.length, { error: 'Post image IDs must be unique.' }),
+  media: postMediaSchema.nullable(),
   requestId: idSchema,
   text: z.string().trim().max(POST_TEXT_LIMIT),
   visibility: visibilitySchema,
 }
 
 const requirePostContent = (post: CreatePostInput, context: z.RefinementCtx): void => {
-  if (post.text.length === 0 && post.imageIds.length === 0) context.addIssue({ code: 'custom', message: 'Post requires text or at least one image.' })
+  if (post.text.length === 0 && post.media === null) context.addIssue({ code: 'custom', message: 'Post requires text or media.' })
 }
 
 export const createPostInputSchema: z.ZodType<CreatePostInput> = z.object(postFields).strict().superRefine(requirePostContent)

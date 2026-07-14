@@ -3,8 +3,6 @@ import { describe, expect, expectTypeOf, test } from 'vitest'
 import {
   ANIME_REVIEWS_PAGE_SIZE,
   FEED_PAGE_SIZE,
-  POST_IMAGE_LIMIT,
-  POST_IMAGE_MAX_BYTES,
   POST_TEXT_LIMIT,
   REVIEW_RATING_DEFAULT,
   createPostInputSchema,
@@ -40,8 +38,6 @@ describe('social contracts', () => {
     expect(FEED_PAGE_SIZE).toBe(20)
     expect(ANIME_REVIEWS_PAGE_SIZE).toBe(12)
     expect(POST_TEXT_LIMIT).toBe(280)
-    expect(POST_IMAGE_LIMIT).toBe(4)
-    expect(POST_IMAGE_MAX_BYTES).toBe(5 * 1024 * 1024)
     expect(REVIEW_RATING_DEFAULT).toBe(50)
   })
 
@@ -64,10 +60,10 @@ describe('social contracts', () => {
   test('validates exact generic cursor feed pages', () => {
     const page = {
       items: [
-        { id: 'post-1', postId: 'source-post-1', kind: 'post', author, text: 'Magic.', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 10, updatedAt: 10 },
+        { id: 'post-1', postId: 'source-post-1', kind: 'post', author, text: 'Magic.', media: null, hasSpoiler: false, visibility: 'public', createdAt: 10, updatedAt: 10 },
         { id: 'review-1', reviewId: 'source-review-1', kind: 'review', author, anime, rating: 90, summary: 'Excellent.', summaryHasSpoiler: false, visibility: 'public', publishedAt: 9, updatedAt: 9 },
-        { id: 'completed-1', kind: 'completed', author, anime, settledAt: 8, visibility: 'public' },
-        { id: 'rewatched-1', kind: 'rewatched', author, anime, settledAt: 7, visibility: 'private' },
+        { id: 'completed-1', kind: 'completed', author, anime: { ...anime, seasonYear: 2023, format: 'TV' }, settledAt: 8, visibility: 'public' },
+        { id: 'rewatched-1', kind: 'rewatched', author, anime: { ...anime, seasonYear: null, format: null }, settledAt: 7, visibility: 'private' },
       ],
       cursor: 'next',
       hasMore: true,
@@ -88,6 +84,18 @@ describe('social contracts', () => {
     expect(() => socialAuthorSchema.parse({ ...author, role: 'admin' })).toThrow()
     expect(() => socialAnimeSchema.parse({ ...anime, internalId: 'secret' })).toThrow()
     expect(() => socialAuthorSchema.parse({ ...author, avatarUrl: 'http://example.com/avatar.jpg' })).toThrow()
+  })
+
+  test('adds nullable activity metadata without widening Review anime DTOs', () => {
+    const reviewAnime = { ...anime, seasonYear: 2023, format: 'TV' }
+    const activityPage = {
+      items: [{ id: 'completed-1', kind: 'completed', author, anime: reviewAnime, settledAt: 8, visibility: 'public' }],
+      cursor: null,
+      hasMore: false,
+    }
+
+    expect(feedPageSchema.parse(activityPage)).toEqual(activityPage)
+    expect(() => socialAnimeSchema.parse(reviewAnime)).toThrow()
   })
 
   test('validates review list, detail, and ten-band stats DTOs', () => {
@@ -118,16 +126,17 @@ describe('social contracts', () => {
     expect(() => reviewPublishInputSchema.parse({ ...input, requestId: 'x'.repeat(129) })).toThrow()
   })
 
-  test('accepts post text or registered images and rejects empty, duplicate, or excessive inputs', () => {
-    const textPost = { requestId: 'request-1', text: '  Magic.  ', imageIds: [], hasSpoiler: false, visibility: 'public' }
-    const imagePost = { ...textPost, text: '', imageIds: ['storage-1'] }
+  test('accepts text-only, media-only, or text-and-media Posts with at most one media item', () => {
+    const textPost = { requestId: 'request-1', text: '  Magic.  ', media: null, hasSpoiler: false, visibility: 'public' }
+    const imagePost = { ...textPost, text: '', media: { type: 'image', url: 'https://images.example/frieren.jpg', description: null } }
 
     expect(createPostInputSchema.parse(textPost).text).toBe('Magic.')
     expect(createPostInputSchema.parse(imagePost)).toEqual(imagePost)
     expect(updatePostInputSchema.parse({ ...textPost, postId: 'post-1' }).postId).toBe('post-1')
-    expect(() => createPostInputSchema.parse({ ...textPost, text: '', imageIds: [] })).toThrow()
+    expect(() => createPostInputSchema.parse({ ...textPost, text: '', media: null })).toThrow()
     expect(() => createPostInputSchema.parse({ ...textPost, text: 'x'.repeat(281) })).toThrow()
-    expect(() => createPostInputSchema.parse({ ...textPost, imageIds: ['a', 'a'] })).toThrow()
-    expect(() => createPostInputSchema.parse({ ...textPost, imageIds: ['a', 'b', 'c', 'd', 'e'] })).toThrow()
+    expect(() => createPostInputSchema.parse({ ...textPost, imageIds: [] })).toThrow()
+    expect(() => createPostInputSchema.parse({ ...textPost, media: [imagePost.media] })).toThrow()
+    expect(() => createPostInputSchema.parse({ ...textPost, media: { type: 'image', url: 'https://images.example/a.jpg', description: null, label: null } })).toThrow()
   })
 })
