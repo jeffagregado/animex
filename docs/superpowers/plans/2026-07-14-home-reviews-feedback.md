@@ -330,6 +330,7 @@ git commit -m "refactor: reuse discover seasonal on home"
 - Modify: `src/features/feed/feed-page.tsx`
 - Modify: `src/features/reviews/ui/review-summary.tsx`
 - Modify: `src/features/reviews/ui/review-summary.test.tsx`
+- Modify only for explicit `variant="detail"` call sites: `src/features/reviews/ui/review-detail-page.tsx`, `src/features/reviews/ui/review-preview.tsx`, and their focused tests
 
 **Steps:**
 
@@ -338,7 +339,7 @@ git commit -m "refactor: reuse discover seasonal on home"
 3. Prove public rendering does not issue `getMyProgress` and the sidebar is hidden below `lg`.
 4. Build scoped loading, empty, error, and retry states for Latest Reviews and List Progress. Preserve loaded content on a retryable refresh error.
 5. Add explicit `detail | list` Review Summary variants. `list` preserves independent spoiler reveal while using compact typography and two-line clamping; existing Detail/Anime Reviews call sites retain `detail` behavior.
-6. Latest Reviews rows show cover, author, relative timestamp, compact `list` Summary, no Rating, Review Detail link, and `See more` to `/reviews`.
+6. Latest Reviews rows show cover, author, relative timestamp, compact `list` Summary, no Rating, Review Detail link, and `See more` to `/reviews`. Reject non-published or missing-`publishedAt` data into the scoped error state; never substitute `updatedAt`.
 7. Reuse `DiscoverWeeklyList` and `DiscoverUpcomingList`; do not copy their markup.
 8. Remove `Community feed` and signed-in `What are you watching?`. Keep the Create Post button and existing feed tabs.
 9. At desktop, use the approved main/feed plus compact right-column geometry. At 390/768, render no utility column and no unreachable modules after the infinite feed.
