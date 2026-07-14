@@ -32,5 +32,7 @@ function HomeRoute() {
 
 /** Keeps Home composition visible while Discover sections hydrate. */
 function HomeRoutePending() {
-  return <HomePage search={{ feed: 'home', compose: false }} onSearchChange={() => undefined} />
+  const search = normalizeHomeSearch(Route.useSearch())
+  const navigate = Route.useNavigate()
+  return <HomePage search={search} onSearchChange={(next) => { void navigate({ search: next }) }} />
 }
