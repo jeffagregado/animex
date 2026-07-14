@@ -745,3 +745,18 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migrations, 
 - [x] Match approved feed-card structure without fake Phase 6 data. Owner: feed UI worker.
 - [x] Build `/reviews` search, filters, visibility, and infinite pagination. Owner: Review discovery UI worker.
 - [x] Integrate generated files and run closure gates: 83 test files passed / 2 skipped; 566 tests passed / 3 skipped; routes, Convex sync, TypeScript, client + SSR build, Fallow new-only audit, client AniList endpoint scan, and diff check pass. Authenticated browser QA covers full Review toolbar and owner actions, Home utility order, Review visibility/search/filter states, account-default visibility, 44 px touch targets, console, requests, and responsive overflow. Owner: controller + reviewer + QA.
+
+# Phase 5 Editor, Post Media, And Feed Feedback
+
+Status: WRITTEN SPEC REVIEW on `jeff-cx/phase-5-feed-reviews`; approved conversational design is persisted, implementation plan pending user review.
+
+- [x] Inspect Review editor, Post storage, feed cards, Home utility, and Discover layout flows.
+- [x] Verify RichTextEditor caret insertion, selection replacement, and Backspace media deletion behavior.
+- [x] Lock Review cursor/top insertion, media deletion, and spoiler unwrap behavior.
+- [x] Lock one URL media item per Post, optional contextual image description, linked video cards, media-only Posts, and no server fetch.
+- [x] Approve deletion of legacy file-image Posts, feed projections, Post image rows, and referenced Convex Storage objects while preserving text-only Posts.
+- [x] Lock feed metadata/menu copy, Home surface, and Discover Genres changes.
+- [x] Write and self-review current-state design specification.
+- [ ] User reviews written specification.
+- [ ] Create detailed implementation plan with migration stages, ownership, validation, and authenticated browser QA.
+- [ ] Implement only after plan approval.
