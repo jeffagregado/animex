@@ -748,7 +748,7 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migrations, 
 
 # Phase 5 Editor, Post Media, And Feed Feedback
 
-Status: WRITTEN SPEC REVIEW on `jeff-cx/phase-5-feed-reviews`; approved conversational design is persisted, implementation plan pending user review.
+Status: IMPLEMENTATION PLAN REVIEW on `jeff-cx/phase-5-feed-reviews`; approved written spec and detailed implementation plan are persisted.
 
 - [x] Inspect Review editor, Post storage, feed cards, Home utility, and Discover layout flows.
 - [x] Verify RichTextEditor caret insertion, selection replacement, and Backspace media deletion behavior.
@@ -757,6 +757,7 @@ Status: WRITTEN SPEC REVIEW on `jeff-cx/phase-5-feed-reviews`; approved conversa
 - [x] Approve deletion of legacy file-image Posts, feed projections, Post image rows, and referenced Convex Storage objects while preserving text-only Posts.
 - [x] Lock feed metadata/menu copy, Home surface, and Discover Genres changes.
 - [x] Write and self-review current-state design specification.
-- [ ] User reviews written specification.
-- [ ] Create detailed implementation plan with migration stages, ownership, validation, and authenticated browser QA.
+- [x] User reviews written specification.
+- [x] Create detailed implementation plan with migration stages, ownership, validation, and authenticated browser QA.
+- [ ] User reviews and approves implementation plan.
 - [ ] Implement only after plan approval.
