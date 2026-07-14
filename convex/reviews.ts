@@ -1,15 +1,36 @@
+import { paginationOptsValidator } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
 
+import type { ReviewDiscoveryVisibility } from '../src/features/reviews/shared/review-discovery-contracts'
 import { ANIME_REVIEWS_PAGE_SIZE, reviewDraftInputSchema, reviewPublishInputSchema, reviewStatsSchema, type ReviewSort } from '../src/features/social/shared/social-contracts'
 import { createReviewStats, parseReviewDocument, REVIEW_DOCUMENT_MAX_BYTES, validateDraftReview, validatePublishedReview } from '../src/features/social/shared/review-document'
 import type { Doc, Id } from './_generated/dataModel'
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { makeOrderKey } from './feedPolicy'
+import {
+  buildReviewDiscoveryFields,
+  createDiscoveryCursorState,
+  getActiveDiscoveryLanes,
+  readLatestPublicReviews,
+  readOrderedDiscoveryPage,
+  readSearchDiscoveryPage,
+  reviewDiscoveryFieldsMatch,
+} from './reviewDiscovery'
+import {
+  decodeReviewDiscoveryCursor,
+  normalizeReviewDiscoveryQuery,
+  type ReviewDiscoveryCursorScope,
+} from './reviewDiscoveryPolicy'
 import { assertRequestId, canReadSocialRecord, decodeReviewCursor, encodeReviewCursor, mergeReviewPage, transitionReviewAggregate } from './socialPolicy'
 import { getOptionalProfile, requireProfile } from './users'
 
 const visibilityValidator = v.union(v.literal('private'), v.literal('followers'), v.literal('public'))
 const reviewSortValidator = v.union(v.literal('newest'), v.literal('rating-high'), v.literal('rating-low'))
+const discoveryVisibilityValidator = v.union(v.literal('all'), v.literal('public'), v.literal('followers'), v.literal('private'))
+const ratingBandValidator = v.union(
+  v.literal('90-100'), v.literal('80-89'), v.literal('70-79'), v.literal('60-69'), v.literal('50-59'),
+  v.literal('40-49'), v.literal('30-39'), v.literal('20-29'), v.literal('10-19'), v.literal('0-9'),
+)
 const reviewFields = {
   anilistId: v.number(), requestId: v.string(), rating: v.union(v.number(), v.null()), summary: v.string(),
   summaryHasSpoiler: v.boolean(), bodyJson: v.string(), visibility: visibilityValidator,
@@ -25,6 +46,7 @@ const reviewListFields = {
 const reviewListValidator = v.object(reviewListFields)
 const reviewDetailValidator = v.object({ ...reviewListFields, bodyJson: v.string() })
 const reviewPageValidator = v.object({ items: v.array(reviewListValidator), cursor: v.union(v.string(), v.null()), hasMore: v.boolean() })
+const discoveryPageValidator = v.object({ items: v.array(reviewListValidator), cursor: v.union(v.string(), v.null()), hasMore: v.boolean() })
 const statsValidator = v.object({
   count: v.number(), average: v.union(v.number(), v.null()),
   bands: v.array(v.number()),
@@ -75,13 +97,6 @@ const readOwnedReview = async (ctx: MutationCtx, reviewId: Id<'reviews'>, userId
   if (review.userId !== userId) return fail('REVIEW_FORBIDDEN', 'Only the Review owner can change it.')
   return review
 }
-
-const ratingOrder = (rating: number, descending: boolean): string => String(descending ? 1000 - Math.round(rating * 10) : Math.round(rating * 10)).padStart(4, '0')
-const reviewOrderFields = (publishedAt: number, rating: number, reviewId: string) => ({
-  newestOrderKey: makeOrderKey(publishedAt, reviewId),
-  highRatingOrderKey: `${ratingOrder(rating, true)}:${makeOrderKey(publishedAt, reviewId)}`,
-  lowRatingOrderKey: `${ratingOrder(rating, false)}:${makeOrderKey(publishedAt, reviewId)}`,
-})
 
 const publicRating = (review: Doc<'reviews'> | null) => review?.state === 'published' && review.visibility === 'public' && review.rating !== null
   ? { public: true, rating: review.rating }
@@ -159,7 +174,7 @@ export const saveDraft = mutation({
   args: reviewFields, returns: v.id('reviews'),
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx)
-    await requireCachedAnime(ctx, args.anilistId)
+    const anime = await requireCachedAnime(ctx, args.anilistId)
     const body = parseBodyJson(args.bodyJson)
     const { anilistId, bodyJson: _bodyJson, ...contractInput } = args
     reviewDraftInputSchema.parse({ ...contractInput, body: body.body, animeId: String(anilistId) })
@@ -171,11 +186,14 @@ export const saveDraft = mutation({
     if (existing?.state === 'published') return fail('REVIEW_ALREADY_PUBLISHED', 'Published Review must be edited, not saved as Draft.')
     const now = Date.now()
     if (existing) {
-      await ctx.db.patch('reviews', existing._id, { requestId, rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now })
+      const discovery = buildReviewDiscoveryFields(existing._id, parsed.rating, undefined, now, profile, anime)
+      await ctx.db.patch('reviews', existing._id, { requestId, rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
       return existing._id
     }
-    const placeholder = reviewOrderFields(now, parsed.rating ?? 0, `${profile._id}:${args.anilistId}`)
-    return await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'draft', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, activityState: 'active', ...placeholder })
+    const discovery = buildReviewDiscoveryFields(`${profile._id}:${args.anilistId}`, parsed.rating, undefined, now, profile, anime)
+    const reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'draft', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, activityState: 'active', ...discovery })
+    await ctx.db.patch('reviews', reviewId, buildReviewDiscoveryFields(reviewId, parsed.rating, undefined, now, profile, anime))
+    return reviewId
   },
 })
 
@@ -183,7 +201,7 @@ export const publish = mutation({
   args: { ...reviewFields, rating: v.number() }, returns: v.id('reviews'),
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx)
-    await requireCachedAnime(ctx, args.anilistId)
+    const anime = await requireCachedAnime(ctx, args.anilistId)
     const body = parseBodyJson(args.bodyJson)
     const { anilistId, bodyJson: _bodyJson, ...contractInput } = args
     reviewPublishInputSchema.parse({ ...contractInput, body: body.body, animeId: String(anilistId) })
@@ -191,18 +209,23 @@ export const publish = mutation({
     const requestId = assertRequestId(args.requestId)
     const byRequest = await ctx.db.query('reviews').withIndex('by_user_request', (q) => q.eq('userId', profile._id).eq('requestId', requestId)).unique()
     const repeatedId = readMatchingPublishRequest(byRequest, { ...args, rating: parsed.rating, summary: parsed.summary }, body.bodyJson)
-    if (repeatedId) return repeatedId
+    if (repeatedId && byRequest) {
+      await ctx.db.patch('reviews', repeatedId, buildReviewDiscoveryFields(byRequest._id, byRequest.rating, byRequest.publishedAt, byRequest.updatedAt, profile, anime))
+      return repeatedId
+    }
     const existing = await readMine(ctx, profile._id, args.anilistId)
     const now = Date.now()
     const publishedAt = existing?.publishedAt ?? now
     let reviewId: Id<'reviews'>
     if (existing) {
-      const order = reviewOrderFields(publishedAt, parsed.rating, existing._id)
-      await ctx.db.patch('reviews', existing._id, { requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, ...order })
+      const discovery = buildReviewDiscoveryFields(existing._id, parsed.rating, publishedAt, now, profile, anime)
+      await ctx.db.patch('reviews', existing._id, { requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, ...discovery })
       reviewId = existing._id
     } else {
       const source = `${profile._id}:${args.anilistId}`
-      reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, activityState: 'active', ...reviewOrderFields(publishedAt, parsed.rating, source) })
+      const discovery = buildReviewDiscoveryFields(source, parsed.rating, publishedAt, now, profile, anime)
+      reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, activityState: 'active', ...discovery })
+      await ctx.db.patch('reviews', reviewId, buildReviewDiscoveryFields(reviewId, parsed.rating, publishedAt, now, profile, anime))
     }
     const next = await ctx.db.get('reviews', reviewId)
     if (!next) return fail('REVIEW_WRITE_FAILED', 'Review was not saved.')
@@ -218,12 +241,13 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx)
     const review = await readOwnedReview(ctx, args.reviewId, profile._id)
-    await requireCachedAnime(ctx, review.anilistId)
+    const anime = await requireCachedAnime(ctx, review.anilistId)
     if (review.state !== 'published' || review.publishedAt === undefined) return fail('REVIEW_NOT_PUBLISHED', 'Only published Reviews can be updated.')
     const body = parseBodyJson(args.bodyJson)
     const parsed = validatePublishedReview(body.body, args.rating, args.summary)
     const now = Date.now()
-    await ctx.db.patch('reviews', review._id, { rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...reviewOrderFields(review.publishedAt, parsed.rating, review._id) })
+    const discovery = buildReviewDiscoveryFields(review._id, parsed.rating, review.publishedAt, now, profile, anime)
+    await ctx.db.patch('reviews', review._id, { rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
     const next = await ctx.db.get('reviews', review._id)
     if (!next) return fail('REVIEW_WRITE_FAILED', 'Review update failed.')
     await applyAggregate(ctx, review.anilistId, review, next)
@@ -313,6 +337,40 @@ export const listForAnime = query({
   },
 })
 
+export const listLatestPublic = query({
+  args: { limit: v.number() }, returns: v.array(reviewListValidator),
+  handler: async (ctx, args) => {
+    const reviews = await readLatestPublicReviews(ctx, args.limit)
+    return await Promise.all(reviews.map((review) => toReviewList(ctx, review)))
+  },
+})
+
+export const listDiscovery = query({
+  args: {
+    query: v.union(v.string(), v.null()), sort: reviewSortValidator,
+    ratingBand: v.union(ratingBandValidator, v.null()), visibility: discoveryVisibilityValidator,
+    cursor: v.union(v.string(), v.null()),
+  },
+  returns: discoveryPageValidator,
+  handler: async (ctx, args) => {
+    const viewer = await getOptionalProfile(ctx)
+    const visibility: ReviewDiscoveryVisibility = viewer ? args.visibility : 'public'
+    const queryText = args.query === null ? null : normalizeReviewDiscoveryQuery(args.query)
+    const scope: ReviewDiscoveryCursorScope = { viewerId: viewer?._id ?? null, query: queryText, sort: args.sort, ratingBand: args.ratingBand, visibility }
+    const active = getActiveDiscoveryLanes(visibility, viewer?._id ?? null)
+    const initialState = createDiscoveryCursorState(queryText, active)
+    const state = args.cursor === null ? initialState : decodeReviewDiscoveryCursor(args.cursor, scope).state
+    if (queryText === null) {
+      if (state.mode !== 'ordered') return fail('INVALID_REVIEW_CURSOR', 'Search cursor cannot continue ordered Review discovery.')
+      const page = await readOrderedDiscoveryPage(ctx, scope, active, state)
+      return { items: await Promise.all(page.reviews.map((review) => toReviewList(ctx, review))), cursor: page.cursor, hasMore: page.hasMore }
+    }
+    if (state.mode !== 'search') return fail('INVALID_REVIEW_CURSOR', 'Ordered cursor cannot continue Review search.')
+    const page = await readSearchDiscoveryPage(ctx, { ...scope, query: queryText }, active, state)
+    return { items: await Promise.all(page.reviews.map((review) => toReviewList(ctx, review))), cursor: page.cursor, hasMore: page.hasMore }
+  },
+})
+
 export const getStats = query({
   args: { anilistId: v.number() }, returns: statsValidator,
   handler: async (ctx, args) => {
@@ -331,8 +389,9 @@ export const setVisibility = mutation({
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx)
     const review = await readOwnedReview(ctx, args.reviewId, profile._id)
-    await requireCachedAnime(ctx, review.anilistId)
-    await ctx.db.patch('reviews', review._id, { visibility: args.visibility, updatedAt: Date.now() })
+    const anime = await requireCachedAnime(ctx, review.anilistId)
+    const updatedAt = Date.now()
+    await ctx.db.patch('reviews', review._id, { visibility: args.visibility, updatedAt, ...buildReviewDiscoveryFields(review._id, review.rating, review.publishedAt, updatedAt, profile, anime) })
     const next = await ctx.db.get('reviews', review._id)
     if (next) { await applyAggregate(ctx, review.anilistId, review, next); await upsertReviewCard(ctx, next) }
     return null
@@ -362,5 +421,40 @@ export const remove = mutation({
     await removeReviewCard(ctx, review._id)
     await ctx.db.delete('reviews', review._id)
     return null
+  },
+})
+
+export const backfillDiscoveryFields = internalMutation({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.object({ continueCursor: v.string(), isDone: v.boolean(), processedCount: v.number(), updatedCount: v.number() }),
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query('reviews').paginate(args.paginationOpts)
+    let updatedCount = 0
+    for (const review of page.page) {
+      const [author, anime] = await Promise.all([ctx.db.get('users', review.userId), requireCachedAnime(ctx, review.anilistId)])
+      if (!author) return fail('REVIEW_AUTHOR_MISSING', `Review author profile is missing for ${review._id}.`)
+      const expected = buildReviewDiscoveryFields(review._id, review.rating, review.publishedAt, review.updatedAt, author, anime)
+      if (!reviewDiscoveryFieldsMatch(review, expected)) {
+        await ctx.db.patch('reviews', review._id, expected)
+        updatedCount += 1
+      }
+    }
+    return { continueCursor: page.continueCursor, isDone: page.isDone, processedCount: page.page.length, updatedCount }
+  },
+})
+
+export const verifyDiscoveryBackfill = internalMutation({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.object({ continueCursor: v.string(), isDone: v.boolean(), processedCount: v.number(), mismatchIds: v.array(v.id('reviews')) }),
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query('reviews').paginate(args.paginationOpts)
+    const mismatchIds: Id<'reviews'>[] = []
+    for (const review of page.page) {
+      const [author, anime] = await Promise.all([ctx.db.get('users', review.userId), requireCachedAnime(ctx, review.anilistId)])
+      if (!author) return fail('REVIEW_AUTHOR_MISSING', `Review author profile is missing for ${review._id}.`)
+      const expected = buildReviewDiscoveryFields(review._id, review.rating, review.publishedAt, review.updatedAt, author, anime)
+      if (!reviewDiscoveryFieldsMatch(review, expected)) mismatchIds.push(review._id)
+    }
+    return { continueCursor: page.continueCursor, isDone: page.isDone, processedCount: page.page.length, mismatchIds }
   },
 })

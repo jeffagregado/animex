@@ -1,6 +1,11 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 
+const storedReviewRatingBandValidator = v.union(
+  v.literal('90-100'), v.literal('80-89'), v.literal('70-79'), v.literal('60-69'), v.literal('50-59'),
+  v.literal('40-49'), v.literal('30-39'), v.literal('20-29'), v.literal('10-19'), v.literal('0-9'), v.literal('none'),
+)
+
 export default defineSchema({
   products: defineTable({
     title: v.string(),
@@ -169,12 +174,29 @@ export default defineSchema({
     visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
     publishedAt: v.optional(v.number()), updatedAt: v.number(), activityState: v.union(v.literal('active'), v.literal('deleted')),
     newestOrderKey: v.string(), highRatingOrderKey: v.string(), lowRatingOrderKey: v.string(),
+    searchText: v.optional(v.string()), ratingBand: v.optional(storedReviewRatingBandValidator),
   })
     .index('by_user_anime', ['userId', 'anilistId'])
     .index('by_user_request', ['userId', 'requestId'])
     .index('by_anime_state_visibility_newest', ['anilistId', 'state', 'visibility', 'newestOrderKey'])
     .index('by_anime_state_visibility_high_rating', ['anilistId', 'state', 'visibility', 'highRatingOrderKey'])
-    .index('by_anime_state_visibility_low_rating', ['anilistId', 'state', 'visibility', 'lowRatingOrderKey']),
+    .index('by_anime_state_visibility_low_rating', ['anilistId', 'state', 'visibility', 'lowRatingOrderKey'])
+    .index('by_discovery_public_newest', ['state', 'visibility', 'newestOrderKey'])
+    .index('by_discovery_public_newest_band', ['state', 'visibility', 'ratingBand', 'newestOrderKey'])
+    .index('by_discovery_owner_newest', ['userId', 'state', 'visibility', 'newestOrderKey'])
+    .index('by_discovery_owner_newest_band', ['userId', 'state', 'visibility', 'ratingBand', 'newestOrderKey'])
+    .index('by_discovery_public_high', ['state', 'visibility', 'highRatingOrderKey'])
+    .index('by_discovery_public_high_band', ['state', 'visibility', 'ratingBand', 'highRatingOrderKey'])
+    .index('by_discovery_owner_high', ['userId', 'state', 'visibility', 'highRatingOrderKey'])
+    .index('by_discovery_owner_high_band', ['userId', 'state', 'visibility', 'ratingBand', 'highRatingOrderKey'])
+    .index('by_discovery_public_low', ['state', 'visibility', 'lowRatingOrderKey'])
+    .index('by_discovery_public_low_band', ['state', 'visibility', 'ratingBand', 'lowRatingOrderKey'])
+    .index('by_discovery_owner_low', ['userId', 'state', 'visibility', 'lowRatingOrderKey'])
+    .index('by_discovery_owner_low_band', ['userId', 'state', 'visibility', 'ratingBand', 'lowRatingOrderKey'])
+    .searchIndex('search_discovery', {
+      searchField: 'searchText',
+      filterFields: ['state', 'visibility', 'userId', 'ratingBand'],
+    }),
   feedCards: defineTable({
     sourceKey: v.string(), kind: v.union(v.literal('post'), v.literal('review'), v.literal('completed'), v.literal('rewatched')),
     userId: v.id('users'), sourceId: v.optional(v.string()), anilistId: v.optional(v.number()),

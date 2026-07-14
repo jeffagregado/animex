@@ -52,6 +52,168 @@ const body = {
 const bodyJson = JSON.stringify(body)
 
 describe('social Convex integration', () => {
+  test('discovers latest Public Reviews without leaking viewer-owned visibility', async () => {
+    const t = createHarness()
+    const viewer = await createOwner(t, 'discovery-viewer')
+    const authors = await Promise.all(Array.from({ length: 7 }, (_, index) => createOwner(t, `latest-${index}`)))
+    await Promise.all(Array.from({ length: 10 }, (_, index) => insertAnime(t, index + 1)))
+
+    for (let index = 0; index < authors.length; index += 1) {
+      await authors[index]!.client.mutation(socialApi.reviews.publish, {
+        anilistId: index + 1, requestId: `latest-${index}`, rating: 50 + index,
+        summary: `Latest ${index}`, summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      })
+    }
+    const followersId = await viewer.client.mutation(socialApi.reviews.publish, {
+      anilistId: 8, requestId: 'own-followers', rating: 88,
+      summary: 'Own Followers', summaryHasSpoiler: false, bodyJson, visibility: 'followers',
+    })
+    const privateId = await viewer.client.mutation(socialApi.reviews.publish, {
+      anilistId: 9, requestId: 'own-private', rating: 77,
+      summary: 'Own Private', summaryHasSpoiler: false, bodyJson, visibility: 'private',
+    })
+
+    const latest = await t.query(socialApi.reviews.listLatestPublic, { limit: 99 })
+    expect(latest).toHaveLength(5)
+    expect(latest.map((review: { summary: string }) => review.summary)).toEqual(['Latest 6', 'Latest 5', 'Latest 4', 'Latest 3', 'Latest 2'])
+
+    const publicPage = await t.query(socialApi.reviews.listDiscovery, {
+      query: null, sort: 'newest', ratingBand: null, visibility: 'all', cursor: null,
+    })
+    expect(publicPage.items).toHaveLength(7)
+    expect(publicPage.items.map((review: { id: string }) => review.id)).not.toContain(followersId)
+    expect(publicPage.items.map((review: { id: string }) => review.id)).not.toContain(privateId)
+
+    const ownPage = await viewer.client.query(socialApi.reviews.listDiscovery, {
+      query: null, sort: 'newest', ratingBand: null, visibility: 'all', cursor: null,
+    })
+    expect(ownPage.items.map((review: { id: string }) => review.id)).toEqual(expect.arrayContaining([followersId, privateId]))
+
+    await viewer.client.mutation(socialApi.reviews.setVisibility, { reviewId: followersId, visibility: 'public' })
+    expect((await t.query(socialApi.reviews.listDiscovery, {
+      query: null, sort: 'newest', ratingBand: null, visibility: 'public', cursor: null,
+    })).items.map((review: { id: string }) => review.id)).toContain(followersId)
+    await viewer.client.mutation(socialApi.reviews.remove, { reviewId: privateId })
+    expect((await viewer.client.query(socialApi.reviews.listDiscovery, {
+      query: null, sort: 'newest', ratingBand: null, visibility: 'all', cursor: null,
+    })).items.map((review: { id: string }) => review.id)).not.toContain(privateId)
+  }, 30_000)
+
+  test('sorts, filters every Rating band, and searches indexed Review metadata', async () => {
+    const t = createHarness()
+    const ratings = [95, 85, 75, 65, 55, 45, 35, 25, 15, 5]
+    const authors = await Promise.all(ratings.map((_, index) => createOwner(t, `band-user-${index}`)))
+    await Promise.all(ratings.map((_, index) => insertAnime(t, index + 1)))
+    await t.run(async (ctx) => {
+      await ctx.db.patch('users', authors[4]!.profileId, { name: 'Search Display', username: 'SearchHandle', usernameKey: 'searchhandle' })
+      const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', 5)).unique()
+      if (!anime) throw new Error('Expected cached Anime 5.')
+      await ctx.db.patch('animeSummaries', anime._id, { titles: { ...anime.titles, display: 'Unique Frieren' } })
+    })
+    for (let index = 0; index < ratings.length; index += 1) {
+      await authors[index]!.client.mutation(socialApi.reviews.publish, {
+        anilistId: index + 1, requestId: `band-${index}`, rating: ratings[index]!,
+        summary: `Band ${index}`, summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      })
+    }
+
+    const read = async (sort: 'newest' | 'rating-high' | 'rating-low', ratingBand: string | null, query: string | null) => await t.query(socialApi.reviews.listDiscovery, {
+      query, sort, ratingBand, visibility: 'public', cursor: null,
+    })
+    expect((await read('rating-high', null, null)).items.map((review: { rating: number }) => review.rating)).toEqual(ratings)
+    expect((await read('rating-low', null, null)).items.map((review: { rating: number }) => review.rating)).toEqual([...ratings].reverse())
+    expect((await read('newest', null, null)).items[0]?.summary).toBe('Band 9')
+
+    const bands = ['90-100', '80-89', '70-79', '60-69', '50-59', '40-49', '30-39', '20-29', '10-19', '0-9']
+    for (let index = 0; index < bands.length; index += 1) {
+      expect((await read('newest', bands[index]!, null)).items.map((review: { rating: number }) => review.rating)).toEqual([ratings[index]])
+    }
+    expect((await read('newest', null, 'Frieren')).items).toHaveLength(1)
+    expect((await read('newest', null, 'Search Display')).items).toHaveLength(1)
+    expect((await read('newest', null, 'SearchHandle')).items).toHaveLength(1)
+  }, 30_000)
+
+  test('continues composite discovery cursors without duplicates and permits retry', async () => {
+    const t = createHarness()
+    const viewer = await createOwner(t, 'cursor-viewer')
+    const authors = await Promise.all(Array.from({ length: 14 }, (_, index) => createOwner(t, `cursor-author-${index}`)))
+    await Promise.all(Array.from({ length: 16 }, (_, index) => insertAnime(t, index + 1)))
+    for (let index = 0; index < authors.length; index += 1) {
+      await authors[index]!.client.mutation(socialApi.reviews.publish, {
+        anilistId: index + 1, requestId: `cursor-${index}`, rating: 60 + index,
+        summary: `Cursor public ${index}`, summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      })
+    }
+    await viewer.client.mutation(socialApi.reviews.publish, {
+      anilistId: 15, requestId: 'cursor-followers', rating: 88,
+      summary: 'Cursor own followers', summaryHasSpoiler: false, bodyJson, visibility: 'followers',
+    })
+    await viewer.client.mutation(socialApi.reviews.publish, {
+      anilistId: 16, requestId: 'cursor-private', rating: 77,
+      summary: 'Cursor own private', summaryHasSpoiler: false, bodyJson, visibility: 'private',
+    })
+    const input = { query: null, sort: 'newest', ratingBand: null, visibility: 'all', cursor: null }
+    const first = await viewer.client.query(socialApi.reviews.listDiscovery, input)
+    expect(first.items).toHaveLength(12)
+    expect(first.hasMore).toBe(true)
+    const retryInput = { ...input, cursor: first.cursor }
+    const second = await viewer.client.query(socialApi.reviews.listDiscovery, retryInput)
+    expect(await viewer.client.query(socialApi.reviews.listDiscovery, retryInput)).toEqual(second)
+    expect(second.hasMore).toBe(false)
+    expect(second.cursor).toBeNull()
+    const ids = [...first.items, ...second.items].map((review: { id: string }) => review.id)
+    expect(ids).toHaveLength(16)
+    expect(new Set(ids).size).toBe(16)
+
+    const searchFirst = await viewer.client.query(socialApi.reviews.listDiscovery, {
+      query: 'Cursor', sort: 'newest', ratingBand: null, visibility: 'all', cursor: null,
+    })
+    expect(searchFirst.items.map((review: { summary: string }) => review.summary)).toEqual(['Cursor own followers'])
+    const searchIds: string[] = [...searchFirst.items.map((review: { id: string }) => review.id)]
+    let searchCursor = searchFirst.cursor
+    while (searchCursor !== null) {
+      const page = await viewer.client.query(socialApi.reviews.listDiscovery, {
+        query: 'Cursor', sort: 'newest', ratingBand: null, visibility: 'all', cursor: searchCursor,
+      })
+      searchIds.push(...page.items.map((review: { id: string }) => review.id))
+      searchCursor = page.cursor
+    }
+    expect(searchIds).toHaveLength(16)
+    expect(new Set(searchIds).size).toBe(16)
+  }, 30_000)
+
+  test('backfills and verifies every Draft and published Review page', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'discovery-backfill')
+    await insertAnime(t, 1)
+    await insertAnime(t, 2)
+    const draftId = await owner.client.mutation(socialApi.reviews.saveDraft, {
+      anilistId: 1, requestId: 'backfill-draft', rating: null, summary: '',
+      summaryHasSpoiler: false, bodyJson, visibility: 'private',
+    })
+    const publishedId = await owner.client.mutation(socialApi.reviews.publish, {
+      anilistId: 2, requestId: 'backfill-published', rating: 90, summary: 'Published',
+      summaryHasSpoiler: false, bodyJson, visibility: 'public',
+    })
+    await t.run(async (ctx) => {
+      await ctx.db.patch('reviews', draftId, { searchText: undefined, ratingBand: undefined })
+      await ctx.db.patch('reviews', publishedId, { searchText: undefined, ratingBand: undefined })
+    })
+
+    const first = await t.mutation(socialInternal.reviews.backfillDiscoveryFields, { paginationOpts: { numItems: 1, cursor: null } })
+    const second = await t.mutation(socialInternal.reviews.backfillDiscoveryFields, { paginationOpts: { numItems: 1, cursor: first.continueCursor } })
+    expect(first).toMatchObject({ processedCount: 1, updatedCount: 1, isDone: false })
+    expect(second).toMatchObject({ processedCount: 1, updatedCount: 1, isDone: true })
+
+    const verifyFirst = await t.mutation(socialInternal.reviews.verifyDiscoveryBackfill, { paginationOpts: { numItems: 1, cursor: null } })
+    const verifySecond = await t.mutation(socialInternal.reviews.verifyDiscoveryBackfill, { paginationOpts: { numItems: 1, cursor: verifyFirst.continueCursor } })
+    expect([...verifyFirst.mismatchIds, ...verifySecond.mismatchIds]).toEqual([])
+    expect(await t.run(async (ctx) => ({
+      draftBand: (await ctx.db.get('reviews', draftId))?.ratingBand,
+      publishedBand: (await ctx.db.get('reviews', publishedId))?.ratingBand,
+    }))).toEqual({ draftBand: 'none', publishedBand: '90-100' })
+  }, 20_000)
+
   test('resumes one Review, publishes idempotently, isolates visibility, and updates metrics', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'owner')
