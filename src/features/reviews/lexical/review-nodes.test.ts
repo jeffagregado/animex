@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { parseReviewDocument } from '#/features/social/shared/review-document'
 import { $createReviewImageNode, ReviewImageNode } from './review-image-node'
 import { $createSpoilerNode, SpoilerNode } from './spoiler-node'
-import { ReviewVideoNode } from './review-video-node'
+import { $createReviewVideoNode, ReviewVideoNode } from './review-video-node'
 import { formatReviewBlock, markSelectedBlocksAsSpoiler } from '../ui/review-toolbar'
-import { $createParagraphNode, $createRangeSelection, $createTextNode, $getRoot, $isElementNode, $setSelection } from 'lexical'
+import { $createNodeSelection, $createParagraphNode, $createRangeSelection, $createTextNode, $getRoot, $isElementNode, $setSelection } from 'lexical'
 import { $createHeadingNode, $createQuoteNode, HeadingNode, QuoteNode } from '@lexical/rich-text'
 import { $createListItemNode, $createListNode, ListItemNode, ListNode } from '@lexical/list'
 
@@ -86,5 +86,41 @@ describe('custom Review Lexical nodes', () => {
     expect(children.map((node) => node.type)).toEqual(['heading', 'quote', 'list', 'review-image'])
     expect(children[0]).toMatchObject({ tag: 'h3', children: [{ format: 1, text: 'Heading' }] })
     expect(children[1]).toMatchObject({ children: [{ format: 2, text: 'Quote' }] })
+  })
+
+  it.each([
+    ['image', () => $createReviewImageNode('https://images.example/frieren.jpg', 'Frieren')],
+    ['video', () => $createReviewVideoNode('https://vimeo.com/123', 'vimeo', 'Trailer')],
+  ] as const)('wraps a node-selected Review %s block', (_kind, createMedia) => {
+    const editor = createEditor({ nodes: [SpoilerNode, ReviewImageNode, ReviewVideoNode] })
+    editor.update(() => {
+      const media = createMedia()
+      $getRoot().append(media)
+      const selection = $createNodeSelection()
+      selection.add(media.getKey())
+      $setSelection(selection)
+    }, { discrete: true })
+
+    markSelectedBlocksAsSpoiler(editor)
+
+    expect(editor.getEditorState().toJSON().root.children[0]).toMatchObject({
+      type: 'spoiler',
+      children: [{ type: _kind === 'image' ? 'review-image' : 'review-video' }],
+    })
+  })
+
+  it('unwraps spoiler around node-selected media', () => {
+    const editor = createEditor({ nodes: [SpoilerNode, ReviewImageNode, ReviewVideoNode] })
+    editor.update(() => {
+      const media = $createReviewImageNode('https://images.example/frieren.jpg', 'Frieren')
+      $getRoot().append($createSpoilerNode().append(media))
+      const selection = $createNodeSelection()
+      selection.add(media.getKey())
+      $setSelection(selection)
+    }, { discrete: true })
+
+    markSelectedBlocksAsSpoiler(editor)
+
+    expect(editor.getEditorState().toJSON().root.children).toEqual([expect.objectContaining({ type: 'review-image' })])
   })
 })

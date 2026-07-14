@@ -78,4 +78,16 @@ describe('ReviewMediaEditingPlugin', () => {
     editor.dispatchCommand(REDO_COMMAND, undefined)
     await waitFor(() => expect(types()).toEqual(['paragraph', 'paragraph']))
   })
+
+  it('deletes and restores selected video with one-step history parity', async () => {
+    render(<Harness />)
+    editor.update(() => { const media = $createReviewVideoNode('https://vimeo.com/123', 'vimeo', 'Trailer'); $getRoot().clear().append($createParagraphNode().append($createTextNode('Before')), media, $createParagraphNode().append($createTextNode('After'))); const selection = $createNodeSelection(); selection.add(media.getKey()); $setSelection(selection) }, { discrete: true, tag: 'history-push' })
+    editor.dispatchCommand(KEY_DELETE_COMMAND, new KeyboardEvent('keydown'))
+    await waitFor(() => expect(types()).toEqual(['paragraph', 'paragraph']))
+
+    editor.dispatchCommand(UNDO_COMMAND, undefined)
+    await waitFor(() => expect(types()).toEqual(['paragraph', 'review-video', 'paragraph']))
+    editor.dispatchCommand(REDO_COMMAND, undefined)
+    await waitFor(() => expect(types()).toEqual(['paragraph', 'paragraph']))
+  })
 })

@@ -6,13 +6,17 @@ import {
   $getNodeByKey,
   $getSelection,
   $getRoot,
+  $isDecoratorNode,
   $isElementNode,
+  $isNodeSelection,
   $isRangeSelection,
   $setSelection,
   FORMAT_TEXT_COMMAND,
   REDO_COMMAND,
   UNDO_COMMAND,
+  type DecoratorNode,
   type ElementNode,
+  type LexicalNode,
   type RangeSelection,
   type TextFormatType,
 } from 'lexical'
@@ -110,7 +114,7 @@ export const insertReviewMedia = (editor: ReturnType<typeof useLexicalComposerCo
 /** Toggles spoiler wrappers while preserving their child blocks. */
 export const markSelectedBlocksAsSpoiler = (editor: ReturnType<typeof useLexicalComposerContext>[0]): void => editor.update(() => {
   const selection = $getSelection()
-  if (!$isRangeSelection(selection)) return
+  if (!$isRangeSelection(selection) && !$isNodeSelection(selection)) return
   const selected = selection.getNodes()
   const spoilers = selected.map((node) => {
     let current = node
@@ -128,10 +132,17 @@ export const markSelectedBlocksAsSpoiler = (editor: ReturnType<typeof useLexical
     })
     return
   }
-  const blocks = selected.map((node) => node.getTopLevelElement()).filter((node): node is ElementNode => node !== null && !$isSpoilerNode(node))
+  const blocks = selected.map((node) => node.getTopLevelElement()).filter(isReviewRootBlock).filter((node) => !$isSpoilerNode(node))
   const unique = blocks.filter((node, index) => blocks.findIndex((candidate) => candidate.getKey() === node.getKey()) === index)
   if (unique.length === 0) return
   const spoiler = $createSpoilerNode()
   unique[0].insertBefore(spoiler)
   spoiler.append(...unique)
 }, { discrete: true })
+
+type ReviewRootBlock = ElementNode | DecoratorNode<unknown>
+
+/** Narrows only root-owned element and decorator blocks. */
+const isReviewRootBlock = (node: LexicalNode | null): node is ReviewRootBlock => node !== null
+  && ($isElementNode(node) || $isDecoratorNode(node))
+  && node.getParent() === $getRoot()
