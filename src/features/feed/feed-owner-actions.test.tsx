@@ -6,14 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FeedCard } from '../social/shared/social-contracts'
 import { FeedOwnerActions } from './feed-owner-actions'
 
-const mocks = vi.hoisted(() => ({ index: 0, postVisibility: vi.fn(), removePost: vi.fn(), activityVisibility: vi.fn(), removeActivity: vi.fn(), reviewVisibility: vi.fn(), removeReviewActivity: vi.fn(), removeReview: vi.fn(), success: vi.fn(), error: vi.fn() }))
-vi.mock('convex/react', () => ({ useMutation: () => [mocks.postVisibility, mocks.removePost, mocks.activityVisibility, mocks.removeActivity, mocks.reviewVisibility, mocks.removeReviewActivity, mocks.removeReview][mocks.index++ % 7] }))
+const mocks = vi.hoisted(() => ({ mutationNames: [] as string[], postVisibility: vi.fn(), removePost: vi.fn(), activityVisibility: vi.fn(), removeActivity: vi.fn(), reviewVisibility: vi.fn(), removeReviewActivity: vi.fn(), removeReview: vi.fn(), success: vi.fn(), error: vi.fn() }))
+vi.mock('convex/react', async () => {
+  const { getFunctionName } = await vi.importActual<typeof import('convex/server')>('convex/server')
+  const mutations = { 'posts:setVisibility': mocks.postVisibility, 'posts:remove': mocks.removePost, 'feed:setActivityVisibility': mocks.activityVisibility, 'feed:removeActivity': mocks.removeActivity, 'reviews:setVisibility': mocks.reviewVisibility, 'reviews:removeActivity': mocks.removeReviewActivity, 'reviews:remove': mocks.removeReview }
+  return { useMutation: (mutation: Parameters<typeof getFunctionName>[0]) => { const name = getFunctionName(mutation); mocks.mutationNames.push(name); return mutations[name as keyof typeof mutations] } }
+})
 vi.mock('sonner', () => ({ toast: { success: mocks.success, error: mocks.error } }))
 
 const author = { id: 'owner', username: 'owner', displayName: 'Owner', avatarUrl: null }
 const anime = { anilistId: 1, slug: 'anime', title: 'Anime', coverImageUrl: null, format: null, seasonYear: null }
 
-beforeEach(() => { mocks.index = 0; mocks.postVisibility.mockResolvedValue(null); mocks.removePost.mockResolvedValue(null); mocks.activityVisibility.mockResolvedValue(null); mocks.removeActivity.mockResolvedValue(null); mocks.reviewVisibility.mockResolvedValue(null); mocks.removeReviewActivity.mockResolvedValue(null); mocks.removeReview.mockResolvedValue(null) })
+beforeEach(() => { mocks.mutationNames.length = 0; mocks.postVisibility.mockResolvedValue(null); mocks.removePost.mockResolvedValue(null); mocks.activityVisibility.mockResolvedValue(null); mocks.removeActivity.mockResolvedValue(null); mocks.reviewVisibility.mockResolvedValue(null); mocks.removeReviewActivity.mockResolvedValue(null); mocks.removeReview.mockResolvedValue(null) })
 afterEach(() => { cleanup(); Object.values(mocks).forEach((value) => { if (typeof value === 'function' && 'mockClear' in value) value.mockClear() }) })
 
 const removeThroughMenu = async (card: Extract<FeedCard, { kind: 'post' | 'completed' | 'rewatched' }>) => {
@@ -53,6 +57,7 @@ describe('FeedOwnerActions', () => {
 
   it('offers only destructive Remove for Review activity deletion', async () => {
     render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    expect(mocks.mutationNames).not.toContain('reviews:remove')
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
     const removeItem = await screen.findByRole('menuitem', { name: 'Remove' })
     expect(removeItem.getAttribute('data-variant')).toBe('destructive')

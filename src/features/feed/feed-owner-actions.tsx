@@ -26,7 +26,6 @@ interface OwnerActionState {
 interface RemoveMutations {
   activity: (args: { cardId: Id<'feedCards'> }) => Promise<null>
   post: (args: { postId: Id<'posts'> }) => Promise<null>
-  review: (args: { reviewId: Id<'reviews'> }) => Promise<null>
   reviewActivity: (args: { reviewId: Id<'reviews'> }) => Promise<null>
 }
 
@@ -42,29 +41,24 @@ const visibilityIcon = (visibility: Visibility) => {
 }
 
 /** Removes owner content through its source mutation. */
-const removeOwnerSource = async (card: OwnerCard, action: Exclude<DeleteAction, null>, mutations: RemoveMutations): Promise<string> => {
+const removeOwnerSource = async (card: OwnerCard, mutations: RemoveMutations): Promise<string> => {
   if (card.kind === 'post') {
     await mutations.post({ postId: card.postId as Id<'posts'> })
     return 'Post deleted.'
   }
   if (card.kind === 'review') {
-    if (action === 'remove-review-activity') {
-      await mutations.reviewActivity({ reviewId: card.reviewId as Id<'reviews'> })
-      return 'Activity removed.'
-    }
-    await mutations.review({ reviewId: card.reviewId as Id<'reviews'> })
-    return 'Review deleted.'
+    await mutations.reviewActivity({ reviewId: card.reviewId as Id<'reviews'> })
+    return 'Activity removed.'
   }
   await mutations.activity({ cardId: card.id as Id<'feedCards'> })
   return 'Activity removed.'
 }
 
 /** Describes the selected destructive owner action. */
-const getDeleteCopy = (card: OwnerCard, action: Exclude<DeleteAction, null>): DeleteCopy => {
+const getDeleteCopy = (card: OwnerCard): DeleteCopy => {
   if (card.kind === 'post') return { title: 'Delete Post?', description: 'This permanently deletes the Post and its images.' }
   if (card.kind !== 'review') return { title: 'Remove activity?', description: 'This removes the milestone from your feed.' }
-  if (action === 'remove-review-activity') return { title: 'Remove feed activity?', description: 'The Review stays on Anime Reviews and Review Detail.' }
-  return { title: 'Delete Review?', description: 'This permanently deletes the Review.' }
+  return { title: 'Remove feed activity?', description: 'The Review stays on Anime Reviews and Review Detail.' }
 }
 
 /** Routes owner actions to source-specific mutations. */
@@ -81,7 +75,6 @@ function useOwnerActions(card: OwnerCard, onChanged: () => void): OwnerActionSta
   const removeActivity = useMutation(api.feed.removeActivity)
   const reviewVisibility = useMutation(api.reviews.setVisibility)
   const removeReviewActivity = useMutation(api.reviews.removeActivity)
-  const removeReview = useMutation(api.reviews.remove)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const restoreAfterVisibilityRef = useRef(false)
   const [deleteAction, setDeleteAction] = useState<DeleteAction>(null)
@@ -118,7 +111,7 @@ function useOwnerActions(card: OwnerCard, onChanged: () => void): OwnerActionSta
     if (deleteAction === null) throw new Error('Delete action is required.')
     setPending(true)
     try {
-      const message = await removeOwnerSource(card, deleteAction, { activity: removeActivity, post: removePost, review: removeReview, reviewActivity: removeReviewActivity })
+      const message = await removeOwnerSource(card, { activity: removeActivity, post: removePost, reviewActivity: removeReviewActivity })
       toast.success(message)
       changeDeleteOpen(false)
       onChanged()
@@ -141,6 +134,6 @@ interface DeleteConfirmationProps {
 }
 
 function DeleteConfirmation({ action, card, onOpenChange, onRemove, pending }: DeleteConfirmationProps) {
-  const copy = action ? getDeleteCopy(card, action) : null
+  const copy = action ? getDeleteCopy(card) : null
   return <Dialog onOpenChange={onOpenChange} open={action !== null}>{copy ? <DialogContent title={copy.title}><p className="mt-4 text-muted-foreground">{copy.description}</p><div className="mt-6 grid grid-cols-2 gap-3"><button className="min-h-11 rounded-lg border border-white/15 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-wait disabled:border-white/10 disabled:bg-white/5 disabled:text-muted-foreground disabled:opacity-60" disabled={pending} onClick={() => onOpenChange(false)} type="button">Cancel</button><button className="min-h-11 rounded-lg bg-red-500 font-black text-white hover:bg-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-wait disabled:bg-red-500/60 disabled:text-white/70 disabled:opacity-100" disabled={pending} onClick={() => void onRemove()} type="button">{pending ? 'Deleting…' : 'Confirm'}</button></div></DialogContent> : null}</Dialog>
 }

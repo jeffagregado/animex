@@ -767,4 +767,4 @@ Status: FINAL REVIEW AND QA on `jeff-cx/phase-5-feed-reviews`; implementation, d
 - [x] Update feed metadata/menu actions and Home/Discover surfaces. Owner: feed/UI workers + reviewers.
 - [x] Sync final Convex functions; update current-state docs; pass tests, TypeScript, build, Fallow, endpoint scan, and diff check. Owner: controller + docs mapper.
 - [ ] Complete whole-branch review and authenticated responsive browser QA. Owner: reviewer + QA + controller.
-- [ ] Implement only after plan approval.
+- [x] Implement only after plan approval.
