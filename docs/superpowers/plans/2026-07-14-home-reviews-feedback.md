@@ -262,6 +262,7 @@ git commit -m "feat: add indexed review discovery"
    - `setScore` when first score changes unset status to Watching;
    - `recordRewatch`;
    - `removeLatestRewatch`.
+   During the optional-schema deployment window, a missing aggregate inside these mutations must first recompute that user's indexed entry truth before applying the transition; legacy users cannot underflow or receive partial counts while backfill is still running.
 5. Add resumable, idempotent internal backfill and verification mutations. Page profiles, recompute each user's counts from indexed `userAnimeEntries` reads, then replace the aggregate rather than incrementing an unknown partial state. Do not create zero-only rows for untouched profiles.
 6. Run:
 
@@ -290,12 +291,14 @@ git commit -m "feat: add list progress projection"
 - Delete: `src/features/home/home-data.ts`
 - Delete: `src/features/home/seasonal-rail.tsx`
 - Create: `src/features/home/home-weekly-list.tsx`
+- Modify only to remove the deleted rail import/render: `src/features/feed/feed-page.tsx`
 
 **Steps:**
 
 1. Write failing Home tests proving Seasonal comes from the Home loader's Discover payload and preserves loading, retry, empty, image-error, and rail controls.
 2. Extract the existing section override/retry behavior into `useDiscoverSections`. Return resolved section states plus per-key retry props so Home and Discover share identical cache, loading, rate-limit, retry, and retry-error behavior.
 3. Add a Home route loader using `getDiscoverPage()` and pass its hydrated data to `HomePage`.
+   Add a real route `pendingComponent` using explicit loading section states so slow Discover hydration preserves Home geometry inside the shared public shell.
 4. Render Seasonal through `DiscoverSectionRail`. Remove the static Home dataset and component.
 5. Do not add a second AniList query, endpoint, server function, or Convex action.
 6. Run:
