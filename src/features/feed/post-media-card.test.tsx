@@ -1,0 +1,33 @@
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import { PostMediaCard } from './post-media-card'
+
+afterEach(cleanup)
+
+describe('PostMediaCard', () => {
+  it('renders secure lazy images with contextual alt and stable broken geometry', () => {
+    render(<PostMediaCard media={{ type: 'image', url: 'https://media.example/image', description: null }} username="mika" />)
+    const image = screen.getByRole('img', { name: 'Image attached to post by mika' })
+    expect(image.getAttribute('loading')).toBe('lazy')
+    expect(image.getAttribute('referrerpolicy')).toBe('no-referrer')
+    fireEvent.error(image)
+    expect(screen.getByText('Image unavailable').parentElement?.parentElement?.className).toContain('aspect-video')
+  })
+
+  it('renders YouTube as linked thumbnail without playback', () => {
+    render(<PostMediaCard media={{ type: 'video', url: 'https://youtu.be/dQw4w9WgXcQ', provider: 'youtube', label: null }} username="mika" />)
+    const link = screen.getByRole('link', { name: 'Open youtube video' })
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toBe('noreferrer noopener')
+    expect(document.querySelector('img')?.getAttribute('src')).toContain('dQw4w9WgXcQ')
+    expect(document.querySelector('iframe')).toBeNull()
+  })
+
+  it('renders external videos as truthful domain cards', () => {
+    render(<PostMediaCard media={{ type: 'video', url: 'https://video.example/watch/1', provider: 'external', label: null }} username="mika" />)
+    expect(screen.getByRole('link', { name: 'Open video.example video' })).toBeTruthy()
+  })
+})

@@ -4,6 +4,7 @@ import { CheckIcon, FileTextIcon, HeartIcon, MessageCircleIcon, Repeat2Icon, Sta
 import type { FeedCard as FeedCardData } from '../social/shared/social-contracts'
 import { FeedCoverImage } from './feed-cover-image'
 import { FeedOwnerActions } from './feed-owner-actions'
+import { PostMediaCard } from './post-media-card'
 
 interface FeedCardProps {
   card: FeedCardData
@@ -65,10 +66,11 @@ export function FeedCard({ card, owner, signedIn, onEdit, onChanged }: FeedCardP
   )
 }
 
+// fallow-ignore-next-line complexity -- Discriminated card variants stay exhaustive in one renderer.
 const renderBody = (card: FeedCardData, revealed: boolean, reveal: () => void): ReactNode => {
   if (card.kind === 'post') {
     if (card.hasSpoiler && !revealed) return <button className="min-h-24 w-full rounded-lg border border-cyan-300/30 bg-cyan-300/5 font-bold text-cyan-200 hover:bg-cyan-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={reveal} type="button">Reveal Post spoiler</button>
-    return <><p className="whitespace-pre-wrap text-sm leading-6 text-slate-200">{card.text}</p>{card.imageUrls.length > 0 ? <div className={`mt-3 grid gap-2 overflow-hidden rounded-lg ${card.imageUrls.length > 1 ? 'grid-cols-2' : ''}`}>{card.imageUrls.map((url, index) => <img alt={`Post image ${index + 1}`} className={`${card.imageUrls.length === 1 ? 'aspect-video' : 'aspect-square'} max-h-[32rem] w-full object-cover`} key={url} src={url} />)}</div> : null}</>
+    return <>{card.text ? <p className="whitespace-pre-wrap text-sm leading-6 text-slate-200">{card.text}</p> : null}{card.media ? <PostMediaCard media={card.media} username={card.author.username} /> : null}</>
   }
   if (card.kind === 'review') return <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4 sm:grid-cols-[6rem_minmax(0,1fr)]"><a className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/anime/${card.anime.anilistId}/${card.anime.slug}`}><FeedCoverImage alt={`${card.anime.title} cover`} className="aspect-[2/3] w-20 rounded-lg sm:w-24" src={card.anime.coverImageUrl} /></a><div className="min-w-0"><h2 className="truncate font-black">{card.anime.title}</h2><p className="mt-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Rating</p><p className="text-2xl font-black tabular-nums text-cyan-300">{card.rating.toFixed(card.rating % 1 === 0 ? 0 : 1)}<span className="text-sm font-medium text-muted-foreground"> / 100</span></p>{card.summaryHasSpoiler && !revealed ? <button className="mt-2 min-h-11 rounded-lg border border-cyan-300/30 px-4 text-sm font-bold text-cyan-200 hover:bg-cyan-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={reveal} type="button">Reveal Summary spoiler</button> : <p className="mt-2 text-sm leading-6 text-slate-200">{card.summary}</p>}<a className="mt-2 inline-flex rounded text-sm font-bold text-cyan-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/reviews/${card.reviewId}`}>Read Review</a></div></div>
   return <a className="flex gap-4 rounded-lg border border-white/8 p-3 outline-none transition hover:border-cyan-300/50 hover:bg-cyan-300/5 focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/anime/${card.anime.anilistId}/${card.anime.slug}`}><FeedCoverImage alt={`${card.anime.title} cover`} className="aspect-[2/3] w-16 rounded-md" src={card.anime.coverImageUrl} /><div className="min-w-0"><p className="text-xs font-black uppercase tracking-wider text-cyan-300">{card.kind === 'completed' ? 'Completed' : 'Rewatched'}</p><h2 className="mt-1 line-clamp-2 font-black">{card.anime.title}</h2><p className="mt-1 text-sm text-muted-foreground">View Anime Detail</p></div></a>

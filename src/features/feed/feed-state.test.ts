@@ -11,8 +11,7 @@ const card = (id: string): FeedCard => ({
   updatedAt: 1,
   postId: `post-${id}`,
   text: id,
-  imageIds: [],
-  imageUrls: [],
+  media: null,
   hasSpoiler: false,
   visibility: 'public',
 })

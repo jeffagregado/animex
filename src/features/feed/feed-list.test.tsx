@@ -8,7 +8,7 @@ import { FeedList } from './feed-list'
 
 vi.mock('convex/react', () => ({ useMutation: () => vi.fn() }))
 
-const card: FeedCard = { id: 'card', kind: 'post', postId: 'post', author: { id: 'author', username: 'author', displayName: 'Author', avatarUrl: null }, text: 'Post', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }
+const card: FeedCard = { id: 'card', kind: 'post', postId: 'post', author: { id: 'author', username: 'author', displayName: 'Author', avatarUrl: null }, text: 'Post', media: null, hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }
 const props = { cards: [card], error: null, hasMore: true, initialLoading: false, loadingMore: false, ownerId: null, signedIn: false, loadMore: vi.fn(), onChanged: vi.fn(), onEdit: vi.fn(), retry: vi.fn(), view: 'home' as const }
 
 let intersect: ((entries: Array<{ isIntersecting: boolean }>) => void) | null = null

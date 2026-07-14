@@ -11,7 +11,7 @@ vi.mock('convex/react', () => ({ useMutation: () => [mocks.postVisibility, mocks
 vi.mock('sonner', () => ({ toast: { success: mocks.success, error: mocks.error } }))
 
 const author = { id: 'owner', username: 'owner', displayName: 'Owner', avatarUrl: null }
-const anime = { anilistId: 1, slug: 'anime', title: 'Anime', coverImageUrl: null }
+const anime = { anilistId: 1, slug: 'anime', title: 'Anime', coverImageUrl: null, format: null, seasonYear: null }
 
 beforeEach(() => { mocks.index = 0; mocks.postVisibility.mockResolvedValue(null); mocks.removePost.mockResolvedValue(null); mocks.activityVisibility.mockResolvedValue(null); mocks.removeActivity.mockResolvedValue(null); mocks.reviewVisibility.mockResolvedValue(null); mocks.removeReviewActivity.mockResolvedValue(null); mocks.removeReview.mockResolvedValue(null) })
 afterEach(() => { cleanup(); Object.values(mocks).forEach((value) => { if (typeof value === 'function' && 'mockClear' in value) value.mockClear() }) })
@@ -25,7 +25,7 @@ const removeThroughMenu = async (card: Extract<FeedCard, { kind: 'post' | 'compl
 
 describe('FeedOwnerActions', () => {
   it('routes Post deletion with source postId', async () => {
-    await removeThroughMenu({ id: 'card', kind: 'post', postId: 'post-source', author, text: 'Post', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 })
+    await removeThroughMenu({ id: 'card', kind: 'post', postId: 'post-source', author, text: 'Post', media: null, hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 })
     expect(mocks.removePost).toHaveBeenCalledWith({ postId: 'post-source' })
   })
 
@@ -69,7 +69,7 @@ describe('FeedOwnerActions', () => {
   })
 
   it('opens an overflow menu and keeps delete confirmation in a dialog', async () => {
-    render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', media: null, hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
     const trigger = screen.getByRole('button', { name: 'Owner actions' })
     expect(trigger.querySelector('svg')?.classList.contains('lucide-ellipsis')).toBe(true)
     fireEvent.click(trigger)
@@ -84,7 +84,7 @@ describe('FeedOwnerActions', () => {
   it('exposes pending visibility state on the overflow trigger and restores focus', async () => {
     let resolve!: (value: null) => void
     mocks.postVisibility.mockReturnValueOnce(new Promise<null>((done) => { resolve = done }))
-    render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', media: null, hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
     const trigger = screen.getByRole('button', { name: 'Owner actions' })
     trigger.focus()
     fireEvent.click(trigger)
@@ -102,7 +102,7 @@ describe('FeedOwnerActions', () => {
   it('disables confirmation controls while deletion is pending', async () => {
     let resolve!: (value: null) => void
     mocks.removePost.mockReturnValueOnce(new Promise<null>((done) => { resolve = done }))
-    render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', media: null, hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Post' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }))
@@ -119,7 +119,7 @@ describe('FeedOwnerActions', () => {
   })
 
   it('returns focus to the overflow trigger when deletion is cancelled', async () => {
-    render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', media: null, hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
     const trigger = screen.getByRole('button', { name: 'Owner actions' })
     fireEvent.click(trigger)
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Post' }))
