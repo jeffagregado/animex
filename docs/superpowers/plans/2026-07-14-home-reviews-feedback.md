@@ -1,6 +1,6 @@
 # Phase 5 Home And Review Discovery Feedback Implementation Plan
 
-> **For Codex:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Use fresh orchestration workers only for disjoint owned files; integrate generated files once.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use fresh orchestration workers only for disjoint owned files; integrate generated files once.
 
 **Goal:** Restore the approved Home desktop utility column, reuse Discover Seasonal data, align feed cards with the approved Home reference, and add indexed Review discovery at `/reviews`.
 
@@ -8,7 +8,19 @@
 
 **Tech Stack:** TanStack Start/Router/Query, React, Convex queries and mutations, Zod, Base UI-backed shadcn components, Tailwind, Vitest, Sonner. No new production dependency, Convex action, AniList transport, external search service, or production deployment.
 
-**Branch:** Continue on `jeff-cx/phase-5-feed-reviews`. Preserve the unrelated generated change in `src/routeTree.gen.ts`; regenerate and integrate it once in Task 9.
+## Global Constraints
+
+- Use direct `base-nova` registry items; never replace Base UI surfaces with new Radix-backed components.
+- Reuse existing Select, Dialog, Sonner, and `AsyncButton`; do not add duplicate primitives or Spinner.
+- Require zero `package.json` or `pnpm-lock.yaml` change from shared component generation.
+- Preserve approved visual references, responsive behavior, keyboard access, touch behavior, and dark-theme hover/open states.
+- Keep TanStack route files thin, use directory `route.tsx` for shared/protected ownership, and regenerate route tree once.
+- Use Convex indexed queries/mutations only; no actions, table-filter scans, client AniList endpoint, or production deployment.
+- No production fixture endpoint. Real QA account data stays dev-only and secrets never enter repository evidence.
+
+---
+
+**Branch:** Continue on `jeff-cx/phase-5-feed-reviews`. Preserve the unrelated generated change in `src/routeTree.gen.ts`; regenerate and integrate it once in Task 10.
 
 **Approved references:**
 
@@ -57,7 +69,92 @@ interface UserAnimeProgress {
 - Signed-in all-search places viewer-owned non-public lanes before Public because Convex does not expose comparable scores across separate search queries.
 - List Progress counts only Watching, Completed, Plan to Watch, and Dropped. Rewatched and unset entries are excluded.
 
-## Task 1: Lock Review Discovery And Progress Contracts
+## Task 1: Add Base UI Shadcn Foundations
+
+**Owner:** shared UI worker
+
+**Files:**
+
+- Create: `src/components/ui/button.tsx`
+- Create: `src/components/ui/card.tsx`
+- Create: `src/components/ui/badge.tsx`
+- Create: `src/components/ui/skeleton.tsx`
+- Create: `src/components/ui/empty.tsx`
+- Create: `src/components/ui/progress.tsx`
+- Create: `src/components/ui/dropdown-menu.tsx`
+- Create: `src/components/ui/input.tsx`
+- Create: `src/components/ui/textarea.tsx`
+- Create: `src/components/ui/input-group.tsx`
+- Reuse unchanged: `src/components/ui/select.tsx`
+- Reuse unchanged: `src/components/ui/dialog.tsx`
+- Reuse unchanged: `src/components/ui/sonner.tsx`
+
+**Interfaces:**
+
+- Produces shared `Button`, `Card`, `Badge`, `Skeleton`, `Empty`, `Progress`, `DropdownMenu`, `Input`, and `InputGroup` exports for Tasks 6–8.
+- Existing `Select`, `Dialog`, and `Toaster` remain authoritative. Do not create duplicates.
+
+**Steps:**
+
+1. Refresh local registry context and official component docs before applying source:
+
+```powershell
+pnpm dlx shadcn@latest info --json
+pnpm dlx shadcn@latest docs button input-group card badge skeleton empty progress dropdown-menu
+```
+
+Expected: TanStack Start, Tailwind v4, `#/components/ui` alias, Lucide icons. Current `components.json` may report Radix; this does not override AnimeX's Base UI requirement.
+
+2. Dry-run direct Base Nova registry items. Never use bare component names because current project registry metadata points at Radix:
+
+```powershell
+pnpm dlx shadcn@latest add https://ui.shadcn.com/r/styles/base-nova/button.json https://ui.shadcn.com/r/styles/base-nova/input-group.json https://ui.shadcn.com/r/styles/base-nova/card.json https://ui.shadcn.com/r/styles/base-nova/badge.json https://ui.shadcn.com/r/styles/base-nova/skeleton.json https://ui.shadcn.com/r/styles/base-nova/empty.json https://ui.shadcn.com/r/styles/base-nova/progress.json https://ui.shadcn.com/r/styles/base-nova/dropdown-menu.json --dry-run
+```
+
+Expected: ten new UI source files. No overwrite of Select, Dialog, Sonner, global styles, or configuration.
+
+3. Inspect each registry source with `--view`. Require Base UI imports for Button, Progress, and Dropdown Menu. Require existing `#/lib/utils.ts` and Lucide aliases.
+
+```powershell
+pnpm dlx shadcn@latest add https://ui.shadcn.com/r/styles/base-nova/button.json --view button.tsx
+pnpm dlx shadcn@latest add https://ui.shadcn.com/r/styles/base-nova/progress.json --view progress.tsx
+pnpm dlx shadcn@latest add https://ui.shadcn.com/r/styles/base-nova/dropdown-menu.json --view dropdown-menu.tsx
+```
+
+4. Apply exact direct URLs only after dry-run/source inspection passes:
+
+```powershell
+pnpm dlx shadcn@latest add https://ui.shadcn.com/r/styles/base-nova/button.json https://ui.shadcn.com/r/styles/base-nova/input-group.json https://ui.shadcn.com/r/styles/base-nova/card.json https://ui.shadcn.com/r/styles/base-nova/badge.json https://ui.shadcn.com/r/styles/base-nova/skeleton.json https://ui.shadcn.com/r/styles/base-nova/empty.json https://ui.shadcn.com/r/styles/base-nova/progress.json https://ui.shadcn.com/r/styles/base-nova/dropdown-menu.json
+```
+
+5. Inspect `package.json` and `pnpm-lock.yaml` immediately. Existing `@base-ui/react`, `class-variance-authority`, `lucide-react`, and `radix-ui` satisfy current registry metadata. Require no dependency/version change. If either dependency file changes, stop and report exact diff before proceeding.
+6. Preserve upstream component composition while adapting source to repository rules:
+   - replace default parameter values with explicit `??` resolution;
+   - keep named exports and files below 300 lines;
+   - use AnimeX semantic tokens and fixed dark-theme behavior;
+   - remove white/native hover, focus, selected, and popup surfaces;
+   - use `cn()` and `gap-*`; no `space-*` utilities;
+   - keep Base UI `render` composition and accessible labels/values;
+   - keep every Dropdown Menu item inside `DropdownMenuGroup` and every Select item inside `SelectGroup` at consumer sites.
+7. Use full Card composition in later consumers: Header/Title/Description/Content/Footer only where those regions exist. Do not wrap feed layouts in decorative nested Cards without purpose.
+8. Run compile and existing shared-component consumers:
+
+```powershell
+pnpm exec tsc --noEmit
+pnpm exec vitest run src/features/discover/ui/discover-search-filters.test.tsx src/features/feed/feed-owner-actions.test.tsx
+git diff --check
+```
+
+Expected: PASS; no package/lock diff; no changes outside ten new UI files.
+
+9. Commit:
+
+```powershell
+git add src/components/ui/button.tsx src/components/ui/card.tsx src/components/ui/badge.tsx src/components/ui/skeleton.tsx src/components/ui/empty.tsx src/components/ui/progress.tsx src/components/ui/dropdown-menu.tsx src/components/ui/input.tsx src/components/ui/textarea.tsx src/components/ui/input-group.tsx
+git commit -m "feat: add base ui shadcn foundations"
+```
+
+## Task 2: Lock Review Discovery And Progress Contracts
 
 **Owner:** contracts worker
 
@@ -88,7 +185,7 @@ git add src/features/reviews/shared/review-discovery-contracts.ts src/features/r
 git commit -m "test: lock review discovery contracts"
 ```
 
-## Task 2: Add Migration-Safe Review Discovery Storage
+## Task 3: Add Migration-Safe Review Discovery Storage
 
 **Owner:** Convex Review worker
 
@@ -133,7 +230,7 @@ ratingBand: v.optional(storedReviewRatingBandValidator)
 pnpm exec vitest run convex/reviewDiscoveryPolicy.test.ts convex/social.integration.test.ts
 ```
 
-9. Do not tighten optional fields yet. Task 8 owns live backfill and final required-schema transition.
+9. Do not tighten optional fields yet. Task 9 owns live backfill and final required-schema transition.
 10. Commit:
 
 ```powershell
@@ -141,7 +238,7 @@ git add convex/schema.ts convex/reviewDiscoveryPolicy.ts convex/reviewDiscoveryP
 git commit -m "feat: add indexed review discovery"
 ```
 
-## Task 3: Add Atomic List Progress Projection
+## Task 4: Add Atomic List Progress Projection
 
 **Owner:** Convex user-anime worker
 
@@ -176,7 +273,7 @@ git add convex/schema.ts convex/userAnime.ts convex/userAnimePolicy.ts convex/us
 git commit -m "feat: add list progress projection"
 ```
 
-## Task 4: Reuse Discover Data On Home
+## Task 5: Reuse Discover Data On Home
 
 **Owner:** Home data-flow worker
 
@@ -210,7 +307,7 @@ git add src/routes/_public/home.tsx src/features/home src/features/discover/ui/u
 git commit -m "refactor: reuse discover seasonal on home"
 ```
 
-## Task 5: Restore The Home Desktop Utility Column
+## Task 6: Restore The Home Desktop Utility Column
 
 **Owner:** Home UI worker
 
@@ -247,7 +344,7 @@ git add src/features/home src/features/feed/feed-page.tsx
 git commit -m "feat: restore home utility column"
 ```
 
-## Task 6: Align Feed Cards With The Approved Home Reference
+## Task 7: Align Feed Cards With The Approved Home Reference
 
 **Owner:** feed-card UI worker
 
@@ -279,7 +376,7 @@ git add src/features/feed
 git commit -m "style: align home feed cards"
 ```
 
-## Task 7: Build The Public `/reviews` Route
+## Task 8: Build The Public `/reviews` Route
 
 **Owner:** Review discovery UI worker
 
@@ -319,7 +416,7 @@ git add src/routes/_public/reviews src/features/reviews/discovery
 git commit -m "feat: add review discovery page"
 ```
 
-## Task 8: Execute And Verify Convex Backfills
+## Task 9: Execute And Verify Convex Backfills
 
 **Owner:** controller; no parallel schema edits
 
@@ -354,7 +451,7 @@ git add convex/schema.ts docs/architecture/review-discovery-data-flow.md TODO.md
 git commit -m "docs: record review discovery data flow"
 ```
 
-## Task 9: Integrate Routes, Generated Types, And Full Automated Gates
+## Task 10: Integrate Routes, Generated Types, And Full Automated Gates
 
 **Owner:** controller, then fresh reviewer and QA agents
 
@@ -393,7 +490,7 @@ git add convex/_generated src/routeTree.gen.ts TODO.md
 git commit -m "chore: integrate home review feedback"
 ```
 
-## Task 10: Live Browser QA With A Real Signed-In Account
+## Task 11: Live Browser QA With A Real Signed-In Account
 
 **Owner:** fresh QA agent plus controller cleanup
 
@@ -427,11 +524,12 @@ git commit -m "chore: integrate home review feedback"
 
 ## Orchestration Order
 
-1. Task 1 locks contracts.
-2. Tasks 2 and 3 may run in parallel after Task 1; schema ownership is coordinated by controller.
-3. Tasks 4, 5, 6, and 7 may run in parallel only with the file ownership above.
-4. Controller performs Tasks 8 and 9 once.
-5. Fresh reviewer and QA perform Task 10 after all automated gates pass.
+1. Task 1 adds shared UI foundations before frontend work.
+2. Task 2 locks contracts.
+3. Tasks 3 and 4 may run in parallel after Task 2; schema ownership is coordinated by controller.
+4. Tasks 5–8 may run in parallel only with file ownership above and after required backend contracts exist.
+5. Controller performs Tasks 9 and 10 once.
+6. Fresh reviewer and QA perform Task 11 after all automated gates pass.
 
 ## Final Acceptance
 
@@ -441,5 +539,6 @@ git commit -m "chore: integrate home review feedback"
 - `/reviews` access, search, sort, bands, visibility, cursors, retry, and infinite scroll are correct.
 - List Progress stays atomic across every status-changing path and verified backfill.
 - No private Review or progress data leaks to public viewers.
+- Planned UI uses shared Base UI shadcn components; no duplicate primitives or Radix-backed replacement surfaces.
 - No Convex action, client AniList endpoint, external search, new production dependency, production deploy, or automatic merge.
 - Real signed-in browser QA covers Post, Anime Detail, Review, Home, and Review discovery flows with secrets excluded from evidence.

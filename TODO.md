@@ -737,6 +737,7 @@ Status: DESIGN AND IMPLEMENTATION PLAN APPROVED on `jeff-cx/phase-5-feed-reviews
 - [x] Write and self-review current-state design specification.
 - [x] User reviews and approves written specification.
 - [x] Create detailed implementation plan with migration, ownership, validation, and signed-in QA workflow.
+- [ ] Add shared Base UI shadcn Button, Input Group, Card, Badge, Skeleton, Empty, Progress, and Dropdown Menu foundations. Owner: shared UI worker.
 - [ ] Implement indexed Review discovery and verified migration. Owner: Convex Review worker.
 - [ ] Implement atomic List Progress projection and verified migration. Owner: Convex user-anime worker.
 - [ ] Reuse Discover Seasonal/This Week/Upcoming and restore Home desktop utilities. Owner: Home workers.
