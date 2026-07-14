@@ -19,7 +19,9 @@ afterEach(() => { cleanup(); Object.values(mocks).forEach((value) => { if (typeo
 const removeThroughMenu = async (card: Extract<FeedCard, { kind: 'post' | 'completed' | 'rewatched' }>) => {
   render(<FeedOwnerActions card={card} onChanged={() => undefined} onEdit={() => undefined} />)
   fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
-  fireEvent.click(await screen.findByRole('menuitem', { name: card.kind === 'post' ? 'Delete Post' : 'Remove activity' }))
+  const deleteItem = await screen.findByRole('menuitem', { name: 'Delete' })
+  expect(deleteItem.getAttribute('data-variant')).toBe('destructive')
+  fireEvent.click(deleteItem)
   fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }))
 }
 
@@ -49,23 +51,17 @@ describe('FeedOwnerActions', () => {
     await waitFor(() => expect(mocks.reviewVisibility).toHaveBeenCalledWith({ reviewId: 'review-source', visibility: 'followers' }))
   })
 
-  it('routes Review activity removal without deleting the Review', async () => {
+  it('offers only destructive Remove for Review activity deletion', async () => {
     render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove feed activity' }))
+    const removeItem = await screen.findByRole('menuitem', { name: 'Remove' })
+    expect(removeItem.getAttribute('data-variant')).toBe('destructive')
+    expect(screen.queryByRole('menuitem', { name: 'Delete Review' })).toBeNull()
+    fireEvent.click(removeItem)
     expect(await screen.findByRole('dialog', { name: 'Remove feed activity?' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(mocks.removeReviewActivity).toHaveBeenCalledWith({ reviewId: 'review-source' }))
     expect(mocks.removeReview).not.toHaveBeenCalled()
-  })
-
-  it('routes permanent Review deletion by review ID', async () => {
-    render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Review' }))
-    expect(await screen.findByRole('dialog', { name: 'Delete Review?' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
-    await waitFor(() => expect(mocks.removeReview).toHaveBeenCalledWith({ reviewId: 'review-source' }))
   })
 
   it('opens an overflow menu and keeps delete confirmation in a dialog', async () => {
@@ -77,7 +73,7 @@ describe('FeedOwnerActions', () => {
     expect(trigger.hasAttribute('data-popup-open')).toBe(true)
     expect(trigger.className).toContain('data-popup-open:bg-cyan-300/10')
     expect(trigger.className).toContain('data-popup-open:ring-2')
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Post' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
     expect(await screen.findByRole('dialog', { name: 'Delete Post?' })).toBeTruthy()
   })
 
@@ -104,7 +100,7 @@ describe('FeedOwnerActions', () => {
     mocks.removePost.mockReturnValueOnce(new Promise<null>((done) => { resolve = done }))
     render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', media: null, hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Post' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }))
     const confirm = await screen.findByRole('button', { name: 'Deleting…' })
     const cancel = screen.getByRole('button', { name: 'Cancel' })
@@ -122,7 +118,7 @@ describe('FeedOwnerActions', () => {
     render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', media: null, hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
     const trigger = screen.getByRole('button', { name: 'Owner actions' })
     fireEvent.click(trigger)
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Post' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(document.activeElement).toBe(trigger))
   })

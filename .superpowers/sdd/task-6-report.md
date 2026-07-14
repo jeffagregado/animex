@@ -1,28 +1,45 @@
-# Task 6: Discover Navigation
+# Task 6 Report
 
-Status: complete
+Status: DONE
 
-## Result
+## Scope
 
-- Rails, search results, This Week rows, and Upcoming rows use typed TanStack `Link` navigation.
-- Every link targets `/anime/$anilistId/$slug` with existing AniList ID and canonical slug.
-- Whole card or row is keyboard-focusable with visible focus ring.
-- Existing layout, content, score badges, filters, responsive branches, and retry controls remain unchanged.
+- Completed/Rewatched rows show cached `year · format`.
+- Missing values show `TBA · Anime`.
+- Whole milestone row stays Anime Detail link.
+- Post and milestone destructive labels: `Delete`.
+- Review activity destructive label: `Remove`.
+- Review menu contains no `Delete Review`.
+- Existing dialogs, mutations, ownership checks, Sonner messages unchanged.
+- Post media rendering untouched.
 
-## TDD Evidence
+`convex/feed.ts` already hydrated `seasonYear` and `format` from `animeSummaries` at base commit `f72dded`. No backend implementation edit needed. Integration assertion now locks behavior.
 
-- RED: focused link tests failed 6 times because no link roles existed; 13 existing tests passed.
-- GREEN: `pnpm test -- src/features/discover/ui/discover-section.test.tsx src/features/discover/ui/discover-search-results.test.tsx src/features/discover/ui/discover-weekly-list.test.tsx src/features/discover/ui/discover-upcoming-list.test.tsx` — 19 passed.
-- Discover UI: `pnpm test -- src/features/discover/ui` — 36 passed.
-- Types: `pnpm exec tsc --noEmit` — passed.
-- Diff: `git diff --check -- <owned Discover files>` — passed.
+## TDD
 
-## Review Fix
+RED:
 
-- Link test doubles now derive hrefs from production `to` templates and params.
-- Missing route params fail explicitly.
-- Tests assert route template, interpolated href, and focus-visible class forwarding.
+- Command: `pnpm exec vitest run convex/feedMilestones.integration.test.ts src/features/feed/feed-card.test.tsx src/features/feed/feed-owner-actions.test.tsx`
+- Result: 10 expected failures; old `View Anime Detail`, `Delete Post`, `Remove activity`, `Remove feed activity`, and `Delete Review` behavior exposed.
+- Cached hydration assertion passed at baseline because implementation already existed.
+
+GREEN:
+
+- Same focused command: PASS, 3 files and 23 tests.
+
+## Validation
+
+- `pnpm exec tsc --noEmit`: PASS.
+- `pnpm exec fallow audit --base HEAD --gate new-only --format json --quiet`: PASS; 0 introduced dead code, complexity, or duplication findings.
+- `git diff --check`: PASS.
+- React review: semantic link/menu controls preserved; no hook, state, media, or accessibility behavior changed.
+- Browser QA not run by worker; controller QA owns integrated viewport and console pass.
 
 ## Risk
 
-- Browser QA remains integration Task 7 scope.
+- Fallow reports one inherited `react-dom` test-only dependency finding and emitted a `node_modules directory not found` warning. Neither finding was introduced by Task 6.
+- No AniList call or non-feed DTO changed.
+
+## Commit
+
+`fix: simplify feed activity actions`

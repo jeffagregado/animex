@@ -62,14 +62,22 @@ describe('FeedCard Post media', () => {
     expect(screen.getByText('Image unavailable').parentElement?.parentElement?.className).toContain('aspect-[2/3]')
   })
 
-  it.each(['completed', 'rewatched'] as const)('renders %s activity metadata', (kind) => {
-    const card: FeedCardData = { ...common, kind, anime: { ...anime, format: null, seasonYear: null }, settledAt: 1, visibility: 'public' }
+  it.each(['completed', 'rewatched'] as const)('renders %s year and format in the whole-row detail link', (kind) => {
+    const card: FeedCardData = { ...common, kind, anime: { ...anime, format: 'TV', seasonYear: 2024 }, settledAt: 1, visibility: 'public' }
     render(<FeedCard card={card} onChanged={() => undefined} onEdit={() => undefined} owner={false} signedIn={false} />)
     expect(screen.getByRole('article').className).toContain('border-l-cyan-300')
     expect(screen.getByText(kind === 'completed' ? 'Mika completed Frieren' : 'Mika rewatched Frieren')).toBeTruthy()
-    expect(screen.getByRole('link', { name: /Frieren/ }).getAttribute('href')).toBe('/anime/154587/frieren')
+    const detailLink = screen.getByRole('link', { name: /Frieren/ })
+    expect(detailLink.getAttribute('href')).toBe('/anime/154587/frieren')
+    expect(detailLink.textContent).toContain('2024 · TV')
     expect(screen.getByText(kind === 'completed' ? 'Completed' : 'Rewatched')).toBeTruthy()
     expect(screen.queryByText(/score/i)).toBeNull()
     expect(screen.queryByText(/description/i)).toBeNull()
+  })
+
+  it.each(['completed', 'rewatched'] as const)('renders %s fallback metadata', (kind) => {
+    const card: FeedCardData = { ...common, kind, anime: { ...anime, format: null, seasonYear: null }, settledAt: 1, visibility: 'public' }
+    render(<FeedCard card={card} onChanged={() => undefined} onEdit={() => undefined} owner={false} signedIn={false} />)
+    expect(screen.getByRole('link', { name: /Frieren/ }).textContent).toContain('TBA · Anime')
   })
 })

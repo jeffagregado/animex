@@ -48,7 +48,13 @@ describe('feed milestone source integrity', () => {
 
     const card = await t.query(feedApi.feed.getById, { cardId })
 
-    expect(card).toMatchObject({ id: cardId, kind: 'completed', settledAt: 200, visibility: 'public' })
+    expect(card).toMatchObject({
+      id: cardId,
+      kind: 'completed',
+      settledAt: 200,
+      visibility: 'public',
+      anime: { anilistId: 1, seasonYear: 2024, format: 'TV' },
+    })
   })
 
   test('suppresses a milestone projection after its source is deleted', async () => {
