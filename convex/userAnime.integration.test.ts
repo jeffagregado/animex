@@ -6,6 +6,7 @@ import { convexTest } from 'convex-test'
 import { describe, expect, test, vi } from 'vitest'
 
 import { api, components } from './_generated/api'
+import type { Id } from './_generated/dataModel'
 import schema from './schema'
 
 const modules = import.meta.glob(['./_generated/**/*.*', './userAnime.ts'])
@@ -61,6 +62,12 @@ const insertAnime = async (t: ReturnType<typeof createHarness>, anilistId: numbe
   })
 })
 
+const deleteProgress = async (t: ReturnType<typeof createHarness>, userId: Id<'users'>) => await t.run(async (ctx) => {
+  const progress = await ctx.db.query('userAnimeProgress').withIndex('by_user', (q) => q.eq('userId', userId)).unique()
+  if (!progress) throw new Error('Expected List Progress row.')
+  await ctx.db.delete('userAnimeProgress', progress._id)
+})
+
 describe('user anime Convex integration', () => {
   test('returns authenticated zero progress without creating an aggregate row', async () => {
     const t = createHarness()
@@ -111,6 +118,50 @@ describe('user anime Convex integration', () => {
 
     await expect(owner.client.query(getMyProgress, {})).rejects.toThrow('nonnegative')
     await expect(owner.client.mutation(api.userAnime.setStatus, { anilistId: 1, status: 'watching' })).rejects.toThrow('nonnegative')
+  })
+
+  test('rebuilds missing legacy progress before every status-changing mutation', async () => {
+    const t = createHarness()
+    const owner = await createAuthUser(t, true, 'progress-legacy')
+    const ownerId = await insertProfile(t, owner.authId, 'ProgressLegacy', 'private')
+    for (const anilistId of [1, 2, 3, 4]) await insertAnime(t, anilistId)
+    await t.run(async (ctx) => {
+      const now = Date.now()
+      await ctx.db.insert('userAnimeEntries', {
+        userId: ownerId, anilistId: 1, status: 'watching', score: null, favoriteAt: null,
+        rewatchCount: 0, lastRewatchSequence: 0, createdAt: now, updatedAt: now,
+      })
+      await ctx.db.insert('userAnimeEntries', {
+        userId: ownerId, anilistId: 2, status: null, score: null, favoriteAt: null,
+        rewatchCount: 0, lastRewatchSequence: 0, createdAt: now, updatedAt: now,
+      })
+      await ctx.db.insert('userAnimeEntries', {
+        userId: ownerId, anilistId: 3, status: 'completed', score: null, favoriteAt: null,
+        rewatchCount: 0, lastRewatchSequence: 0, createdAt: now, updatedAt: now,
+      })
+      const rewatchEntryId = await ctx.db.insert('userAnimeEntries', {
+        userId: ownerId, anilistId: 4, status: 'rewatched', score: null, favoriteAt: null,
+        rewatchCount: 1, lastRewatchSequence: 1, createdAt: now, updatedAt: now,
+      })
+      await ctx.db.insert('animeRewatchEntries', {
+        entryId: rewatchEntryId, userId: ownerId, anilistId: 4, completedAt: now, sequence: 1,
+      })
+    })
+
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 1, status: 'completed' })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 2, planned: 0, dropped: 0 })
+
+    await deleteProgress(t, ownerId)
+    await owner.client.mutation(api.userAnime.setScore, { anilistId: 2, score: 8 })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 1, completed: 2, planned: 0, dropped: 0 })
+
+    await deleteProgress(t, ownerId)
+    await owner.client.mutation(api.userAnime.recordRewatch, { anilistId: 3 })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 1, completed: 1, planned: 0, dropped: 0 })
+
+    await deleteProgress(t, ownerId)
+    await owner.client.mutation(api.userAnime.removeLatestRewatch, { anilistId: 4 })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 1, completed: 2, planned: 0, dropped: 0 })
   })
 
   test('backfills profile pages by replacement and verifies drift without zero rows', async () => {

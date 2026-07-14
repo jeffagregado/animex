@@ -82,10 +82,13 @@ const progressMatches = (left: UserAnimeProgress, right: UserAnimeProgress): boo
 
 /** Recomputes List Progress from one user's indexed entries. */
 const computeProgress = async (ctx: UserCtx, userId: Id<'users'>): Promise<UserAnimeProgress> => {
-  const entries = await ctx.db.query('userAnimeEntries').withIndex('by_user_anime', (q) => q.eq('userId', userId)).collect()
-  let progress: UserAnimeProgress = { watching: 0, completed: 0, planned: 0, dropped: 0 }
-  for (const entry of entries) progress = applyProgressTransition(null, entry.status as AnimeStatus | null, progress)
-  return progress
+  const [watching, completed, planned, dropped] = await Promise.all([
+    ctx.db.query('userAnimeEntries').withIndex('by_user_status', (q) => q.eq('userId', userId).eq('status', 'watching')).collect(),
+    ctx.db.query('userAnimeEntries').withIndex('by_user_status', (q) => q.eq('userId', userId).eq('status', 'completed')).collect(),
+    ctx.db.query('userAnimeEntries').withIndex('by_user_status', (q) => q.eq('userId', userId).eq('status', 'planned')).collect(),
+    ctx.db.query('userAnimeEntries').withIndex('by_user_status', (q) => q.eq('userId', userId).eq('status', 'dropped')).collect(),
+  ])
+  return { watching: watching.length, completed: completed.length, planned: planned.length, dropped: dropped.length }
 }
 
 /** Replaces one aggregate with recomputed truth and removes zero-only rows. */
@@ -128,7 +131,8 @@ const applyProgress = async (
   next: AnimeStatus | null,
 ): Promise<void> => {
   const current = await readProgress(ctx, userId)
-  const updated = transitionProgress(previous, next, current ?? { watching: 0, completed: 0, planned: 0, dropped: 0 })
+  const baseline = current ?? await computeProgress(ctx, userId)
+  const updated = transitionProgress(previous, next, baseline)
   if (isEmptyProgress(updated)) {
     if (current) await ctx.db.delete('userAnimeProgress', current._id)
     return
