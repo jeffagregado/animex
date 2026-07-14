@@ -748,7 +748,7 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migrations, 
 
 # Phase 5 Editor, Post Media, And Feed Feedback
 
-Status: FINAL REVIEW AND QA on `jeff-cx/phase-5-feed-reviews`; implementation, dev migration, current-state docs, and automated gates are complete.
+Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migration, review, authenticated browser QA, and closure gates pass.
 
 - [x] Inspect Review editor, Post storage, feed cards, Home utility, and Discover layout flows.
 - [x] Verify RichTextEditor caret insertion, selection replacement, and Backspace media deletion behavior.
@@ -766,5 +766,5 @@ Status: FINAL REVIEW AND QA on `jeff-cx/phase-5-feed-reviews`; implementation, d
 - [x] Replace Post uploads with one external Image/Video URL and preserve Post lifecycle behavior. Owner: Post UI worker + reviewer.
 - [x] Update feed metadata/menu actions and Home/Discover surfaces. Owner: feed/UI workers + reviewers.
 - [x] Sync final Convex functions; update current-state docs; pass tests, TypeScript, build, Fallow, endpoint scan, and diff check. Owner: controller + docs mapper.
-- [ ] Complete whole-branch review and authenticated responsive browser QA. Owner: reviewer + QA + controller.
+- [x] Complete whole-branch review and authenticated responsive browser QA at 390, 768, and 1280 px, including hover/focus, Review media editing, Post lifecycle, Home/Discover surfaces, console/network, overflow, and dark scrollbar states. Owner: reviewer + QA + controller.
 - [x] Implement only after plan approval.
