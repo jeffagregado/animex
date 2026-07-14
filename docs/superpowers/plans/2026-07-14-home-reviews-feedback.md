@@ -67,7 +67,9 @@ interface UserAnimeProgress {
 - Active search uses Convex relevance order. Empty search uses the selected sort.
 - Public users always normalize visibility to `public`. Signed-in `all` includes Public plus only the viewer's Followers/Private Reviews.
 - Signed-in all-search places viewer-owned non-public lanes before Public because Convex does not expose comparable scores across separate search queries.
+- Signed-in all-search lane order is deterministic: My Followers, then My Private, then Public. Cursor state advances each lane independently; relevance scores never merge across lanes.
 - List Progress counts only Watching, Completed, Plan to Watch, and Dropped. Rewatched and unset entries are excluded.
+- `userAnimeProgress` stays sparse: one indexed row for users with list-status activity or migrated entries. Untouched users have no row and read as explicit zeros.
 
 ## Task 1: Add Base UI Shadcn Foundations
 
@@ -215,14 +217,14 @@ searchText: v.optional(v.string())
 ratingBand: v.optional(storedReviewRatingBandValidator)
 ```
 
-3. Add one search index with `searchText` as the single search field and equality filter fields for state, visibility, user, and rating band. Add bounded database indexes for each empty-search sort, with public and owner variants and rating-band variants. No `.filter()` scans.
-4. Implement pure cursor encode/decode and deterministic lane merge in `reviewDiscoveryPolicy.ts`. Scope cursors to viewer identity, normalized query, sort, rating band, and visibility so a cursor cannot be replayed under wider access.
+3. Add exactly one `search_discovery` index with `searchText` as the single search field and equality filter fields `state`, `visibility`, `userId`, and `ratingBand`. For each of newest/high/low order keys, add four bounded indexes: Public; Public + rating band; owner + visibility; owner + visibility + rating band. Existing five plus these thirteen remain below Convex's 32-index table limit. No `.filter()` scans.
+4. Implement pure cursor encode/decode and deterministic lane merge in `reviewDiscoveryPolicy.ts`. Scope cursors to version, viewer identity, normalized query, sort, rating band, and visibility so a cursor cannot be replayed under wider access. Empty-search cursors hold independent order-key anchors/completion flags. Search cursors hold independent Convex cursors and the fixed My Followers → My Private → Public phase.
 5. Update Review publish/update/visibility/delete paths so discovery fields and order keys remain atomic with the source Review.
 6. Add:
    - `reviews.listLatestPublic({ limit: 5 })` with a hard server cap of five;
    - `reviews.listDiscovery(input)` with a hard page size of 12;
-   - resumable `internal.reviews.backfillDiscoveryFields`;
-   - resumable `internal.reviews.verifyDiscoveryBackfill`.
+   - resumable `internal.reviews.backfillDiscoveryFields` for every draft and published Review;
+   - resumable `internal.reviews.verifyDiscoveryBackfill` for every Review.
 7. Hydrate each result through existing author/anime helpers. Missing source data raises an explicit error; do not fabricate metadata.
 8. Run focused tests:
 
@@ -252,14 +254,14 @@ git commit -m "feat: add indexed review discovery"
 **Steps:**
 
 1. Write failing integration tests for zero state, each counted status, excluded unset/Rewatched states, first-score auto-Watching, repeated idempotent writes, status replacement, rewatch transition, and rewatch rollback.
-2. Add `userAnimeProgress` with one indexed row per user and the four nonnegative counts.
+2. Add sparse `userAnimeProgress` with one unique indexed row per user who has list-status activity and the four nonnegative counts. Untouched users intentionally have no row.
 3. Add `userAnime.getMyProgress`; it must derive identity through `requireProfile` and return explicit zeros when no aggregate row exists.
 4. Apply the pure transition helper atomically in every status-changing mutation path:
    - `setStatus`;
    - `setScore` when first score changes unset status to Watching;
    - `recordRewatch`;
    - `removeLatestRewatch`.
-5. Add resumable, idempotent internal backfill and verification mutations. Recompute a user's counts from indexed `userAnimeEntries` reads, then replace the aggregate rather than incrementing an unknown partial state.
+5. Add resumable, idempotent internal backfill and verification mutations. Page profiles, recompute each user's counts from indexed `userAnimeEntries` reads, then replace the aggregate rather than incrementing an unknown partial state. Do not create zero-only rows for untouched profiles.
 6. Run:
 
 ```powershell
@@ -446,7 +448,7 @@ git commit -m "feat: add review discovery page"
 pnpm exec convex dev --once
 ```
 
-2. Run Review discovery backfill repeatedly using its returned cursor until `isDone: true`. Then run its verification mutation and require zero missing/mismatched published Reviews.
+2. Run Review discovery backfill repeatedly using its returned cursor until `isDone: true`. Then run its verification mutation and require zero missing/mismatched Reviews across both draft and published states.
 3. Run List Progress backfill repeatedly until `isDone: true`. Then run verification and require every user aggregate to match indexed entries.
 4. If verification fails, stop with the exact offending IDs/counts. Do not tighten the schema or invent fallback data.
 5. Change `searchText` and the storage band (`none` for unrated drafts, a real band for published Reviews) to required only after the Review verification passes. Push again:
