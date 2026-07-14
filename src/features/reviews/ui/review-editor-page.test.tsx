@@ -58,7 +58,7 @@ const fillPublishableReview = (): void => {
 
 describe('LoadedReviewEditor lifecycle', () => {
   it('saves Draft then publishes with distinct intent IDs and navigates after persistence', async () => {
-    render(<LoadedReviewEditor anime={anime} existing={null} mode="create" />)
+    render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={null} mode="create" />)
     fillPublishableReview()
     fireEvent.click(screen.getByRole('button', { name: /Save draft/ }))
     await waitFor(() => expect(saveDraft).toHaveBeenCalledTimes(1))
@@ -72,7 +72,7 @@ describe('LoadedReviewEditor lifecycle', () => {
 
   it('retains failed Draft fields and dirty state while reusing the logical retry ID', async () => {
     saveDraft.mockRejectedValueOnce(new Error('Network failed.')).mockResolvedValueOnce('review-1')
-    render(<LoadedReviewEditor anime={anime} existing={null} mode="create" />)
+    render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={null} mode="create" />)
     fillPublishableReview()
     fireEvent.click(screen.getByRole('button', { name: /Save draft/ }))
     expect(await screen.findByText('Network failed.')).toBeTruthy()
@@ -85,7 +85,7 @@ describe('LoadedReviewEditor lifecycle', () => {
 
   it('wires blocker Stay and Discard actions', () => {
     blocker = { status: 'blocked', reset, proceed }
-    render(<LoadedReviewEditor anime={anime} existing={null} mode="create" />)
+    render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={null} mode="create" />)
     fireEvent.click(screen.getByRole('button', { name: 'Stay' }))
     expect(reset).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
@@ -94,8 +94,38 @@ describe('LoadedReviewEditor lifecycle', () => {
 })
 
 describe('ReviewEditorPage existing Review routing', () => {
+  it('keeps the edit surface loading until the public auth profile resolves', () => {
+    publicAuth.mockReturnValue({ status: 'loading' })
+
+    render(<ReviewEditorPage anime={null} mode="edit" reviewId="review-1" />)
+
+    expect(screen.queryByText('Review unavailable')).toBeNull()
+    expect(document.querySelectorAll('.animate-pulse')).toHaveLength(2)
+  })
+
   it('redirects an existing published create intent from an effect', async () => {
     render(<ReviewEditorPage anime={anime} mode="create" reviewId={null} />)
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/reviews/$reviewId', params: { reviewId: 'review-1' }, replace: true }))
+  })
+
+  it.each([
+    ['public', 'Public'],
+    ['followers', 'Followers'],
+    ['private', 'Private'],
+  ] as const)('defaults a new Review to the account %s visibility', (visibility, label) => {
+    publicAuth.mockReturnValue({ status: 'ready', authState: { status: 'complete', email: 'fan@example.test', profile: { id: 'author-1', username: 'fan', name: 'Fan', avatarUrl: null, visibility } } })
+    vi.mocked(useQuery).mockReturnValue(null as ReturnType<typeof useQuery>)
+
+    render(<ReviewEditorPage anime={anime} mode="create" reviewId={null} />)
+
+    expect(screen.getByRole('combobox').textContent).toContain(label)
+  })
+
+  it('preserves an existing Review visibility instead of applying the account default', () => {
+    publicAuth.mockReturnValue({ status: 'ready', authState: { status: 'complete', email: 'fan@example.test', profile: { id: 'author-1', username: 'fan', name: 'Fan', avatarUrl: null, visibility: 'private' } } })
+
+    render(<ReviewEditorPage anime={null} mode="edit" reviewId="review-1" />)
+
+    expect(screen.getByRole('combobox').textContent).toContain('Public')
   })
 })

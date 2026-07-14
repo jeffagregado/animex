@@ -104,6 +104,23 @@ describe('user anime Convex integration', () => {
     expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 1, planned: 1, dropped: 1 })
   })
 
+  test('keeps one progress row when first status writes race', async () => {
+    const t = createHarness()
+    const owner = await createAuthUser(t, true, 'progress-concurrent')
+    const ownerId = await insertProfile(t, owner.authId, 'ProgressConcurrent', 'private')
+    await insertAnime(t, 1)
+    await insertAnime(t, 2)
+
+    await Promise.all([
+      owner.client.mutation(api.userAnime.setStatus, { anilistId: 1, status: 'watching' }),
+      owner.client.mutation(api.userAnime.setStatus, { anilistId: 2, status: 'completed' }),
+    ])
+
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 1, completed: 1, planned: 0, dropped: 0 })
+    const rows = await t.run(async (ctx) => await ctx.db.query('userAnimeProgress').withIndex('by_user', (q) => q.eq('userId', ownerId)).collect())
+    expect(rows).toHaveLength(1)
+  })
+
   test('fails loudly when stored progress contains a negative count', async () => {
     const t = createHarness()
     const owner = await createAuthUser(t, true, 'progress-negative')

@@ -41,13 +41,14 @@ export function ReviewEditorPage({ anime, mode, reviewId }: ReviewEditorPageProp
   if (mode === 'edit' && raw === null) return <EditorState title="Review not found" message="This Review is unavailable or no longer editable." />
   if (mode === 'create' && existing?.state === 'published') return <EditorLoading />
   if (mode === 'edit' && existing?.state !== 'published') return <EditorState title="Published Review required" message="Drafts resume from the anime Reviews tab." />
+  if (auth.status !== 'ready' || auth.authState.status !== 'complete') return <EditorLoading />
   if (mode === 'edit' && (existing === null || auth.status !== 'ready' || auth.authState.status !== 'complete' || auth.authState.profile.id !== existing.author.id)) return <EditorState title="Review unavailable" message="Only the Review owner can edit it." />
   const editorAnime = anime ?? { anilistId: existing!.anime.anilistId, coverImageUrl: existing!.anime.coverImageUrl, episodes: null, format: null, seasonYear: null, slug: existing!.anime.slug, titles: { display: existing!.anime.title, english: null, native: null, romaji: null } }
-  return <LoadedReviewEditor anime={editorAnime} existing={existing} mode={mode} />
+  return <LoadedReviewEditor anime={editorAnime} defaultVisibility={auth.authState.profile.visibility} existing={existing} mode={mode} />
 }
 
-export function LoadedReviewEditor({ anime, existing, mode }: { anime: ReviewEditorAnime; existing: ReviewDetail | null; mode: 'create' | 'edit' }) {
-  const [fields, setFields] = useState<EditorFields>(() => existing ? fromExisting(existing) : { body: createEmptyReviewDocument(), rating: REVIEW_RATING_DEFAULT, summary: '', summaryHasSpoiler: false, visibility: 'private' })
+export function LoadedReviewEditor({ anime, defaultVisibility, existing, mode }: { anime: ReviewEditorAnime; defaultVisibility: Visibility; existing: ReviewDetail | null; mode: 'create' | 'edit' }) {
+  const [fields, setFields] = useState<EditorFields>(() => existing ? fromExisting(existing) : { body: createEmptyReviewDocument(), rating: REVIEW_RATING_DEFAULT, summary: '', summaryHasSpoiler: false, visibility: defaultVisibility })
   const [tab, setTab] = useState<'editor' | 'preview'>('editor')
   const [dirty, setDirty] = useState(false)
   const [pending, setPending] = useState<ReviewSaveMode | null>(null)

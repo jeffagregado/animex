@@ -3,6 +3,7 @@
 ## Source truth
 
 - `reviews` owns Review state, visibility, Rating, Summary, body, and discovery projection fields.
+- `posts`, `reviews`, and `animeMilestones` remain authoritative for feed content and access. `feedCards` is an indexed projection, never source truth.
 - `users` supplies author display name and username.
 - `animeSummaries` supplies the cached anime title and cover.
 - `userAnimeEntries` owns per-anime list status.
@@ -14,6 +15,12 @@ Review create, draft save, publish, edit, and visibility mutations update the so
 
 Review deletion removes the source row. Activity deletion removes only the feed projection and does not remove Review discovery.
 
+New Review fields start from the author's account visibility after the complete profile resolves. Existing Drafts and published Reviews retain their stored visibility.
+
+## Feed projection reads
+
+Every Post, Review, Completed, or Rewatched card resolves its source row before hydration. Missing, deleted, inactive, draft, or mismatched sources are omitted. Source key, source ID, owner, anime ID when applicable, and visibility must match the projection. Authorization uses source owner and visibility; projection fields cannot widen access.
+
 ## Discovery reads
 
 - Latest Reviews: indexed Public, published, newest read; server cap five.
@@ -21,14 +28,16 @@ Review deletion removes the source row. Activity deletion removes only the feed 
 - Search: one Convex search index over `searchText`; equality filters cover state, visibility, owner, and Rating band.
 - Public viewers read only Public Reviews.
 - Signed-in visibility lanes are My Followers, My Private, then Public. Non-public lanes are owner-bound.
+- Public-auth state first normalizes the URL. Viewer-scoped lanes wait for Convex authentication and use the resolved profile ID; an auth mismatch fails visibly without issuing a viewer query.
 - Cursors bind version, viewer, normalized query, sort, Rating band, and visibility. Each lane advances independently. Search relevance scores never merge across lanes.
 - Discovery pages cap at 12 items and hydrate through required author/anime source records. Missing source records fail explicitly.
+- Home Latest Reviews reads at most five indexed Public, published Reviews. Rows keep loaded content across retry errors, omit Rating, render compact spoiler-safe Summary and cover failure, and expose one full-row Review Detail target.
 
 ## List Progress
 
 Status-changing mutations update `userAnimeProgress` in the same transaction. First Score on an unset entry changes Status to Watching before applying one progress transition. Rewatch and rollback paths apply one caller-owned transition; shared rewatch helpers do not update the projection.
 
-No row means zero counts for an untouched user. During migration, a missing row inside a status mutation first recomputes indexed entry truth, then applies the requested transition. Negative or mismatched counts fail explicitly.
+`userAnimeProgress` is a logical singleton per user. Indexed reads require at most one row; duplicates are corruption. No row means zero counts for an untouched user. Status mutations and backfill upsert or recompute the same row. During migration, a missing row inside a status mutation first recomputes indexed entry truth, then applies the requested transition. Negative or mismatched counts fail explicitly.
 
 ## Indexes and cost
 

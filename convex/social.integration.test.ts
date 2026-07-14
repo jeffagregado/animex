@@ -417,6 +417,104 @@ describe('social Convex integration', () => {
     expect(home.items.slice(0, 2).every((item: { author: { username: string } }) => item.author.username === 'feed-owner')).toBe(true)
   }, 20_000)
 
+  test('suppresses corrupt Post projections and authorizes from Post source truth', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'source-post-owner')
+    const other = await createOwner(t, 'source-post-other')
+    const viewer = await createOwner(t, 'source-post-viewer')
+    const postId = await owner.client.mutation(socialApi.posts.create, {
+      requestId: 'source-post', text: 'Source Post', imageIds: [], hasSpoiler: false, visibility: 'public',
+    })
+    const otherPostId = await other.client.mutation(socialApi.posts.create, {
+      requestId: 'source-post-other', text: 'Other Post', imageIds: [], hasSpoiler: false, visibility: 'public',
+    })
+    const privatePostId = await owner.client.mutation(socialApi.posts.create, {
+      requestId: 'source-post-private', text: 'Private Post', imageIds: [], hasSpoiler: false, visibility: 'private',
+    })
+    const cards = await t.run(async (ctx) => ({
+      card: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `post:${postId}`)).unique(),
+      privateCard: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `post:${privatePostId}`)).unique(),
+    }))
+    if (!cards.card || !cards.privateCard) throw new Error('Expected Post feed projections.')
+
+    expect(await viewer.client.query(socialApi.feed.getById, { cardId: cards.card._id })).toMatchObject({
+      postId, author: { id: owner.profileId, username: 'source-post-owner' }, visibility: 'public',
+    })
+    expect((await t.query(socialApi.feed.listGlobal, { cursor: null })).items.map((item: { id: string }) => item.id)).toContain(cards.card._id)
+
+    const corruptions = [
+      { sourceKey: 'post:wrong-source-key' },
+      { sourceId: otherPostId },
+      { userId: other.profileId },
+      { visibility: 'private' as const },
+      { sourceId: 'missing-post-source' },
+    ]
+    for (const corruption of corruptions) {
+      await t.run(async (ctx) => await ctx.db.patch('feedCards', cards.card!._id, corruption))
+      expect(await viewer.client.query(socialApi.feed.getById, { cardId: cards.card._id })).toBeNull()
+      expect((await t.query(socialApi.feed.listGlobal, { cursor: null })).items.map((item: { id: string }) => item.id)).not.toContain(cards.card._id)
+      await t.run(async (ctx) => await ctx.db.patch('feedCards', cards.card!._id, {
+        sourceKey: `post:${postId}`, sourceId: postId, userId: owner.profileId, visibility: 'public',
+      }))
+    }
+
+    expect(await viewer.client.query(socialApi.feed.getById, { cardId: cards.privateCard._id })).toBeNull()
+    expect(await owner.client.query(socialApi.feed.getById, { cardId: cards.privateCard._id })).toMatchObject({ postId: privatePostId, visibility: 'private' })
+    expect((await t.query(socialApi.feed.listGlobal, { cursor: null })).items.map((item: { id: string }) => item.id)).not.toContain(cards.privateCard._id)
+    expect((await owner.client.query(socialApi.feed.listHome, { cursor: null })).items.map((item: { id: string }) => item.id)).toContain(cards.privateCard._id)
+
+    await t.run(async (ctx) => await ctx.db.delete('posts', postId))
+    expect(await viewer.client.query(socialApi.feed.getById, { cardId: cards.card._id })).toBeNull()
+    expect((await t.query(socialApi.feed.listGlobal, { cursor: null })).items.map((item: { id: string }) => item.id)).not.toContain(cards.card._id)
+  }, 20_000)
+
+  test('suppresses unpublished or inactive Review projections', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'source-review-owner')
+    const viewer = await createOwner(t, 'source-review-viewer')
+    await insertAnime(t, 89)
+    await insertAnime(t, 90)
+    const reviewId = await owner.client.mutation(socialApi.reviews.publish, {
+      anilistId: 89, requestId: 'source-review', rating: 90, summary: 'Source Review',
+      summaryHasSpoiler: false, bodyJson, visibility: 'public',
+    })
+    const otherReviewId = await viewer.client.mutation(socialApi.reviews.publish, {
+      anilistId: 90, requestId: 'source-review-other', rating: 80, summary: 'Other Review',
+      summaryHasSpoiler: false, bodyJson, visibility: 'public',
+    })
+    const card = await t.run(async (ctx) => await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `review:${reviewId}`)).unique())
+    if (!card) throw new Error('Expected Review feed projection.')
+
+    const readCard = async () => ({
+      direct: await owner.client.query(socialApi.feed.getById, { cardId: card._id }),
+      globalHasCard: (await t.query(socialApi.feed.listGlobal, { cursor: null })).items.some((item: { id: string }) => item.id === card._id),
+    })
+    await t.run(async (ctx) => await ctx.db.patch('reviews', reviewId, { state: 'draft' }))
+    expect(await readCard()).toEqual({ direct: null, globalHasCard: false })
+    await t.run(async (ctx) => await ctx.db.patch('reviews', reviewId, { state: 'published', activityState: 'deleted' }))
+    expect(await readCard()).toEqual({ direct: null, globalHasCard: false })
+    await t.run(async (ctx) => await ctx.db.patch('reviews', reviewId, { activityState: 'active' }))
+
+    const corruptions = [
+      { sourceKey: 'review:wrong-source-key' },
+      { sourceId: otherReviewId },
+      { userId: viewer.profileId },
+      { anilistId: 90 },
+      { visibility: 'private' as const },
+      { sourceId: 'missing-review-source' },
+    ]
+    for (const corruption of corruptions) {
+      await t.run(async (ctx) => await ctx.db.patch('feedCards', card._id, corruption))
+      expect(await readCard()).toEqual({ direct: null, globalHasCard: false })
+      await t.run(async (ctx) => await ctx.db.patch('feedCards', card._id, {
+        sourceKey: `review:${reviewId}`, sourceId: reviewId, userId: owner.profileId, anilistId: 89, visibility: 'public',
+      }))
+    }
+
+    await t.run(async (ctx) => await ctx.db.delete('reviews', reviewId))
+    expect(await readCard()).toEqual({ direct: null, globalHasCard: false })
+  }, 20_000)
+
   test('returns null for malformed direct feed IDs and exposes milestone visibility', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'milestone-owner')

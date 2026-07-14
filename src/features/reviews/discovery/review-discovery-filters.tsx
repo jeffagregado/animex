@@ -41,19 +41,19 @@ export function ReviewDiscoveryFilters(props: ReviewDiscoveryFiltersProps) {
     </label>
     <Filter label="Sort">
       <Select disabled={searching} onValueChange={(value) => { if (value) props.onStateChange({ ...props.state, sort: value as ReviewDiscoverySort }) }} value={props.state.sort}>
-        <SelectTrigger aria-label="Sort reviews"><SelectValue>{searching ? 'Relevance' : sortOptions.find((option) => option.value === props.state.sort)?.label}</SelectValue></SelectTrigger>
+        <SelectTrigger aria-label="Sort reviews" className="min-h-11"><SelectValue>{searching ? 'Relevance' : sortOptions.find((option) => option.value === props.state.sort)?.label}</SelectValue></SelectTrigger>
         <SelectContent><SelectGroup>{sortOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
     </Filter>
     <Filter label="Rating">
       <Select onValueChange={(value) => { if (value) props.onStateChange({ ...props.state, ratingBand: value === 'any' ? null : value as ReviewRatingBand }) }} value={props.state.ratingBand ?? 'any'}>
-        <SelectTrigger aria-label="Rating filter"><SelectValue>{ratingOptions.find((option) => option.value === (props.state.ratingBand ?? 'any'))?.label}</SelectValue></SelectTrigger>
+        <SelectTrigger aria-label="Rating filter" className="min-h-11"><SelectValue>{ratingOptions.find((option) => option.value === (props.state.ratingBand ?? 'any'))?.label}</SelectValue></SelectTrigger>
         <SelectContent><SelectGroup>{ratingOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
     </Filter>
     {props.signedIn ? <Filter className="col-span-2 lg:col-span-1" label="Visibility">
       <Select onValueChange={(value) => { if (value) props.onStateChange({ ...props.state, visibility: value as ReviewDiscoveryVisibility }) }} value={props.state.visibility}>
-        <SelectTrigger aria-label="Visibility filter"><SelectValue>{visibilityOptions.find((option) => option.value === props.state.visibility)?.label}</SelectValue></SelectTrigger>
+        <SelectTrigger aria-label="Visibility filter" className="min-h-11"><SelectValue>{visibilityOptions.find((option) => option.value === props.state.visibility)?.label}</SelectValue></SelectTrigger>
         <SelectContent><SelectGroup>{visibilityOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
     </Filter> : null}

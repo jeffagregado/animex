@@ -13,6 +13,7 @@
 - Mobile: Editor and Preview tabs.
 - Header retains anime identity and clear Draft/Publish actions.
 - Rating, Summary, summary spoiler, visibility precede body editor.
+- New Reviews start from Account-Level Default Visibility; saved Drafts and published Reviews keep their own visibility while editing.
 - Toolbar stays one readable row where possible; mobile wraps without horizontal page overflow.
 - Save Draft accepts partial content. Publish requires body text, Rating, Summary.
 

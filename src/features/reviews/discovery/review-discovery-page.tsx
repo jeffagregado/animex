@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useConvexAuth } from 'convex/react'
 import { FileSearchIcon } from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
@@ -27,6 +28,14 @@ interface ReviewDiscoveryRouteProps {
   onNavigate: (options: ReturnType<typeof getReviewDiscoveryNavigationOptions>) => void
 }
 
+type ReviewDiscoveryAccess = {
+  authKey: string
+  error: boolean
+  loading: boolean
+  signedIn: boolean
+  visibilityReady: boolean
+}
+
 /** Resolves auth-sensitive route state before mounting discovery queries. */
 export function ReviewDiscoveryRoute({ auth, routeState, onNavigate }: ReviewDiscoveryRouteProps) {
   const resolution = resolveReviewDiscoverySearch(routeState, auth)
@@ -41,13 +50,10 @@ export function ReviewDiscoveryRoute({ auth, routeState, onNavigate }: ReviewDis
 /** Renders public Review search, filters, cards, and infinite cursor states. */
 export function ReviewDiscoveryPage({ searchState, onSearchStateChange }: ReviewDiscoveryPageProps) {
   const auth = usePublicAuthState()
-  const profile = auth.status === 'ready' && auth.authState.status === 'complete' ? auth.authState.profile : null
-  const signedIn = profile !== null
-  const authReady = auth.status === 'ready'
-  const authKey = profile?.id ?? 'signed-out'
-  const visibilityReady = authReady && (signedIn || searchState.visibility === 'public')
+  const convexAuth = useConvexAuth()
+  const access = getReviewDiscoveryAccess(auth, convexAuth.isLoading, convexAuth.isAuthenticated, searchState.visibility)
   const [searchText, setSearchText] = useState(searchState.query ?? '')
-  const pages = useReviewDiscoveryPages(searchState, authKey, visibilityReady)
+  const pages = useReviewDiscoveryPages(searchState, access.authKey, access.visibilityReady)
 
   useEffect(() => { setSearchText(searchState.query ?? '') }, [searchState.query])
   useEffect(() => {
@@ -59,11 +65,23 @@ export function ReviewDiscoveryPage({ searchState, onSearchStateChange }: Review
     return () => window.clearTimeout(timer)
   }, [onSearchStateChange, searchState, searchText])
 
+  if (access.loading) return <ReviewDiscoveryAuthState message={null} />
+  if (access.error) return <ReviewDiscoveryAuthState message="Refresh the page or sign in again." />
+
   return <main className="mx-auto min-h-full w-full min-w-0 max-w-5xl overflow-x-hidden px-4 pt-6 pb-28 sm:px-6 lg:pb-12">
     <header className="mb-5 min-w-0"><h1 className="text-3xl font-black sm:text-4xl">Reviews</h1><p className="mt-1 text-muted-foreground">Find recent reviews from the AnimeX community.</p></header>
-    <ReviewDiscoveryFilters state={searchState} searchText={searchText} signedIn={signedIn} onSearchTextChange={setSearchText} onStateChange={onSearchStateChange} />
+    <ReviewDiscoveryFilters state={searchState} searchText={searchText} signedIn={access.signedIn} onSearchTextChange={setSearchText} onStateChange={onSearchStateChange} />
     <ReviewDiscoveryList pages={pages} />
   </main>
+}
+
+/** Resolves public-profile and Convex-session readiness without widening viewer access. */
+function getReviewDiscoveryAccess(auth: ClientAuthState, convexLoading: boolean, convexAuthenticated: boolean, visibility: ReviewDiscoverySearchState['visibility']): ReviewDiscoveryAccess {
+  const profileId = auth.status === 'ready' && auth.authState.status === 'complete' ? auth.authState.profile.id : null
+  if (profileId === null) return { authKey: 'signed-out', error: false, loading: false, signedIn: false, visibilityReady: auth.status === 'ready' && visibility === 'public' }
+  if (convexLoading) return { authKey: 'auth-pending', error: false, loading: true, signedIn: true, visibilityReady: false }
+  if (!convexAuthenticated) return { authKey: 'auth-pending', error: true, loading: false, signedIn: true, visibilityReady: false }
+  return { authKey: profileId, error: false, loading: false, signedIn: true, visibilityReady: true }
 }
 
 /** Preserves route geometry while auth resolves or reports a scoped failure. */

@@ -38,52 +38,84 @@ const requireCachedAnime = async (ctx: QueryCtx | MutationCtx, anilistId: number
   if (!anime) return fail('ANIME_NOT_CACHED', 'Anime must be loaded before writing milestone activity.')
 }
 
-type FeedAuthor = Awaited<ReturnType<typeof getAuthor>>
-type MilestoneRead = { mode: 'direct'; viewerId: Id<'users'> | null } | { mode: 'owner' } | { mode: 'public' }
+type FeedRead = { mode: 'direct' | 'owner'; viewerId: Id<'users'> | null } | { mode: 'public' }
 
 /** Identifies milestone projections. */
 const isMilestoneCard = (card: Doc<'feedCards'>): boolean => card.kind === 'completed' || card.kind === 'rewatched'
 
 /** Applies lane-specific source visibility. */
-const canReadMilestone = (milestone: Doc<'animeMilestones'>, read: MilestoneRead): boolean => {
-  if (read.mode === 'public') return milestone.visibility === 'public'
-  if (read.mode === 'direct') return canReadSocialRecord(milestone.visibility, read.viewerId, milestone.userId)
-  return true
+const canReadSource = (visibility: Doc<'feedCards'>['visibility'], ownerId: Id<'users'>, read: FeedRead): boolean => {
+  if (read.mode === 'public') return visibility === 'public'
+  return canReadSocialRecord(visibility, read.viewerId, ownerId)
 }
 
-const resolvePostCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, author: FeedAuthor): Promise<FeedCard> => {
+/** Applies lane-specific source visibility. */
+const canReadMilestone = (milestone: Doc<'animeMilestones'>, read: FeedRead): boolean => {
+  if (read.mode === 'public') return milestone.visibility === 'public'
+  return canReadSocialRecord(milestone.visibility, read.viewerId, milestone.userId)
+}
+
+const resolvePostCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {
   const postId = card.sourceId ? ctx.db.normalizeId('posts', card.sourceId) : null
   const post = postId ? await ctx.db.get('posts', postId) : null
-  if (!post) return fail('FEED_SOURCE_MISSING', 'Feed Post source is missing.')
+  if (!post) return null
+  if (card.sourceKey !== `post:${post._id}` || card.sourceId !== post._id || card.userId !== post.userId || card.visibility !== post.visibility) return null
+  if (!canReadSource(post.visibility, post.userId, read)) return null
   const images = await Promise.all(post.imageIds.map((id) => ctx.db.get('postImages', id)))
   const imageUrls = await Promise.all(images.map(async (image) => image?.storageId ? await ctx.storage.getUrl(image.storageId) : null))
   const resolvedImages = post.imageIds.flatMap((imageId, index) => {
     const url = imageUrls[index]
     return url ? [{ imageId, url }] : []
   })
-  return { id: card._id, postId: post._id, kind: 'post', author, text: post.text, imageIds: resolvedImages.map((image) => image.imageId), imageUrls: resolvedImages.map((image) => image.url), hasSpoiler: post.hasSpoiler, visibility: post.visibility, createdAt: post.createdAt, updatedAt: post.updatedAt }
+  return { id: card._id, postId: post._id, kind: 'post', author: await getAuthor(ctx, post.userId), text: post.text, imageIds: resolvedImages.map((image) => image.imageId), imageUrls: resolvedImages.map((image) => image.url), hasSpoiler: post.hasSpoiler, visibility: post.visibility, createdAt: post.createdAt, updatedAt: post.updatedAt }
 }
 
-const resolveReviewCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, author: FeedAuthor): Promise<FeedCard> => {
+type ActiveReviewSource = {
+  publishedAt: number
+  rating: number
+  review: Doc<'reviews'>
+}
+
+/** Narrows one Review source to a feed-visible lifecycle. */
+const getActiveReviewSource = (review: Doc<'reviews'>): ActiveReviewSource | null => {
+  if (review.state !== 'published') return null
+  if (review.activityState !== 'active') return null
+  if (review.rating === null) return null
+  if (review.publishedAt === undefined) return null
+  return { publishedAt: review.publishedAt, rating: review.rating, review }
+}
+
+/** Rejects stale or corrupt Review projections before access checks. */
+const matchesReviewProjection = (card: Doc<'feedCards'>, review: Doc<'reviews'>): boolean => [
+  card.sourceKey === `review:${review._id}`,
+  card.sourceId === review._id,
+  card.userId === review.userId,
+  card.anilistId === review.anilistId,
+  card.visibility === review.visibility,
+].every(Boolean)
+
+const resolveReviewCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {
   const reviewId = card.sourceId ? ctx.db.normalizeId('reviews', card.sourceId) : null
   const review = reviewId ? await ctx.db.get('reviews', reviewId) : null
-  if (!review || review.rating === null || review.publishedAt === undefined) return fail('FEED_SOURCE_MISSING', 'Feed Review source is missing.')
-  return { id: card._id, reviewId: review._id, kind: 'review', author, anime: await getAnime(ctx, review.anilistId), rating: review.rating, summary: review.summary, summaryHasSpoiler: review.summaryHasSpoiler, visibility: review.visibility, publishedAt: review.publishedAt, updatedAt: review.updatedAt }
+  if (!review) return null
+  const source = getActiveReviewSource(review)
+  if (!source || !matchesReviewProjection(card, source.review)) return null
+  if (!canReadSource(source.review.visibility, source.review.userId, read)) return null
+  return { id: card._id, reviewId: source.review._id, kind: 'review', author: await getAuthor(ctx, source.review.userId), anime: await getAnime(ctx, source.review.anilistId), rating: source.rating, summary: source.review.summary, summaryHasSpoiler: source.review.summaryHasSpoiler, visibility: source.review.visibility, publishedAt: source.publishedAt, updatedAt: source.review.updatedAt }
 }
 
-const resolveMilestoneCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: MilestoneRead): Promise<FeedCard | null> => {
+const resolveMilestoneCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {
   if (card.anilistId === undefined || (card.kind !== 'completed' && card.kind !== 'rewatched')) return fail('FEED_SOURCE_MISSING', 'Feed milestone source is missing.')
   if (card.sourceKey !== `${card.kind}:${card.userId}:${card.anilistId}`) return null
   const milestone = await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', card.userId).eq('anilistId', card.anilistId as number).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
-  if (!milestone || !canReadMilestone(milestone, read)) return null
+  if (!milestone || card.visibility !== milestone.visibility || !canReadMilestone(milestone, read)) return null
   return { id: card._id, kind: milestone.kind, author: await getAuthor(ctx, milestone.userId), anime: await getAnime(ctx, milestone.anilistId), settledAt: milestone.occurredAt, visibility: milestone.visibility }
 }
 
-const resolveCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, milestoneRead: MilestoneRead): Promise<FeedCard | null> => {
-  if (isMilestoneCard(card)) return await resolveMilestoneCard(ctx, card, milestoneRead)
-  const author = await getAuthor(ctx, card.userId)
-  if (card.kind === 'post') return await resolvePostCard(ctx, card, author)
-  return await resolveReviewCard(ctx, card, author)
+const resolveCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {
+  if (isMilestoneCard(card)) return await resolveMilestoneCard(ctx, card, read)
+  if (card.kind === 'post') return await resolvePostCard(ctx, card, read)
+  return await resolveReviewCard(ctx, card, read)
 }
 
 const readGlobal = async (ctx: QueryCtx, anchor: string | null) => await ctx.db.query('feedCards')
@@ -113,7 +145,7 @@ const createRawPage = (cards: Doc<'feedCards'>[], anchor: string | null): HomeGl
 }
 
 /** Resolves source-backed cards while preserving anchors. */
-const resolveFeedPage = async (ctx: QueryCtx, page: HomeGlobalPage, read: MilestoneRead): Promise<ResolvedFeedPage> => {
+const resolveFeedPage = async (ctx: QueryCtx, page: HomeGlobalPage, read: FeedRead): Promise<ResolvedFeedPage> => {
   const items: FeedCard[] = []
   const resumeAnchors: Array<string | null> = []
   const resolved = await Promise.all(page.cards.map(async (card) => await resolveCard(ctx, card, read)))
@@ -172,7 +204,7 @@ const listHomePage = async (ctx: QueryCtx, cursor: string | null, viewerId: Id<'
   const anchors = decodeFeedCursor(cursor, 'home', viewerId)
   const [own, global] = await Promise.all([readOwn(ctx, viewerId, anchors.prioritizedAnchor), readHomeGlobal(ctx, viewerId, anchors.globalAnchor)])
   const [ownPage, globalPage] = await Promise.all([
-    resolveFeedPage(ctx, createRawPage(own, anchors.prioritizedAnchor), { mode: 'owner' }),
+    resolveFeedPage(ctx, createRawPage(own, anchors.prioritizedAnchor), { mode: 'owner', viewerId }),
     resolveFeedPage(ctx, global, { mode: 'public' }),
   ])
   const merged = mergeFeedCards(ownPage.items, globalPage.items, FEED_PAGE_SIZE, anchors.cycleIndex)
@@ -210,7 +242,6 @@ export const listFollowing = query({
 /** Resolves a card using authoritative direct-read access. */
 const resolveDirectCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, viewerId: Id<'users'> | null): Promise<FeedCard | null> => {
   if (isMilestoneCard(card)) return await resolveMilestoneCard(ctx, card, { mode: 'direct', viewerId })
-  if (!canReadSocialRecord(card.visibility, viewerId, card.userId)) return null
   return await resolveCard(ctx, card, { mode: 'direct', viewerId })
 }
 

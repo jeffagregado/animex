@@ -99,6 +99,29 @@ describe('feed milestone source integrity', () => {
     expect((await t.query(feedApi.feed.listGlobal, { cursor: null })).items).toEqual([])
   })
 
+  test('suppresses a stale private projection for a public milestone source', async () => {
+    const t = createHarness()
+    await insertAnime(t, 1)
+    const cardId = await t.run(async (ctx) => {
+      const now = Date.now()
+      const userId = await ctx.db.insert('users', {
+        authId: 'public-source-owner', username: 'PublicSourceOwner', usernameKey: 'publicsourceowner', name: 'Public Source Owner',
+        visibility: 'public', createdAt: now, updatedAt: now,
+      })
+      await ctx.db.insert('animeMilestones', {
+        userId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now,
+      })
+      const sourceKey = `completed:${userId}:1`
+      return await ctx.db.insert('feedCards', {
+        sourceKey, kind: 'completed', userId, anilistId: 1, visibility: 'private', active: true,
+        orderKey: makeOrderKey(now, sourceKey), occurredAt: now, updatedAt: now,
+      })
+    })
+
+    expect(await t.query(feedApi.feed.getById, { cardId })).toBeNull()
+    expect((await t.query(feedApi.feed.listGlobal, { cursor: null })).items).toEqual([])
+  })
+
   test('suppresses a projection whose source key does not match its milestone identity', async () => {
     const t = createHarness()
     await insertAnime(t, 1)

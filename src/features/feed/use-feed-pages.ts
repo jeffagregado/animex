@@ -47,6 +47,10 @@ export function useFeedPages(view: FeedView, authKey: string) {
     const request = client.query(feedQuery(view), { cursor }).then((raw) => {
       if (epochRef.current !== epoch || scopeRef.current !== scope) return
       const page = feedPageSchema.parse(raw)
+      if (page.items.length === 0 && page.hasMore) {
+        if (page.cursor === null || page.cursor === cursor) throw new Error('Feed pagination returned a repeated cursor.')
+        return load(page.cursor, false, false)
+      }
       setState((current) => {
         const base = replace || current.scope !== scope ? createFeedState() : current
         return { scope, ...appendFeedPage(base, page), loading: false, error: null }

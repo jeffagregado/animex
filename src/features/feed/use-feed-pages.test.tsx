@@ -44,6 +44,25 @@ describe('useFeedPages', () => {
     expect(result.current.items.map((item) => item.id)).toEqual(['one', 'two'])
   })
 
+  it('advances past an empty source-suppressed page to reachable feed cards', async () => {
+    query.mockResolvedValueOnce(page([], 'cursor-1', true)).mockResolvedValueOnce(page(['visible'], null, false))
+
+    const { result } = renderHook(() => useFeedPages('global', 'signed-out'))
+
+    await waitFor(() => expect(result.current.items.map((item) => item.id)).toEqual(['visible']))
+    expect(query).toHaveBeenNthCalledWith(2, expect.anything(), { cursor: 'cursor-1' })
+    expect(result.current.hasMore).toBe(false)
+  })
+
+  it('fails explicitly when an empty page repeats its cursor', async () => {
+    query.mockResolvedValueOnce(page([], 'cursor-1', true)).mockResolvedValueOnce(page([], 'cursor-1', true))
+
+    const { result } = renderHook(() => useFeedPages('global', 'signed-out'))
+
+    await waitFor(() => expect(result.current.error).toBe('Feed pagination returned a repeated cursor.'))
+    expect(query).toHaveBeenCalledTimes(2)
+  })
+
   it.each(['refresh-first', 'load-more-first'] as const)('refresh invalidates load-more when %s resolves', async (order) => {
     const loadMore = deferred<unknown>()
     const refresh = deferred<unknown>()

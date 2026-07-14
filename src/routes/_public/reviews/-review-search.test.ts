@@ -27,6 +27,7 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 vi.mock('#/features/shell/public-auth-context', () => ({ usePublicAuthState: mocks.auth }))
 vi.mock('#/features/reviews/discovery/use-review-discovery-pages', () => ({ useReviewDiscoveryPages: mocks.pages }))
+vi.mock('convex/react', () => ({ useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }) }))
 
 await import('./index')
 

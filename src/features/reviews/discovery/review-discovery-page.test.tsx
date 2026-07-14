@@ -6,9 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReviewDiscoveryPageState } from './use-review-discovery-pages'
 import { ReviewDiscoveryPage } from './review-discovery-page'
 
-const mocks = vi.hoisted(() => ({ pages: vi.fn(), auth: vi.fn(), change: vi.fn() }))
+const mocks = vi.hoisted(() => ({ pages: vi.fn(), auth: vi.fn(), convexAuth: vi.fn(), change: vi.fn() }))
 vi.mock('./use-review-discovery-pages', () => ({ useReviewDiscoveryPages: mocks.pages }))
 vi.mock('#/features/shell/public-auth-context', () => ({ usePublicAuthState: mocks.auth }))
+vi.mock('convex/react', () => ({ useConvexAuth: mocks.convexAuth }))
 
 const review = { id: 'review-1', author: { id: 'author', username: 'author', displayName: 'Author', avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: 'https://example.test/frieren.jpg' }, state: 'published' as const, rating: 90, summary: 'Compact summary', summaryHasSpoiler: false, visibility: 'public' as const, publishedAt: 1, updatedAt: 1 }
 const loadMore = vi.fn<() => Promise<void>>()
@@ -18,7 +19,9 @@ const state = { query: null, sort: 'newest' as const, ratingBand: null, visibili
 beforeEach(() => {
   vi.useFakeTimers()
   mocks.auth.mockReturnValue({ status: 'ready', authState: { status: 'signedOut' } })
+  mocks.convexAuth.mockReturnValue({ isAuthenticated: false, isLoading: false })
   mocks.pages.mockReturnValue(readyPages)
+  mocks.pages.mockClear()
   mocks.change.mockReset()
   loadMore.mockReset()
   loadMore.mockResolvedValue(undefined)
@@ -45,6 +48,7 @@ describe('ReviewDiscoveryPage', () => {
 
   it('shows signed-in visibility options and truthful compact card fields', () => {
     mocks.auth.mockReturnValue({ status: 'ready', authState: { status: 'complete', email: 'fan@example.com', profile: { id: 'author', username: 'author', name: 'Author', avatarUrl: null, visibility: 'public' } } })
+    mocks.convexAuth.mockReturnValue({ isAuthenticated: true, isLoading: false })
     render(<ReviewDiscoveryPage searchState={{ ...state, visibility: 'all' }} onSearchStateChange={mocks.change} />)
     expect(screen.getByRole('combobox', { name: 'Visibility filter' })).toBeTruthy()
     expect(screen.getByText('Frieren')).toBeTruthy()
@@ -54,8 +58,29 @@ describe('ReviewDiscoveryPage', () => {
     expect(screen.queryByText(/body/i)).toBeNull()
   })
 
+  it('waits for Convex auth before loading viewer-scoped visibility', () => {
+    mocks.auth.mockReturnValue({ status: 'ready', authState: { status: 'complete', email: 'fan@example.com', profile: { id: 'author', username: 'author', name: 'Author', avatarUrl: null, visibility: 'public' } } })
+    mocks.convexAuth.mockReturnValue({ isAuthenticated: false, isLoading: true })
+    const searchState = { ...state, visibility: 'all' as const }
+    const view = render(<ReviewDiscoveryPage searchState={searchState} onSearchStateChange={mocks.change} />)
+
+    expect(mocks.pages).toHaveBeenLastCalledWith(searchState, 'auth-pending', false)
+    expect(screen.getByLabelText('Loading review access')).toBeTruthy()
+
+    mocks.convexAuth.mockReturnValue({ isAuthenticated: false, isLoading: false })
+    view.rerender(<ReviewDiscoveryPage searchState={searchState} onSearchStateChange={mocks.change} />)
+    expect(mocks.pages).toHaveBeenLastCalledWith(searchState, 'auth-pending', false)
+    expect(screen.getByRole('alert').textContent).toContain('Refresh the page or sign in again.')
+
+    mocks.convexAuth.mockReturnValue({ isAuthenticated: true, isLoading: false })
+    view.rerender(<ReviewDiscoveryPage searchState={searchState} onSearchStateChange={mocks.change} />)
+    expect(mocks.pages).toHaveBeenLastCalledWith(searchState, 'author', true)
+    expect(screen.getByText('Frieren')).toBeTruthy()
+  })
+
   it('keeps two-column mobile/tablet filter geometry and one-column desktop visibility', () => {
     mocks.auth.mockReturnValue({ status: 'ready', authState: { status: 'complete', email: 'fan@example.com', profile: { id: 'author', username: 'author', name: 'Author', avatarUrl: null, visibility: 'public' } } })
+    mocks.convexAuth.mockReturnValue({ isAuthenticated: true, isLoading: false })
     render(<ReviewDiscoveryPage searchState={{ ...state, visibility: 'all' }} onSearchStateChange={mocks.change} />)
     const filters = screen.getByRole('region', { name: 'Review filters' })
     expect(filters.className).toContain('grid-cols-2')
@@ -64,10 +89,14 @@ describe('ReviewDiscoveryPage', () => {
     expect(screen.getByRole('searchbox', { name: 'Search reviews' }).parentElement?.className).toContain('lg:col-span-3')
     expect(screen.getByRole('combobox', { name: 'Visibility filter' }).parentElement?.className).toContain('col-span-2')
     expect(screen.getByRole('combobox', { name: 'Visibility filter' }).parentElement?.className).toContain('lg:col-span-1')
+    for (const name of ['Sort reviews', 'Rating filter', 'Visibility filter']) {
+      expect(screen.getByRole('combobox', { name }).className).toContain('min-h-11')
+    }
   })
 
   it('keeps phased signed-in discovery loadable when the first lane is empty', () => {
     mocks.auth.mockReturnValue({ status: 'ready', authState: { status: 'complete', email: 'fan@example.com', profile: { id: 'author', username: 'author', name: 'Author', avatarUrl: null, visibility: 'public' } } })
+    mocks.convexAuth.mockReturnValue({ isAuthenticated: true, isLoading: false })
     mocks.pages.mockReturnValue({ ...readyPages, items: [], hasMore: true })
     render(<ReviewDiscoveryPage searchState={{ ...state, visibility: 'all' }} onSearchStateChange={mocks.change} />)
 
