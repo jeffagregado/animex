@@ -28,12 +28,6 @@ export function DiscoverPage({ data, isLoading, searchState, onSearchStateChange
           <DiscoverSearchResults searchState={searchState} />
           <DiscoverSectionRail title="Trending Anime" state={trending} {...discover.retryProps.trending} />
           <DiscoverSectionRail title="Seasonal Anime" state={discover.sections.seasonal} {...discover.retryProps.seasonal} />
-          <section aria-labelledby="genres-heading" className="space-y-3">
-            <h2 id="genres-heading" className="text-xl font-extrabold">Genres</h2>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              {DISCOVER_GENRES.map((genre) => <button className="rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold outline-none transition hover:border-cyan-300 hover:bg-cyan-300/10 focus-visible:ring-2 focus-visible:ring-cyan-300" type="button" onClick={() => selectGenre(genre)} key={genre}>{genre}</button>)}
-            </div>
-          </section>
           <DiscoverSectionRail title="Popular Recommendations" state={discover.sections.recommendations} {...discover.retryProps.recommendations} />
           <div className="space-y-7 lg:hidden">
             <DiscoverWeeklyList items={weeklyItems} variant="mobile" />

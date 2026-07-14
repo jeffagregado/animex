@@ -15,5 +15,5 @@ type HomeSidebarProps = {
 
 /** Composes auth-specific desktop utility modules in locked order. */
 export function HomeSidebar({ signedIn, trending, trendingRetry, upcoming, upcomingRetry }: HomeSidebarProps) {
-  return <aside aria-label="Home utility column" className="hidden space-y-4 lg:block">{signedIn ? <HomeListProgress /> : null}<HomeLatestReviews /><HomeWeeklyList state={trending} variant="desktop" {...trendingRetry} /><DiscoverUpcomingList state={upcoming} variant="desktop" {...upcomingRetry} /></aside>
+  return <aside aria-label="Home utility column" className="hidden space-y-4 lg:block">{signedIn ? <HomeListProgress /> : null}<HomeLatestReviews /><section className="rounded-lg border border-border bg-card p-4"><HomeWeeklyList state={trending} variant="desktop" {...trendingRetry} /></section><section className="rounded-lg border border-border bg-card p-4"><DiscoverUpcomingList state={upcoming} variant="desktop" {...upcomingRetry} /></section></aside>
 }

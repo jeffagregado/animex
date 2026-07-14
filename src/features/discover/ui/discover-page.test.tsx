@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AnimeSummary, DiscoverPageData } from '../shared/discover-contracts'
 import { DiscoverPage } from './discover-page'
-import type { DiscoverUrlSearchState } from './discover-ui.types'
+import type { DiscoverSearchStateChange, DiscoverUrlSearchState } from './discover-ui.types'
 
 const serverMocks = vi.hoisted(() => ({ refreshDiscoverSection: vi.fn(), searchAnime: vi.fn() }))
 
@@ -33,9 +33,9 @@ const anime: AnimeSummary = {
 const ready = (key: 'trending' | 'seasonal' | 'recommendations' | 'upcoming') => ({ status: 'ready' as const, section: { key, items: [anime], refreshedAt: 1, expiresAt: 2 } })
 const data: DiscoverPageData = { sections: { trending: ready('trending'), seasonal: ready('seasonal'), recommendations: ready('recommendations'), upcoming: ready('upcoming') } }
 
-const renderPage = (pageData: DiscoverPageData | null, isLoading: boolean): void => {
+const renderPage = (pageData: DiscoverPageData | null, isLoading: boolean, onSearchStateChange: DiscoverSearchStateChange): void => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={client}><DiscoverPage data={pageData} isLoading={isLoading} searchState={searchState} onSearchStateChange={vi.fn()} /></QueryClientProvider>)
+  render(<QueryClientProvider client={client}><DiscoverPage data={pageData} isLoading={isLoading} searchState={searchState} onSearchStateChange={onSearchStateChange} /></QueryClientProvider>)
 }
 
 afterEach(() => {
@@ -46,7 +46,7 @@ afterEach(() => {
 
 describe('DiscoverPage', () => {
   it('uses compact Upcoming modules and one manga placeholder for each responsive branch', () => {
-    renderPage(data, false)
+    renderPage(data, false, vi.fn())
 
     expect(screen.getAllByRole('heading', { name: 'Upcoming' })).toHaveLength(2)
     expect(document.querySelectorAll('#upcoming-mobile-heading')).toHaveLength(1)
@@ -54,8 +54,27 @@ describe('DiscoverPage', () => {
     expect(screen.getAllByText('Manga lists later')).toHaveLength(2)
   })
 
+  it('removes main Genres while retaining Top Genres and genre filter selection', () => {
+    const onSearchStateChange = vi.fn()
+    renderPage(data, false, onSearchStateChange)
+
+    const topGenres = screen.getByRole('heading', { name: 'Top Genres' }).closest('section')
+    if (topGenres === null) throw new Error('Top Genres section is missing.')
+    const action = topGenres.querySelector<HTMLButtonElement>('button')
+    if (action === null) throw new Error('Top Genres options are missing.')
+    fireEvent.click(action)
+    expect(onSearchStateChange).toHaveBeenCalledWith({ ...searchState, genre: 'Action' }, 'push')
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Genre' }))
+    const comedy = screen.getByRole('option', { name: 'Comedy' })
+    fireEvent.pointerDown(comedy, { pointerType: 'mouse' })
+    fireEvent.click(comedy)
+    expect(onSearchStateChange).toHaveBeenCalledWith({ ...searchState, genre: 'Comedy' }, 'push')
+    expect(screen.queryByRole('heading', { name: 'Genres' })).toBeNull()
+  })
+
   it('links poster cards and shows an explicit image failure state', () => {
-    renderPage(data, false)
+    renderPage(data, false, vi.fn())
 
     const image = screen.getAllByAltText('Frieren cover')[0]
     const card = image.closest('article')
@@ -69,7 +88,7 @@ describe('DiscoverPage', () => {
   })
 
   it('renders rail skeletons while page data is loading', () => {
-    renderPage(null, true)
+    renderPage(null, true, vi.fn())
 
     expect(screen.getByLabelText('Trending Anime loading')).toBeTruthy()
   })
@@ -79,7 +98,7 @@ describe('DiscoverPage', () => {
       sections: { ...data.sections, trending: { status: 'error', key: 'trending', code: 'UPSTREAM', retryAfterSeconds: null } },
     }
     serverMocks.refreshDiscoverSection.mockRejectedValueOnce(new Error('AniList unavailable'))
-    renderPage(errorData, false)
+    renderPage(errorData, false, vi.fn())
 
     fireEvent.click(screen.getByRole('button', { name: 'Retry Trending Anime' }))
 
@@ -98,7 +117,7 @@ describe('DiscoverPage', () => {
       },
     }
     serverMocks.refreshDiscoverSection.mockImplementation(({ data: key }: { data: string }) => key === 'trending' ? pendingTrending : pendingSeasonal)
-    renderPage(errorData, false)
+    renderPage(errorData, false, vi.fn())
 
     const trendingRetry = screen.getByRole('button', { name: 'Retry Trending Anime' })
     const seasonalRetry = screen.getByRole('button', { name: 'Retry Seasonal Anime' })

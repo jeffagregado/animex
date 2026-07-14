@@ -62,6 +62,19 @@ describe('HomeSidebar', () => {
     expect(headings()).toEqual(['List Progress', 'Latest Reviews', 'This Week', 'Upcoming'])
     await waitFor(() => expect(queryNames()).toContain('userAnime:getMyProgress'))
   })
+
+  it('matches Discover card surfaces for This Week and Upcoming', () => {
+    mocks.query.mockResolvedValue([])
+    render(<HomeSidebar signedIn={false} trending={ready('trending')} trendingRetry={retryProps} upcoming={ready('upcoming')} upcomingRetry={retryProps} />)
+
+    const sidebar = screen.getByLabelText('Home utility column')
+    const expectedSurface = 'rounded-lg border border-border bg-card p-4'
+    const thisWeek = Array.from(sidebar.children).find((child) => child.querySelector('h2')?.textContent === 'This Week')
+    const upcoming = Array.from(sidebar.children).find((child) => child.querySelector('h2')?.textContent === 'Upcoming')
+
+    expect(thisWeek?.className).toBe(expectedSurface)
+    expect(upcoming?.className).toBe(expectedSurface)
+  })
 })
 
 describe('Home utility data states', () => {
