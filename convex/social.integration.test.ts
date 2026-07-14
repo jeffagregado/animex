@@ -52,34 +52,6 @@ const body = {
 const bodyJson = JSON.stringify(body)
 
 describe('social Convex integration', () => {
-  test('accepts legacy imageIds and nullable external media during transition', async () => {
-    const t = createHarness()
-    const owner = await createOwner(t, 'transition-owner')
-    const imageId = await t.run(async (ctx) => await ctx.db.insert('postImages', {
-      ownerId: owner.profileId, claimId: 'transition-image', mimeType: 'image/png', size: 5,
-      width: 1, height: 1, state: 'pending', createdAt: Date.now(), updatedAt: Date.now(),
-    }))
-    const [legacyPostId, externalPostId] = await t.run(async (ctx) => {
-      const now = Date.now()
-      return await Promise.all([
-        ctx.db.insert('posts', {
-          userId: owner.profileId, requestId: 'transition-legacy', text: '', imageIds: [imageId],
-          hasSpoiler: false, visibility: 'public', createdAt: now, updatedAt: now,
-        }),
-        ctx.db.insert('posts', {
-          userId: owner.profileId, requestId: 'transition-external', text: '',
-          media: { type: 'image', url: 'https://example.com/image.jpg', description: null },
-          hasSpoiler: false, visibility: 'public', createdAt: now, updatedAt: now,
-        }),
-      ])
-    })
-
-    expect(await t.run(async (ctx) => await ctx.db.get('posts', legacyPostId))).toMatchObject({ imageIds: [imageId] })
-    expect(await t.run(async (ctx) => await ctx.db.get('posts', externalPostId))).toMatchObject({
-      media: { type: 'image', url: 'https://example.com/image.jpg', description: null },
-    })
-  })
-
   test('discovers latest Public Reviews without leaking viewer-owned visibility', async () => {
     const t = createHarness()
     const viewer = await createOwner(t, 'discovery-viewer')
@@ -401,27 +373,45 @@ describe('social Convex integration', () => {
     expect(new TextEncoder().encode(stored?.bodyJson).byteLength).toBeLessThanOrEqual(64 * 1024)
   }, 20_000)
 
-  test('creates, edits, and removes an image Post with owned storage cleanup', async () => {
+  test('creates media-only Post, replaces and removes media, then deletes its feed projection', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'poster')
-    const storageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(['image'], { type: 'image/png' })))
-    const imageId = await t.run(async (ctx) => await ctx.db.insert('postImages', {
-      ownerId: owner.profileId, claimId: 'claim-1', storageId, mimeType: 'image/png', size: 5,
-      width: 1, height: 1, state: 'pending', createdAt: Date.now(), updatedAt: Date.now(),
-    }))
+    const image = { type: 'image', url: 'https://example.com/image.jpg', description: null } as const
+    const video = { type: 'video', url: 'https://vimeo.com/123', provider: 'vimeo', label: 'Trailer' } as const
     const postId = await owner.client.mutation(socialApi.posts.create, {
-      requestId: 'post-1', text: '', imageIds: [imageId], hasSpoiler: false, visibility: 'public',
+      requestId: 'post-1', text: '', media: image, hasSpoiler: false, visibility: 'public',
     })
     expect(await owner.client.query(socialApi.feed.listGlobal, { cursor: null })).toMatchObject({
-      items: [expect.objectContaining({ kind: 'post', postId, imageIds: [imageId] })],
+      items: [expect.objectContaining({ kind: 'post', postId, media: image })],
     })
     await owner.client.mutation(socialApi.posts.update, {
-      postId, requestId: 'post-update-1', text: 'edited', imageIds: [imageId], hasSpoiler: true, visibility: 'followers',
+      postId, requestId: 'post-update-1', text: 'edited', media: video, hasSpoiler: true, visibility: 'followers',
+    })
+    expect(await t.run(async (ctx) => await ctx.db.get('posts', postId))).toMatchObject({ media: video })
+    await owner.client.mutation(socialApi.posts.update, {
+      postId, requestId: 'post-update-2', text: 'text only', media: null, hasSpoiler: false, visibility: 'private',
     })
     await owner.client.mutation(socialApi.posts.remove, { postId })
-    expect(await t.run(async (ctx) => await ctx.db.get('postImages', imageId))).toBeNull()
-    expect(await t.run(async (ctx) => await ctx.storage.get(storageId))).toBeNull()
+    expect(await t.run(async (ctx) => await ctx.db.get('posts', postId))).toBeNull()
     expect(await t.run(async (ctx) => await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `post:${postId}`)).unique())).toBeNull()
+  }, 20_000)
+
+  test('rejects invalid external Post media and removed upload writers', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'post-media-validation')
+    const base = { requestId: 'invalid-media', text: '', hasSpoiler: false, visibility: 'public' }
+    for (const media of [
+      { type: 'image', url: 'http://example.com/image.jpg', description: null },
+      { type: 'image', url: 'https://user:pass@example.com/image.jpg', description: null },
+      { type: 'image', url: `https://example.com/${'x'.repeat(2049)}`, description: null },
+      { type: 'video', url: 'https://youtube.com/watch?v=abc', provider: 'vimeo', label: null },
+    ]) await expect(owner.client.mutation(socialApi.posts.create, { ...base, media })).rejects.toThrow()
+
+    await expect(owner.client.mutation(socialApi.posts.generateUploadUrl, { claimId: 'removed-upload' })).rejects.toThrow('no such export')
+    await expect(owner.client.mutation(socialApi.posts.registerImage, {
+      claimId: 'removed-register', storageId: 'storage', mimeType: 'image/png', size: 1, width: 1, height: 1,
+    })).rejects.toThrow('no such export')
+    await expect(owner.client.mutation(socialApi.posts.discardImage, { imageId: 'image' })).rejects.toThrow('no such export')
   }, 20_000)
 
   test('shows public Global cards and dedupes owner-prioritized Home cards', async () => {
@@ -430,11 +420,11 @@ describe('social Convex integration', () => {
     const other = await createOwner(t, 'feed-other')
     for (const requestId of ['owner-1', 'owner-2']) {
       await owner.client.mutation(socialApi.posts.create, {
-        requestId, text: requestId, imageIds: [], hasSpoiler: false, visibility: 'public',
+        requestId, text: requestId, media: null, hasSpoiler: false, visibility: 'public',
       })
     }
     await other.client.mutation(socialApi.posts.create, {
-      requestId: 'global-1', text: 'global', imageIds: [], hasSpoiler: false, visibility: 'public',
+      requestId: 'global-1', text: 'global', media: null, hasSpoiler: false, visibility: 'public',
     })
 
     const global = await t.query(socialApi.feed.listGlobal, { cursor: null })
@@ -451,13 +441,13 @@ describe('social Convex integration', () => {
     const other = await createOwner(t, 'source-post-other')
     const viewer = await createOwner(t, 'source-post-viewer')
     const postId = await owner.client.mutation(socialApi.posts.create, {
-      requestId: 'source-post', text: 'Source Post', imageIds: [], hasSpoiler: false, visibility: 'public',
+      requestId: 'source-post', text: 'Source Post', media: null, hasSpoiler: false, visibility: 'public',
     })
     const otherPostId = await other.client.mutation(socialApi.posts.create, {
-      requestId: 'source-post-other', text: 'Other Post', imageIds: [], hasSpoiler: false, visibility: 'public',
+      requestId: 'source-post-other', text: 'Other Post', media: null, hasSpoiler: false, visibility: 'public',
     })
     const privatePostId = await owner.client.mutation(socialApi.posts.create, {
-      requestId: 'source-post-private', text: 'Private Post', imageIds: [], hasSpoiler: false, visibility: 'private',
+      requestId: 'source-post-private', text: 'Private Post', media: null, hasSpoiler: false, visibility: 'private',
     })
     const cards = await t.run(async (ctx) => ({
       card: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `post:${postId}`)).unique(),
@@ -583,58 +573,41 @@ describe('social Convex integration', () => {
     const t = createHarness()
     const owner = await createOwner(t, 'post-collision-owner')
     const firstId = await owner.client.mutation(socialApi.posts.create, {
-      requestId: 'post-request-a', text: 'First', imageIds: [], hasSpoiler: false, visibility: 'public',
+      requestId: 'post-request-a', text: 'First', media: null, hasSpoiler: false, visibility: 'public',
     })
     const secondId = await owner.client.mutation(socialApi.posts.create, {
-      requestId: 'post-request-b', text: 'Second', imageIds: [], hasSpoiler: false, visibility: 'public',
+      requestId: 'post-request-b', text: 'Second', media: null, hasSpoiler: false, visibility: 'public',
     })
     await expect(owner.client.mutation(socialApi.posts.update, {
-      postId: secondId, requestId: 'post-request-a', text: 'Collision', imageIds: [], hasSpoiler: false, visibility: 'public',
+      postId: secondId, requestId: 'post-request-a', text: 'Collision', media: null, hasSpoiler: false, visibility: 'public',
     })).rejects.toThrow('collision')
     expect(await t.run(async (ctx) => await ctx.db.get('posts', firstId))).not.toBeNull()
   }, 20_000)
 
-  test('binds Post create request IDs to exact normalized intent before image attachment', async () => {
+  test('binds Post create request IDs to exact normalized media intent', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'post-create-retry-owner')
-    const firstStorageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(['first'], { type: 'image/png' })))
-    const secondStorageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(['second'], { type: 'image/png' })))
-    const [firstImageId, secondImageId] = await t.run(async (ctx) => {
-      const now = Date.now()
-      return await Promise.all([
-        ctx.db.insert('postImages', {
-          ownerId: owner.profileId, claimId: 'retry-first-image', storageId: firstStorageId, mimeType: 'image/png', size: 5,
-          width: 1, height: 1, state: 'pending', createdAt: now, updatedAt: now,
-        }),
-        ctx.db.insert('postImages', {
-          ownerId: owner.profileId, claimId: 'retry-second-image', storageId: secondStorageId, mimeType: 'image/png', size: 6,
-          width: 1, height: 1, state: 'pending', createdAt: now, updatedAt: now,
-        }),
-      ])
-    })
+    const firstMedia = { type: 'image', url: 'https://example.com/first.jpg', description: null } as const
+    const secondMedia = { type: 'video', url: 'https://vimeo.com/456', provider: 'vimeo', label: null } as const
     const requestId = 'post-create-retry'
     const postId = await owner.client.mutation(socialApi.posts.create, {
-      requestId, text: '  Same text  ', imageIds: [firstImageId], hasSpoiler: false, visibility: 'public',
+      requestId, text: '  Same text  ', media: firstMedia, hasSpoiler: false, visibility: 'public',
     })
 
     expect(await owner.client.mutation(socialApi.posts.create, {
-      requestId, text: 'Same text', imageIds: [firstImageId], hasSpoiler: false, visibility: 'public',
+      requestId, text: 'Same text', media: firstMedia, hasSpoiler: false, visibility: 'public',
     })).toBe(postId)
     for (const changed of [
-      { text: 'Changed text', imageIds: [firstImageId], hasSpoiler: false, visibility: 'public' },
-      { text: 'Same text', imageIds: [firstImageId], hasSpoiler: true, visibility: 'public' },
-      { text: 'Same text', imageIds: [firstImageId], hasSpoiler: false, visibility: 'private' },
-      { text: 'Same text', imageIds: [secondImageId], hasSpoiler: false, visibility: 'public' },
+      { text: 'Changed text', media: firstMedia, hasSpoiler: false, visibility: 'public' },
+      { text: 'Same text', media: firstMedia, hasSpoiler: true, visibility: 'public' },
+      { text: 'Same text', media: firstMedia, hasSpoiler: false, visibility: 'private' },
+      { text: 'Same text', media: secondMedia, hasSpoiler: false, visibility: 'public' },
     ] as const) {
       await expect(owner.client.mutation(socialApi.posts.create, { requestId, ...changed })).rejects.toThrow('collision')
     }
 
     expect(await t.run(async (ctx) => await ctx.db.get('posts', postId))).toMatchObject({
-      text: 'Same text', imageIds: [firstImageId], hasSpoiler: false, visibility: 'public',
-    })
-    expect(await t.run(async (ctx) => await ctx.db.get('postImages', firstImageId))).toMatchObject({ state: 'attached', postId, order: 0 })
-    expect(await t.run(async (ctx) => await ctx.db.get('postImages', secondImageId))).toMatchObject({
-      state: 'pending', storageId: secondStorageId,
+      text: 'Same text', media: firstMedia, hasSpoiler: false, visibility: 'public',
     })
   }, 20_000)
 
@@ -655,19 +628,6 @@ describe('social Convex integration', () => {
     await expect(owner.client.mutation(socialApi.reviews.remove, { reviewId })).rejects.toThrow('loaded')
   }, 20_000)
 
-  test('discards an unregistered signed upload using its owned pending claim', async () => {
-    const t = createHarness()
-    const owner = await createOwner(t, 'discard-owner')
-    const storageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(['pending'], { type: 'image/png' })))
-    const imageId = await t.run(async (ctx) => await ctx.db.insert('postImages', {
-      ownerId: owner.profileId, claimId: 'pending-claim', mimeType: '', size: 0, width: 0, height: 0,
-      state: 'pending', createdAt: Date.now(), updatedAt: Date.now(),
-    }))
-    await owner.client.mutation(socialApi.posts.discardImage, { imageId, storageId })
-    expect(await t.run(async (ctx) => await ctx.db.get('postImages', imageId))).toBeNull()
-    expect(await t.run(async (ctx) => await ctx.storage.get(storageId))).toBeNull()
-  }, 20_000)
-
   test('continues Home two-to-one ranking across same-time pages without own/global duplication', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'paged-owner')
@@ -678,7 +638,7 @@ describe('social Convex integration', () => {
         for (const [profileId, prefix] of [[owner.profileId, 'own'], [other.profileId, 'global']] as const) {
           const postId = await ctx.db.insert('posts', {
             userId: profileId, requestId: `${prefix}-${index}`, text: `${prefix}-${index}`, hasSpoiler: false,
-            visibility: 'public', imageIds: [], createdAt: occurredAt, updatedAt: occurredAt,
+            visibility: 'public', media: null, createdAt: occurredAt, updatedAt: occurredAt,
           })
           const sourceKey = `post:${postId}`
           await ctx.db.insert('feedCards', {
@@ -716,7 +676,7 @@ describe('social Convex integration', () => {
       for (let index = 1; index <= 25; index += 1) {
         const postId = await ctx.db.insert('posts', {
           userId: owner.profileId, requestId: `prefix-own-${index}`, text: `own-${index}`, hasSpoiler: false,
-          visibility: 'public', imageIds: [], createdAt: index, updatedAt: index,
+          visibility: 'public', media: null, createdAt: index, updatedAt: index,
         })
         await ctx.db.insert('feedCards', {
           sourceKey: `post:${postId}`, kind: 'post', userId: owner.profileId, sourceId: postId,
@@ -726,7 +686,7 @@ describe('social Convex integration', () => {
       for (let index = 26; index <= 28; index += 1) {
         const postId = await ctx.db.insert('posts', {
           userId: other.profileId, requestId: `prefix-global-${index}`, text: `global-${index}`, hasSpoiler: false,
-          visibility: 'public', imageIds: [], createdAt: index, updatedAt: index,
+          visibility: 'public', media: null, createdAt: index, updatedAt: index,
         })
         await ctx.db.insert('feedCards', {
           sourceKey: `post:${postId}`, kind: 'post', userId: other.profileId, sourceId: postId,

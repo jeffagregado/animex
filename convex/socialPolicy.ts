@@ -1,6 +1,5 @@
-import { POST_IMAGE_LIMIT, POST_IMAGE_MAX_BYTES, POST_TEXT_LIMIT, REQUEST_ID_MAX_LENGTH, type ReviewSort, type Visibility } from '../src/features/social/shared/social-contracts'
-
-const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+import { POST_TEXT_LIMIT, REQUEST_ID_MAX_LENGTH, type ReviewSort, type Visibility } from '../src/features/social/shared/social-contracts'
+import type { PostMedia } from '../src/features/social/shared/external-media'
 
 export type AggregateRating = { public: boolean; rating: number }
 export type AggregateDelta = {
@@ -83,32 +82,11 @@ export const canReadSocialRecord = (
 ): boolean => visibility === 'public' || viewerId === ownerId
 
 /** Trims and validates Post content using locked shared limits. */
-export const normalizePostContent = (text: string, imageIds: string[]) => {
+export const normalizePostContent = (text: string, media: PostMedia | null): { text: string; media: PostMedia | null } => {
   const normalizedText = text.trim()
   if (normalizedText.length > POST_TEXT_LIMIT) throw new RangeError(`Post text must not exceed ${POST_TEXT_LIMIT} characters.`)
-  if (imageIds.length > POST_IMAGE_LIMIT) throw new RangeError(`Post must not exceed ${POST_IMAGE_LIMIT} images.`)
-  if (new Set(imageIds).size !== imageIds.length) throw new TypeError('Post image IDs must be unique.')
-  if (normalizedText.length === 0 && imageIds.length === 0) throw new RangeError('Post requires text or at least one image.')
-  return { text: normalizedText, imageIds }
-}
-
-/** Rejects unsupported or oversized registered uploads. */
-export const assertImageMetadata = (mimeType: string, size: number): void => {
-  if (!IMAGE_MIME_TYPES.has(mimeType)) throw new TypeError('Image must be JPEG, PNG, WebP, or GIF.')
-  if (!Number.isSafeInteger(size) || size < 1 || size > POST_IMAGE_MAX_BYTES) throw new RangeError('Image must be 5 MiB or smaller.')
-}
-
-/** Validates authoritative Convex storage metadata against client preview metadata. */
-export const assertStoredImageMetadata = (
-  contentType: string | null,
-  size: number,
-  expectedMimeType: string,
-  expectedSize: number,
-): { mimeType: string; size: number } => {
-  if (contentType === null) throw new TypeError('Stored image content type is required.')
-  assertImageMetadata(contentType, size)
-  if (contentType !== expectedMimeType || size !== expectedSize) throw new TypeError('Stored image metadata does not match upload metadata.')
-  return { mimeType: contentType, size }
+  if (normalizedText.length === 0 && media === null) throw new RangeError('Post requires text or media.')
+  return { text: normalizedText, media }
 }
 
 /** Normalizes bounded shared request and claim IDs. */

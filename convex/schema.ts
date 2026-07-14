@@ -165,22 +165,10 @@ export default defineSchema({
   posts: defineTable({
     userId: v.id('users'), requestId: v.string(), text: v.string(), hasSpoiler: v.boolean(),
     visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
-    imageIds: v.optional(v.array(v.id('postImages'))),
-    media: v.optional(v.union(postMediaValidator, v.null())), createdAt: v.number(), updatedAt: v.number(),
+    media: v.union(postMediaValidator, v.null()), createdAt: v.number(), updatedAt: v.number(),
   })
     .index('by_user_request', ['userId', 'requestId'])
     .index('by_user_created_at', ['userId', 'createdAt'])
-    .index('by_created_at', ['createdAt']),
-  postImages: defineTable({
-    ownerId: v.id('users'), claimId: v.string(), storageId: v.optional(v.id('_storage')),
-    mimeType: v.string(), size: v.number(), width: v.number(), height: v.number(),
-    state: v.union(v.literal('pending'), v.literal('attached')),
-    postId: v.optional(v.id('posts')), order: v.optional(v.number()), createdAt: v.number(), updatedAt: v.number(),
-  })
-    .index('by_owner_claim', ['ownerId', 'claimId'])
-    .index('by_owner_state', ['ownerId', 'state'])
-    .index('by_post_order', ['postId', 'order'])
-    .index('by_storage_id', ['storageId'])
     .index('by_created_at', ['createdAt']),
   reviews: defineTable({
     userId: v.id('users'), anilistId: v.number(), requestId: v.string(),

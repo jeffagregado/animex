@@ -12,11 +12,27 @@ import { getOptionalProfile, requireProfile } from './users'
 const visibilityValidator = v.union(v.literal('private'), v.literal('followers'), v.literal('public'))
 const authorValidator = v.object({ id: v.string(), username: v.string(), displayName: v.string(), avatarUrl: v.union(v.string(), v.null()) })
 const animeValidator = v.object({ anilistId: v.number(), slug: v.string(), title: v.string(), coverImageUrl: v.union(v.string(), v.null()) })
+const animeFormatValidator = v.union(
+  v.literal('TV'), v.literal('TV_SHORT'), v.literal('MOVIE'), v.literal('SPECIAL'),
+  v.literal('OVA'), v.literal('ONA'), v.literal('MUSIC'), v.null(),
+)
+const activityAnimeValidator = v.object({
+  anilistId: v.number(), slug: v.string(), title: v.string(), coverImageUrl: v.union(v.string(), v.null()),
+  seasonYear: v.union(v.number(), v.null()), format: animeFormatValidator,
+})
+const postMediaValidator = v.union(
+  v.object({ type: v.literal('image'), url: v.string(), description: v.union(v.string(), v.null()) }),
+  v.object({
+    type: v.literal('video'), url: v.string(),
+    provider: v.union(v.literal('youtube'), v.literal('vimeo'), v.literal('external')),
+    label: v.union(v.string(), v.null()),
+  }),
+)
 const feedCardValidator = v.union(
-  v.object({ id: v.string(), postId: v.string(), kind: v.literal('post'), author: authorValidator, text: v.string(), imageIds: v.array(v.string()), imageUrls: v.array(v.string()), hasSpoiler: v.boolean(), visibility: visibilityValidator, createdAt: v.number(), updatedAt: v.number() }),
+  v.object({ id: v.string(), postId: v.string(), kind: v.literal('post'), author: authorValidator, text: v.string(), media: v.union(postMediaValidator, v.null()), hasSpoiler: v.boolean(), visibility: visibilityValidator, createdAt: v.number(), updatedAt: v.number() }),
   v.object({ id: v.string(), reviewId: v.string(), kind: v.literal('review'), author: authorValidator, anime: animeValidator, rating: v.number(), summary: v.string(), summaryHasSpoiler: v.boolean(), visibility: visibilityValidator, publishedAt: v.number(), updatedAt: v.number() }),
-  v.object({ id: v.string(), kind: v.literal('completed'), author: authorValidator, anime: animeValidator, settledAt: v.number(), visibility: visibilityValidator }),
-  v.object({ id: v.string(), kind: v.literal('rewatched'), author: authorValidator, anime: animeValidator, settledAt: v.number(), visibility: visibilityValidator }),
+  v.object({ id: v.string(), kind: v.literal('completed'), author: authorValidator, anime: activityAnimeValidator, settledAt: v.number(), visibility: visibilityValidator }),
+  v.object({ id: v.string(), kind: v.literal('rewatched'), author: authorValidator, anime: activityAnimeValidator, settledAt: v.number(), visibility: visibilityValidator }),
 )
 const feedPageValidator = v.object({ items: v.array(feedCardValidator), cursor: v.union(v.string(), v.null()), hasMore: v.boolean() })
 const fail = (code: string, message: string): never => { throw new ConvexError({ code, message }) }
@@ -49,25 +65,35 @@ const canReadSource = (visibility: Doc<'feedCards'>['visibility'], ownerId: Id<'
   return canReadSocialRecord(visibility, read.viewerId, ownerId)
 }
 
+const getActivityAnime = async (ctx: QueryCtx, anilistId: number) => {
+  const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', anilistId)).unique()
+  if (!anime) return fail('FEED_ANIME_MISSING', 'Feed anime summary is missing.')
+  return {
+    anilistId, slug: anime.slug, title: anime.titles.display, coverImageUrl: anime.coverImageUrl,
+    seasonYear: anime.seasonYear, format: anime.format,
+  }
+}
+
 /** Applies lane-specific source visibility. */
 const canReadMilestone = (milestone: Doc<'animeMilestones'>, read: FeedRead): boolean => {
   if (read.mode === 'public') return milestone.visibility === 'public'
   return canReadSocialRecord(milestone.visibility, read.viewerId, milestone.userId)
 }
 
+const matchesPostProjection = (card: Doc<'feedCards'>, post: Doc<'posts'>): boolean => [
+  card.sourceKey === `post:${post._id}`,
+  card.sourceId === post._id,
+  card.userId === post.userId,
+  card.visibility === post.visibility,
+].every(Boolean)
+
 const resolvePostCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {
   const postId = card.sourceId ? ctx.db.normalizeId('posts', card.sourceId) : null
   const post = postId ? await ctx.db.get('posts', postId) : null
-  if (!post) return null
-  if (card.sourceKey !== `post:${post._id}` || card.sourceId !== post._id || card.userId !== post.userId || card.visibility !== post.visibility) return null
+  if (!post || !matchesPostProjection(card, post)) return null
   if (!canReadSource(post.visibility, post.userId, read)) return null
-  const images = await Promise.all(post.imageIds.map((id) => ctx.db.get('postImages', id)))
-  const imageUrls = await Promise.all(images.map(async (image) => image?.storageId ? await ctx.storage.getUrl(image.storageId) : null))
-  const resolvedImages = post.imageIds.flatMap((imageId, index) => {
-    const url = imageUrls[index]
-    return url ? [{ imageId, url }] : []
-  })
-  return { id: card._id, postId: post._id, kind: 'post', author: await getAuthor(ctx, post.userId), text: post.text, imageIds: resolvedImages.map((image) => image.imageId), imageUrls: resolvedImages.map((image) => image.url), hasSpoiler: post.hasSpoiler, visibility: post.visibility, createdAt: post.createdAt, updatedAt: post.updatedAt }
+  if (post.media === undefined) return null
+  return { id: card._id, postId: post._id, kind: 'post', author: await getAuthor(ctx, post.userId), text: post.text, media: post.media, hasSpoiler: post.hasSpoiler, visibility: post.visibility, createdAt: post.createdAt, updatedAt: post.updatedAt }
 }
 
 type ActiveReviewSource = {
@@ -109,7 +135,7 @@ const resolveMilestoneCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read:
   if (card.sourceKey !== `${card.kind}:${card.userId}:${card.anilistId}`) return null
   const milestone = await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', card.userId).eq('anilistId', card.anilistId as number).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
   if (!milestone || card.visibility !== milestone.visibility || !canReadMilestone(milestone, read)) return null
-  return { id: card._id, kind: milestone.kind, author: await getAuthor(ctx, milestone.userId), anime: await getAnime(ctx, milestone.anilistId), settledAt: milestone.occurredAt, visibility: milestone.visibility }
+  return { id: card._id, kind: milestone.kind, author: await getAuthor(ctx, milestone.userId), anime: await getActivityAnime(ctx, milestone.anilistId), settledAt: milestone.occurredAt, visibility: milestone.visibility }
 }
 
 const resolveCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {

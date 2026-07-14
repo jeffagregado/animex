@@ -1,9 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import {
-  assertImageMetadata,
   assertRequestId,
-  assertStoredImageMetadata,
   canReadSocialRecord,
   decodeReviewCursor,
   encodeReviewCursor,
@@ -20,15 +18,12 @@ describe('social policy', () => {
     expect(canReadSocialRecord('private', null, 'owner')).toBe(false)
   })
 
-  test('validates post content and upload metadata', () => {
-    expect(normalizePostContent('  hello  ', ['a'])).toEqual({ text: 'hello', imageIds: ['a'] })
-    expect(() => normalizePostContent('', [])).toThrow('text or at least one image')
-    expect(() => assertImageMetadata('image/svg+xml', 10)).toThrow('JPEG, PNG, WebP, or GIF')
-    expect(() => assertImageMetadata('image/gif', 5 * 1024 * 1024 + 1)).toThrow('5 MiB')
-    expect(() => assertStoredImageMetadata(null, 5, 'image/png', 5)).toThrow('content type')
-    expect(() => assertStoredImageMetadata('image/jpeg', 5, 'image/png', 5)).toThrow('does not match')
-    expect(() => assertStoredImageMetadata('image/png', 6, 'image/png', 5)).toThrow('does not match')
-    expect(assertStoredImageMetadata('image/png', 5, 'image/png', 5)).toEqual({ mimeType: 'image/png', size: 5 })
+  test('validates text-only, media-only, and empty Post content', () => {
+    const media = { type: 'image', url: 'https://example.com/image.jpg', description: null } as const
+    expect(normalizePostContent('  hello  ', null)).toEqual({ text: 'hello', media: null })
+    expect(normalizePostContent('', media)).toEqual({ text: '', media })
+    expect(() => normalizePostContent('', null)).toThrow('text or media')
+    expect(() => normalizePostContent('x'.repeat(281), null)).toThrow('280')
   })
 
   test('rejects blank and oversized request or claim IDs', () => {
