@@ -1,4 +1,36 @@
 export type AnimeStatus = 'watching' | 'planned' | 'dropped' | 'completed' | 'rewatched'
+
+export interface UserAnimeProgress {
+  watching: number
+  completed: number
+  planned: number
+  dropped: number
+}
+
+type ProgressKey = keyof UserAnimeProgress
+
+/** Maps only statuses represented by List Progress. */
+const getProgressKey = (status: AnimeStatus | null): ProgressKey | null => status === 'rewatched' ? null : status
+
+/** Applies one status transition to immutable List Progress counts. */
+export const applyProgressTransition = (
+  previous: AnimeStatus | null,
+  next: AnimeStatus | null,
+  counts: UserAnimeProgress,
+): UserAnimeProgress => {
+  const previousKey = getProgressKey(previous)
+  const nextKey = getProgressKey(next)
+  if (previousKey === nextKey) return { ...counts }
+
+  const updated = { ...counts }
+  if (previousKey !== null) {
+    if (updated[previousKey] <= 0) throw new RangeError(`${previousKey} count cannot be negative.`)
+    updated[previousKey] -= 1
+  }
+  if (nextKey !== null) updated[nextKey] += 1
+  return updated
+}
+
 /** Wraps saved user state in the frozen mutation result contract. */
 export const toSavedResult = <T>(entry: T) => ({ status: 'saved' as const, entry })
 

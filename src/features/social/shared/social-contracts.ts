@@ -15,7 +15,7 @@ export const POST_IMAGE_MAX_BYTES = 5 * 1024 * 1024
 export const REVIEW_RATING_DEFAULT = 50 as const
 export const REQUEST_ID_MAX_LENGTH = 128 as const
 
-const visibilitySchema = z.enum(['public', 'followers', 'private'])
+export const visibilitySchema = z.enum(['public', 'followers', 'private'])
 const reviewStateSchema = z.enum(['draft', 'published'])
 export const reviewSortSchema = z.enum(['newest', 'rating-high', 'rating-low'])
 export const reviewRatingSchema = z.number().min(0).max(100).multipleOf(0.1).nullable()

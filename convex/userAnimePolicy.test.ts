@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 
 import {
   applyFavorite,
+  applyProgressTransition,
   createMilestoneInsert,
   createMilestoneTimestampPatch,
   decideStatusChange,
@@ -54,5 +55,36 @@ describe('user anime policy', () => {
       userId: 'owner', anilistId: 1, kind: 'rewatched', visibility: 'private', occurredAt: 100, updatedAt: 100,
     })
     expect(createMilestoneTimestampPatch(200)).toEqual({ occurredAt: 200, updatedAt: 200 })
+  })
+
+  test('applies progress deltas across counted and excluded statuses', () => {
+    const empty = { watching: 0, completed: 0, planned: 0, dropped: 0 }
+    const watching = applyProgressTransition(null, 'watching', empty)
+    expect(watching).toEqual({ watching: 1, completed: 0, planned: 0, dropped: 0 })
+
+    const completed = applyProgressTransition('watching', 'completed', watching)
+    expect(completed).toEqual({ watching: 0, completed: 1, planned: 0, dropped: 0 })
+
+    const planned = applyProgressTransition('completed', 'planned', completed)
+    expect(planned).toEqual({ watching: 0, completed: 0, planned: 1, dropped: 0 })
+
+    const dropped = applyProgressTransition('planned', 'dropped', planned)
+    expect(dropped).toEqual({ watching: 0, completed: 0, planned: 0, dropped: 1 })
+
+    expect(applyProgressTransition('dropped', 'rewatched', dropped)).toEqual(empty)
+    expect(applyProgressTransition('rewatched', null, empty)).toEqual(empty)
+    expect(applyProgressTransition('rewatched', 'completed', empty)).toEqual({ ...empty, completed: 1 })
+  })
+
+  test('keeps repeated progress status writes idempotent', () => {
+    const counts = { watching: 2, completed: 1, planned: 3, dropped: 4 }
+    expect(applyProgressTransition('planned', 'planned', counts)).toEqual(counts)
+    expect(applyProgressTransition(null, 'rewatched', counts)).toEqual(counts)
+    expect(counts).toEqual({ watching: 2, completed: 1, planned: 3, dropped: 4 })
+  })
+
+  test('rejects progress underflow instead of hiding projection drift', () => {
+    const empty = { watching: 0, completed: 0, planned: 0, dropped: 0 }
+    expect(() => applyProgressTransition('watching', 'completed', empty)).toThrow('watching count cannot be negative')
   })
 })
