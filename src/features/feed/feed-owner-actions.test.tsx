@@ -13,7 +13,7 @@ vi.mock('sonner', () => ({ toast: { success: mocks.success, error: mocks.error }
 const author = { id: 'owner', username: 'owner', displayName: 'Owner', avatarUrl: null }
 const anime = { anilistId: 1, slug: 'anime', title: 'Anime', coverImageUrl: null }
 
-beforeEach(() => { mocks.index = 0; mocks.removePost.mockResolvedValue(null); mocks.removeActivity.mockResolvedValue(null) })
+beforeEach(() => { mocks.index = 0; mocks.postVisibility.mockResolvedValue(null); mocks.removePost.mockResolvedValue(null); mocks.activityVisibility.mockResolvedValue(null); mocks.removeActivity.mockResolvedValue(null) })
 afterEach(() => { cleanup(); Object.values(mocks).forEach((value) => { if (typeof value === 'function' && 'mockClear' in value) value.mockClear() }) })
 
 const removeThroughMenu = async (card: Extract<FeedCard, { kind: 'post' | 'completed' | 'rewatched' }>) => {
@@ -47,8 +47,29 @@ describe('FeedOwnerActions', () => {
     expect(trigger.querySelector('svg')?.classList.contains('lucide-ellipsis')).toBe(true)
     fireEvent.click(trigger)
     expect(await screen.findByRole('menu')).toBeTruthy()
+    expect(trigger.hasAttribute('data-popup-open')).toBe(true)
+    expect(trigger.className).toContain('data-popup-open:bg-cyan-300/10')
+    expect(trigger.className).toContain('data-popup-open:ring-2')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Post' }))
     expect(await screen.findByRole('dialog', { name: 'Delete Post?' })).toBeTruthy()
+  })
+
+  it('exposes pending visibility state on the overflow trigger and restores focus', async () => {
+    let resolve!: (value: null) => void
+    mocks.postVisibility.mockReturnValueOnce(new Promise<null>((done) => { resolve = done }))
+    render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    const trigger = screen.getByRole('button', { name: 'Owner actions' })
+    trigger.focus()
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Followers' }))
+    await waitFor(() => expect(mocks.postVisibility).toHaveBeenCalledWith({ postId: 'post', visibility: 'followers' }))
+    expect(trigger.hasAttribute('disabled')).toBe(true)
+    expect(trigger.getAttribute('aria-busy')).toBe('true')
+    expect(trigger.className).toContain('disabled:bg-cyan-300/10')
+    expect(trigger.className).toContain('disabled:opacity-100')
+    resolve(null)
+    await waitFor(() => expect(trigger.hasAttribute('disabled')).toBe(false))
+    expect(document.activeElement).toBe(trigger)
   })
 
   it('disables confirmation controls while deletion is pending', async () => {
@@ -58,9 +79,24 @@ describe('FeedOwnerActions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Post' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }))
-    expect((await screen.findByRole('button', { name: 'Deleting…' })).hasAttribute('disabled')).toBe(true)
-    expect(screen.getByRole('button', { name: 'Cancel' }).hasAttribute('disabled')).toBe(true)
+    const confirm = await screen.findByRole('button', { name: 'Deleting…' })
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    expect(confirm.hasAttribute('disabled')).toBe(true)
+    expect(confirm.className).toContain('disabled:cursor-wait')
+    expect(confirm.className).toContain('disabled:bg-red-500/60')
+    expect(cancel.hasAttribute('disabled')).toBe(true)
+    expect(cancel.className).toContain('disabled:cursor-wait')
+    expect(cancel.className).toContain('disabled:bg-white/5')
     resolve(null)
     await waitFor(() => expect(mocks.success).toHaveBeenCalledWith('Post deleted.'))
+  })
+
+  it('returns focus to the overflow trigger when deletion is cancelled', async () => {
+    render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    const trigger = screen.getByRole('button', { name: 'Owner actions' })
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Post' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
   })
 })
