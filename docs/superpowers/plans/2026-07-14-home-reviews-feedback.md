@@ -194,6 +194,7 @@ git commit -m "test: lock review discovery contracts"
 **Files:**
 
 - Modify: `convex/schema.ts`
+- Create: `convex/reviewDiscovery.ts`
 - Create: `convex/reviewDiscoveryPolicy.ts`
 - Create: `convex/reviewDiscoveryPolicy.test.ts`
 - Modify: `convex/reviews.ts`
@@ -223,7 +224,7 @@ ratingBand: v.optional(storedReviewRatingBandValidator)
 6. Add:
    - `reviews.listLatestPublic({ limit: 5 })` with a hard server cap of five;
    - `reviews.listDiscovery(input)` with a hard page size of 12;
-   - resumable `internal.reviews.backfillDiscoveryFields` for every draft and published Review;
+   - resumable `internal.reviews.backfillDiscoveryFields` for every draft and published Review; published Reviews without a rating fail explicitly instead of receiving the draft-only `none` band;
    - resumable `internal.reviews.verifyDiscoveryBackfill` for every Review.
 7. Hydrate each result through existing author/anime helpers. Missing source data raises an explicit error; do not fabricate metadata.
 8. Run focused tests:
