@@ -43,7 +43,7 @@ export interface SocialAnime {
   coverImageUrl: string | null
 }
 
-export interface ActivityAnime extends SocialAnime {
+interface ActivityAnime extends SocialAnime {
   seasonYear: number | null
   format: AnimeFormat | null
 }
@@ -62,7 +62,7 @@ export const socialAnimeSchema = z.object({
   title: z.string().trim().min(1).max(256),
 }).strict() satisfies z.ZodType<SocialAnime>
 
-export const activityAnimeSchema = socialAnimeSchema.extend({
+const activityAnimeSchema = socialAnimeSchema.extend({
   format: animeFormatSchema.nullable(),
   seasonYear: z.number().int().positive().nullable(),
 }).strict() satisfies z.ZodType<ActivityAnime>

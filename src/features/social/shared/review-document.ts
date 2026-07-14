@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
 import {
-  EXTERNAL_MEDIA_URL_MAX_LENGTH,
   externalMediaUrlSchema,
   getVideoProvider,
   videoProviderSchema,
@@ -16,7 +15,6 @@ export const REVIEW_DOCUMENT_MAX_MEDIA = 4 as const
 export const REVIEW_DOCUMENT_MAX_DEPTH = 8 as const
 export const REVIEW_DOCUMENT_MAX_NODES = 400 as const
 export const REVIEW_DOCUMENT_MAX_BYTES = 64 * 1024
-export const REVIEW_DOCUMENT_MAX_URL_LENGTH = EXTERNAL_MEDIA_URL_MAX_LENGTH
 
 type TextNode = {
   detail: 0
