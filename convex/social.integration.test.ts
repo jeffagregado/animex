@@ -396,6 +396,33 @@ describe('social Convex integration', () => {
     expect(await t.run(async (ctx) => await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `post:${postId}`)).unique())).toBeNull()
   }, 20_000)
 
+  test('rejects non-owner Post mutations without changing source or feed projection', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'post-owner')
+    const other = await createOwner(t, 'post-other')
+    const media = { type: 'image', url: 'https://example.com/owned.jpg', description: 'Owned' } as const
+    const postId = await owner.client.mutation(socialApi.posts.create, {
+      requestId: 'owned-post', text: 'Owner text', media, hasSpoiler: false, visibility: 'public',
+    })
+    const before = await t.run(async (ctx) => ({
+      post: await ctx.db.get('posts', postId),
+      card: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `post:${postId}`)).unique(),
+    }))
+
+    await expect(other.client.mutation(socialApi.posts.update, {
+      postId, requestId: 'forged-update', text: 'Forged', media: null, hasSpoiler: true, visibility: 'private',
+    })).rejects.toThrow('Only the Post owner')
+    await expect(other.client.mutation(socialApi.posts.remove, { postId })).rejects.toThrow('Only the Post owner')
+    await expect(other.client.mutation(socialApi.posts.setVisibility, {
+      postId, visibility: 'private',
+    })).rejects.toThrow('Only the Post owner')
+
+    expect(await t.run(async (ctx) => ({
+      post: await ctx.db.get('posts', postId),
+      card: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `post:${postId}`)).unique(),
+    }))).toEqual(before)
+  }, 20_000)
+
   test('rejects invalid external Post media and removed upload writers', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'post-media-validation')

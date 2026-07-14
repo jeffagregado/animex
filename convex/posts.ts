@@ -31,10 +31,7 @@ type CreateIntent = {
   visibility: Doc<'posts'>['visibility']
 }
 
-const mediaMatches = (left: PostMedia | null | undefined, right: PostMedia | null): boolean => {
-  if (left === undefined) return false
-  return JSON.stringify(left) === JSON.stringify(right)
-}
+const mediaMatches = (left: PostMedia | null, right: PostMedia | null): boolean => JSON.stringify(left) === JSON.stringify(right)
 
 const readMatchingCreateRequest = (post: Doc<'posts'> | null, intent: CreateIntent): Id<'posts'> | null => {
   if (!post) return null

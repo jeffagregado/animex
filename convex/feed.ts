@@ -92,7 +92,6 @@ const resolvePostCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: Feed
   const post = postId ? await ctx.db.get('posts', postId) : null
   if (!post || !matchesPostProjection(card, post)) return null
   if (!canReadSource(post.visibility, post.userId, read)) return null
-  if (post.media === undefined) return null
   return { id: card._id, postId: post._id, kind: 'post', author: await getAuthor(ctx, post.userId), text: post.text, media: post.media, hasSpoiler: post.hasSpoiler, visibility: post.visibility, createdAt: post.createdAt, updatedAt: post.updatedAt }
 }
 
