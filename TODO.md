@@ -768,3 +768,18 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migration, r
 - [x] Sync final Convex functions; update current-state docs; pass tests, TypeScript, build, Fallow, endpoint scan, and diff check. Owner: controller + docs mapper.
 - [x] Complete whole-branch review and authenticated responsive browser QA at 390, 768, and 1280 px, including hover/focus, Review media editing, Post lifecycle, Home/Discover surfaces, console/network, overflow, and dark scrollbar states. Owner: reviewer + QA + controller.
 - [x] Implement only after plan approval.
+
+# Phase 5 Review Card, Avatar, And Rail Feedback
+
+Status: DESIGN APPROVED on `jeff-cx/phase-5-feed-reviews`; written specification awaiting user review.
+
+- [x] Inspect Feed Review, Review discovery, Anime Reviews, Latest Reviews, writer fields, avatar renderers, and anime rails.
+- [x] Lock whole-body Review links, activity-only Delete copy, exact shared Review card, and per-rail equal heights.
+- [x] Lock Review-level spoiler badge with always-visible Summary.
+- [x] Lock spinner-free Rating input and right-aligned Review spoiler checkbox.
+- [x] Lock reuse-first shared Avatar with uppercase one-letter fallback.
+- [x] Approve deletion of existing Reviews, drafts, and linked Review activities only.
+- [x] Approve written design behavior.
+- [ ] Review and approve written specification.
+- [ ] Create and approve implementation plan.
+- [ ] Implement only after plan approval.
