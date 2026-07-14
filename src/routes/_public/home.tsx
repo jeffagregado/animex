@@ -14,6 +14,7 @@ export const Route = createFileRoute('/_public/home')({
   },
   loader: loadHomePage,
   component: HomeRoute,
+  pendingComponent: HomeRoutePending,
 })
 
 /** Normalizes stable Home tab/composer URL state. */
@@ -27,4 +28,9 @@ function HomeRoute() {
   const search = normalizeHomeSearch(Route.useSearch())
   const navigate = Route.useNavigate()
   return <HomePage data={data} search={search} onSearchChange={(next) => { void navigate({ search: next }) }} />
+}
+
+/** Keeps Home composition visible while Discover sections hydrate. */
+function HomeRoutePending() {
+  return <HomePage search={{ feed: 'home', compose: false }} onSearchChange={() => undefined} />
 }

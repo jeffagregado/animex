@@ -101,6 +101,40 @@ describe('HomePage', () => {
     expect(screen.queryByText('Anime 6')).toBeNull()
   })
 
+  it('keeps mobile weekly loading rows from collapsing', () => {
+    render(<HomeWeeklyList state={undefined} onRetry={vi.fn()} isRetrying={false} retryError={null} variant="mobile" />)
+
+    const skeletons = screen.getByLabelText('This Week loading').querySelectorAll('.animate-pulse')
+    expect(skeletons).toHaveLength(3)
+    for (const skeleton of skeletons) {
+      expect(skeleton.className).toContain('w-44')
+      expect(skeleton.className).toContain('shrink-0')
+    }
+  })
+
+  it('shows an explicit weekly empty state', () => {
+    render(<HomeWeeklyList state={ready('trending', [])} onRetry={vi.fn()} isRetrying={false} retryError={null} variant="desktop" />)
+
+    expect(screen.getByText('No trending anime is available this week.')).toBeTruthy()
+    expect(screen.queryByText('This week is unavailable.')).toBeNull()
+  })
+
+  it('shows weekly errors and retries only Trending', () => {
+    const retry = vi.fn()
+    render(<HomeWeeklyList state={{ status: 'error', key: 'trending', code: 'RATE_LIMITED', retryAfterSeconds: 12 }} onRetry={retry} isRetrying={false} retryError="Refresh failed" variant="desktop" />)
+
+    expect(screen.getByRole('alert').textContent).toContain('Try again in 12 seconds.')
+    expect(screen.getByRole('status').textContent).toBe('Refresh failed')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retry).toHaveBeenCalledWith('trending')
+  })
+
+  it('disables weekly retry while refresh is pending', () => {
+    render(<HomeWeeklyList state={{ status: 'error', key: 'trending', code: 'UPSTREAM', retryAfterSeconds: null }} onRetry={vi.fn()} isRetrying retryError={null} variant="desktop" />)
+
+    expect(screen.getByRole('button', { name: 'Retrying' })).toHaveProperty('disabled', true)
+  })
+
   it('renders content without duplicating the public shell', () => {
     mockAuthState({
       status: 'signedOut',
