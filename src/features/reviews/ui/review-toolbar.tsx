@@ -4,7 +4,7 @@ import { INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND } from '@lex
 import { $createHeadingNode, $createQuoteNode } from '@lexical/rich-text'
 import {
   $getSelection,
-  $insertNodes,
+  $getRoot,
   $isElementNode,
   $isRangeSelection,
   FORMAT_TEXT_COMMAND,
@@ -73,7 +73,10 @@ function MediaForm({ editor, kind, onDone }: { editor: ReturnType<typeof useLexi
 export const insertReviewMedia = (editor: ReturnType<typeof useLexicalComposerContext>[0], kind: Exclude<MediaDialog, null>, url: string, label: string): void => {
   const provider = kind === 'video' ? getVideoProvider(url) : null
   if (kind === 'image' && label.length === 0) throw new RangeError('Image alt text is required.')
-  editor.update(() => { $insertNodes([kind === 'image' ? $createReviewImageNode(url, label) : $createReviewVideoNode(url, provider!, label || undefined)]) }, { discrete: true })
+  editor.update(() => {
+    const node = kind === 'image' ? $createReviewImageNode(url, label) : $createReviewVideoNode(url, provider!, label || undefined)
+    $getRoot().append(node)
+  }, { discrete: true })
 }
 
 /** Wraps selected top-level blocks once; existing spoiler selections stay unchanged. */

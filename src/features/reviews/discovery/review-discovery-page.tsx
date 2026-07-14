@@ -107,7 +107,7 @@ function useReviewIntersection(pages: ReturnType<typeof useReviewDiscoveryPages>
 
 function ReviewDiscoveryStatus({ pages }: { pages: ReturnType<typeof useReviewDiscoveryPages> }) {
   return <>
-    {!pages.initialLoading && pages.items.length === 0 && pages.error === null ? <ReviewEmpty /> : null}
+    {!pages.initialLoading && pages.items.length === 0 && !pages.hasMore && pages.error === null ? <ReviewEmpty /> : null}
     {pages.error ? <div className="min-h-28 rounded-xl border border-red-400/40 bg-red-400/5 p-5 text-center" role="alert"><p className="font-bold">Reviews unavailable</p><p className="mt-1 text-sm text-red-200">{pages.error}</p><Button className="mt-3 min-h-11" onClick={() => void pages.retry()} type="button" variant="outline">Retry</Button></div> : null}
   </>
 }

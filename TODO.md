@@ -703,7 +703,7 @@ Status: COMPLETE on `jeff-cx/phase-4-anime-detail`.
 
 # Phase 5 Feed, Posts, Reviews
 
-Status: IMPLEMENTED on `jeff-cx/phase-5-feed-reviews`; signed-in browser QA remains pending.
+Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; authenticated browser QA and closure gates pass.
 
 - [x] Create feature branch; verify clean 349-pass baseline. Owner: controller.
 - [x] Add approved direct Lexical dependencies. Owner: controller.
@@ -717,7 +717,7 @@ Status: IMPLEMENTED on `jeff-cx/phase-5-feed-reviews`; signed-in browser QA rema
 - [x] Complete dev milestone projection backfill: one cursor page, `isDone: true`, `processedCount: 2`, `verifiedCount: 2` (2/2). Owner: controller.
 - [x] Resolve Fallow new-only audit: zero introduced dead-code, complexity, or duplication findings. Inherited complexity findings and the inherited `react-dom` test-only dependency warning remain outside the locked new-only gate. Owner: controller.
 - [x] Sync current-state docs and data-flow notes. Owner: docs mapper.
-- [ ] Complete spec/thermo review and responsive browser QA. Signed-in Review Creation/Detail, Post publishing/upload/owner actions, visibility, and pagination-above-page-size remain browser-blocked without a complete authenticated dev account and published Review; see `design-qa.md`. Owner: reviewer + QA.
+- [x] Complete spec/thermo review and responsive browser QA at 390, 768, and 1280 px. Authenticated checks cover Posts, anime controls, Review draft/resume/publish/edit, owner visibility actions, full rich-text toolbar, Preview parity, published rendering, keyboard focus, pointer hover, and responsive states. Review pagination above 12 records remains integration-tested because dev data did not reach the live threshold; see `design-qa.md`. Owner: reviewer + QA.
 - [x] Commit verified Phase 5 and stop for user review. Owner: controller.
 
 ## Optional Backlog
@@ -727,7 +727,7 @@ Status: IMPLEMENTED on `jeff-cx/phase-5-feed-reviews`; signed-in browser QA rema
 
 # Phase 5 Home And Review Discovery Feedback
 
-Status: IMPLEMENTATION IN PROGRESS on `jeff-cx/phase-5-feed-reviews`; backend migrations and Home/feed slices verified.
+Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migrations, browser QA, and closure gates pass.
 
 - [x] Inspect current Home, Discover, feed, Review, user-anime, and cache flows.
 - [x] Lock Home Seasonal, desktop utility order, List Progress metrics, and removed placeholders.
@@ -744,4 +744,4 @@ Status: IMPLEMENTATION IN PROGRESS on `jeff-cx/phase-5-feed-reviews`; backend mi
 - [x] Reuse Discover Seasonal/This Week/Upcoming and restore Home desktop utilities. Owner: Home workers.
 - [x] Match approved feed-card structure without fake Phase 6 data. Owner: feed UI worker.
 - [x] Build `/reviews` search, filters, visibility, and infinite pagination. Owner: Review discovery UI worker.
-- [ ] Integrate generated files, run full gates, review, real signed-in browser QA, and cleanup. Owner: controller + reviewer + QA.
+- [x] Integrate generated files and run closure gates: 83 test files passed / 2 skipped; 554 tests passed / 3 skipped; routes, Convex sync, TypeScript, client + SSR build, Fallow new-only audit, client AniList endpoint scan, and diff check pass. Authenticated browser QA includes full Review toolbar and owner-action coverage. Owner: controller + reviewer + QA.

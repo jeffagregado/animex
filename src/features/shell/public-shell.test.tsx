@@ -14,8 +14,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from '../home/home-page'
 import { PublicShell } from './public-shell'
 
-const convex = vi.hoisted(() => ({ authenticated: true, query: vi.fn(async () => ({ items: [], cursor: null, hasMore: false })), mutation: vi.fn(() => vi.fn()) }))
-vi.mock('convex/react', () => ({ useConvexAuth: () => ({ isAuthenticated: convex.authenticated, isLoading: false }), useConvex: () => ({ query: convex.query }), useMutation: convex.mutation }))
+const convex = vi.hoisted(() => {
+  const query = vi.fn(async () => ({ items: [], cursor: null, hasMore: false }))
+  return { authenticated: true, query, client: { query }, mutation: vi.fn(() => vi.fn()) }
+})
+vi.mock('convex/react', () => ({ useConvexAuth: () => ({ isAuthenticated: convex.authenticated, isLoading: false }), useConvex: () => convex.client, useMutation: convex.mutation }))
 
 const createPublicTestRouter = (initialEntry: string) => {
   const rootRoute = createRootRoute({
@@ -91,7 +94,7 @@ describe('PublicShell', () => {
 
     await screen.findByRole('button', { name: 'Sign out' })
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(screen.getByText('What are you watching?')).toBeTruthy()
+    expect(screen.queryByText('What are you watching?')).toBeNull()
   })
 
   it('hides mobile Create until Convex authentication is ready', async () => {

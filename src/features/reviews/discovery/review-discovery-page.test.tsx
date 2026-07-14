@@ -66,6 +66,16 @@ describe('ReviewDiscoveryPage', () => {
     expect(screen.getByRole('combobox', { name: 'Visibility filter' }).parentElement?.className).toContain('lg:col-span-1')
   })
 
+  it('keeps phased signed-in discovery loadable when the first lane is empty', () => {
+    mocks.auth.mockReturnValue({ status: 'ready', authState: { status: 'complete', email: 'fan@example.com', profile: { id: 'author', username: 'author', name: 'Author', avatarUrl: null, visibility: 'public' } } })
+    mocks.pages.mockReturnValue({ ...readyPages, items: [], hasMore: true })
+    render(<ReviewDiscoveryPage searchState={{ ...state, visibility: 'all' }} onSearchStateChange={mocks.change} />)
+
+    expect(screen.queryByText('No reviews found')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    expect(loadMore).toHaveBeenCalledTimes(1)
+  })
+
   it('preserves cover geometry after image failure and renders relative publish time', () => {
     vi.setSystemTime(new Date('2026-07-14T12:00:00Z'))
     mocks.pages.mockReturnValue({ ...readyPages, items: [{ ...review, publishedAt: Date.now() - 2 * 60 * 60 * 1000 }] })

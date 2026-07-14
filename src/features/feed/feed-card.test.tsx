@@ -47,7 +47,7 @@ describe('FeedCard', () => {
     expect(screen.getByText('1h ago')).toBeTruthy()
     expect(screen.getByRole('img', { name: 'Frieren cover' }).parentElement?.className).toContain('aspect-[2/3]')
     expect(screen.getByText('91')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Owner actions' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Owner actions' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Reveal Summary spoiler' }))
     expect(screen.getByText('Summary')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Read Review' }).getAttribute('href')).toBe('/reviews/review-source')

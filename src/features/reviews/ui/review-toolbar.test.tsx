@@ -9,7 +9,7 @@ import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { ListItemNode, ListNode } from '@lexical/list'
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
-import { $createParagraphNode, $createTextNode, $getRoot, $isElementNode, $isTextNode, type LexicalEditor } from 'lexical'
+import { $createParagraphNode, $createTextNode, $getRoot, $isElementNode, $isTextNode, $setSelection, type LexicalEditor } from 'lexical'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
@@ -50,10 +50,19 @@ describe('ReviewToolbar Lexical behavior', () => {
     selectText('Media')
     insertReviewMedia(editor, 'image', 'https://images.example/frieren.jpg', 'Frieren sunset')
     insertReviewMedia(editor, 'video', 'https://youtu.be/dQw4w9WgXcQ', 'Trailer')
-    expect(editor.getEditorState().toJSON().root.children).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'review-image', alt: 'Frieren sunset' }),
-      expect.objectContaining({ type: 'review-video', provider: 'youtube', label: 'Trailer' }),
-    ]))
+    const children = editor.getEditorState().toJSON().root.children
+    expect(children.map((node) => node.type)).toEqual(['paragraph', 'review-image', 'review-video'])
+    expect(children[0]).toMatchObject({ children: [expect.objectContaining({ text: 'Media' })] })
+    expect(children[1]).toMatchObject({ type: 'review-image', alt: 'Frieren sunset' })
+    expect(children[2]).toMatchObject({ type: 'review-video', provider: 'youtube', label: 'Trailer' })
+  })
+
+  it('appends media when dialog focus clears the editor selection', () => {
+    editor.update(() => { $getRoot().clear().append($createParagraphNode().append($createTextNode('Body'))); $setSelection(null) }, { discrete: true })
+
+    insertReviewMedia(editor, 'image', 'https://images.example/frieren.jpg', 'Frieren sunset')
+
+    expect(editor.getEditorState().toJSON().root.children.at(-1)).toMatchObject({ type: 'review-image', alt: 'Frieren sunset' })
   })
 
   it('undoes and redoes a history change through toolbar commands', async () => {

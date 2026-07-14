@@ -10,15 +10,29 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import type { FeedCard, Visibility } from '../social/shared/social-contracts'
 import { getVisibilityLabel } from '../social/visibility'
 
-type OwnerCard = Extract<FeedCard, { kind: 'post' | 'completed' | 'rewatched' }>
+type OwnerCard = FeedCard
+type DeleteAction = 'remove' | 'remove-review-activity' | null
 
 interface OwnerActionState {
   changeDeleteOpen: (open: boolean) => void
   changeVisibility: (visibility: Visibility) => Promise<void>
-  confirmDelete: boolean
+  deleteAction: DeleteAction
   pending: boolean
+  requestDelete: (action: Exclude<DeleteAction, null>) => void
   remove: () => Promise<void>
   triggerRef: RefObject<HTMLButtonElement | null>
+}
+
+interface RemoveMutations {
+  activity: (args: { cardId: Id<'feedCards'> }) => Promise<null>
+  post: (args: { postId: Id<'posts'> }) => Promise<null>
+  review: (args: { reviewId: Id<'reviews'> }) => Promise<null>
+  reviewActivity: (args: { reviewId: Id<'reviews'> }) => Promise<null>
+}
+
+interface DeleteCopy {
+  description: string
+  title: string
 }
 
 const visibilityIcon = (visibility: Visibility) => {
@@ -27,11 +41,37 @@ const visibilityIcon = (visibility: Visibility) => {
   return <LockIcon />
 }
 
+/** Removes owner content through its source mutation. */
+const removeOwnerSource = async (card: OwnerCard, action: Exclude<DeleteAction, null>, mutations: RemoveMutations): Promise<string> => {
+  if (card.kind === 'post') {
+    await mutations.post({ postId: card.postId as Id<'posts'> })
+    return 'Post deleted.'
+  }
+  if (card.kind === 'review') {
+    if (action === 'remove-review-activity') {
+      await mutations.reviewActivity({ reviewId: card.reviewId as Id<'reviews'> })
+      return 'Activity removed.'
+    }
+    await mutations.review({ reviewId: card.reviewId as Id<'reviews'> })
+    return 'Review deleted.'
+  }
+  await mutations.activity({ cardId: card.id as Id<'feedCards'> })
+  return 'Activity removed.'
+}
+
+/** Describes the selected destructive owner action. */
+const getDeleteCopy = (card: OwnerCard, action: Exclude<DeleteAction, null>): DeleteCopy => {
+  if (card.kind === 'post') return { title: 'Delete Post?', description: 'This permanently deletes the Post and its images.' }
+  if (card.kind !== 'review') return { title: 'Remove activity?', description: 'This removes the milestone from your feed.' }
+  if (action === 'remove-review-activity') return { title: 'Remove feed activity?', description: 'The Review stays on Anime Reviews and Review Detail.' }
+  return { title: 'Delete Review?', description: 'This permanently deletes the Review.' }
+}
+
 /** Routes owner actions to source-specific mutations. */
 export function FeedOwnerActions({ card, onEdit, onChanged }: { card: OwnerCard; onEdit: () => void; onChanged: () => void }) {
   const actions = useOwnerActions(card, onChanged)
 
-  return <><DropdownMenu><DropdownMenuTrigger aria-busy={actions.pending} aria-label="Owner actions" className="grid size-10 place-items-center rounded-lg text-muted-foreground transition hover:bg-cyan-300/10 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 data-popup-open:bg-cyan-300/10 data-popup-open:text-cyan-300 data-popup-open:ring-2 data-popup-open:ring-cyan-300 disabled:cursor-wait disabled:bg-cyan-300/10 disabled:text-cyan-300 disabled:opacity-100" disabled={actions.pending} ref={actions.triggerRef}><EllipsisIcon className="size-5" /></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48" sideOffset={6}>{card.kind === 'post' ? <DropdownMenuItem disabled={actions.pending} onClick={onEdit}><EditIcon />Edit Post</DropdownMenuItem> : null}{(['public', 'followers', 'private'] as Visibility[]).map((visibility) => <DropdownMenuItem disabled={actions.pending || visibility === card.visibility} key={visibility} onClick={() => void actions.changeVisibility(visibility)}>{visibilityIcon(visibility)}{getVisibilityLabel(visibility)}{visibility === card.visibility ? <CheckIcon className="ml-auto" /> : null}</DropdownMenuItem>)}<DropdownMenuSeparator /><DropdownMenuItem disabled={actions.pending} onClick={() => actions.changeDeleteOpen(true)} variant="destructive"><Trash2Icon />{card.kind === 'post' ? 'Delete Post' : 'Remove activity'}</DropdownMenuItem></DropdownMenuContent></DropdownMenu><DeleteConfirmation card={card} onOpenChange={actions.changeDeleteOpen} onRemove={actions.remove} open={actions.confirmDelete} pending={actions.pending} /></>
+  return <><DropdownMenu><DropdownMenuTrigger aria-busy={actions.pending} aria-label="Owner actions" className="grid size-10 place-items-center rounded-lg text-muted-foreground transition hover:bg-cyan-300/10 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 data-popup-open:bg-cyan-300/10 data-popup-open:text-cyan-300 data-popup-open:ring-2 data-popup-open:ring-cyan-300 disabled:cursor-wait disabled:bg-cyan-300/10 disabled:text-cyan-300 disabled:opacity-100" disabled={actions.pending} ref={actions.triggerRef}><EllipsisIcon className="size-5" /></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48" sideOffset={6}>{card.kind === 'post' ? <DropdownMenuItem disabled={actions.pending} onClick={onEdit}><EditIcon />Edit Post</DropdownMenuItem> : null}{card.kind === 'review' ? <DropdownMenuItem disabled={actions.pending} render={<a href={`/reviews/${card.reviewId}/edit`} />}><EditIcon />Edit Review</DropdownMenuItem> : null}{(['public', 'followers', 'private'] as Visibility[]).map((visibility) => <DropdownMenuItem disabled={actions.pending || visibility === card.visibility} key={visibility} onClick={() => void actions.changeVisibility(visibility)}>{visibilityIcon(visibility)}{getVisibilityLabel(visibility)}{visibility === card.visibility ? <CheckIcon className="ml-auto" /> : null}</DropdownMenuItem>)}<DropdownMenuSeparator />{card.kind === 'review' ? <DropdownMenuItem disabled={actions.pending} onClick={() => actions.requestDelete('remove-review-activity')}><Trash2Icon />Remove feed activity</DropdownMenuItem> : null}<DropdownMenuItem disabled={actions.pending} onClick={() => actions.requestDelete('remove')} variant="destructive"><Trash2Icon />{card.kind === 'post' ? 'Delete Post' : card.kind === 'review' ? 'Delete Review' : 'Remove activity'}</DropdownMenuItem></DropdownMenuContent></DropdownMenu><DeleteConfirmation action={actions.deleteAction} card={card} onOpenChange={actions.changeDeleteOpen} onRemove={actions.remove} pending={actions.pending} /></>
 }
 
 function useOwnerActions(card: OwnerCard, onChanged: () => void): OwnerActionState {
@@ -39,9 +79,12 @@ function useOwnerActions(card: OwnerCard, onChanged: () => void): OwnerActionSta
   const removePost = useMutation(api.posts.remove)
   const activityVisibility = useMutation(api.feed.setActivityVisibility)
   const removeActivity = useMutation(api.feed.removeActivity)
+  const reviewVisibility = useMutation(api.reviews.setVisibility)
+  const removeReviewActivity = useMutation(api.reviews.removeActivity)
+  const removeReview = useMutation(api.reviews.remove)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const restoreAfterVisibilityRef = useRef(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteAction, setDeleteAction] = useState<DeleteAction>(null)
   const [pending, setPending] = useState(false)
 
   useEffect(() => {
@@ -51,14 +94,17 @@ function useOwnerActions(card: OwnerCard, onChanged: () => void): OwnerActionSta
   }, [pending])
 
   const changeDeleteOpen = (open: boolean): void => {
-    setConfirmDelete(open)
+    if (open) return
+    setDeleteAction(null)
     if (!open) queueMicrotask(() => triggerRef.current?.focus())
   }
+  const requestDelete = (action: Exclude<DeleteAction, null>): void => setDeleteAction(action)
   const changeVisibility = async (visibility: Visibility): Promise<void> => {
     restoreAfterVisibilityRef.current = true
     setPending(true)
     try {
       if (card.kind === 'post') await postVisibility({ postId: card.postId as Id<'posts'>, visibility })
+      else if (card.kind === 'review') await reviewVisibility({ reviewId: card.reviewId as Id<'reviews'>, visibility })
       else await activityVisibility({ cardId: card.id as Id<'feedCards'>, visibility })
       toast.success('Visibility updated.')
       onChanged()
@@ -69,11 +115,11 @@ function useOwnerActions(card: OwnerCard, onChanged: () => void): OwnerActionSta
     }
   }
   const remove = async (): Promise<void> => {
+    if (deleteAction === null) throw new Error('Delete action is required.')
     setPending(true)
     try {
-      if (card.kind === 'post') await removePost({ postId: card.postId as Id<'posts'> })
-      else await removeActivity({ cardId: card.id as Id<'feedCards'> })
-      toast.success(card.kind === 'post' ? 'Post deleted.' : 'Activity removed.')
+      const message = await removeOwnerSource(card, deleteAction, { activity: removeActivity, post: removePost, review: removeReview, reviewActivity: removeReviewActivity })
+      toast.success(message)
       changeDeleteOpen(false)
       onChanged()
     } catch (cause) {
@@ -83,17 +129,18 @@ function useOwnerActions(card: OwnerCard, onChanged: () => void): OwnerActionSta
     }
   }
 
-  return { changeDeleteOpen, changeVisibility, confirmDelete, pending, remove, triggerRef }
+  return { changeDeleteOpen, changeVisibility, deleteAction, pending, remove, requestDelete, triggerRef }
 }
 
 interface DeleteConfirmationProps {
+  action: DeleteAction
   card: OwnerCard
   onOpenChange: (open: boolean) => void
   onRemove: () => Promise<void>
-  open: boolean
   pending: boolean
 }
 
-function DeleteConfirmation({ card, onOpenChange, onRemove, open, pending }: DeleteConfirmationProps) {
-  return <Dialog onOpenChange={onOpenChange} open={open}>{open ? <DialogContent title={card.kind === 'post' ? 'Delete Post?' : 'Remove activity?'}><p className="mt-4 text-muted-foreground">{card.kind === 'post' ? 'This permanently deletes the Post and its images.' : 'This removes the milestone from your feed.'}</p><div className="mt-6 grid grid-cols-2 gap-3"><button className="min-h-11 rounded-lg border border-white/15 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-wait disabled:border-white/10 disabled:bg-white/5 disabled:text-muted-foreground disabled:opacity-60" disabled={pending} onClick={() => onOpenChange(false)} type="button">Cancel</button><button className="min-h-11 rounded-lg bg-red-500 font-black text-white hover:bg-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-wait disabled:bg-red-500/60 disabled:text-white/70 disabled:opacity-100" disabled={pending} onClick={() => void onRemove()} type="button">{pending ? 'Deleting…' : 'Confirm'}</button></div></DialogContent> : null}</Dialog>
+function DeleteConfirmation({ action, card, onOpenChange, onRemove, pending }: DeleteConfirmationProps) {
+  const copy = action ? getDeleteCopy(card, action) : null
+  return <Dialog onOpenChange={onOpenChange} open={action !== null}>{copy ? <DialogContent title={copy.title}><p className="mt-4 text-muted-foreground">{copy.description}</p><div className="mt-6 grid grid-cols-2 gap-3"><button className="min-h-11 rounded-lg border border-white/15 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-wait disabled:border-white/10 disabled:bg-white/5 disabled:text-muted-foreground disabled:opacity-60" disabled={pending} onClick={() => onOpenChange(false)} type="button">Cancel</button><button className="min-h-11 rounded-lg bg-red-500 font-black text-white hover:bg-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-wait disabled:bg-red-500/60 disabled:text-white/70 disabled:opacity-100" disabled={pending} onClick={() => void onRemove()} type="button">{pending ? 'Deleting…' : 'Confirm'}</button></div></DialogContent> : null}</Dialog>
 }

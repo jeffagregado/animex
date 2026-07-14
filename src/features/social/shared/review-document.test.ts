@@ -37,6 +37,17 @@ describe('review document validation', () => {
     expect(validatePublishedReview(body, 90, 'Excellent.').body).toEqual(body)
   })
 
+  test('accepts unchecked Lexical list items without allowing checklist state', () => {
+    const uncheckedList = document([
+      { children: [{ checked: undefined, children: [text('First')], direction: null, format: '', indent: 0, type: 'listitem', version: 1, value: 1 }], direction: null, format: '', indent: 0, listType: 'bullet', start: 1, tag: 'ul', type: 'list', version: 1 },
+    ])
+
+    expect(parseReviewDocument(uncheckedList)).toEqual(uncheckedList)
+    expect(() => parseReviewDocument(document([
+      { children: [{ checked: true, children: [text('Task')], direction: null, format: '', indent: 0, type: 'listitem', version: 1, value: 1 }], direction: null, format: '', indent: 0, listType: 'bullet', start: 1, tag: 'ul', type: 'list', version: 1 },
+    ]))).toThrow()
+  })
+
   test('allows empty drafts but publish requires real text, rating, and summary', () => {
     const empty = document([])
     const mediaOnly = document([{ type: 'review-image', version: 1, url: 'https://images.example/a.jpg', alt: 'Alt only' }])

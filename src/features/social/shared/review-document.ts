@@ -164,6 +164,7 @@ const quoteNodeSchema: z.ZodType<QuoteNode> = z.object({
 }).strict()
 
 const listItemNodeSchema: z.ZodType<ListItemNode> = z.object({
+  checked: z.undefined().optional(),
   children: z.array(listItemChildSchema),
   ...elementFields,
   type: z.literal('listitem'),

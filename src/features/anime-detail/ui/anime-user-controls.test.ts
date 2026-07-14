@@ -154,7 +154,8 @@ describe('anime user control policies', () => {
     expect(score.getAttribute('min')).toBe('0')
     expect(score.getAttribute('max')).toBe('10')
     expect(score.getAttribute('step')).toBe('0.5')
-    expect(score.getAttribute('value')).toBe('0')
+    expect(score.getAttribute('value')).toBe('')
+    expect(score.getAttribute('placeholder')).toBe('0')
     expect(screen.getByRole('button', { name: 'Decrease score' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Increase score' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Clear score' })).toBeNull()
@@ -172,6 +173,21 @@ describe('anime user control policies', () => {
     fireEvent.blur(score)
 
     await waitFor(() => expect(controlState.score).toHaveBeenCalledWith({ anilistId: 1, score: 0 }))
+  })
+
+  it('replaces the visual zero without prefixing typed scores', () => {
+    controlState.entry = { anilistId: 1, status: null, score: null, isFavorite: false, favoriteChangedAt: null, rewatchCount: 0, createdAt: 1, updatedAt: 1 }
+    render(createElement(AnimeUserControls, { anilistId: 1, canonicalPath: '/anime/1/frieren' }))
+
+    const score = screen.getByRole('textbox', { name: 'Score' }) as HTMLInputElement
+    fireEvent.click(score)
+    expect(score.selectionStart).toBe(0)
+    expect(score.selectionEnd).toBe(score.getAttribute('value')?.length)
+    fireEvent.change(score, { target: { value: '' } })
+    fireEvent.change(score, { target: { value: '8' } })
+    fireEvent.change(score, { target: { value: '8.7' } })
+
+    expect(score.getAttribute('value')).toBe('8.7')
   })
 
   it('shows the exact Status label with the reference state indicator', () => {

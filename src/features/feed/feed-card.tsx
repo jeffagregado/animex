@@ -57,7 +57,7 @@ export function FeedCard({ card, owner, signedIn, onEdit, onChanged }: FeedCardP
           <p className="truncate text-sm font-bold text-slate-100">{activityText(card)}</p>
           <a className="inline-flex rounded text-xs text-muted-foreground hover:text-cyan-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/feed/${card.id}`} title={new Date(occurredAt).toISOString()}><time dateTime={new Date(occurredAt).toISOString()}>{relativeTime(occurredAt)}</time>{edited ? ' · Edited' : ''}</a>
         </div>
-        {owner && card.kind !== 'review' ? <FeedOwnerActions card={card} onChanged={onChanged} onEdit={() => { if (card.kind === 'post') onEdit(card) }} /> : null}
+        {owner ? <FeedOwnerActions card={card} onChanged={onChanged} onEdit={() => { if (card.kind === 'post') onEdit(card) }} /> : null}
       </header>
       <div className="mt-3">{renderBody(card, revealed, () => setRevealed(true))}</div>
       {signedIn ? <footer className="mt-3 flex gap-2 border-t border-white/8 pt-2"><button aria-label="Like · Coming in Phase 6" className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-70" disabled title="Coming in Phase 6" type="button"><HeartIcon className="size-4" />Like</button><button aria-label="Comment · Coming in Phase 6" className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-70" disabled title="Coming in Phase 6" type="button"><MessageCircleIcon className="size-4" />Comment</button></footer> : null}

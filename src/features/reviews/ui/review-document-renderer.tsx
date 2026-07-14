@@ -33,8 +33,8 @@ const renderChildren = (children: ReviewNode[]): ReactNode => children.map((chil
 
 const renderText = (text: string, format: number): ReactNode => {
   let value: ReactNode = text
-  if ((format & 8) !== 0) value = <s>{value}</s>
-  if ((format & 4) !== 0) value = <u>{value}</u>
+  if ((format & 8) !== 0) value = <u>{value}</u>
+  if ((format & 4) !== 0) value = <s>{value}</s>
   if ((format & 2) !== 0) value = <em>{value}</em>
   if ((format & 1) !== 0) value = <strong>{value}</strong>
   return value

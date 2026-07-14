@@ -29,10 +29,21 @@ describe('ReviewDocumentRenderer', () => {
     const { container } = render(<ReviewDocumentRenderer document={document} />)
     expect(screen.getByRole('heading', { level: 2, name: 'Heading' })).toBeTruthy()
     const marked = screen.getByText('Bold italic underline strike')
-    expect(marked.closest('strong em u s')).toBe(marked)
+    expect(container.querySelector('strong em s u')).toBe(marked)
     expect(screen.getByRole('list').tagName).toBe('UL')
     expect(container.querySelector('iframe')).toBeNull()
     expect(container.querySelector('script')).toBeNull()
+  })
+
+  it('maps Lexical underline and strikethrough bits to matching elements', () => {
+    const formatted: ReviewDocumentV1 = {
+      version: 1,
+      editorState: { root: { ...fields, type: 'root', children: [paragraph('Underlined', 8), paragraph('Struck', 4)] } },
+    }
+
+    render(<ReviewDocumentRenderer document={formatted} />)
+    expect(screen.getByText('Underlined').tagName).toBe('U')
+    expect(screen.getByText('Struck').tagName).toBe('S')
   })
 
   it('reveals spoilers independently and preserves covered preview state', () => {

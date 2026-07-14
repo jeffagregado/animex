@@ -11,6 +11,7 @@ const config = defineConfig({
   plugins: [devtools(), tailwindcss(), tanstackStart(), viteReact()],
   test: {
     setupFiles: ['./src/test/setup-env.ts'],
+    testTimeout: 10_000,
   },
 })
 

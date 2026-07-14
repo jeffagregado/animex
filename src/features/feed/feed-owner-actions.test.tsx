@@ -6,14 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FeedCard } from '../social/shared/social-contracts'
 import { FeedOwnerActions } from './feed-owner-actions'
 
-const mocks = vi.hoisted(() => ({ index: 0, postVisibility: vi.fn(), removePost: vi.fn(), activityVisibility: vi.fn(), removeActivity: vi.fn(), success: vi.fn(), error: vi.fn() }))
-vi.mock('convex/react', () => ({ useMutation: () => [mocks.postVisibility, mocks.removePost, mocks.activityVisibility, mocks.removeActivity][mocks.index++ % 4] }))
+const mocks = vi.hoisted(() => ({ index: 0, postVisibility: vi.fn(), removePost: vi.fn(), activityVisibility: vi.fn(), removeActivity: vi.fn(), reviewVisibility: vi.fn(), removeReviewActivity: vi.fn(), removeReview: vi.fn(), success: vi.fn(), error: vi.fn() }))
+vi.mock('convex/react', () => ({ useMutation: () => [mocks.postVisibility, mocks.removePost, mocks.activityVisibility, mocks.removeActivity, mocks.reviewVisibility, mocks.removeReviewActivity, mocks.removeReview][mocks.index++ % 7] }))
 vi.mock('sonner', () => ({ toast: { success: mocks.success, error: mocks.error } }))
 
 const author = { id: 'owner', username: 'owner', displayName: 'Owner', avatarUrl: null }
 const anime = { anilistId: 1, slug: 'anime', title: 'Anime', coverImageUrl: null }
 
-beforeEach(() => { mocks.index = 0; mocks.postVisibility.mockResolvedValue(null); mocks.removePost.mockResolvedValue(null); mocks.activityVisibility.mockResolvedValue(null); mocks.removeActivity.mockResolvedValue(null) })
+beforeEach(() => { mocks.index = 0; mocks.postVisibility.mockResolvedValue(null); mocks.removePost.mockResolvedValue(null); mocks.activityVisibility.mockResolvedValue(null); mocks.removeActivity.mockResolvedValue(null); mocks.reviewVisibility.mockResolvedValue(null); mocks.removeReviewActivity.mockResolvedValue(null); mocks.removeReview.mockResolvedValue(null) })
 afterEach(() => { cleanup(); Object.values(mocks).forEach((value) => { if (typeof value === 'function' && 'mockClear' in value) value.mockClear() }) })
 
 const removeThroughMenu = async (card: Extract<FeedCard, { kind: 'post' | 'completed' | 'rewatched' }>) => {
@@ -39,6 +39,33 @@ describe('FeedOwnerActions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
     expect(await screen.findByRole('menu')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: 'Followers' }).getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it('offers Review edit and routes Review visibility by review ID', async () => {
+    render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
+    expect((await screen.findByRole('menuitem', { name: 'Edit Review' })).getAttribute('href')).toBe('/reviews/review-source/edit')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Followers' }))
+    await waitFor(() => expect(mocks.reviewVisibility).toHaveBeenCalledWith({ reviewId: 'review-source', visibility: 'followers' }))
+  })
+
+  it('routes Review activity removal without deleting the Review', async () => {
+    render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove feed activity' }))
+    expect(await screen.findByRole('dialog', { name: 'Remove feed activity?' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(mocks.removeReviewActivity).toHaveBeenCalledWith({ reviewId: 'review-source' }))
+    expect(mocks.removeReview).not.toHaveBeenCalled()
+  })
+
+  it('routes permanent Review deletion by review ID', async () => {
+    render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Review' }))
+    expect(await screen.findByRole('dialog', { name: 'Delete Review?' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(mocks.removeReview).toHaveBeenCalledWith({ reviewId: 'review-source' }))
   })
 
   it('opens an overflow menu and keeps delete confirmation in a dialog', async () => {
