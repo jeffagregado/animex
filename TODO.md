@@ -723,3 +723,17 @@ Status: IMPLEMENTED on `jeff-cx/phase-5-feed-reviews`; signed-in browser QA rema
 ## Optional Backlog
 
 - [ ] Optional anime attachment in Post Composer.
+- [ ] Mobile Home Explore tab or sheet for utility modules.
+
+# Phase 5 Home And Review Discovery Feedback
+
+Status: DESIGN APPROVED on `jeff-cx/phase-5-feed-reviews`; written spec ready for review.
+
+- [x] Inspect current Home, Discover, feed, Review, user-anime, and cache flows.
+- [x] Lock Home Seasonal, desktop utility order, List Progress metrics, and removed placeholders.
+- [x] Lock feed-card visual-only fidelity boundary.
+- [x] Lock `/reviews` visibility, search, filters, relevance behavior, and infinite pagination.
+- [x] Generate and inspect desktop/mobile `/reviews` references.
+- [x] Write and self-review current-state design specification.
+- [ ] User reviews written specification.
+- [ ] Create detailed implementation plan.
