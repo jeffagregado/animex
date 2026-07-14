@@ -17,7 +17,28 @@ describe('ReviewSummary', () => {
 
   it('renders non-spoiler summaries immediately', () => {
     render(<ReviewSummary hasSpoiler={false} summary="A patient journey." />)
-    expect(screen.getByText('A patient journey.')).toBeTruthy()
+    const summary = screen.getByText('A patient journey.')
+    expect(summary.className).toContain('text-lg')
+    expect(summary.className).toContain('italic')
+  })
+
+  it('renders compact list summaries with two-line clamping', () => {
+    render(<ReviewSummary hasSpoiler={false} summary="A compact journey." variant="list" />)
+
+    const summary = screen.getByText('A compact journey.')
+    expect(summary.className).toContain('line-clamp-2')
+    expect(summary.className).toContain('text-sm')
+    expect(summary.className).not.toContain('italic')
+  })
+
+  it('reveals list spoilers independently', () => {
+    render(<><ReviewSummary hasSpoiler summary="First secret" variant="list" /><ReviewSummary hasSpoiler summary="Second secret" variant="list" /></>)
+
+    const revealButtons = screen.getAllByRole('button', { name: 'Reveal summary spoiler' })
+    fireEvent.click(revealButtons[0])
+
+    expect(screen.getByText('First secret')).toBeTruthy()
+    expect(screen.queryByText('Second secret')).toBeNull()
   })
 
   it('covers safely when spoiler status or summary content changes', () => {

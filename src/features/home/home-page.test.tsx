@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { getFunctionName } from 'convex/server'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { type AuthState } from '../auth/profile-actions'
 import type { AnimeSummary, DiscoverPageData } from '../discover/shared/discover-contracts'
@@ -11,12 +11,15 @@ import { PublicAuthStateProvider } from '../shell/public-auth-context'
 import { HomePage } from './home-page'
 import { HomeWeeklyList } from './home-weekly-list'
 
-const convex = vi.hoisted(() => ({ authenticated: true, query: vi.fn(async (..._args: unknown[]) => ({ items: [], cursor: null, hasMore: false })), mutation: vi.fn(() => vi.fn()) }))
+const convex = vi.hoisted(() => {
+  const query = vi.fn(async (..._args: unknown[]): Promise<unknown> => ({ items: [], cursor: null, hasMore: false }))
+  return { authenticated: true, query, client: { query }, mutation: vi.fn(() => vi.fn()) }
+})
 const serverMocks = vi.hoisted(() => ({ refreshDiscoverSection: vi.fn() }))
-vi.mock('convex/react', () => ({ useConvexAuth: () => ({ isAuthenticated: convex.authenticated, isLoading: false }), useConvex: () => ({ query: convex.query }), useMutation: convex.mutation }))
+vi.mock('convex/react', () => ({ useConvexAuth: () => ({ isAuthenticated: convex.authenticated, isLoading: false }), useConvex: () => convex.client, useMutation: convex.mutation }))
 vi.mock('../discover/server/discover.functions', () => ({ refreshDiscoverSection: serverMocks.refreshDiscoverSection }))
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children, to, params, className }: { children: React.ReactNode; to: string; params: Record<string, string>; className?: string }) => <a className={className} href={to.replace('$anilistId', params.anilistId).replace('$slug', params.slug)}>{children}</a>,
+  Link: ({ children, to, params, className }: { children: React.ReactNode; to: string; params?: Record<string, string>; className?: string }) => <a className={className} href={params ? to.replace('$anilistId', params.anilistId).replace('$slug', params.slug) : to}>{children}</a>,
 }))
 
 const anime: AnimeSummary = {
@@ -46,11 +49,23 @@ const mockPendingAuthState = (): void => {
   )
 }
 
+const defaultQuery = async (...args: unknown[]): Promise<unknown> => {
+  const name = getFunctionName(args[0] as Parameters<typeof getFunctionName>[0])
+  if (name === 'reviews:listLatestPublic') return []
+  if (name === 'userAnime:getMyProgress') return { watching: 0, completed: 0, planned: 0, dropped: 0 }
+  return { items: [], cursor: null, hasMore: false }
+}
+
+beforeEach(() => {
+  convex.query.mockReset()
+  convex.query.mockImplementation(defaultQuery)
+})
+
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   convex.authenticated = true
-  convex.query.mockClear()
+  convex.query.mockReset()
   convex.mutation.mockClear()
   serverMocks.refreshDiscoverSection.mockReset()
 })
@@ -61,7 +76,9 @@ describe('HomePage', () => {
 
     render(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)
 
-    expect(screen.getByText('Loader Anime')).toBeTruthy()
+    const seasonal = screen.getByRole('heading', { name: 'Seasonal Anime' }).closest('section')
+    if (seasonal === null) throw new TypeError('Seasonal section is required.')
+    expect(within(seasonal).getByText('Loader Anime')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Previous Seasonal Anime' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Next Seasonal Anime' })).toBeTruthy()
   })
@@ -76,7 +93,9 @@ describe('HomePage', () => {
     expect(screen.getByText('No anime available in this section.')).toBeTruthy()
 
     view.rerender(<PublicAuthStateProvider><QueryClientProvider client={client}><HomePage data={data} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider></PublicAuthStateProvider>)
-    fireEvent.error(screen.getByAltText('Loader Anime cover'))
+    const seasonal = screen.getByRole('heading', { name: 'Seasonal Anime' }).closest('section')
+    if (seasonal === null) throw new TypeError('Seasonal section is required.')
+    fireEvent.error(within(seasonal).getByAltText('Loader Anime cover'))
     expect(screen.getByText('Image unavailable')).toBeTruthy()
   })
 
@@ -89,7 +108,11 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry Seasonal Anime' }))
 
     await waitFor(() => expect(serverMocks.refreshDiscoverSection).toHaveBeenCalledWith({ data: 'seasonal' }))
-    expect(await screen.findByText('Loader Anime')).toBeTruthy()
+    await waitFor(() => {
+      const seasonal = screen.getByRole('heading', { name: 'Seasonal Anime' }).closest('section')
+      if (seasonal === null) throw new TypeError('Seasonal section is required.')
+      expect(within(seasonal).getByText('Loader Anime')).toBeTruthy()
+    })
   })
 
   it('adapts Trending state to the shared top-five weekly list', () => {
@@ -148,7 +171,11 @@ describe('HomePage', () => {
     expect(screen.queryByRole('link', { name: 'Community' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Stats' })).toBeNull()
     expect(screen.getByRole('heading', { name: 'Seasonal Anime' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Latest Reviews' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'This Week' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'My Anime' })).toBeNull()
+    expect(screen.queryByText('Community feed')).toBeNull()
     expect(screen.queryByText('What are you watching?')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Following' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Global' })).toBeNull()
@@ -193,7 +220,9 @@ describe('HomePage', () => {
 
     await waitFor(() => expect(screen.getByRole('tab', { name: 'home' })).toBeTruthy())
     expect(screen.queryByRole('heading', { name: 'My Anime' })).toBeNull()
-    expect(screen.getByText('What are you watching?')).toBeTruthy()
+    expect(screen.queryByText('What are you watching?')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Create Post' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'List Progress' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'following' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'global' })).toBeTruthy()
   })
@@ -214,7 +243,12 @@ describe('HomePage', () => {
 
   it('waits for Convex auth before mounting private Home actions', async () => {
     convex.authenticated = false
-    convex.query.mockResolvedValue({ items: [{ id: 'card', kind: 'post', postId: 'post', author: { id: 'profile-1', username: 'mika', displayName: 'Mika', avatarUrl: null }, text: 'Public card', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }], cursor: null, hasMore: false } as never)
+    convex.query.mockImplementation(async (...args: unknown[]): Promise<unknown> => {
+      const name = getFunctionName(args[0] as Parameters<typeof getFunctionName>[0])
+      if (name === 'reviews:listLatestPublic') return []
+      if (name === 'userAnime:getMyProgress') return { watching: 0, completed: 0, planned: 0, dropped: 0 }
+      return { items: [{ id: 'card', kind: 'post', postId: 'post', author: { id: 'profile-1', username: 'mika', displayName: 'Mika', avatarUrl: null }, text: 'Public card', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }], cursor: null, hasMore: false } as never
+    })
     mockAuthState({ status: 'complete', email: 'mika@example.com', profile: { id: 'profile-1', username: 'mika', name: 'Mika', avatarUrl: null, visibility: 'private' } })
     const view = render(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Global' })).toBeTruthy())
@@ -224,9 +258,10 @@ describe('HomePage', () => {
     expect(screen.queryByRole('button', { name: 'Owner actions' })).toBeNull()
     expect(convex.mutation).not.toHaveBeenCalled()
     convex.authenticated = true
-    view.rerender(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)
+    view.rerender(<PublicAuthStateProvider><QueryClientProvider client={client}><HomePage data={data} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider></PublicAuthStateProvider>)
     await waitFor(() => expect(screen.getByRole('tab', { name: 'home' })).toBeTruthy())
     await waitFor(() => expect(getFunctionName(convex.query.mock.calls.at(-1)?.[0] as Parameters<typeof getFunctionName>[0])).toBe('feed:listHome'))
-    expect(screen.getByText('What are you watching?')).toBeTruthy()
+    expect(screen.queryByText('What are you watching?')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Create Post' })).toBeTruthy()
   })
 })
