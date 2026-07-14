@@ -1,6 +1,6 @@
 # Phase 5 Review Card, Avatar, And Rail Feedback Design
 
-Status: APPROVED DESIGN. Written specification awaiting user review.
+Status: APPROVED WRITTEN SPECIFICATION. Implementation plan prepared for user review.
 
 ## Scope
 
@@ -38,7 +38,8 @@ User authorizes deletion of all existing Review records, including drafts.
 
 - Delete all Review sources in bounded, resumable pages.
 - Delete only feed cards whose source is a Review.
-- Verify zero Reviews, drafts, and Review activity remnants before final schema removal.
+- Delete `animeReviewStats` rows after Review removal so count, average, and bands cannot remain stale.
+- Verify zero Reviews, drafts, Review activity remnants, and Review aggregate rows before final schema removal.
 - Remove old spoiler field after verified cleanup.
 - Preserve Posts, Post media, Completed/Rewatched activities, anime state, anime caches, accounts, profiles, and unrelated feed cards.
 - Remove temporary cleanup functions after verification.

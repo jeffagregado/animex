@@ -771,7 +771,7 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migration, r
 
 # Phase 5 Review Card, Avatar, And Rail Feedback
 
-Status: DESIGN APPROVED on `jeff-cx/phase-5-feed-reviews`; written specification awaiting user review.
+Status: IMPLEMENTATION PLAN READY on `jeff-cx/phase-5-feed-reviews`; awaiting plan approval.
 
 - [x] Inspect Feed Review, Review discovery, Anime Reviews, Latest Reviews, writer fields, avatar renderers, and anime rails.
 - [x] Lock whole-body Review links, activity-only Delete copy, exact shared Review card, and per-rail equal heights.
@@ -780,6 +780,7 @@ Status: DESIGN APPROVED on `jeff-cx/phase-5-feed-reviews`; written specification
 - [x] Lock reuse-first shared Avatar with uppercase one-letter fallback.
 - [x] Approve deletion of existing Reviews, drafts, and linked Review activities only.
 - [x] Approve written design behavior.
-- [ ] Review and approve written specification.
-- [ ] Create and approve implementation plan.
+- [x] Review and approve written specification.
+- [x] Create detailed implementation plan.
+- [ ] Review and approve implementation plan.
 - [ ] Implement only after plan approval.
