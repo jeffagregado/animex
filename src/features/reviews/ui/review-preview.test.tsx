@@ -20,4 +20,15 @@ describe('ReviewPreview', () => {
     expect(screen.getByText('Ending revealed')).toBeTruthy()
     expect(screen.getByText('92.0')).toBeTruthy()
   })
+
+  it('renders validated structured media without HTML injection', () => {
+    const mediaDocument: ReviewDocumentV1 = { version: 1, editorState: { root: { ...fields, type: 'root', children: [
+      { alt: 'Frieren sunset', type: 'review-image', url: 'https://images.example/frieren.jpg', version: 1 },
+      { label: 'Trailer', provider: 'youtube', type: 'review-video', url: 'https://youtu.be/dQw4w9WgXcQ', version: 1 },
+    ] } } }
+    const { container } = render(<ReviewPreview document={mediaDocument} rating={80} summary="Media review" summaryHasSpoiler={false} />)
+    expect(screen.getByAltText('Frieren sunset')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Trailer/ }).getAttribute('rel')).toBe('noreferrer noopener')
+    expect(container.querySelector('[dangerouslySetInnerHTML]')).toBeNull()
+  })
 })

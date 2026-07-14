@@ -9,14 +9,14 @@ import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { ListItemNode, ListNode } from '@lexical/list'
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
-import { $createParagraphNode, $createTextNode, $getRoot, $isElementNode, $isTextNode, $setSelection, type LexicalEditor } from 'lexical'
+import { $createParagraphNode, $createTextNode, $getRoot, $getSelection, $isElementNode, $isRangeSelection, $isTextNode, $setSelection, type LexicalEditor, type RangeSelection } from 'lexical'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { ReviewImageNode } from '../lexical/review-image-node'
 import { SpoilerNode } from '../lexical/spoiler-node'
 import { ReviewVideoNode } from '../lexical/review-video-node'
-import { formatReviewText, insertReviewMedia, ReviewToolbar } from './review-toolbar'
+import { formatReviewText, insertReviewMedia, markSelectedBlocksAsSpoiler, ReviewToolbar } from './review-toolbar'
 
 let editor: LexicalEditor
 
@@ -46,23 +46,80 @@ describe('ReviewToolbar Lexical behavior', () => {
     await waitFor(() => expect((firstNode() as unknown as { children: Array<{ format: number }> }).children[0].format).toBe(15))
   })
 
-  it('inserts strict image and video nodes', () => {
-    selectText('Media')
-    insertReviewMedia(editor, 'image', 'https://images.example/frieren.jpg', 'Frieren sunset')
-    insertReviewMedia(editor, 'video', 'https://youtu.be/dQw4w9WgXcQ', 'Trailer')
+  it('inserts image and video nodes at collapsed caret positions', () => {
+    let imageSelection: RangeSelection | null = null
+    editor.update(() => { const text = $createTextNode('BeforeAfter'); $getRoot().clear().append($createParagraphNode().append(text)); text.select(6, 6); imageSelection = $getSelection()?.clone() as RangeSelection }, { discrete: true })
+    insertReviewMedia(editor, 'image', 'https://images.example/frieren.jpg', 'Frieren sunset', imageSelection)
+
+    let videoSelection: RangeSelection | null = null
+    editor.update(() => { const last = $getRoot().getLastChild(); if (!$isElementNode(last)) throw new TypeError('Expected trailing block.'); last.selectEnd(); videoSelection = $getSelection()?.clone() as RangeSelection }, { discrete: true })
+    insertReviewMedia(editor, 'video', 'https://youtu.be/dQw4w9WgXcQ', 'Trailer', videoSelection)
     const children = editor.getEditorState().toJSON().root.children
-    expect(children.map((node) => node.type)).toEqual(['paragraph', 'review-image', 'review-video'])
-    expect(children[0]).toMatchObject({ children: [expect.objectContaining({ text: 'Media' })] })
+    expect(children.map((node) => node.type)).toEqual(['paragraph', 'review-image', 'paragraph', 'review-video', 'paragraph'])
+    expect(children[0]).toMatchObject({ children: [expect.objectContaining({ text: 'Before' })] })
     expect(children[1]).toMatchObject({ type: 'review-image', alt: 'Frieren sunset' })
-    expect(children[2]).toMatchObject({ type: 'review-video', provider: 'youtube', label: 'Trailer' })
+    expect(children[2]).toMatchObject({ children: [expect.objectContaining({ text: 'After' })] })
+    expect(children[3]).toMatchObject({ type: 'review-video', provider: 'youtube', label: 'Trailer' })
+    editor.getEditorState().read(() => { const selection = $getSelection(); expect($isRangeSelection(selection) && selection.isCollapsed()).toBe(true) })
   })
 
-  it('appends media when dialog focus clears the editor selection', () => {
+  it('replaces selected text and restores captured selection after focus loss', () => {
+    let saved: RangeSelection | null = null
+    editor.update(() => { const text = $createTextNode('Before remove After'); $getRoot().clear().append($createParagraphNode().append(text)); text.select(7, 13); saved = $getSelection()?.clone() as RangeSelection; $setSelection(null) }, { discrete: true })
+
+    insertReviewMedia(editor, 'image', 'https://images.example/frieren.jpg', 'Frieren sunset', saved)
+
+    expect(editor.getEditorState().toJSON().root.children.map((node) => node.type)).toEqual(['paragraph', 'review-image', 'paragraph'])
+    expect(editor.getEditorState().read(() => $getRoot().getTextContent().replaceAll('\n', ''))).toBe('Before  After')
+  })
+
+  it('inserts media first when selection is missing or stale', () => {
     editor.update(() => { $getRoot().clear().append($createParagraphNode().append($createTextNode('Body'))); $setSelection(null) }, { discrete: true })
 
-    insertReviewMedia(editor, 'image', 'https://images.example/frieren.jpg', 'Frieren sunset')
+    insertReviewMedia(editor, 'image', 'https://images.example/frieren.jpg', 'Frieren sunset', null)
+    expect(editor.getEditorState().toJSON().root.children[0]).toMatchObject({ type: 'review-image' })
 
-    expect(editor.getEditorState().toJSON().root.children.at(-1)).toMatchObject({ type: 'review-image', alt: 'Frieren sunset' })
+    let stale: RangeSelection | null = null
+    editor.update(() => { const body = $getRoot().getLastChild(); if (!$isElementNode(body)) throw new TypeError('Expected body.'); body.selectEnd(); stale = $getSelection()?.clone() as RangeSelection; $setSelection(null); body.replace($createParagraphNode().append($createTextNode('Fresh'))) }, { discrete: true })
+    insertReviewMedia(editor, 'video', 'https://vimeo.com/123', '', stale)
+
+    expect(editor.getEditorState().toJSON().root.children[0]).toMatchObject({ type: 'review-video' })
+  })
+
+  it('toggles spoiler wrappers without nesting', () => {
+    selectText('Secret')
+    markSelectedBlocksAsSpoiler(editor)
+    expect(firstNode()).toMatchObject({ type: 'spoiler', children: [{ type: 'paragraph' }] })
+
+    editor.update(() => { const spoiler = $getRoot().getFirstChild(); if (!$isElementNode(spoiler)) throw new TypeError('Expected spoiler.'); spoiler.selectStart() }, { discrete: true })
+    markSelectedBlocksAsSpoiler(editor)
+    expect(firstNode()).toMatchObject({ type: 'paragraph', children: [expect.objectContaining({ text: 'Secret' })] })
+  })
+
+  it('undoes and redoes media insertion as one history operation', async () => {
+    let saved: RangeSelection | null = null
+    editor.update(() => { const text = $createTextNode('Body'); $getRoot().clear().append($createParagraphNode().append(text)); text.selectEnd(); saved = $getSelection()?.clone() as RangeSelection }, { discrete: true, tag: 'history-push' })
+    insertReviewMedia(editor, 'image', 'https://images.example/frieren.jpg', 'Frieren', saved)
+    await waitFor(() => expect(editor.getEditorState().toJSON().root.children.some((node) => node.type === 'review-image')).toBe(true))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(editor.getEditorState().toJSON().root.children.some((node) => node.type === 'review-image')).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name: 'Redo' }))
+    await waitFor(() => expect(editor.getEditorState().toJSON().root.children.some((node) => node.type === 'review-image')).toBe(true))
+  })
+
+  it('undoes and redoes spoiler toggle as one history operation', async () => {
+    selectText('Secret')
+    markSelectedBlocksAsSpoiler(editor)
+    await waitFor(() => expect(firstNode()).toMatchObject({ type: 'spoiler' }))
+    editor.update(() => { const spoiler = $getRoot().getFirstChild(); if (!$isElementNode(spoiler)) throw new TypeError('Expected spoiler.'); spoiler.selectStart() }, { discrete: true })
+    markSelectedBlocksAsSpoiler(editor)
+    await waitFor(() => expect(firstNode()).toMatchObject({ type: 'paragraph' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(firstNode()).toMatchObject({ type: 'spoiler' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Redo' }))
+    await waitFor(() => expect(firstNode()).toMatchObject({ type: 'paragraph' }))
   })
 
   it('undoes and redoes a history change through toolbar commands', async () => {

@@ -64,4 +64,10 @@ describe('ReviewDocumentRenderer', () => {
     fireEvent.error(screen.getByAltText('Frieren sunset'))
     expect(screen.getByText('Image unavailable')).toBeTruthy()
   })
+
+  it('renders only validated structured nodes without raw HTML paths', () => {
+    const { container } = render(<ReviewDocumentRenderer document={document} />)
+    expect(container.querySelector('iframe, script, style')).toBeNull()
+    expect(container.innerHTML).not.toContain('dangerouslySetInnerHTML')
+  })
 })

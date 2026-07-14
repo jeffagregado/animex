@@ -14,6 +14,7 @@ import { ReviewImageNode } from '../lexical/review-image-node'
 import { SpoilerNode } from '../lexical/spoiler-node'
 import { ReviewVideoNode } from '../lexical/review-video-node'
 import { ReviewToolbar } from './review-toolbar'
+import { ReviewMediaEditingPlugin } from './review-media-editing-plugin'
 
 type ReviewEditorProps = {
   document: ReviewDocumentV1
@@ -44,7 +45,7 @@ export function ReviewEditor({ document, onChange, onError, onLimitExceeded }: R
     if (tags.has('review-state-revert')) return
     lastValid.current = acceptReviewEditorChange({ editor, state, lastValid: lastValid.current, onChange, onError, onLimitExceeded })
   }
-  return <LexicalComposer initialConfig={initialConfig}><div className="overflow-hidden rounded-lg border border-border bg-card/30"><ReviewToolbar /><RichTextPlugin contentEditable={<ContentEditable aria-label="Review body" className="min-h-80 px-5 py-4 leading-7 outline-none md:min-h-[30rem]" />} ErrorBoundary={EditorBoundary} placeholder={<p className="pointer-events-none absolute px-5 py-4 text-muted-foreground">Share your full review…</p>} /><HistoryPlugin /><ListPlugin /><OnChangePlugin ignoreSelectionChange onChange={change} /></div></LexicalComposer>
+  return <LexicalComposer initialConfig={initialConfig}><div className="overflow-hidden rounded-lg border border-border bg-card/30"><ReviewToolbar /><RichTextPlugin contentEditable={<ContentEditable aria-label="Review body" className="min-h-80 px-5 py-4 leading-7 outline-none md:min-h-[30rem]" />} ErrorBoundary={EditorBoundary} placeholder={<p className="pointer-events-none absolute px-5 py-4 text-muted-foreground">Share your full review…</p>} /><ReviewMediaEditingPlugin /><HistoryPlugin /><ListPlugin /><OnChangePlugin ignoreSelectionChange onChange={change} /></div></LexicalComposer>
 }
 
 /** Uses callback initialization only for truly empty serialized roots. */

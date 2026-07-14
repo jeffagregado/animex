@@ -3,14 +3,17 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND } from '@lexical/list'
 import { $createHeadingNode, $createQuoteNode } from '@lexical/rich-text'
 import {
+  $getNodeByKey,
   $getSelection,
   $getRoot,
   $isElementNode,
   $isRangeSelection,
+  $setSelection,
   FORMAT_TEXT_COMMAND,
   REDO_COMMAND,
   UNDO_COMMAND,
   type ElementNode,
+  type RangeSelection,
   type TextFormatType,
 } from 'lexical'
 import { ImageIcon, ListIcon, ListOrderedIcon, QuoteIcon, RedoIcon, StrikethroughIcon, UndoIcon, VideoIcon, EyeOffIcon } from 'lucide-react'
@@ -30,7 +33,13 @@ export function ReviewToolbar() {
   const block = (kind: 'h2' | 'h3' | 'quote'): void => formatReviewBlock(editor, kind)
   const mark = (format: TextFormatType): void => formatReviewText(editor, format)
 
-  return <><div aria-label="Review formatting" className="flex flex-wrap items-center gap-1 border-b border-border p-2" role="toolbar"><Tool label="H2" onClick={() => block('h2')}>H2</Tool><Tool label="H3" onClick={() => block('h3')}>H3</Tool><Tool label="Quote" onClick={() => block('quote')}><QuoteIcon /></Tool><Tool label="Bulleted list" onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}><ListIcon /></Tool><Tool label="Numbered list" onClick={() => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)}><ListOrderedIcon /></Tool><Tool label="Bold" onClick={() => mark('bold')}><strong>B</strong></Tool><Tool label="Italic" onClick={() => mark('italic')}><em>I</em></Tool><Tool label="Underline" onClick={() => mark('underline')}><u>U</u></Tool><Tool label="Strikethrough" onClick={() => mark('strikethrough')}><StrikethroughIcon /></Tool><Tool label="Image" onClick={() => setDialog('image')}><ImageIcon /></Tool><Tool label="Video" onClick={() => setDialog('video')}><VideoIcon /></Tool><Tool label="Spoiler" onClick={() => markSelectedBlocksAsSpoiler(editor)}><EyeOffIcon /></Tool><Tool label="Undo" onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)}><UndoIcon /></Tool><Tool label="Redo" onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)}><RedoIcon /></Tool></div><Dialog onOpenChange={(open) => { if (!open) setDialog(null) }} open={dialog !== null}>{dialog ? <DialogContent title={dialog === 'image' ? 'Add image' : 'Add video'}><MediaForm editor={editor} kind={dialog} onDone={() => setDialog(null)} /></DialogContent> : null}</Dialog></>
+  const [mediaSelection, setMediaSelection] = useState<RangeSelection | null>(null)
+  const openMedia = (kind: Exclude<MediaDialog, null>): void => {
+    setMediaSelection(captureReviewSelection(editor))
+    setDialog(kind)
+  }
+
+  return <><div aria-label="Review formatting" className="flex flex-wrap items-center gap-1 border-b border-border p-2" role="toolbar"><Tool label="H2" onClick={() => block('h2')}>H2</Tool><Tool label="H3" onClick={() => block('h3')}>H3</Tool><Tool label="Quote" onClick={() => block('quote')}><QuoteIcon /></Tool><Tool label="Bulleted list" onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}><ListIcon /></Tool><Tool label="Numbered list" onClick={() => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)}><ListOrderedIcon /></Tool><Tool label="Bold" onClick={() => mark('bold')}><strong>B</strong></Tool><Tool label="Italic" onClick={() => mark('italic')}><em>I</em></Tool><Tool label="Underline" onClick={() => mark('underline')}><u>U</u></Tool><Tool label="Strikethrough" onClick={() => mark('strikethrough')}><StrikethroughIcon /></Tool><Tool label="Image" onClick={() => openMedia('image')}><ImageIcon /></Tool><Tool label="Video" onClick={() => openMedia('video')}><VideoIcon /></Tool><Tool label="Spoiler" onClick={() => markSelectedBlocksAsSpoiler(editor)}><EyeOffIcon /></Tool><Tool label="Undo" onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)}><UndoIcon /></Tool><Tool label="Redo" onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)}><RedoIcon /></Tool></div><Dialog onOpenChange={(open) => { if (!open) setDialog(null) }} open={dialog !== null}>{dialog ? <DialogContent title={dialog === 'image' ? 'Add image' : 'Add video'}><MediaForm editor={editor} kind={dialog} onDone={() => setDialog(null)} selection={mediaSelection} /></DialogContent> : null}</Dialog></>
 }
 
 /** Applies one approved inline format to the active Lexical selection. */
@@ -54,7 +63,7 @@ function Tool({ children, label, onClick }: { children: ReactNode; label: string
   return <button aria-label={label} className="grid min-h-11 min-w-11 place-items-center rounded-md px-2 text-muted-foreground hover:bg-cyan-300/10 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 [&_svg]:size-5" onClick={onClick} title={label} type="button">{children}</button>
 }
 
-function MediaForm({ editor, kind, onDone }: { editor: ReturnType<typeof useLexicalComposerContext>[0]; kind: Exclude<MediaDialog, null>; onDone: () => void }) {
+function MediaForm({ editor, kind, onDone, selection }: { editor: ReturnType<typeof useLexicalComposerContext>[0]; kind: Exclude<MediaDialog, null>; onDone: () => void; selection: RangeSelection | null }) {
   const [error, setError] = useState<string | null>(null)
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
@@ -62,7 +71,7 @@ function MediaForm({ editor, kind, onDone }: { editor: ReturnType<typeof useLexi
     const url = String(values.get('url') ?? '').trim()
     const label = String(values.get('label') ?? '').trim()
     try {
-      insertReviewMedia(editor, kind, url, label)
+      insertReviewMedia(editor, kind, url, label, selection)
       onDone()
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Media link is invalid.') }
   }
@@ -70,20 +79,56 @@ function MediaForm({ editor, kind, onDone }: { editor: ReturnType<typeof useLexi
 }
 
 /** Validates and inserts one approved Review media node at the active selection. */
-export const insertReviewMedia = (editor: ReturnType<typeof useLexicalComposerContext>[0], kind: Exclude<MediaDialog, null>, url: string, label: string): void => {
+const captureReviewSelection = (editor: ReturnType<typeof useLexicalComposerContext>[0]): RangeSelection | null => editor.getEditorState().read(() => {
+  const selection = $getSelection()
+  return $isRangeSelection(selection) ? selection.clone() : null
+})
+
+/** Validates and inserts one approved Review media node at a captured selection. */
+export const insertReviewMedia = (editor: ReturnType<typeof useLexicalComposerContext>[0], kind: Exclude<MediaDialog, null>, url: string, label: string, savedSelection: RangeSelection | null): void => {
   const provider = kind === 'video' ? getVideoProvider(url) : null
   if (kind === 'image' && label.length === 0) throw new RangeError('Image alt text is required.')
   editor.update(() => {
     const node = kind === 'image' ? $createReviewImageNode(url, label) : $createReviewVideoNode(url, provider!, label || undefined)
-    $getRoot().append(node)
+    const selectionIsCurrent = savedSelection !== null
+      && $getNodeByKey(savedSelection.anchor.key) !== null
+      && $getNodeByKey(savedSelection.focus.key) !== null
+    if (selectionIsCurrent) {
+      $setSelection(savedSelection.clone())
+      const selection = $getSelection()
+      if (!$isRangeSelection(selection)) throw new TypeError('Expected restored Review selection.')
+      selection.insertNodes([node])
+      return
+    }
+    const first = $getRoot().getFirstChild()
+    if (first === null) $getRoot().append(node)
+    else first.insertBefore(node)
+    node.selectNext()
   }, { discrete: true })
 }
 
-/** Wraps selected top-level blocks once; existing spoiler selections stay unchanged. */
+/** Toggles spoiler wrappers while preserving their child blocks. */
 export const markSelectedBlocksAsSpoiler = (editor: ReturnType<typeof useLexicalComposerContext>[0]): void => editor.update(() => {
   const selection = $getSelection()
   if (!$isRangeSelection(selection)) return
-  const blocks = selection.getNodes().map((node) => node.getTopLevelElement()).filter((node): node is ElementNode => node !== null && !$isSpoilerNode(node))
+  const selected = selection.getNodes()
+  const spoilers = selected.map((node) => {
+    let current = node
+    while (current.getParent() !== null) {
+      if ($isSpoilerNode(current)) return current
+      current = current.getParentOrThrow()
+    }
+    return $isSpoilerNode(current) ? current : null
+  }).filter((node): node is ReturnType<typeof $createSpoilerNode> => node !== null)
+  const uniqueSpoilers = spoilers.filter((node, index) => spoilers.findIndex((candidate) => candidate.getKey() === node.getKey()) === index)
+  if (uniqueSpoilers.length > 0) {
+    uniqueSpoilers.forEach((spoiler) => {
+      spoiler.getChildren().forEach((child) => spoiler.insertBefore(child))
+      spoiler.remove()
+    })
+    return
+  }
+  const blocks = selected.map((node) => node.getTopLevelElement()).filter((node): node is ElementNode => node !== null && !$isSpoilerNode(node))
   const unique = blocks.filter((node, index) => blocks.findIndex((candidate) => candidate.getKey() === node.getKey()) === index)
   if (unique.length === 0) return
   const spoiler = $createSpoilerNode()
