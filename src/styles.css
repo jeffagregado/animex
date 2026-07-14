@@ -414,6 +414,26 @@ img {
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+
+  .scrollbar-themed {
+    scrollbar-color: oklch(0.82 0.15 196 / 0.45) oklch(0.12 0.025 242);
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-themed::-webkit-scrollbar {
+    width: 0.625rem;
+  }
+
+  .scrollbar-themed::-webkit-scrollbar-track {
+    background: oklch(0.12 0.025 242);
+  }
+
+  .scrollbar-themed::-webkit-scrollbar-thumb {
+    border: 2px solid oklch(0.12 0.025 242);
+    border-radius: 999px;
+    background: oklch(0.82 0.15 196 / 0.45);
+    background-clip: padding-box;
+  }
 }
 
 @media (max-width: 640px) {
