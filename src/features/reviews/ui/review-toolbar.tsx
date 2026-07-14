@@ -104,6 +104,7 @@ export const insertReviewMedia = (editor: ReturnType<typeof useLexicalComposerCo
       $setSelection(savedSelection.clone())
       const selection = $getSelection()
       if (!$isRangeSelection(selection)) throw new TypeError('Expected restored Review selection.')
+      if (!selection.isCollapsed()) selection.removeText()
       selection.insertNodes([node])
       return
     }

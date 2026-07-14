@@ -63,14 +63,30 @@ describe('ReviewToolbar Lexical behavior', () => {
     editor.getEditorState().read(() => { const selection = $getSelection(); expect($isRangeSelection(selection) && selection.isCollapsed()).toBe(true) })
   })
 
-  it('replaces selected text and restores captured selection after focus loss', () => {
+  it.each([
+    ['image', 'https://images.example/frieren.jpg', 'Frieren sunset'],
+    ['video', 'https://youtu.be/dQw4w9WgXcQ', 'Trailer'],
+  ] as const)('replaces partial text selection with %s media', (kind, url, label) => {
     let saved: RangeSelection | null = null
     editor.update(() => { const text = $createTextNode('Before remove After'); $getRoot().clear().append($createParagraphNode().append(text)); text.select(7, 13); saved = $getSelection()?.clone() as RangeSelection; $setSelection(null) }, { discrete: true })
 
-    insertReviewMedia(editor, 'image', 'https://images.example/frieren.jpg', 'Frieren sunset', saved)
+    insertReviewMedia(editor, kind, url, label, saved)
 
-    expect(editor.getEditorState().toJSON().root.children.map((node) => node.type)).toEqual(['paragraph', 'review-image', 'paragraph'])
+    expect(editor.getEditorState().toJSON().root.children.map((node) => node.type)).toEqual(['paragraph', `review-${kind}`, 'paragraph'])
     expect(editor.getEditorState().read(() => $getRoot().getTextContent().replaceAll('\n', ''))).toBe('Before  After')
+  })
+
+  it.each([
+    ['image', 'https://images.example/frieren.jpg', 'Frieren sunset'],
+    ['video', 'https://youtu.be/dQw4w9WgXcQ', 'Replace me QA'],
+  ] as const)('replaces a backward full-block selection with %s media', (kind, url, label) => {
+    let saved: RangeSelection | null = null
+    editor.update(() => { const text = $createTextNode('Replace me QA'); $getRoot().clear().append($createParagraphNode().append(text)); text.select(13, 0); saved = $getSelection()?.clone() as RangeSelection; $setSelection(null) }, { discrete: true })
+
+    insertReviewMedia(editor, kind, url, label, saved)
+
+    expect(editor.getEditorState().toJSON().root.children.map((node) => node.type)).toEqual([`review-${kind}`])
+    expect(editor.getEditorState().read(() => $getRoot().getTextContent())).toBe('')
   })
 
   it('replaces selected text when the video button collapses editor focus', async () => {
