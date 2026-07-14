@@ -47,7 +47,11 @@ const isOrphanPostCard = async (ctx: QueryCtx, card: Doc<'feedCards'>): Promise<
   const postId = ctx.db.normalizeId('posts', card.sourceId)
   if (!postId) return true
   const post = await ctx.db.get('posts', postId)
-  return !post || card.sourceKey !== `post:${post._id}` || card.sourceId !== post._id
+  return !post
+    || card.sourceKey !== `post:${post._id}`
+    || card.sourceId !== post._id
+    || card.userId !== post.userId
+    || card.visibility !== post.visibility
 }
 
 // Read one indexed page so operators can inspect or verify without table scans.

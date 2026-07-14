@@ -1,15 +1,36 @@
 /// <reference types="vite/client" />
 
 import { convexTest } from 'convex-test'
+import { makeFunctionReference } from 'convex/server'
 import { describe, expect, test } from 'vitest'
 
-import { internal } from './_generated/api'
 import type { Id } from './_generated/dataModel'
 import schema from './schema'
 
 const modules = import.meta.glob(['./_generated/**/*.*', './postMediaMigration.ts'])
-// Generated API stays controller-owned until the serialized Task 4 live window.
-const migration = (internal as any).postMediaMigration
+type Target = 'posts' | 'postImages' | 'feedCards'
+type PageArgs = { target: Target; paginationOpts: { cursor: string | null; numItems: number } }
+type InspectionResult = {
+  continueCursor: string
+  isDone: boolean
+  processedCount: number
+  legacyPostIds: Id<'posts'>[]
+  postImageIds: Id<'postImages'>[]
+  orphanPostFeedCardIds: Id<'feedCards'>[]
+}
+type MigrationResult = {
+  continueCursor: string
+  isDone: boolean
+  processedCount: number
+  deletedPostCount: number
+  preservedPostCount: number
+  deletedImageCount: number
+  deletedFeedCardCount: number
+  deletedStorageCount: number
+}
+const inspectLegacyPostMedia = makeFunctionReference<'query', PageArgs, InspectionResult>('postMediaMigration:inspectLegacyPostMedia')
+const verifyLegacyPostMedia = makeFunctionReference<'query', PageArgs, InspectionResult>('postMediaMigration:verifyLegacyPostMedia')
+const migrateLegacyPostMedia = makeFunctionReference<'mutation', PageArgs, MigrationResult>('postMediaMigration:migrateLegacyPostMedia')
 const createHarness = () => convexTest(schema, modules)
 
 const insertUser = async (t: ReturnType<typeof createHarness>, name: string) => await t.run(async (ctx) => await ctx.db.insert('users', {
@@ -40,10 +61,10 @@ const insertPost = async (
 
 const runPage = async (
   t: ReturnType<typeof createHarness>,
-  target: 'posts' | 'postImages' | 'feedCards',
+  target: Target,
   cursor: string | null,
   numItems: number,
-) => await t.mutation(migration.migrateLegacyPostMedia, { target, paginationOpts: { cursor, numItems } })
+) => await t.mutation(migrateLegacyPostMedia, { target, paginationOpts: { cursor, numItems } })
 
 describe('legacy Post media migration', () => {
   test('deletes only image Posts, their projection, image rows, and owned storage', async () => {
@@ -135,20 +156,99 @@ describe('legacy Post media migration', () => {
       active: true, orderKey: 'orphan', occurredAt: Date.now(), updatedAt: Date.now(),
     }))
 
-    expect(await t.query(migration.inspectLegacyPostMedia, {
+    expect(await t.query(inspectLegacyPostMedia, {
       target: 'posts', paginationOpts: { cursor: null, numItems: 10 },
     })).toMatchObject({ legacyPostIds: [postId], postImageIds: [], orphanPostFeedCardIds: [] })
-    expect(await t.query(migration.verifyLegacyPostMedia, {
+    expect(await t.query(verifyLegacyPostMedia, {
       target: 'postImages', paginationOpts: { cursor: null, numItems: 10 },
     })).toMatchObject({ legacyPostIds: [], postImageIds: [imageId], orphanPostFeedCardIds: [] })
-    expect(await t.query(migration.verifyLegacyPostMedia, {
+    expect(await t.query(verifyLegacyPostMedia, {
       target: 'feedCards', paginationOpts: { cursor: null, numItems: 10 },
     })).toMatchObject({ legacyPostIds: [], postImageIds: [], orphanPostFeedCardIds: [orphanCardId] })
     expect(await runPage(t, 'feedCards', null, 10)).toMatchObject({
       isDone: true, processedCount: 1, deletedFeedCardCount: 1,
     })
-    expect(await t.query(migration.verifyLegacyPostMedia, {
+    expect(await t.query(verifyLegacyPostMedia, {
       target: 'feedCards', paginationOpts: { cursor: null, numItems: 10 },
     })).toMatchObject({ orphanPostFeedCardIds: [] })
+  })
+
+  test('flags Post projections with corrupt owner or visibility source truth', async () => {
+    const t = createHarness()
+    const ownerId = await insertUser(t, 'card-owner')
+    const otherId = await insertUser(t, 'card-other')
+    const ownerPostId = await insertPost(t, ownerId, 'owner-corrupt', [])
+    const visibilityPostId = await insertPost(t, ownerId, 'visibility-corrupt', [])
+    const [ownerCardId, visibilityCardId] = await t.run(async (ctx) => {
+      const now = Date.now()
+      return await Promise.all([
+        ctx.db.insert('feedCards', {
+          sourceKey: `post:${ownerPostId}`, kind: 'post', userId: otherId, sourceId: ownerPostId,
+          visibility: 'public', active: true, orderKey: 'owner-corrupt', occurredAt: now, updatedAt: now,
+        }),
+        ctx.db.insert('feedCards', {
+          sourceKey: `post:${visibilityPostId}`, kind: 'post', userId: ownerId, sourceId: visibilityPostId,
+          visibility: 'private', active: true, orderKey: 'visibility-corrupt', occurredAt: now, updatedAt: now,
+        }),
+      ])
+    })
+
+    const result = await t.query(verifyLegacyPostMedia, {
+      target: 'feedCards', paginationOpts: { cursor: null, numItems: 10 },
+    })
+    expect(new Set(result.orphanPostFeedCardIds)).toEqual(new Set([ownerCardId, visibilityCardId]))
+  })
+
+  test('resumes destructive Post pages and repeats cleanly', async () => {
+    const t = createHarness()
+    const ownerId = await insertUser(t, 'post-page-owner')
+    const firstStorageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(['first-post'])))
+    const secondStorageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(['second-post'])))
+    const firstImageId = await insertImage(t, ownerId, 'first-post-image', 'attached', firstStorageId)
+    const secondImageId = await insertImage(t, ownerId, 'second-post-image', 'attached', secondStorageId)
+    const firstPostId = await insertPost(t, ownerId, 'first-image-post', [firstImageId])
+    const secondPostId = await insertPost(t, ownerId, 'second-image-post', [secondImageId])
+    await t.run(async (ctx) => {
+      await ctx.db.patch('posts', firstPostId, { createdAt: 1 })
+      await ctx.db.patch('posts', secondPostId, { createdAt: 2 })
+      await ctx.db.patch('postImages', firstImageId, { postId: firstPostId, order: 0 })
+      await ctx.db.patch('postImages', secondImageId, { postId: secondPostId, order: 0 })
+    })
+
+    const first = await runPage(t, 'posts', null, 1)
+    const second = await runPage(t, 'posts', first.continueCursor, 1)
+    const repeated = await runPage(t, 'posts', null, 10)
+
+    expect(first).toMatchObject({ processedCount: 1, deletedPostCount: 1, deletedImageCount: 1, deletedStorageCount: 1 })
+    expect(second).toMatchObject({ isDone: true, processedCount: 1, deletedPostCount: 1, deletedImageCount: 1, deletedStorageCount: 1 })
+    expect(repeated).toMatchObject({ isDone: true, processedCount: 0, deletedPostCount: 0, deletedImageCount: 0, deletedStorageCount: 0 })
+  })
+
+  test('rolls back earlier same-page deletions when a later Post is corrupt', async () => {
+    const t = createHarness()
+    const ownerId = await insertUser(t, 'rollback-owner')
+    const firstStorageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(['rollback-first'])))
+    const secondStorageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(['rollback-second'])))
+    const firstImageId = await insertImage(t, ownerId, 'rollback-first-image', 'attached', firstStorageId)
+    const secondImageId = await insertImage(t, ownerId, 'rollback-second-image', 'attached', secondStorageId)
+    const firstPostId = await insertPost(t, ownerId, 'rollback-first-post', [firstImageId])
+    const secondPostId = await insertPost(t, ownerId, 'rollback-second-post', [secondImageId])
+    const firstCardId = await t.run(async (ctx) => {
+      await ctx.db.patch('posts', firstPostId, { createdAt: 1 })
+      await ctx.db.patch('posts', secondPostId, { createdAt: 2 })
+      await ctx.db.patch('postImages', firstImageId, { postId: firstPostId, order: 0 })
+      await ctx.db.patch('postImages', secondImageId, { postId: secondPostId, order: 0 })
+      await ctx.storage.delete(secondStorageId)
+      return await ctx.db.insert('feedCards', {
+        sourceKey: `post:${firstPostId}`, kind: 'post', userId: ownerId, sourceId: firstPostId,
+        visibility: 'public', active: true, orderKey: 'rollback-first', occurredAt: 1, updatedAt: 1,
+      })
+    })
+
+    await expect(runPage(t, 'posts', null, 10)).rejects.toThrow('Legacy Post storage object is missing')
+    expect(await t.run(async (ctx) => await ctx.db.get('posts', firstPostId))).not.toBeNull()
+    expect(await t.run(async (ctx) => await ctx.db.get('postImages', firstImageId))).not.toBeNull()
+    expect(await t.run(async (ctx) => await ctx.db.get('feedCards', firstCardId))).not.toBeNull()
+    expect(await t.run(async (ctx) => (await ctx.storage.get(firstStorageId)) !== null)).toBe(true)
   })
 })
