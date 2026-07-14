@@ -1,11 +1,13 @@
+import { paginationOptsValidator } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
 
 import { type Doc, type Id } from './_generated/dataModel'
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { removeMilestoneCard, upsertMilestoneCard } from './feed'
 import { requireProfile } from './users'
 import {
   applyFavorite,
+  applyProgressTransition,
   createMilestoneInsert,
   createMilestoneTimestampPatch,
   decideStatusChange,
@@ -13,6 +15,7 @@ import {
   rollbackRewatch,
   toSavedResult,
   type AnimeStatus,
+  type UserAnimeProgress,
 } from './userAnimePolicy'
 
 const statusValidator = v.union(v.literal('watching'), v.literal('planned'), v.literal('dropped'), v.literal('completed'), v.literal('rewatched'))
@@ -24,6 +27,7 @@ const entryValidator = v.object({
 const rewatchValidator = v.object({ id: v.string(), anilistId: v.number(), completedAt: v.number() })
 const rewatchPaginationValidator = v.object({ numItems: v.literal(20), cursor: v.union(v.string(), v.null()) })
 const savedResultValidator = v.object({ status: v.literal('saved'), entry: entryValidator })
+const progressValidator = v.object({ watching: v.number(), completed: v.number(), planned: v.number(), dropped: v.number() })
 const rewatchPageValidator = v.object({
   items: v.array(rewatchValidator), continueCursor: v.string(), isDone: v.boolean(), perPage: v.literal(20),
 })
@@ -62,6 +66,76 @@ const requireCachedAnime = async (ctx: UserCtx, anilistId: number): Promise<void
 
 const readEntry = async (ctx: UserCtx, userId: Id<'users'>, anilistId: number) => await ctx.db
   .query('userAnimeEntries').withIndex('by_user_anime', (q) => q.eq('userId', userId).eq('anilistId', anilistId)).unique()
+
+const readProgress = async (ctx: UserCtx, userId: Id<'users'>) => await ctx.db
+  .query('userAnimeProgress').withIndex('by_user', (q) => q.eq('userId', userId)).unique()
+
+const isEmptyProgress = (progress: UserAnimeProgress): boolean => progress.watching === 0
+  && progress.completed === 0
+  && progress.planned === 0
+  && progress.dropped === 0
+
+const progressMatches = (left: UserAnimeProgress, right: UserAnimeProgress): boolean => left.watching === right.watching
+  && left.completed === right.completed
+  && left.planned === right.planned
+  && left.dropped === right.dropped
+
+/** Recomputes List Progress from one user's indexed entries. */
+const computeProgress = async (ctx: UserCtx, userId: Id<'users'>): Promise<UserAnimeProgress> => {
+  const entries = await ctx.db.query('userAnimeEntries').withIndex('by_user_anime', (q) => q.eq('userId', userId)).collect()
+  let progress: UserAnimeProgress = { watching: 0, completed: 0, planned: 0, dropped: 0 }
+  for (const entry of entries) progress = applyProgressTransition(null, entry.status as AnimeStatus | null, progress)
+  return progress
+}
+
+/** Replaces one aggregate with recomputed truth and removes zero-only rows. */
+const replaceProgress = async (ctx: MutationCtx, userId: Id<'users'>, expected: UserAnimeProgress): Promise<boolean> => {
+  const current = await readProgress(ctx, userId)
+  if (isEmptyProgress(expected)) {
+    if (!current) return false
+    await ctx.db.delete('userAnimeProgress', current._id)
+    return true
+  }
+  if (!current) {
+    await ctx.db.insert('userAnimeProgress', { userId, ...expected })
+    return true
+  }
+  if (progressMatches(current, expected)) return false
+  await ctx.db.patch('userAnimeProgress', current._id, expected)
+  return true
+}
+
+const transitionProgress = (
+  previous: AnimeStatus | null,
+  next: AnimeStatus | null,
+  current: UserAnimeProgress,
+): UserAnimeProgress => {
+  try {
+    return applyProgressTransition(previous, next, current)
+  } catch (error) {
+    throw new ConvexError({
+      code: 'USER_ANIME_PROGRESS_DRIFT',
+      message: error instanceof Error ? error.message : 'List Progress projection is inconsistent.',
+    })
+  }
+}
+
+/** Applies one status delta while keeping the aggregate sparse. */
+const applyProgress = async (
+  ctx: MutationCtx,
+  userId: Id<'users'>,
+  previous: AnimeStatus | null,
+  next: AnimeStatus | null,
+): Promise<void> => {
+  const current = await readProgress(ctx, userId)
+  const updated = transitionProgress(previous, next, current ?? { watching: 0, completed: 0, planned: 0, dropped: 0 })
+  if (isEmptyProgress(updated)) {
+    if (current) await ctx.db.delete('userAnimeProgress', current._id)
+    return
+  }
+  if (current) await ctx.db.patch('userAnimeProgress', current._id, updated)
+  else await ctx.db.insert('userAnimeProgress', { userId, ...updated })
+}
 
 const getOrCreateEntry = async (ctx: MutationCtx, userId: Id<'users'>, anilistId: number, now: number): Promise<Doc<'userAnimeEntries'>> => {
   const current = await readEntry(ctx, userId, anilistId)
@@ -108,6 +182,20 @@ export const getMine = query({
   },
 })
 
+/** Returns current List Progress, including explicit zeros for untouched users. */
+export const getMyProgress = query({
+  args: {}, returns: progressValidator,
+  handler: async (ctx) => {
+    const { profile } = await requireProfile(ctx)
+    const progress = await readProgress(ctx, profile._id)
+    return progress
+      ? transitionProgress(null, null, {
+        watching: progress.watching, completed: progress.completed, planned: progress.planned, dropped: progress.dropped,
+      })
+      : { watching: 0, completed: 0, planned: 0, dropped: 0 }
+  },
+})
+
 /** Lists only the authenticated owner's rewatch history, fixed at 20 per page. */
 export const listMyRewatches = query({
   args: { anilistId: v.number(), paginationOpts: rewatchPaginationValidator }, returns: rewatchPageValidator,
@@ -145,6 +233,7 @@ export const setStatus = mutation({
     const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
     const completion = await readMilestone(ctx, profile._id, args.anilistId, 'completed')
     const effects = decideStatusChange(entry.status as AnimeStatus | null, args.status, Boolean(completion))
+    await applyProgress(ctx, profile._id, entry.status as AnimeStatus | null, args.status)
     if (effects.createCompletion) await createMilestoneOnce(ctx, profile, args.anilistId, 'completed', now)
     if (effects.recordRewatch) await addRewatch(ctx, profile, entry, now)
     await ctx.db.patch(entry._id, { status: args.status, updatedAt: now })
@@ -162,6 +251,7 @@ export const setScore = mutation({
     try { score = normalizeScore(args.score) } catch (error) { throw new ConvexError({ code: 'INVALID_SCORE', message: error instanceof Error ? error.message : 'Score is invalid.' }) }
     const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
     const status = entry.score === null && score !== null && entry.status === null ? 'watching' : entry.status
+    await applyProgress(ctx, profile._id, entry.status as AnimeStatus | null, status as AnimeStatus | null)
     await ctx.db.patch(entry._id, { score, status, updatedAt: now })
     const completion = await readMilestone(ctx, profile._id, args.anilistId, 'completed'); if (completion) await upsertMilestoneCard(ctx, completion, false)
     const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
@@ -183,6 +273,7 @@ export const recordRewatch = mutation({
   args: { anilistId: v.number() }, returns: savedResultValidator,
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const now = Date.now(); const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
+    await applyProgress(ctx, profile._id, entry.status as AnimeStatus | null, 'rewatched')
     await addRewatch(ctx, profile, entry, now); await ctx.db.patch(entry._id, { status: 'rewatched', updatedAt: now })
     const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
   },
@@ -197,6 +288,7 @@ export const removeLatestRewatch = mutation({
     const history = await ctx.db.query('animeRewatchEntries').withIndex('by_user_anime_sequence', (q) => q.eq('userId', profile._id).eq('anilistId', args.anilistId)).order('desc').take(2)
     if (!history[0]) throw new ConvexError({ code: 'REWATCH_NOT_FOUND', message: 'No rewatch exists to remove.' })
     const now = Date.now(); const rollback = rollbackRewatch(history.map((item) => item.completedAt), entry.status as AnimeStatus | null); await ctx.db.delete(history[0]._id)
+    await applyProgress(ctx, profile._id, entry.status as AnimeStatus | null, rollback.nextStatus)
     const milestone = await readMilestone(ctx, profile._id, args.anilistId, 'rewatched')
     if (milestone && rollback.milestoneAt === null) { await ctx.db.delete(milestone._id); await removeMilestoneCard(ctx, profile._id, args.anilistId, 'rewatched') }
     else if (milestone && rollback.milestoneAt !== null) {
@@ -205,5 +297,39 @@ export const removeLatestRewatch = mutation({
     }
     await ctx.db.patch(entry._id, { rewatchCount: Math.max(0, entry.rewatchCount - 1), status: rollback.nextStatus, updatedAt: now })
     const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
+  },
+})
+
+/** Rebuilds sparse List Progress rows one resumable profile page at a time. */
+export const backfillProgress = internalMutation({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.object({ continueCursor: v.string(), isDone: v.boolean(), processedCount: v.number(), updatedCount: v.number() }),
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query('users').paginate(args.paginationOpts)
+    let updatedCount = 0
+    for (const profile of page.page) {
+      const expected = await computeProgress(ctx, profile._id)
+      if (await replaceProgress(ctx, profile._id, expected)) updatedCount += 1
+    }
+    return { continueCursor: page.continueCursor, isDone: page.isDone, processedCount: page.page.length, updatedCount }
+  },
+})
+
+/** Reports profile aggregates that differ from indexed entry truth. */
+export const verifyProgress = internalMutation({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.object({ continueCursor: v.string(), isDone: v.boolean(), processedCount: v.number(), mismatchUserIds: v.array(v.id('users')) }),
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query('users').paginate(args.paginationOpts)
+    const mismatchUserIds: Id<'users'>[] = []
+    for (const profile of page.page) {
+      const expected = await computeProgress(ctx, profile._id)
+      const current = await readProgress(ctx, profile._id)
+      const matches = current
+        ? !isEmptyProgress(expected) && progressMatches(current, expected)
+        : isEmptyProgress(expected)
+      if (!matches) mismatchUserIds.push(profile._id)
+    }
+    return { continueCursor: page.continueCursor, isDone: page.isDone, processedCount: page.page.length, mismatchUserIds }
   },
 })

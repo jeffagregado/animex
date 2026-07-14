@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import betterAuthTest from '@convex-dev/better-auth/test'
+import { makeFunctionReference } from 'convex/server'
 import { convexTest } from 'convex-test'
 import { describe, expect, test, vi } from 'vitest'
 
@@ -8,6 +9,13 @@ import { api, components } from './_generated/api'
 import schema from './schema'
 
 const modules = import.meta.glob(['./_generated/**/*.*', './userAnime.ts'])
+type Progress = { watching: number; completed: number; planned: number; dropped: number }
+type PageArgs = { paginationOpts: { numItems: number; cursor: string | null } }
+type BackfillPage = { continueCursor: string; isDone: boolean; processedCount: number; updatedCount: number }
+type VerificationPage = { continueCursor: string; isDone: boolean; processedCount: number; mismatchUserIds: string[] }
+const getMyProgress = makeFunctionReference<'query', Record<string, never>, Progress>('userAnime:getMyProgress')
+const backfillProgress = makeFunctionReference<'mutation', PageArgs, BackfillPage>('userAnime:backfillProgress')
+const verifyProgress = makeFunctionReference<'mutation', PageArgs, VerificationPage>('userAnime:verifyProgress')
 const createHarness = () => {
   const t = convexTest(schema, modules)
   betterAuthTest.register(t)
@@ -54,6 +62,104 @@ const insertAnime = async (t: ReturnType<typeof createHarness>, anilistId: numbe
 })
 
 describe('user anime Convex integration', () => {
+  test('returns authenticated zero progress without creating an aggregate row', async () => {
+    const t = createHarness()
+    await expect(t.query(getMyProgress, {})).rejects.toThrow('Unauthenticated')
+
+    const owner = await createAuthUser(t, true, 'progress-zero')
+    await expect(owner.client.query(getMyProgress, {})).rejects.toThrow('Complete your profile')
+    await insertProfile(t, owner.authId, 'ProgressZero', 'private')
+
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 0, planned: 0, dropped: 0 })
+    expect(await t.run(async (ctx) => await ctx.db.query('userAnimeProgress').collect())).toEqual([])
+  })
+
+  test('counts status transitions once and replaces prior status atomically', async () => {
+    const t = createHarness()
+    const owner = await createAuthUser(t, true, 'progress-status')
+    await insertProfile(t, owner.authId, 'ProgressStatus', 'private')
+    for (const anilistId of [1, 2, 3, 4, 5]) await insertAnime(t, anilistId)
+
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 1, status: 'watching' })
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 2, status: 'completed' })
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 3, status: 'planned' })
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 4, status: 'dropped' })
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 5, status: 'rewatched' })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 1, completed: 1, planned: 1, dropped: 1 })
+
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 3, status: 'planned' })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 1, completed: 1, planned: 1, dropped: 1 })
+
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 1, status: 'completed' })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 2, planned: 1, dropped: 1 })
+
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 2, status: 'rewatched' })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 1, planned: 1, dropped: 1 })
+  })
+
+  test('fails loudly when stored progress contains a negative count', async () => {
+    const t = createHarness()
+    const owner = await createAuthUser(t, true, 'progress-negative')
+    const ownerId = await insertProfile(t, owner.authId, 'ProgressNegative', 'private')
+    await insertAnime(t, 1)
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 1, status: 'watching' })
+    await t.run(async (ctx) => {
+      const progress = await ctx.db.query('userAnimeProgress').withIndex('by_user', (q) => q.eq('userId', ownerId)).unique()
+      if (!progress) throw new Error('Expected List Progress row.')
+      await ctx.db.patch('userAnimeProgress', progress._id, { completed: -1 })
+    })
+
+    await expect(owner.client.query(getMyProgress, {})).rejects.toThrow('nonnegative')
+    await expect(owner.client.mutation(api.userAnime.setStatus, { anilistId: 1, status: 'watching' })).rejects.toThrow('nonnegative')
+  })
+
+  test('backfills profile pages by replacement and verifies drift without zero rows', async () => {
+    const t = createHarness()
+    const active = await createAuthUser(t, true, 'progress-backfill-active')
+    const activeId = await insertProfile(t, active.authId, 'ProgressBackfillActive', 'private')
+    const untouched = await createAuthUser(t, true, 'progress-backfill-untouched')
+    const untouchedId = await insertProfile(t, untouched.authId, 'ProgressBackfillUntouched', 'private')
+    const drifted = await createAuthUser(t, true, 'progress-backfill-drifted')
+    const driftedId = await insertProfile(t, drifted.authId, 'ProgressBackfillDrifted', 'private')
+
+    await t.run(async (ctx) => {
+      const now = Date.now()
+      for (const [anilistId, status] of [[1, 'watching'], [2, 'completed'], [3, 'rewatched']] as const) {
+        await ctx.db.insert('userAnimeEntries', {
+          userId: activeId, anilistId, status, score: null, favoriteAt: null,
+          rewatchCount: 0, lastRewatchSequence: 0, createdAt: now, updatedAt: now,
+        })
+      }
+      await ctx.db.insert('userAnimeEntries', {
+        userId: driftedId, anilistId: 4, status: 'dropped', score: null, favoriteAt: null,
+        rewatchCount: 0, lastRewatchSequence: 0, createdAt: now, updatedAt: now,
+      })
+      await ctx.db.insert('userAnimeProgress', { userId: driftedId, watching: 8, completed: 7, planned: 6, dropped: 5 })
+    })
+
+    const first = await t.mutation(backfillProgress, { paginationOpts: { numItems: 2, cursor: null } })
+    expect(first).toMatchObject({ isDone: false, processedCount: 2 })
+    const second = await t.mutation(backfillProgress, { paginationOpts: { numItems: 2, cursor: first.continueCursor } })
+    expect(second).toMatchObject({ isDone: true, processedCount: 1 })
+    expect(await active.client.query(getMyProgress, {})).toEqual({ watching: 1, completed: 1, planned: 0, dropped: 0 })
+    expect(await untouched.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 0, planned: 0, dropped: 0 })
+    expect(await drifted.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 0, planned: 0, dropped: 1 })
+    expect(await t.run(async (ctx) => await ctx.db.query('userAnimeProgress').collect())).toHaveLength(2)
+
+    const repeatFirst = await t.mutation(backfillProgress, { paginationOpts: { numItems: 2, cursor: null } })
+    const repeatSecond = await t.mutation(backfillProgress, { paginationOpts: { numItems: 2, cursor: repeatFirst.continueCursor } })
+    expect(repeatFirst.updatedCount + repeatSecond.updatedCount).toBe(0)
+
+    await t.run(async (ctx) => {
+      const activeProgress = await ctx.db.query('userAnimeProgress').withIndex('by_user', (q) => q.eq('userId', activeId)).unique()
+      if (!activeProgress) throw new Error('Expected active List Progress row.')
+      await ctx.db.patch('userAnimeProgress', activeProgress._id, { completed: 99 })
+      await ctx.db.insert('userAnimeProgress', { userId: untouchedId, watching: 0, completed: 0, planned: 0, dropped: 0 })
+    })
+    const verification = await t.mutation(verifyProgress, { paginationOpts: { numItems: 10, cursor: null } })
+    expect(new Set(verification.mismatchUserIds)).toEqual(new Set([activeId, untouchedId]))
+  })
+
   test('enforces auth, verification, profile, cache, envelopes, ownership, and milestone rollback', async () => {
     const t = createHarness()
     await expect(t.query(api.userAnime.getMine, { anilistId: 1 })).rejects.toThrow('Unauthenticated')
@@ -73,6 +179,8 @@ describe('user anime Convex integration', () => {
     expect(await owner.client.mutation(api.userAnime.recordRewatch, { anilistId: 1 })).toMatchObject({
       status: 'saved', entry: { status: 'rewatched', rewatchCount: 1 },
     })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 0, planned: 0, dropped: 0 })
+    expect(await t.run(async (ctx) => await ctx.db.query('userAnimeProgress').collect())).toEqual([])
     const milestones = await t.run(async (ctx) => await ctx.db.query('animeMilestones').collect())
     expect(milestones.map(({ kind, visibility }) => ({ kind, visibility }))).toEqual([
       { kind: 'completed', visibility: 'followers' },
@@ -81,6 +189,7 @@ describe('user anime Convex integration', () => {
     expect(await owner.client.mutation(api.userAnime.removeLatestRewatch, { anilistId: 1 })).toMatchObject({
       status: 'saved', entry: { status: 'completed', rewatchCount: 0 },
     })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 1, planned: 0, dropped: 0 })
     const afterRollback = await t.run(async (ctx) => ({
       completion: await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', ownerProfileId).eq('anilistId', 1).eq('kind', 'completed')).unique(),
       rewatch: await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', ownerProfileId).eq('anilistId', 1).eq('kind', 'rewatched')).unique(),
@@ -93,6 +202,7 @@ describe('user anime Convex integration', () => {
     expect(afterRollback.rewatchCard?.active).toBe(false)
 
     await owner.client.mutation(api.userAnime.recordRewatch, { anilistId: 1 })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 0, planned: 0, dropped: 0 })
     const bumpedCard = await t.run(async (ctx) => await ctx.db.query('feedCards')
       .withIndex('by_source_key', (q) => q.eq('sourceKey', `rewatched:${ownerProfileId}:1`)).unique())
     expect(bumpedCard?.active).toBe(true)
@@ -113,14 +223,17 @@ describe('user anime Convex integration', () => {
     expect(await owner.client.mutation(api.userAnime.setScore, { anilistId: 1, score: 8.1 })).toMatchObject({
       status: 'saved', entry: { anilistId: 1, score: 8.1, status: 'watching' },
     })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 1, completed: 0, planned: 0, dropped: 0 })
     expect(await owner.client.mutation(api.userAnime.setScore, { anilistId: 1, score: 9 })).toMatchObject({
       status: 'saved', entry: { anilistId: 1, score: 9, status: 'watching' },
     })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 1, completed: 0, planned: 0, dropped: 0 })
 
     await owner.client.mutation(api.userAnime.setStatus, { anilistId: 2, status: 'planned' })
     expect(await owner.client.mutation(api.userAnime.setScore, { anilistId: 2, score: 7.5 })).toMatchObject({
       status: 'saved', entry: { anilistId: 2, score: 7.5, status: 'planned' },
     })
+    expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 1, completed: 0, planned: 1, dropped: 0 })
   })
 
   test('pages 0, 20, 21, and 41 same-time rewatches without gaps', async () => {

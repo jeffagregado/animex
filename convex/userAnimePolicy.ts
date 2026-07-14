@@ -12,12 +12,20 @@ type ProgressKey = keyof UserAnimeProgress
 /** Maps only statuses represented by List Progress. */
 const getProgressKey = (status: AnimeStatus | null): ProgressKey | null => status === 'rewatched' ? null : status
 
+const assertProgress = (counts: UserAnimeProgress): void => {
+  if (!Number.isSafeInteger(counts.watching) || counts.watching < 0) throw new RangeError('watching count must be a nonnegative safe integer.')
+  if (!Number.isSafeInteger(counts.completed) || counts.completed < 0) throw new RangeError('completed count must be a nonnegative safe integer.')
+  if (!Number.isSafeInteger(counts.planned) || counts.planned < 0) throw new RangeError('planned count must be a nonnegative safe integer.')
+  if (!Number.isSafeInteger(counts.dropped) || counts.dropped < 0) throw new RangeError('dropped count must be a nonnegative safe integer.')
+}
+
 /** Applies one status transition to immutable List Progress counts. */
 export const applyProgressTransition = (
   previous: AnimeStatus | null,
   next: AnimeStatus | null,
   counts: UserAnimeProgress,
 ): UserAnimeProgress => {
+  assertProgress(counts)
   const previousKey = getProgressKey(previous)
   const nextKey = getProgressKey(next)
   if (previousKey === nextKey) return { ...counts }
