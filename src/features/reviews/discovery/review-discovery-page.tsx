@@ -4,15 +4,38 @@ import { FileSearchIcon } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '#/components/ui/empty'
 import { Skeleton } from '#/components/ui/skeleton'
+import type { ClientAuthState } from '#/features/auth/use-auth-state'
 import { usePublicAuthState } from '#/features/shell/public-auth-context'
 import { ReviewDiscoveryCard } from './review-discovery-card'
 import { ReviewDiscoveryFilters } from './review-discovery-filters'
-import type { ReviewDiscoverySearchState } from './review-discovery-state'
+import {
+  getReviewDiscoveryNavigationOptions,
+  resolveReviewDiscoverySearch,
+  type ReviewDiscoveryRouteState,
+  type ReviewDiscoverySearchState,
+} from './review-discovery-state'
 import { useReviewDiscoveryPages } from './use-review-discovery-pages'
 
 interface ReviewDiscoveryPageProps {
   searchState: ReviewDiscoverySearchState
   onSearchStateChange: (state: ReviewDiscoverySearchState) => void
+}
+
+interface ReviewDiscoveryRouteProps {
+  auth: ClientAuthState
+  routeState: ReviewDiscoveryRouteState
+  onNavigate: (options: ReturnType<typeof getReviewDiscoveryNavigationOptions>) => void
+}
+
+/** Resolves auth-sensitive route state before mounting discovery queries. */
+export function ReviewDiscoveryRoute({ auth, routeState, onNavigate }: ReviewDiscoveryRouteProps) {
+  const resolution = resolveReviewDiscoverySearch(routeState, auth)
+  useEffect(() => {
+    if (resolution?.replace) onNavigate(getReviewDiscoveryNavigationOptions(resolution.state))
+  }, [onNavigate, resolution])
+  if (auth.status === 'error') return <ReviewDiscoveryAuthState message={auth.message} />
+  if (resolution === null || resolution.replace) return <ReviewDiscoveryAuthState message={null} />
+  return <ReviewDiscoveryPage searchState={resolution.state} onSearchStateChange={(state) => onNavigate(getReviewDiscoveryNavigationOptions(state))} />
 }
 
 /** Renders public Review search, filters, cards, and infinite cursor states. */
@@ -40,6 +63,16 @@ export function ReviewDiscoveryPage({ searchState, onSearchStateChange }: Review
     <header className="mb-5 min-w-0"><h1 className="text-3xl font-black sm:text-4xl">Reviews</h1><p className="mt-1 text-muted-foreground">Find recent reviews from the AnimeX community.</p></header>
     <ReviewDiscoveryFilters state={searchState} searchText={searchText} signedIn={signedIn} onSearchTextChange={setSearchText} onStateChange={onSearchStateChange} />
     <ReviewDiscoveryList pages={pages} />
+  </main>
+}
+
+/** Preserves route geometry while auth resolves or reports a scoped failure. */
+function ReviewDiscoveryAuthState({ message }: { message: string | null }) {
+  return <main className="mx-auto min-h-full w-full min-w-0 max-w-5xl overflow-x-hidden px-4 pt-6 pb-28 sm:px-6 lg:pb-12">
+    <header className="mb-5 min-w-0"><h1 className="text-3xl font-black sm:text-4xl">Reviews</h1><p className="mt-1 text-muted-foreground">Find recent reviews from the AnimeX community.</p></header>
+    {message === null
+      ? <div aria-label="Loading review access" className="grid min-h-40 gap-3 rounded-xl border border-border p-5"><Skeleton className="h-5 w-2/5" /><Skeleton className="h-12 w-full" /><Skeleton className="h-5 w-3/5" /></div>
+      : <div className="min-h-32 rounded-xl border border-red-400/40 bg-red-400/5 p-5" role="alert"><h2 className="font-black">Review access unavailable</h2><p className="mt-2 text-red-200">{message}</p></div>}
   </main>
 }
 

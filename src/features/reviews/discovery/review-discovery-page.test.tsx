@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({ pages: vi.fn(), auth: vi.fn(), change: vi.fn()
 vi.mock('./use-review-discovery-pages', () => ({ useReviewDiscoveryPages: mocks.pages }))
 vi.mock('#/features/shell/public-auth-context', () => ({ usePublicAuthState: mocks.auth }))
 
-const review = { id: 'review-1', author: { id: 'author', username: 'author', displayName: 'Author', avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published' as const, rating: 90, summary: 'Compact summary', summaryHasSpoiler: false, visibility: 'public' as const, publishedAt: 1, updatedAt: 1 }
+const review = { id: 'review-1', author: { id: 'author', username: 'author', displayName: 'Author', avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: 'https://example.test/frieren.jpg' }, state: 'published' as const, rating: 90, summary: 'Compact summary', summaryHasSpoiler: false, visibility: 'public' as const, publishedAt: 1, updatedAt: 1 }
 const loadMore = vi.fn<() => Promise<void>>()
 const readyPages: ReviewDiscoveryPageState = { items: [review], cursor: null, hasMore: false, error: null, initialLoading: false, loadingMore: false, loadMore, retry: vi.fn() }
 const state = { query: null, sort: 'newest' as const, ratingBand: null, visibility: 'public' as const }
@@ -54,6 +54,30 @@ describe('ReviewDiscoveryPage', () => {
     expect(screen.queryByText(/body/i)).toBeNull()
   })
 
+  it('keeps two-column mobile/tablet filter geometry and one-column desktop visibility', () => {
+    mocks.auth.mockReturnValue({ status: 'ready', authState: { status: 'complete', email: 'fan@example.com', profile: { id: 'author', username: 'author', name: 'Author', avatarUrl: null, visibility: 'public' } } })
+    render(<ReviewDiscoveryPage searchState={{ ...state, visibility: 'all' }} onSearchStateChange={mocks.change} />)
+    const filters = screen.getByRole('region', { name: 'Review filters' })
+    expect(filters.className).toContain('grid-cols-2')
+    expect(filters.className).toContain('lg:grid-cols-3')
+    expect(screen.getByRole('searchbox', { name: 'Search reviews' }).parentElement?.className).toContain('col-span-2')
+    expect(screen.getByRole('searchbox', { name: 'Search reviews' }).parentElement?.className).toContain('lg:col-span-3')
+    expect(screen.getByRole('combobox', { name: 'Visibility filter' }).parentElement?.className).toContain('col-span-2')
+    expect(screen.getByRole('combobox', { name: 'Visibility filter' }).parentElement?.className).toContain('lg:col-span-1')
+  })
+
+  it('preserves cover geometry after image failure and renders relative publish time', () => {
+    vi.setSystemTime(new Date('2026-07-14T12:00:00Z'))
+    mocks.pages.mockReturnValue({ ...readyPages, items: [{ ...review, publishedAt: Date.now() - 2 * 60 * 60 * 1000 }] })
+    render(<ReviewDiscoveryPage searchState={state} onSearchStateChange={mocks.change} />)
+    const image = screen.getByRole('img', { name: 'Frieren cover' })
+    const cover = image.parentElement
+    fireEvent.error(image)
+    expect(screen.getByLabelText('Image unavailable')).toBeTruthy()
+    expect(cover?.className).toContain('overflow-hidden')
+    expect(screen.getByText('2h ago')).toBeTruthy()
+  })
+
   it('loads from intersection once and preserves geometry states without horizontal overflow classes', async () => {
     vi.useRealTimers()
     const observerCallbacks: IntersectionObserverCallback[] = []
@@ -74,6 +98,8 @@ describe('ReviewDiscoveryPage', () => {
     expect(container.firstElementChild?.className).toContain('min-w-0')
     expect(container.firstElementChild?.className).toContain('overflow-x-hidden')
     expect(container.firstElementChild?.className).toContain('pb-28')
+    expect(Array.from(container.querySelectorAll('[class]')).some((element) => element.getAttribute('class')?.includes('min-w-['))).toBe(false)
+    expect(Array.from(container.querySelectorAll('[class]')).some((element) => element.getAttribute('class')?.includes('overflow-x-auto'))).toBe(false)
     mocks.pages.mockReturnValue({ ...readyPages, items: [], error: 'offline', retry: vi.fn() })
     rerender(<ReviewDiscoveryPage searchState={state} onSearchStateChange={mocks.change} />)
     expect(screen.getByRole('alert').textContent).toContain('offline')

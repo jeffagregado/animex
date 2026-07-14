@@ -33,8 +33,8 @@ const visibilityOptions: Array<{ label: string; value: ReviewDiscoveryVisibility
 /** Renders URL-backed Review discovery search and filters. */
 export function ReviewDiscoveryFilters(props: ReviewDiscoveryFiltersProps) {
   const searching = props.state.query !== null
-  return <section aria-label="Review filters" className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    <label className="relative min-w-0 sm:col-span-2 lg:col-span-3">
+  return <section aria-label="Review filters" className="grid min-w-0 grid-cols-2 gap-4 lg:grid-cols-3">
+    <label className="relative col-span-2 min-w-0 lg:col-span-3">
       <span className="sr-only">Search reviews</span>
       <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted-foreground" />
       <Input aria-label="Search reviews" className="h-12 min-w-0 pl-10" maxLength={100} onChange={(event) => props.onSearchTextChange(event.target.value)} placeholder="Search anime or author..." type="search" value={props.searchText} />
@@ -51,7 +51,7 @@ export function ReviewDiscoveryFilters(props: ReviewDiscoveryFiltersProps) {
         <SelectContent><SelectGroup>{ratingOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
     </Filter>
-    {props.signedIn ? <Filter label="Visibility">
+    {props.signedIn ? <Filter className="col-span-2 lg:col-span-1" label="Visibility">
       <Select onValueChange={(value) => { if (value) props.onStateChange({ ...props.state, visibility: value as ReviewDiscoveryVisibility }) }} value={props.state.visibility}>
         <SelectTrigger aria-label="Visibility filter"><SelectValue>{visibilityOptions.find((option) => option.value === props.state.visibility)?.label}</SelectValue></SelectTrigger>
         <SelectContent><SelectGroup>{visibilityOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
@@ -60,6 +60,6 @@ export function ReviewDiscoveryFilters(props: ReviewDiscoveryFiltersProps) {
   </section>
 }
 
-function Filter({ children, label }: { children: React.ReactNode; label: string }) {
-  return <label className="grid min-w-0 gap-2 text-sm text-muted-foreground"><span>{label}</span>{children}</label>
+function Filter({ children, className, label }: { children: React.ReactNode; className?: string; label: string }) {
+  return <label className={`grid min-w-0 gap-2 text-sm text-muted-foreground ${className ?? ''}`}><span>{label}</span>{children}</label>
 }
