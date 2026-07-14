@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { animeFormatSchema, type AnimeFormat } from '#/features/discover/shared/discover-contracts'
+import { animeFormatSchema, type AnimeFormat } from '../../discover/shared/discover-contracts'
 
 import { postMediaSchema, type PostMedia } from './external-media'
 import {
@@ -55,21 +55,17 @@ export const socialAuthorSchema: z.ZodType<SocialAuthor> = z.object({
   username: z.string().trim().min(1).max(128),
 }).strict()
 
-export const socialAnimeSchema: z.ZodType<SocialAnime> = z.object({
+export const socialAnimeSchema = z.object({
   anilistId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   coverImageUrl: nullableHttpsUrlSchema,
   slug: z.string().trim().min(1).max(128),
   title: z.string().trim().min(1).max(256),
-}).strict()
+}).strict() satisfies z.ZodType<SocialAnime>
 
-export const activityAnimeSchema: z.ZodType<ActivityAnime> = z.object({
-  anilistId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-  coverImageUrl: nullableHttpsUrlSchema,
+export const activityAnimeSchema = socialAnimeSchema.extend({
   format: animeFormatSchema.nullable(),
   seasonYear: z.number().int().positive().nullable(),
-  slug: z.string().trim().min(1).max(128),
-  title: z.string().trim().min(1).max(256),
-}).strict()
+}).strict() satisfies z.ZodType<ActivityAnime>
 
 const postFeedCardSchema = z.object({
   author: socialAuthorSchema,

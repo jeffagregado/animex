@@ -22,7 +22,12 @@ describe('external media contracts', () => {
   })
 
   test('enforces the 2,048-character URL limit', () => {
+    const prefix = 'https://example.com/'
+    const maximumUrl = `${prefix}${'x'.repeat(EXTERNAL_MEDIA_URL_MAX_LENGTH - prefix.length)}`
+
     expect(EXTERNAL_MEDIA_URL_MAX_LENGTH).toBe(2_048)
+    expect(maximumUrl).toHaveLength(EXTERNAL_MEDIA_URL_MAX_LENGTH)
+    expect(parseExternalMediaUrl(maximumUrl).href).toBe(maximumUrl)
     expect(() => parseExternalMediaUrl(`https://example.com/${'x'.repeat(EXTERNAL_MEDIA_URL_MAX_LENGTH)}`)).toThrow('Media URL must not exceed 2048 characters.')
   })
 
