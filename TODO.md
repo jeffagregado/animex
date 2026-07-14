@@ -727,7 +727,7 @@ Status: IMPLEMENTED on `jeff-cx/phase-5-feed-reviews`; signed-in browser QA rema
 
 # Phase 5 Home And Review Discovery Feedback
 
-Status: DESIGN AND IMPLEMENTATION PLAN APPROVED on `jeff-cx/phase-5-feed-reviews`; ready for execution.
+Status: IMPLEMENTATION IN PROGRESS on `jeff-cx/phase-5-feed-reviews`; backend migrations and Home/feed slices verified.
 
 - [x] Inspect current Home, Discover, feed, Review, user-anime, and cache flows.
 - [x] Lock Home Seasonal, desktop utility order, List Progress metrics, and removed placeholders.
@@ -739,9 +739,9 @@ Status: DESIGN AND IMPLEMENTATION PLAN APPROVED on `jeff-cx/phase-5-feed-reviews
 - [x] Create detailed implementation plan with migration, ownership, validation, and signed-in QA workflow.
 - [x] Audit implementation plan against current UI; lock Discover state reuse, compact Summary, image fallback, auth-ready normalization, and infinite-feed fixes.
 - [x] Add shared Base UI shadcn Button, Input Group, Card, Badge, Skeleton, Empty, Progress, and Dropdown Menu foundations. Owner: shared UI worker.
-- [ ] Implement indexed Review discovery and verified migration. Owner: Convex Review worker.
-- [ ] Implement atomic List Progress projection and verified migration. Owner: Convex user-anime worker.
-- [ ] Reuse Discover Seasonal/This Week/Upcoming and restore Home desktop utilities. Owner: Home workers.
-- [ ] Match approved feed-card structure without fake Phase 6 data. Owner: feed UI worker.
+- [x] Implement indexed Review discovery and verified migration. Owner: Convex Review worker.
+- [x] Implement atomic List Progress projection and verified migration. Owner: Convex user-anime worker.
+- [x] Reuse Discover Seasonal/This Week/Upcoming and restore Home desktop utilities. Owner: Home workers.
+- [x] Match approved feed-card structure without fake Phase 6 data. Owner: feed UI worker.
 - [ ] Build `/reviews` search, filters, visibility, and infinite pagination. Owner: Review discovery UI worker.
 - [ ] Integrate generated files, run full gates, review, real signed-in browser QA, and cleanup. Owner: controller + reviewer + QA.

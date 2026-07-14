@@ -177,7 +177,7 @@ export default defineSchema({
     visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
     publishedAt: v.optional(v.number()), updatedAt: v.number(), activityState: v.union(v.literal('active'), v.literal('deleted')),
     newestOrderKey: v.string(), highRatingOrderKey: v.string(), lowRatingOrderKey: v.string(),
-    searchText: v.optional(v.string()), ratingBand: v.optional(storedReviewRatingBandValidator),
+    searchText: v.string(), ratingBand: storedReviewRatingBandValidator,
   })
     .index('by_user_anime', ['userId', 'anilistId'])
     .index('by_user_request', ['userId', 'requestId'])

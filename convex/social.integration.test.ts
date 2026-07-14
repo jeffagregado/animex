@@ -216,8 +216,8 @@ describe('social Convex integration', () => {
       summaryHasSpoiler: false, bodyJson, visibility: 'public',
     })
     await t.run(async (ctx) => {
-      await ctx.db.patch('reviews', draftId, { searchText: undefined, ratingBand: undefined })
-      await ctx.db.patch('reviews', publishedId, { searchText: undefined, ratingBand: undefined })
+      await ctx.db.patch('reviews', draftId, { searchText: 'stale draft', ratingBand: '0-9' })
+      await ctx.db.patch('reviews', publishedId, { searchText: 'stale published', ratingBand: '0-9' })
     })
 
     const first = await t.mutation(socialInternal.reviews.backfillDiscoveryFields, { paginationOpts: { numItems: 1, cursor: null } })
@@ -243,7 +243,7 @@ describe('social Convex integration', () => {
       anilistId: 1, requestId: 'null-rating-draft', rating: null, summary: '',
       summaryHasSpoiler: false, bodyJson, visibility: 'private',
     })
-    await t.run(async (ctx) => await ctx.db.patch('reviews', draftId, { searchText: undefined, ratingBand: undefined }))
+    await t.run(async (ctx) => await ctx.db.patch('reviews', draftId, { searchText: 'stale', ratingBand: '0-9' }))
     await t.mutation(socialInternal.reviews.backfillDiscoveryFields, { paginationOpts: { numItems: 1, cursor: null } })
     expect(await t.run(async (ctx) => (await ctx.db.get('reviews', draftId))?.ratingBand)).toBe('none')
 
@@ -252,6 +252,7 @@ describe('social Convex integration', () => {
         userId: owner.profileId, anilistId: 2, requestId: 'corrupt-published-null', state: 'published', rating: null,
         summary: 'Corrupt', summaryHasSpoiler: false, bodyJson, visibility: 'public', publishedAt: 1,
         updatedAt: 1, activityState: 'active', newestOrderKey: 'corrupt', highRatingOrderKey: 'corrupt', lowRatingOrderKey: 'corrupt',
+        searchText: 'corrupt', ratingBand: 'none',
       })
     })
     await expect(t.mutation(socialInternal.reviews.backfillDiscoveryFields, {
@@ -641,14 +642,14 @@ describe('social Convex integration', () => {
           userId, anilistId: 1, requestId: `public-${index}`, state: 'published', rating: 50,
           summary: `Public ${index}`, summaryHasSpoiler: false, bodyJson, visibility: 'public',
           publishedAt: now, updatedAt: now, activityState: 'active', newestOrderKey: key,
-          highRatingOrderKey: key, lowRatingOrderKey: key,
+          highRatingOrderKey: key, lowRatingOrderKey: key, searchText: `author ${index}`, ratingBand: '50-59',
         })
       }
       await ctx.db.insert('reviews', {
         userId: viewer.profileId, anilistId: 1, requestId: 'private-own', state: 'published', rating: 50,
         summary: 'Private own', summaryHasSpoiler: false, bodyJson, visibility: 'private',
         publishedAt: 13, updatedAt: 13, activityState: 'active', newestOrderKey: '0025',
-        highRatingOrderKey: '0025', lowRatingOrderKey: '0025',
+        highRatingOrderKey: '0025', lowRatingOrderKey: '0025', searchText: 'private own', ratingBand: '50-59',
       })
     })
 
