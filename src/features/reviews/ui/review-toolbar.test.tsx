@@ -73,6 +73,20 @@ describe('ReviewToolbar Lexical behavior', () => {
     expect(editor.getEditorState().read(() => $getRoot().getTextContent().replaceAll('\n', ''))).toBe('Before  After')
   })
 
+  it('replaces selected text when the video button collapses editor focus', async () => {
+    selectText('Remove')
+    const videoButton = screen.getByRole('button', { name: 'Video' })
+    fireEvent.pointerDown(videoButton)
+    editor.update(() => { const text = $getRoot().getFirstDescendant(); if (!$isTextNode(text)) throw new TypeError('Expected selected text.'); text.selectEnd() }, { discrete: true })
+    fireEvent.click(videoButton)
+    fireEvent.change(screen.getByLabelText('HTTPS URL'), { target: { value: 'https://vimeo.com/123' } })
+    fireEvent.change(screen.getByLabelText('Label (optional)'), { target: { value: 'Trailer' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add video' }))
+
+    await waitFor(() => expect(editor.getEditorState().toJSON().root.children.map((node) => node.type)).toEqual(['review-video']))
+    expect(editor.getEditorState().read(() => $getRoot().getTextContent())).toBe('')
+  })
+
   it('inserts media first when selection is missing or stale', () => {
     editor.update(() => { $getRoot().clear().append($createParagraphNode().append($createTextNode('Body'))); $setSelection(null) }, { discrete: true })
 

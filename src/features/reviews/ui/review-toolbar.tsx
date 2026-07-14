@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND } from '@lexical/list'
 import { $createHeadingNode, $createQuoteNode } from '@lexical/rich-text'
@@ -38,12 +38,15 @@ export function ReviewToolbar() {
   const mark = (format: TextFormatType): void => formatReviewText(editor, format)
 
   const [mediaSelection, setMediaSelection] = useState<RangeSelection | null>(null)
+  const pendingMediaSelection = useRef<RangeSelection | null | undefined>(undefined)
+  const captureMediaSelection = (): void => { pendingMediaSelection.current = captureReviewSelection(editor) }
   const openMedia = (kind: Exclude<MediaDialog, null>): void => {
-    setMediaSelection(captureReviewSelection(editor))
+    setMediaSelection(pendingMediaSelection.current === undefined ? captureReviewSelection(editor) : pendingMediaSelection.current)
+    pendingMediaSelection.current = undefined
     setDialog(kind)
   }
 
-  return <><div aria-label="Review formatting" className="flex flex-wrap items-center gap-1 border-b border-border p-2" role="toolbar"><Tool label="H2" onClick={() => block('h2')}>H2</Tool><Tool label="H3" onClick={() => block('h3')}>H3</Tool><Tool label="Quote" onClick={() => block('quote')}><QuoteIcon /></Tool><Tool label="Bulleted list" onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}><ListIcon /></Tool><Tool label="Numbered list" onClick={() => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)}><ListOrderedIcon /></Tool><Tool label="Bold" onClick={() => mark('bold')}><strong>B</strong></Tool><Tool label="Italic" onClick={() => mark('italic')}><em>I</em></Tool><Tool label="Underline" onClick={() => mark('underline')}><u>U</u></Tool><Tool label="Strikethrough" onClick={() => mark('strikethrough')}><StrikethroughIcon /></Tool><Tool label="Image" onClick={() => openMedia('image')}><ImageIcon /></Tool><Tool label="Video" onClick={() => openMedia('video')}><VideoIcon /></Tool><Tool label="Spoiler" onClick={() => markSelectedBlocksAsSpoiler(editor)}><EyeOffIcon /></Tool><Tool label="Undo" onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)}><UndoIcon /></Tool><Tool label="Redo" onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)}><RedoIcon /></Tool></div><Dialog onOpenChange={(open) => { if (!open) setDialog(null) }} open={dialog !== null}>{dialog ? <DialogContent title={dialog === 'image' ? 'Add image' : 'Add video'}><MediaForm editor={editor} kind={dialog} onDone={() => setDialog(null)} selection={mediaSelection} /></DialogContent> : null}</Dialog></>
+  return <><div aria-label="Review formatting" className="flex flex-wrap items-center gap-1 border-b border-border p-2" role="toolbar"><Tool label="H2" onClick={() => block('h2')}>H2</Tool><Tool label="H3" onClick={() => block('h3')}>H3</Tool><Tool label="Quote" onClick={() => block('quote')}><QuoteIcon /></Tool><Tool label="Bulleted list" onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}><ListIcon /></Tool><Tool label="Numbered list" onClick={() => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)}><ListOrderedIcon /></Tool><Tool label="Bold" onClick={() => mark('bold')}><strong>B</strong></Tool><Tool label="Italic" onClick={() => mark('italic')}><em>I</em></Tool><Tool label="Underline" onClick={() => mark('underline')}><u>U</u></Tool><Tool label="Strikethrough" onClick={() => mark('strikethrough')}><StrikethroughIcon /></Tool><Tool label="Image" onClick={() => openMedia('image')} onPointerDown={captureMediaSelection}><ImageIcon /></Tool><Tool label="Video" onClick={() => openMedia('video')} onPointerDown={captureMediaSelection}><VideoIcon /></Tool><Tool label="Spoiler" onClick={() => markSelectedBlocksAsSpoiler(editor)}><EyeOffIcon /></Tool><Tool label="Undo" onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)}><UndoIcon /></Tool><Tool label="Redo" onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)}><RedoIcon /></Tool></div><Dialog onOpenChange={(open) => { if (!open) setDialog(null) }} open={dialog !== null}>{dialog ? <DialogContent title={dialog === 'image' ? 'Add image' : 'Add video'}><MediaForm editor={editor} kind={dialog} onDone={() => setDialog(null)} selection={mediaSelection} /></DialogContent> : null}</Dialog></>
 }
 
 /** Applies one approved inline format to the active Lexical selection. */
@@ -63,8 +66,8 @@ export const formatReviewBlock = (editor: ReturnType<typeof useLexicalComposerCo
     })
   }, { discrete: true })
 
-function Tool({ children, label, onClick }: { children: ReactNode; label: string; onClick: () => void }) {
-  return <button aria-label={label} className="grid min-h-11 min-w-11 place-items-center rounded-md px-2 text-muted-foreground hover:bg-cyan-300/10 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 [&_svg]:size-5" onClick={onClick} title={label} type="button">{children}</button>
+function Tool({ children, label, onClick, onPointerDown }: { children: ReactNode; label: string; onClick: () => void; onPointerDown?: () => void }) {
+  return <button aria-label={label} className="grid min-h-11 min-w-11 place-items-center rounded-md px-2 text-muted-foreground hover:bg-cyan-300/10 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 [&_svg]:size-5" onClick={onClick} onPointerDown={onPointerDown} title={label} type="button">{children}</button>
 }
 
 function MediaForm({ editor, kind, onDone, selection }: { editor: ReturnType<typeof useLexicalComposerContext>[0]; kind: Exclude<MediaDialog, null>; onDone: () => void; selection: RangeSelection | null }) {
