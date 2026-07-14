@@ -80,6 +80,7 @@ describe('FeedOwnerActions', () => {
     expect(trigger.className).toContain('data-popup-open:ring-2')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
     expect(await screen.findByRole('dialog', { name: 'Delete Post?' })).toBeTruthy()
+    expect(screen.getByText('This permanently deletes the Post.')).toBeTruthy()
   })
 
   it('exposes pending visibility state on the overflow trigger and restores focus', async () => {

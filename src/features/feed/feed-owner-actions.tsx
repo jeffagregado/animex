@@ -56,7 +56,7 @@ const removeOwnerSource = async (card: OwnerCard, mutations: RemoveMutations): P
 
 /** Describes the selected destructive owner action. */
 const getDeleteCopy = (card: OwnerCard): DeleteCopy => {
-  if (card.kind === 'post') return { title: 'Delete Post?', description: 'This permanently deletes the Post and its images.' }
+  if (card.kind === 'post') return { title: 'Delete Post?', description: 'This permanently deletes the Post.' }
   if (card.kind !== 'review') return { title: 'Remove activity?', description: 'This removes the milestone from your feed.' }
   return { title: 'Remove feed activity?', description: 'The Review stays on Anime Reviews and Review Detail.' }
 }
