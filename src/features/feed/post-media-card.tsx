@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ExternalLinkIcon, ImageOffIcon, PlayIcon } from 'lucide-react'
 
 import { getLinkedVideoLabel, type PostMedia } from '../social/shared/external-media'
@@ -20,6 +20,7 @@ const getYouTubeId = (value: string): string | null => {
 /** Renders one external image or safe linked-video card. */
 export function PostMediaCard({ media, username }: PostMediaCardProps) {
   const [broken, setBroken] = useState(false)
+  useEffect(() => setBroken(false), [media.type, media.url])
   if (media.type === 'image') {
     const alt = media.description?.trim() || `Image attached to post by ${username}`
     return <div className="mt-3 aspect-video max-h-[32rem] overflow-hidden rounded-lg border border-white/10 bg-black/20">{broken

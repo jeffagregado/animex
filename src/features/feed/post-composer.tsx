@@ -86,7 +86,7 @@ export function PostComposer({ initial, postId, onCancel, onSaved, registerClose
   }
 
   return <>
-    <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); void save() }}>
+    <form className="mt-5 space-y-4" noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
       <label className="block"><span className="sr-only">Post text</span><textarea autoFocus className="min-h-32 w-full resize-y rounded-lg border border-white/10 bg-white/[0.025] p-3 outline-none placeholder:text-muted-foreground hover:border-cyan-300/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/30 disabled:opacity-60" disabled={composer.submitting} maxLength={POST_TEXT_LIMIT} onChange={(event) => composer.setText(event.target.value)} placeholder="What are you watching?" value={composer.text} /></label>
       <p className="text-right text-sm text-muted-foreground">{composer.text.length}/{POST_TEXT_LIMIT}</p>
       <PostMediaFields disabled={composer.submitting} draft={composer.mediaDraft} error={composer.mediaError} remove={composer.removeMedia} setCopy={composer.setMediaCopy} setType={composer.setMediaType} setUrl={composer.setMediaUrl} />

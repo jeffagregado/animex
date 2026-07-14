@@ -30,4 +30,12 @@ describe('PostMediaCard', () => {
     render(<PostMediaCard media={{ type: 'video', url: 'https://video.example/watch/1', provider: 'external', label: null }} username="mika" />)
     expect(screen.getByRole('link', { name: 'Open video.example video' })).toBeTruthy()
   })
+
+  it('recovers from a broken image when media changes', () => {
+    const { rerender } = render(<PostMediaCard media={{ type: 'image', url: 'https://media.example/broken', description: null }} username="mika" />)
+    fireEvent.error(screen.getByRole('img'))
+    expect(screen.getByText('Image unavailable')).toBeTruthy()
+    rerender(<PostMediaCard media={{ type: 'image', url: 'https://media.example/replacement', description: 'Replacement' }} username="mika" />)
+    expect(screen.getByRole('img', { name: 'Replacement' }).getAttribute('src')).toBe('https://media.example/replacement')
+  })
 })

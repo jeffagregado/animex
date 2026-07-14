@@ -34,7 +34,7 @@ describe('FeedCardDetailPage', () => {
 
   it('does not mount owner mutation children without Convex auth', async () => {
     mocks.mutation.mockClear()
-    mocks.result = { id: 'card', kind: 'post', postId: 'post', author: { id: 'owner', username: 'owner', displayName: 'Owner', avatarUrl: null }, text: 'Public', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }
+    mocks.result = { id: 'card', kind: 'post', postId: 'post', author: { id: 'owner', username: 'owner', displayName: 'Owner', avatarUrl: null }, text: 'Public', media: null, hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }
     renderDetail('card')
     await screen.findByText('Public')
     expect(screen.queryByRole('button', { name: 'Owner actions' })).toBeNull()

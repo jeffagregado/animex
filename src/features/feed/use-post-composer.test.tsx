@@ -40,14 +40,30 @@ describe('usePostComposer', () => {
     expect(mocks.create).not.toHaveBeenCalled()
   })
 
-  it('edits, replaces, and removes existing media', async () => {
-    const edit = { ...initial, media: { type: 'image' as const, url: 'https://media.example/old', description: null } }
+  it('removes persisted media before updating', async () => {
+    const edit = { ...initial, text: 'Keep this text', media: { type: 'image' as const, url: 'https://media.example/old', description: null } }
+    const { result } = renderHook(() => usePostComposer(edit))
+    act(() => result.current.removeMedia())
+    await act(async () => result.current.submit('post-1'))
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ postId: 'post-1', media: null }))
+  })
+
+  it('replaces persisted image media with a labeled video', async () => {
+    const edit = { ...initial, text: 'Edit', media: { type: 'image' as const, url: 'https://media.example/old', description: null } }
     const { result } = renderHook(() => usePostComposer(edit))
     act(() => { result.current.setMediaType('video'); result.current.setMediaUrl('https://vimeo.com/123'); result.current.setMediaCopy('Trailer') })
     await act(async () => result.current.submit('post-1'))
-    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ postId: 'post-1', media: { type: 'video', url: 'https://vimeo.com/123', provider: 'vimeo', label: 'Trailer' } }))
-    act(() => result.current.removeMedia())
-    expect(result.current.mediaDraft).toBeNull()
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ media: { type: 'video', url: 'https://vimeo.com/123', provider: 'vimeo', label: 'Trailer' } }))
+  })
+
+  it('retains edits and unlocks the composer after mutation failure', async () => {
+    mocks.update.mockRejectedValueOnce(new Error('save offline'))
+    const edit = { ...initial, text: 'Original', media: null }
+    const { result } = renderHook(() => usePostComposer(edit))
+    act(() => result.current.setText('Changed'))
+    await expect(result.current.submit('post-1')).rejects.toThrow('save offline')
+    expect(result.current.text).toBe('Changed')
+    expect(result.current.submitting).toBe(false)
     expect(result.current.dirty).toBe(true)
   })
 })

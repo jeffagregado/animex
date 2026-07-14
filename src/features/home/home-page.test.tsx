@@ -247,7 +247,7 @@ describe('HomePage', () => {
       const name = getFunctionName(args[0] as Parameters<typeof getFunctionName>[0])
       if (name === 'reviews:listLatestPublic') return []
       if (name === 'userAnime:getMyProgress') return { watching: 0, completed: 0, planned: 0, dropped: 0 }
-      return { items: [{ id: 'card', kind: 'post', postId: 'post', author: { id: 'profile-1', username: 'mika', displayName: 'Mika', avatarUrl: null }, text: 'Public card', imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }], cursor: null, hasMore: false } as never
+      return { items: [{ id: 'card', kind: 'post', postId: 'post', author: { id: 'profile-1', username: 'mika', displayName: 'Mika', avatarUrl: null }, text: 'Public card', media: null, hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }], cursor: null, hasMore: false } as never
     })
     mockAuthState({ status: 'complete', email: 'mika@example.com', profile: { id: 'profile-1', username: 'mika', name: 'Mika', avatarUrl: null, visibility: 'private' } })
     const view = render(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)

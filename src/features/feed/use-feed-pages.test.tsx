@@ -10,7 +10,7 @@ const query = vi.fn()
 const client = { query }
 vi.mock('convex/react', () => ({ useConvex: () => client }))
 
-const post = (id: string) => ({ id, kind: 'post' as const, postId: `post-${id}`, author: { id: 'author', username: 'author', displayName: 'Author', avatarUrl: null }, text: id, imageIds: [], imageUrls: [], hasSpoiler: false, visibility: 'public' as const, createdAt: 1, updatedAt: 1 })
+const post = (id: string) => ({ id, kind: 'post' as const, postId: `post-${id}`, author: { id: 'author', username: 'author', displayName: 'Author', avatarUrl: null }, text: id, media: null, hasSpoiler: false, visibility: 'public' as const, createdAt: 1, updatedAt: 1 })
 const page = (ids: string[], cursor: string | null, hasMore: boolean): FeedPage<ReturnType<typeof post>> => ({ items: ids.map(post), cursor, hasMore })
 const deferred = <T,>() => { let resolve!: (value: T) => void; let reject!: (cause: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 
