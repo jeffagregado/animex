@@ -57,6 +57,23 @@ describe('Review discovery policy', () => {
     expect(() => decodeReviewDiscoveryCursor(cursor, { ...scope, query: 'frieren' })).toThrow('query')
   })
 
+  test('round-trips Unicode cursor scope and continuation state for retries', () => {
+    const unicodeScope = { ...scope, query: '葬送のフリーレン café' }
+    const payload = {
+      scope: unicodeScope,
+      state: {
+        mode: 'search' as const,
+        phase: 'public' as const,
+        cursors: { followers: null, private: null, public: '続き-カーソル' },
+        done: { followers: true, private: true, public: false },
+      },
+    }
+
+    const cursor = encodeReviewDiscoveryCursor(payload)
+    expect(decodeReviewDiscoveryCursor(cursor, unicodeScope)).toEqual(payload)
+    expect(decodeReviewDiscoveryCursor(cursor, unicodeScope)).toEqual(payload)
+  })
+
   test('merges ordered lanes deterministically without duplicates', () => {
     const merged = mergeOrderedReviewLanes({
       followers: [{ key: '01', id: 'same' }, { key: '04', id: 'f' }],

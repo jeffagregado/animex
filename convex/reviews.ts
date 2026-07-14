@@ -186,13 +186,13 @@ export const saveDraft = mutation({
     if (existing?.state === 'published') return fail('REVIEW_ALREADY_PUBLISHED', 'Published Review must be edited, not saved as Draft.')
     const now = Date.now()
     if (existing) {
-      const discovery = buildReviewDiscoveryFields(existing._id, parsed.rating, undefined, now, profile, anime)
+      const discovery = buildReviewDiscoveryFields(existing._id, 'draft', parsed.rating, undefined, now, profile, anime)
       await ctx.db.patch('reviews', existing._id, { requestId, rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
       return existing._id
     }
-    const discovery = buildReviewDiscoveryFields(`${profile._id}:${args.anilistId}`, parsed.rating, undefined, now, profile, anime)
+    const discovery = buildReviewDiscoveryFields(`${profile._id}:${args.anilistId}`, 'draft', parsed.rating, undefined, now, profile, anime)
     const reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'draft', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, activityState: 'active', ...discovery })
-    await ctx.db.patch('reviews', reviewId, buildReviewDiscoveryFields(reviewId, parsed.rating, undefined, now, profile, anime))
+    await ctx.db.patch('reviews', reviewId, buildReviewDiscoveryFields(reviewId, 'draft', parsed.rating, undefined, now, profile, anime))
     return reviewId
   },
 })
@@ -210,7 +210,7 @@ export const publish = mutation({
     const byRequest = await ctx.db.query('reviews').withIndex('by_user_request', (q) => q.eq('userId', profile._id).eq('requestId', requestId)).unique()
     const repeatedId = readMatchingPublishRequest(byRequest, { ...args, rating: parsed.rating, summary: parsed.summary }, body.bodyJson)
     if (repeatedId && byRequest) {
-      await ctx.db.patch('reviews', repeatedId, buildReviewDiscoveryFields(byRequest._id, byRequest.rating, byRequest.publishedAt, byRequest.updatedAt, profile, anime))
+      await ctx.db.patch('reviews', repeatedId, buildReviewDiscoveryFields(byRequest._id, byRequest.state, byRequest.rating, byRequest.publishedAt, byRequest.updatedAt, profile, anime))
       return repeatedId
     }
     const existing = await readMine(ctx, profile._id, args.anilistId)
@@ -218,14 +218,14 @@ export const publish = mutation({
     const publishedAt = existing?.publishedAt ?? now
     let reviewId: Id<'reviews'>
     if (existing) {
-      const discovery = buildReviewDiscoveryFields(existing._id, parsed.rating, publishedAt, now, profile, anime)
+      const discovery = buildReviewDiscoveryFields(existing._id, 'published', parsed.rating, publishedAt, now, profile, anime)
       await ctx.db.patch('reviews', existing._id, { requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, ...discovery })
       reviewId = existing._id
     } else {
       const source = `${profile._id}:${args.anilistId}`
-      const discovery = buildReviewDiscoveryFields(source, parsed.rating, publishedAt, now, profile, anime)
+      const discovery = buildReviewDiscoveryFields(source, 'published', parsed.rating, publishedAt, now, profile, anime)
       reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, activityState: 'active', ...discovery })
-      await ctx.db.patch('reviews', reviewId, buildReviewDiscoveryFields(reviewId, parsed.rating, publishedAt, now, profile, anime))
+      await ctx.db.patch('reviews', reviewId, buildReviewDiscoveryFields(reviewId, 'published', parsed.rating, publishedAt, now, profile, anime))
     }
     const next = await ctx.db.get('reviews', reviewId)
     if (!next) return fail('REVIEW_WRITE_FAILED', 'Review was not saved.')
@@ -246,7 +246,7 @@ export const update = mutation({
     const body = parseBodyJson(args.bodyJson)
     const parsed = validatePublishedReview(body.body, args.rating, args.summary)
     const now = Date.now()
-    const discovery = buildReviewDiscoveryFields(review._id, parsed.rating, review.publishedAt, now, profile, anime)
+    const discovery = buildReviewDiscoveryFields(review._id, 'published', parsed.rating, review.publishedAt, now, profile, anime)
     await ctx.db.patch('reviews', review._id, { rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
     const next = await ctx.db.get('reviews', review._id)
     if (!next) return fail('REVIEW_WRITE_FAILED', 'Review update failed.')
@@ -391,7 +391,7 @@ export const setVisibility = mutation({
     const review = await readOwnedReview(ctx, args.reviewId, profile._id)
     const anime = await requireCachedAnime(ctx, review.anilistId)
     const updatedAt = Date.now()
-    await ctx.db.patch('reviews', review._id, { visibility: args.visibility, updatedAt, ...buildReviewDiscoveryFields(review._id, review.rating, review.publishedAt, updatedAt, profile, anime) })
+    await ctx.db.patch('reviews', review._id, { visibility: args.visibility, updatedAt, ...buildReviewDiscoveryFields(review._id, review.state, review.rating, review.publishedAt, updatedAt, profile, anime) })
     const next = await ctx.db.get('reviews', review._id)
     if (next) { await applyAggregate(ctx, review.anilistId, review, next); await upsertReviewCard(ctx, next) }
     return null
@@ -403,6 +403,7 @@ export const removeActivity = mutation({
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx)
     const review = await readOwnedReview(ctx, args.reviewId, profile._id)
+    if (review.state !== 'published') return fail('REVIEW_NOT_PUBLISHED', 'Activity can be removed only from published Reviews.')
     await requireCachedAnime(ctx, review.anilistId)
     await ctx.db.patch('reviews', review._id, { activityState: 'deleted', updatedAt: Date.now() })
     const next = await ctx.db.get('reviews', review._id)
@@ -433,7 +434,7 @@ export const backfillDiscoveryFields = internalMutation({
     for (const review of page.page) {
       const [author, anime] = await Promise.all([ctx.db.get('users', review.userId), requireCachedAnime(ctx, review.anilistId)])
       if (!author) return fail('REVIEW_AUTHOR_MISSING', `Review author profile is missing for ${review._id}.`)
-      const expected = buildReviewDiscoveryFields(review._id, review.rating, review.publishedAt, review.updatedAt, author, anime)
+      const expected = buildReviewDiscoveryFields(review._id, review.state, review.rating, review.publishedAt, review.updatedAt, author, anime)
       if (!reviewDiscoveryFieldsMatch(review, expected)) {
         await ctx.db.patch('reviews', review._id, expected)
         updatedCount += 1
@@ -452,7 +453,7 @@ export const verifyDiscoveryBackfill = internalMutation({
     for (const review of page.page) {
       const [author, anime] = await Promise.all([ctx.db.get('users', review.userId), requireCachedAnime(ctx, review.anilistId)])
       if (!author) return fail('REVIEW_AUTHOR_MISSING', `Review author profile is missing for ${review._id}.`)
-      const expected = buildReviewDiscoveryFields(review._id, review.rating, review.publishedAt, review.updatedAt, author, anime)
+      const expected = buildReviewDiscoveryFields(review._id, review.state, review.rating, review.publishedAt, review.updatedAt, author, anime)
       if (!reviewDiscoveryFieldsMatch(review, expected)) mismatchIds.push(review._id)
     }
     return { continueCursor: page.continueCursor, isDone: page.isDone, processedCount: page.page.length, mismatchIds }

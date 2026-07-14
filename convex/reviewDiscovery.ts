@@ -45,16 +45,20 @@ export const reviewOrderFields = (publishedAt: number, rating: number, reviewId:
 /** Builds every Review discovery projection from authoritative source fields. */
 export const buildReviewDiscoveryFields = (
   sourceId: string,
+  state: Doc<'reviews'>['state'],
   rating: number | null,
   publishedAt: number | undefined,
   updatedAt: number,
   author: Doc<'users'>,
   anime: Doc<'animeSummaries'>,
-) => ({
-  searchText: buildReviewSearchText(anime.titles.display, author.name, author.username),
-  ratingBand: getStoredReviewRatingBand(rating),
-  ...reviewOrderFields(publishedAt ?? updatedAt, rating ?? 0, sourceId),
-})
+) => {
+  if (state === 'published' && rating === null) return fail('REVIEW_DISCOVERY_RATING_MISSING', 'Published Review requires a Rating before discovery projection.')
+  return {
+    searchText: buildReviewSearchText(anime.titles.display, author.name, author.username),
+    ratingBand: getStoredReviewRatingBand(rating),
+    ...reviewOrderFields(publishedAt ?? updatedAt, rating ?? 0, sourceId),
+  }
+}
 
 /** Checks stored discovery fields against rebuilt source truth. */
 export const reviewDiscoveryFieldsMatch = (

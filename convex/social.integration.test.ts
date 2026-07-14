@@ -99,9 +99,9 @@ describe('social Convex integration', () => {
     })).items.map((review: { id: string }) => review.id)).not.toContain(privateId)
   }, 30_000)
 
-  test('sorts, filters every Rating band, and searches indexed Review metadata', async () => {
+  test('sorts, filters every decimal Rating-band boundary, and searches indexed Review metadata', async () => {
     const t = createHarness()
-    const ratings = [95, 85, 75, 65, 55, 45, 35, 25, 15, 5]
+    const ratings = [100, 90, 89.9, 80, 79.9, 70, 69.9, 60, 59.9, 50, 49.9, 40, 39.9, 30, 29.9, 20, 19.9, 10, 9.9, 0]
     const authors = await Promise.all(ratings.map((_, index) => createOwner(t, `band-user-${index}`)))
     await Promise.all(ratings.map((_, index) => insertAnime(t, index + 1)))
     await t.run(async (ctx) => {
@@ -120,13 +120,22 @@ describe('social Convex integration', () => {
     const read = async (sort: 'newest' | 'rating-high' | 'rating-low', ratingBand: string | null, query: string | null) => await t.query(socialApi.reviews.listDiscovery, {
       query, sort, ratingBand, visibility: 'public', cursor: null,
     })
-    expect((await read('rating-high', null, null)).items.map((review: { rating: number }) => review.rating)).toEqual(ratings)
-    expect((await read('rating-low', null, null)).items.map((review: { rating: number }) => review.rating)).toEqual([...ratings].reverse())
-    expect((await read('newest', null, null)).items[0]?.summary).toBe('Band 9')
+    expect((await read('rating-high', null, null)).items.map((review: { rating: number }) => review.rating)).toEqual(ratings.slice(0, 12))
+    expect((await read('rating-low', null, null)).items.map((review: { rating: number }) => review.rating)).toEqual([...ratings].reverse().slice(0, 12))
+    const newestItems: Array<{ summary: string }> = []
+    let newestCursor: string | null = null
+    do {
+      const page: { items: Array<{ summary: string }>; cursor: string | null } = await t.query(socialApi.reviews.listDiscovery, {
+        query: null, sort: 'newest', ratingBand: null, visibility: 'public', cursor: newestCursor,
+      })
+      newestItems.push(...page.items)
+      newestCursor = page.cursor
+    } while (newestCursor !== null)
+    expect(newestItems[0]?.summary).toBe('Band 19')
 
     const bands = ['90-100', '80-89', '70-79', '60-69', '50-59', '40-49', '30-39', '20-29', '10-19', '0-9']
     for (let index = 0; index < bands.length; index += 1) {
-      expect((await read('newest', bands[index]!, null)).items.map((review: { rating: number }) => review.rating)).toEqual([ratings[index]])
+      expect((await read('newest', bands[index]!, null)).items.map((review: { rating: number }) => review.rating)).toEqual(ratings.slice(index * 2, (index * 2) + 2).reverse())
     }
     expect((await read('newest', null, 'Frieren')).items).toHaveLength(1)
     expect((await read('newest', null, 'Search Display')).items).toHaveLength(1)
@@ -138,6 +147,13 @@ describe('social Convex integration', () => {
     const viewer = await createOwner(t, 'cursor-viewer')
     const authors = await Promise.all(Array.from({ length: 14 }, (_, index) => createOwner(t, `cursor-author-${index}`)))
     await Promise.all(Array.from({ length: 16 }, (_, index) => insertAnime(t, index + 1)))
+    await t.run(async (ctx) => {
+      for (let index = 1; index <= 16; index += 1) {
+        const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', index)).unique()
+        if (!anime) throw new Error(`Expected cached Anime ${index}.`)
+        await ctx.db.patch('animeSummaries', anime._id, { titles: { ...anime.titles, display: `葬送 Anime ${index}` } })
+      }
+    })
     for (let index = 0; index < authors.length; index += 1) {
       await authors[index]!.client.mutation(socialApi.reviews.publish, {
         anilistId: index + 1, requestId: `cursor-${index}`, rating: 60 + index,
@@ -166,14 +182,18 @@ describe('social Convex integration', () => {
     expect(new Set(ids).size).toBe(16)
 
     const searchFirst = await viewer.client.query(socialApi.reviews.listDiscovery, {
-      query: 'Cursor', sort: 'newest', ratingBand: null, visibility: 'all', cursor: null,
+      query: '葬送', sort: 'newest', ratingBand: null, visibility: 'all', cursor: null,
     })
     expect(searchFirst.items.map((review: { summary: string }) => review.summary)).toEqual(['Cursor own followers'])
     const searchIds: string[] = [...searchFirst.items.map((review: { id: string }) => review.id)]
-    let searchCursor = searchFirst.cursor
+    const searchRetryInput = { query: '葬送', sort: 'newest', ratingBand: null, visibility: 'all', cursor: searchFirst.cursor }
+    const searchSecond = await viewer.client.query(socialApi.reviews.listDiscovery, searchRetryInput)
+    expect(await viewer.client.query(socialApi.reviews.listDiscovery, searchRetryInput)).toEqual(searchSecond)
+    searchIds.push(...searchSecond.items.map((review: { id: string }) => review.id))
+    let searchCursor = searchSecond.cursor
     while (searchCursor !== null) {
       const page = await viewer.client.query(socialApi.reviews.listDiscovery, {
-        query: 'Cursor', sort: 'newest', ratingBand: null, visibility: 'all', cursor: searchCursor,
+        query: '葬送', sort: 'newest', ratingBand: null, visibility: 'all', cursor: searchCursor,
       })
       searchIds.push(...page.items.map((review: { id: string }) => review.id))
       searchCursor = page.cursor
@@ -212,6 +232,65 @@ describe('social Convex integration', () => {
       draftBand: (await ctx.db.get('reviews', draftId))?.ratingBand,
       publishedBand: (await ctx.db.get('reviews', publishedId))?.ratingBand,
     }))).toEqual({ draftBand: 'none', publishedBand: '90-100' })
+  }, 20_000)
+
+  test('allows unrated Draft projection but rejects published Review without Rating', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'null-rating-backfill')
+    await insertAnime(t, 1)
+    await insertAnime(t, 2)
+    const draftId = await owner.client.mutation(socialApi.reviews.saveDraft, {
+      anilistId: 1, requestId: 'null-rating-draft', rating: null, summary: '',
+      summaryHasSpoiler: false, bodyJson, visibility: 'private',
+    })
+    await t.run(async (ctx) => await ctx.db.patch('reviews', draftId, { searchText: undefined, ratingBand: undefined }))
+    await t.mutation(socialInternal.reviews.backfillDiscoveryFields, { paginationOpts: { numItems: 1, cursor: null } })
+    expect(await t.run(async (ctx) => (await ctx.db.get('reviews', draftId))?.ratingBand)).toBe('none')
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert('reviews', {
+        userId: owner.profileId, anilistId: 2, requestId: 'corrupt-published-null', state: 'published', rating: null,
+        summary: 'Corrupt', summaryHasSpoiler: false, bodyJson, visibility: 'public', publishedAt: 1,
+        updatedAt: 1, activityState: 'active', newestOrderKey: 'corrupt', highRatingOrderKey: 'corrupt', lowRatingOrderKey: 'corrupt',
+      })
+    })
+    await expect(t.mutation(socialInternal.reviews.backfillDiscoveryFields, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })).rejects.toThrow('Published Review requires a Rating')
+    await expect(t.mutation(socialInternal.reviews.verifyDiscoveryBackfill, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })).rejects.toThrow('Published Review requires a Rating')
+  }, 20_000)
+
+  test('rejects activity removal for Draft Reviews without changing projection state', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'draft-activity-owner')
+    await insertAnime(t, 1)
+    const reviewId = await owner.client.mutation(socialApi.reviews.saveDraft, {
+      anilistId: 1, requestId: 'draft-activity', rating: null, summary: '',
+      summaryHasSpoiler: false, bodyJson, visibility: 'private',
+    })
+    const before = await t.run(async (ctx) => await ctx.db.get('reviews', reviewId))
+
+    await expect(owner.client.mutation(socialApi.reviews.removeActivity, { reviewId })).rejects.toThrow('published Reviews')
+
+    const after = await t.run(async (ctx) => await ctx.db.get('reviews', reviewId))
+    expect(after).toMatchObject({ state: 'draft', activityState: 'active', searchText: before?.searchText, ratingBand: 'none' })
+  }, 20_000)
+
+  test('fails discovery hydration when indexed Review author source is missing', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'missing-discovery-author')
+    await insertAnime(t, 1)
+    await owner.client.mutation(socialApi.reviews.publish, {
+      anilistId: 1, requestId: 'missing-discovery-author', rating: 75, summary: 'Source required',
+      summaryHasSpoiler: false, bodyJson, visibility: 'public',
+    })
+    await t.run(async (ctx) => await ctx.db.delete('users', owner.profileId))
+
+    await expect(t.query(socialApi.reviews.listDiscovery, {
+      query: null, sort: 'newest', ratingBand: null, visibility: 'public', cursor: null,
+    })).rejects.toThrow('author profile is missing')
   }, 20_000)
 
   test('resumes one Review, publishes idempotently, isolates visibility, and updates metrics', async () => {

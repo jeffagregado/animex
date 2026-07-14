@@ -34,6 +34,19 @@ const checksum = (value: string): string => {
   return (hash >>> 0).toString(36)
 }
 
+const encodeBase64Utf8 = (value: string): string => {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary)
+}
+
+const decodeBase64Utf8 = (value: string): string => {
+  const binary = atob(value)
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+}
+
 /** Maps nullable Review Rating to its migration-safe storage band. */
 export const getStoredReviewRatingBand = (rating: number | null): StoredReviewRatingBand => {
   if (rating === null) return 'none'
@@ -59,7 +72,7 @@ export const buildReviewSearchText = (animeTitle: string, displayName: string, u
 /** Encodes versioned, access-scoped Review discovery state. */
 export const encodeReviewDiscoveryCursor = (cursor: ReviewDiscoveryCursor): string => {
   const json = JSON.stringify({ version: CURSOR_VERSION, ...cursor })
-  return btoa(`${checksum(json)}:${json}`)
+  return encodeBase64Utf8(`${checksum(json)}:${json}`)
 }
 
 const assertScope = (actual: ReviewDiscoveryCursorScope, expected: ReviewDiscoveryCursorScope): void => {
@@ -88,7 +101,7 @@ const assertLaneRecords = (state: ReviewDiscoveryCursorState): void => {
 /** Validates and decodes an access-scoped Review discovery cursor. */
 export const decodeReviewDiscoveryCursor = (encoded: string, scope: ReviewDiscoveryCursorScope): ReviewDiscoveryCursor => {
   try {
-    const decoded = atob(encoded)
+    const decoded = decodeBase64Utf8(encoded)
     const separator = decoded.indexOf(':')
     const providedChecksum = decoded.slice(0, separator)
     const json = decoded.slice(separator + 1)
