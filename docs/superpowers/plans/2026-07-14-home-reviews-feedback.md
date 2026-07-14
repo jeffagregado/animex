@@ -13,7 +13,7 @@
 - Use direct `base-nova` registry items; never replace Base UI surfaces with new Radix-backed components.
 - Reuse existing Select, Dialog, Sonner, and `AsyncButton`; do not add duplicate primitives or Spinner.
 - Require zero `package.json` or `pnpm-lock.yaml` change from shared component generation.
-- Preserve approved visual references, responsive behavior, keyboard access, touch behavior, and dark-theme hover/open states.
+- Preserve approved visual references, responsive behavior, keyboard access, touch behavior, dark-theme hover/open states, and Home feed infinite pagination.
 - Keep TanStack route files thin, use directory `route.tsx` for shared/protected ownership, and regenerate route tree once.
 - Use Convex indexed queries/mutations only; no actions, table-filter scans, client AniList endpoint, or production deployment.
 - No production fixture endpoint. Real QA account data stays dev-only and secrets never enter repository evidence.
@@ -82,8 +82,8 @@ interface UserAnimeProgress {
 - Create: `src/components/ui/empty.tsx`
 - Create: `src/components/ui/progress.tsx`
 - Create: `src/components/ui/dropdown-menu.tsx`
-- Create: `src/components/ui/input.tsx`
-- Create: `src/components/ui/textarea.tsx`
+- Create: `src/components/ui/input.tsx` (Input Group registry dependency)
+- Create: `src/components/ui/textarea.tsx` (Input Group registry dependency)
 - Create: `src/components/ui/input-group.tsx`
 - Reuse unchanged: `src/components/ui/select.tsx`
 - Reuse unchanged: `src/components/ui/dialog.tsx`
@@ -111,7 +111,7 @@ Expected: TanStack Start, Tailwind v4, `#/components/ui` alias, Lucide icons. Cu
 pnpm dlx shadcn@latest add https://ui.shadcn.com/r/styles/base-nova/button.json https://ui.shadcn.com/r/styles/base-nova/input-group.json https://ui.shadcn.com/r/styles/base-nova/card.json https://ui.shadcn.com/r/styles/base-nova/badge.json https://ui.shadcn.com/r/styles/base-nova/skeleton.json https://ui.shadcn.com/r/styles/base-nova/empty.json https://ui.shadcn.com/r/styles/base-nova/progress.json https://ui.shadcn.com/r/styles/base-nova/dropdown-menu.json --dry-run
 ```
 
-Expected: ten new UI source files. No overwrite of Select, Dialog, Sonner, global styles, or configuration.
+Expected: eight requested registry items and ten new UI source files because Input Group also owns Input and Textarea. No overwrite of Select, Dialog, Sonner, global styles, or configuration.
 
 3. Inspect each registry source with `--view`. Require Base UI imports for Button, Progress, and Dropdown Menu. Require existing `#/lib/utils.ts` and Lucide aliases.
 
@@ -135,7 +135,7 @@ pnpm dlx shadcn@latest add https://ui.shadcn.com/r/styles/base-nova/button.json 
    - remove white/native hover, focus, selected, and popup surfaces;
    - use `cn()` and `gap-*`; no `space-*` utilities;
    - keep Base UI `render` composition and accessible labels/values;
-   - keep every Dropdown Menu item inside `DropdownMenuGroup` and every Select item inside `SelectGroup` at consumer sites.
+   - keep every Dropdown Menu item inside `DropdownMenuGroup` and every Select item inside `SelectGroup` in new or modified consumers.
 7. Use full Card composition in later consumers: Header/Title/Description/Content/Footer only where those regions exist. Do not wrap feed layouts in decorative nested Cards without purpose.
 8. Run compile and existing shared-component consumers:
 
@@ -282,15 +282,16 @@ git commit -m "feat: add list progress projection"
 - Modify: `src/routes/_public/home.tsx`
 - Modify: `src/features/home/home-page.tsx`
 - Modify: `src/features/home/home-page.test.tsx`
-- Create: `src/features/discover/ui/use-discover-section-refresh.ts`
+- Create: `src/features/discover/ui/use-discover-sections.ts`
 - Modify: `src/features/discover/ui/discover-page.tsx`
 - Delete: `src/features/home/home-data.ts`
 - Delete: `src/features/home/seasonal-rail.tsx`
+- Create: `src/features/home/home-weekly-list.tsx`
 
 **Steps:**
 
 1. Write failing Home tests proving Seasonal comes from the Home loader's Discover payload and preserves loading, retry, empty, image-error, and rail controls.
-2. Extract the existing section refresh behavior into one reusable Discover hook; keep provider loading/rate-limit behavior unchanged.
+2. Extract the existing section override/retry behavior into `useDiscoverSections`. Return resolved section states plus per-key retry props so Home and Discover share identical cache, loading, rate-limit, retry, and retry-error behavior.
 3. Add a Home route loader using `getDiscoverPage()` and pass its hydrated data to `HomePage`.
 4. Render Seasonal through `DiscoverSectionRail`. Remove the static Home dataset and component.
 5. Do not add a second AniList query, endpoint, server function, or Convex action.
@@ -300,10 +301,11 @@ git commit -m "feat: add list progress projection"
 pnpm exec vitest run src/features/home/home-page.test.tsx src/features/discover/ui/discover-page.test.tsx src/features/discover/ui/discover-section.test.tsx
 ```
 
-7. Commit:
+7. Add a This Week state adapter around `DiscoverWeeklyList`: loading/error/retry/empty states match Upcoming, ready state truncates Trending to five. Do not duplicate weekly row markup.
+8. Commit:
 
 ```powershell
-git add src/routes/_public/home.tsx src/features/home src/features/discover/ui/use-discover-section-refresh.ts src/features/discover/ui/discover-page.tsx
+git add src/routes/_public/home.tsx src/features/home src/features/discover/ui/use-discover-sections.ts src/features/discover/ui/discover-page.tsx
 git commit -m "refactor: reuse discover seasonal on home"
 ```
 
@@ -320,6 +322,8 @@ git commit -m "refactor: reuse discover seasonal on home"
 - Modify: `src/features/home/home-page.tsx`
 - Modify: `src/features/home/home-page.test.tsx`
 - Modify: `src/features/feed/feed-page.tsx`
+- Modify: `src/features/reviews/ui/review-summary.tsx`
+- Modify: `src/features/reviews/ui/review-summary.test.tsx`
 
 **Steps:**
 
@@ -327,20 +331,21 @@ git commit -m "refactor: reuse discover seasonal on home"
 2. Write failing tests for exact signed-in order: List Progress, Latest Reviews, This Week, Upcoming.
 3. Prove public rendering does not issue `getMyProgress` and the sidebar is hidden below `lg`.
 4. Build scoped loading, empty, error, and retry states for Latest Reviews and List Progress. Preserve loaded content on a retryable refresh error.
-5. Latest Reviews rows show cover, author, relative timestamp, two-line Summary, no Rating, Review Detail link, and `See more` to `/reviews`.
-6. Reuse `DiscoverWeeklyList` and `DiscoverUpcomingList`; do not copy their markup.
-7. Remove `Community feed` and signed-in `What are you watching?`. Keep the Create Post button and existing feed tabs.
-8. At desktop, use the approved main/feed plus compact right-column geometry. At 390/768, render no utility column and no unreachable modules after the infinite feed.
-9. Run:
+5. Add explicit `detail | list` Review Summary variants. `list` preserves independent spoiler reveal while using compact typography and two-line clamping; existing Detail/Anime Reviews call sites retain `detail` behavior.
+6. Latest Reviews rows show cover, author, relative timestamp, compact `list` Summary, no Rating, Review Detail link, and `See more` to `/reviews`.
+7. Reuse `DiscoverWeeklyList` and `DiscoverUpcomingList`; do not copy their markup.
+8. Remove `Community feed` and signed-in `What are you watching?`. Keep the Create Post button and existing feed tabs.
+9. At desktop, use the approved main/feed plus compact right-column geometry. At 390/768, render no utility column and no unreachable modules after the infinite feed.
+10. Run:
 
 ```powershell
-pnpm exec vitest run src/features/home/home-sidebar.test.tsx src/features/home/home-page.test.tsx
+pnpm exec vitest run src/features/home/home-sidebar.test.tsx src/features/home/home-page.test.tsx src/features/reviews/ui/review-summary.test.tsx
 ```
 
-10. Commit:
+11. Commit:
 
 ```powershell
-git add src/features/home src/features/feed/feed-page.tsx
+git add src/features/home src/features/feed/feed-page.tsx src/features/reviews/ui/review-summary.tsx src/features/reviews/ui/review-summary.test.tsx
 git commit -m "feat: restore home utility column"
 ```
 
@@ -353,23 +358,29 @@ git commit -m "feat: restore home utility column"
 - Modify: `src/features/feed/feed-card.tsx`
 - Modify: `src/features/feed/feed-card.test.tsx`
 - Modify: `src/features/feed/feed-list.tsx`
+- Create: `src/features/feed/feed-list.test.tsx`
+- Create: `src/features/feed/feed-cover-image.tsx`
 - Modify when separation is needed: `src/features/feed/post-image-grid.tsx`
-- Modify when separation is needed: `src/features/feed/feed-owner-actions.tsx`
+- Modify: `src/features/feed/feed-owner-actions.tsx`
+- Modify: `src/features/feed/use-feed-pages.test.tsx`
 
 **Steps:**
 
 1. Write failing behavior/structure tests for coral Post accent, cyan Review/Completed/Rewatched accent, compact activity header, owner menu, timestamp, Review anime cover/title/Rating/Summary, and responsive image framing.
-2. Restyle with Tailwind to match `home-desktop-feed.png` while retaining current DTO truth.
-3. Preserve Post spoiler reveal, Review Summary spoiler reveal, direct activity links, Review Detail links, owner edit/visibility/delete, and disabled Phase 6 Like/Comment labels.
-4. Assert absent fake reaction counts, bookmarks, milestone Score/descriptions, and Post anime attachment.
-5. Test hover, focus-visible, pending, disabled, spoiler-covered, spoiler-revealed, image-error, and owner-menu-open class states.
-6. Run:
+2. Restyle with Tailwind to match `home-desktop-feed.png` while retaining current DTO truth. Put coral/cyan accent on actual card articles and use compact contextual activity phrasing plus relative time.
+3. Replace Eye-triggered owner Dialog entry with Base UI Dropdown Menu overflow trigger. Keep confirmations in accessible Dialogs, and keep edit/visibility/delete mutations unchanged.
+4. Add explicit cover-image unavailable state using the existing Discover image-failure pattern. Preserve card geometry after failure.
+5. Convert Home feed pagination to IntersectionObserver-driven infinite loading. Keep scoped retry/terminal rows and an accessible manual Load more fallback when IntersectionObserver is unavailable.
+6. Preserve Post spoiler reveal, Review Summary spoiler reveal, direct activity links, Review Detail links, owner edit/visibility/delete, and disabled Phase 6 Like/Comment labels.
+7. Assert absent fake reaction counts, bookmarks, milestone Score/descriptions, and Post anime attachment.
+8. Test hover, focus-visible, pending, disabled, spoiler-covered, spoiler-revealed, image-error, owner-menu-open, observer load, duplicate-intersection guard, retry, and terminal states.
+9. Run:
 
 ```powershell
-pnpm exec vitest run src/features/feed/feed-card.test.tsx src/features/feed/feed-card-detail-page.test.tsx src/features/feed/feed-owner-actions.test.tsx
+pnpm exec vitest run src/features/feed/feed-card.test.tsx src/features/feed/feed-card-detail-page.test.tsx src/features/feed/feed-owner-actions.test.tsx src/features/feed/feed-list.test.tsx src/features/feed/use-feed-pages.test.tsx
 ```
 
-7. Commit:
+10. Commit:
 
 ```powershell
 git add src/features/feed
@@ -395,21 +406,22 @@ git commit -m "style: align home feed cards"
 
 **Steps:**
 
-1. Write route-state tests for invalid value normalization, public visibility locking, signed-in visibility options, and URL replace navigation.
-2. Add the path using the existing directory route convention. Keep `index.tsx` thin: validate search, normalize auth-aware visibility, render the feature page.
+1. Write route-state tests for invalid value normalization, public visibility locking, signed-in visibility options, auth-ready URL replacement, and URL replace navigation.
+2. Add the path using the existing directory route convention. Keep `index.tsx` thin: shape-normalize search params and render the feature page. After public auth resolves, replace non-public visibility with `public` before issuing discovery query; backend visibility isolation remains authoritative.
 3. Implement 300 ms trailing search debounce. Query text under two characters does not reach Convex. Clearing restores selected sort.
 4. Active search disables the sort Select and labels it `Relevance`; rating and visibility remain active.
 5. Build a scope/epoch-isolated cursor hook following `useFeedPages`: ignore stale auth/filter responses, dedupe IDs, retain loaded cards during pagination failure, retry the failed cursor, and prevent duplicate in-flight requests.
-6. Use `IntersectionObserver` for 12-item infinite pages. Provide skeleton, empty, retry, and terminal rows that preserve list geometry.
-7. Card fields: anime cover/title, Rating, Summary, author, timestamp, visibility where owner-only content needs disclosure, spoiler reveal, and Review Detail action. Never render the full body.
-8. Match the approved desktop/mobile references. Use AnimeX shell navigation rather than older reference-only navigation.
-9. Run:
+6. Use `IntersectionObserver` for 12-item infinite pages and the existing Discover test shim pattern. Provide skeleton, empty, retry, and terminal rows that preserve list geometry.
+7. Card fields: anime cover/title, Rating, compact `list` Summary, author, timestamp, visibility where owner-only content needs disclosure, spoiler reveal, and Review Detail action. Never render the full body.
+8. Match the approved desktop/mobile references. Use `min-w-0`, overflow containment, and mobile bottom-navigation clearance (`pb-28`). Use AnimeX shell navigation rather than older reference-only navigation.
+9. Assert no horizontal overflow at 390 px and no discovery query before auth-ready visibility normalization.
+10. Run:
 
 ```powershell
 pnpm exec vitest run src/routes/_public/reviews/-review-search.test.ts src/features/reviews/discovery/review-discovery-page.test.tsx src/features/reviews/discovery/use-review-discovery-pages.test.tsx
 ```
 
-10. Commit:
+11. Commit:
 
 ```powershell
 git add src/routes/_public/reviews src/features/reviews/discovery
@@ -527,9 +539,10 @@ git commit -m "chore: integrate home review feedback"
 1. Task 1 adds shared UI foundations before frontend work.
 2. Task 2 locks contracts.
 3. Tasks 3 and 4 may run in parallel after Task 2; schema ownership is coordinated by controller.
-4. Tasks 5–8 may run in parallel only with file ownership above and after required backend contracts exist.
-5. Controller performs Tasks 9 and 10 once.
-6. Fresh reviewer and QA perform Task 11 after all automated gates pass.
+4. Task 5 completes before Task 6 because both own Home composition and Discover section state.
+5. Tasks 7 and 8 may run in parallel after Task 6 and required backend contracts exist; their write sets are disjoint.
+6. Controller performs Tasks 9 and 10 once.
+7. Fresh reviewer and QA perform Task 11 after all automated gates pass.
 
 ## Final Acceptance
 
