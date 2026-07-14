@@ -413,14 +413,14 @@ git commit -m "style: align home feed cards"
 
 **Steps:**
 
-1. Write route-state tests for invalid value normalization, public visibility locking, signed-in visibility options, auth-ready URL replacement, and URL replace navigation.
-2. Add the path using the existing directory route convention. Keep `index.tsx` thin: shape-normalize search params and render the feature page. After public auth resolves, replace non-public visibility with `public` before issuing discovery query; backend visibility isolation remains authoritative.
+1. Write route-state tests for absent versus invalid value normalization, public visibility locking, signed-in visibility options, auth-ready URL replacement, and URL replace navigation. Bare signed-in `/reviews` defaults to `all`; bare signed-out and invalid visibility normalize to `public`.
+2. Add the path using the existing directory route convention. Keep `index.tsx` thin: shape-normalize search params and render the feature page. After public auth resolves, resolve the absent visibility default or replace an invalid/non-public public-viewer value before issuing discovery query; backend visibility isolation remains authoritative. Auth failure renders an explicit scoped error, never an empty result.
 3. Implement 300 ms trailing search debounce. Query text under two characters does not reach Convex. Clearing restores selected sort.
 4. Active search disables the sort Select and labels it `Relevance`; rating and visibility remain active.
 5. Build a scope/epoch-isolated cursor hook following `useFeedPages`: ignore stale auth/filter responses, dedupe IDs, retain loaded cards during pagination failure, retry the failed cursor, and prevent duplicate in-flight requests.
 6. Use `IntersectionObserver` for 12-item infinite pages and the existing Discover test shim pattern. Provide skeleton, empty, retry, and terminal rows that preserve list geometry.
 7. Card fields: anime cover/title, Rating, compact `list` Summary, author, timestamp, visibility where owner-only content needs disclosure, spoiler reveal, and Review Detail action. Never render the full body.
-8. Match the approved desktop/mobile references. Use `min-w-0`, overflow containment, and mobile bottom-navigation clearance (`pb-28`). Use AnimeX shell navigation rather than older reference-only navigation.
+8. Match the approved desktop/mobile references. Use a two-column mobile/tablet filter grid with Search and Visibility spanning both columns until `lg`; Sort and Rating stay paired. Use `min-w-0`, overflow containment, and mobile bottom-navigation clearance (`pb-28`). Use AnimeX shell navigation rather than older reference-only navigation.
 9. Assert no horizontal overflow at 390 px and no discovery query before auth-ready visibility normalization.
 10. Run:
 

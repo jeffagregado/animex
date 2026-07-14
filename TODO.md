@@ -743,5 +743,5 @@ Status: IMPLEMENTATION IN PROGRESS on `jeff-cx/phase-5-feed-reviews`; backend mi
 - [x] Implement atomic List Progress projection and verified migration. Owner: Convex user-anime worker.
 - [x] Reuse Discover Seasonal/This Week/Upcoming and restore Home desktop utilities. Owner: Home workers.
 - [x] Match approved feed-card structure without fake Phase 6 data. Owner: feed UI worker.
-- [ ] Build `/reviews` search, filters, visibility, and infinite pagination. Owner: Review discovery UI worker.
+- [x] Build `/reviews` search, filters, visibility, and infinite pagination. Owner: Review discovery UI worker.
 - [ ] Integrate generated files, run full gates, review, real signed-in browser QA, and cleanup. Owner: controller + reviewer + QA.
