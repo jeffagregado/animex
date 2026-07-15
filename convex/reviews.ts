@@ -51,8 +51,12 @@ const statsValidator = v.object({
   count: v.number(), average: v.union(v.number(), v.null()),
   bands: v.array(v.number()),
 })
+const REVIEW_MAINTENANCE_MESSAGE = 'Review maintenance is in progress. Try again shortly.'
 
 const fail = (code: string, message: string): never => { throw new ConvexError({ code, message }) }
+
+/** Blocks public Review writes during destructive maintenance. */
+const requireReviewWritesOpen = (): never => fail('REVIEW_MAINTENANCE', REVIEW_MAINTENANCE_MESSAGE)
 
 type PublishIntent = { anilistId: number; rating: number; summary: string; summaryHasSpoiler: boolean; visibility: Doc<'reviews'>['visibility'] }
 
@@ -173,6 +177,7 @@ export const getMineForAnime = query({
 export const saveDraft = mutation({
   args: reviewFields, returns: v.id('reviews'),
   handler: async (ctx, args) => {
+    requireReviewWritesOpen()
     const { profile } = await requireProfile(ctx)
     const anime = await requireCachedAnime(ctx, args.anilistId)
     const body = parseBodyJson(args.bodyJson)
@@ -200,6 +205,7 @@ export const saveDraft = mutation({
 export const publish = mutation({
   args: { ...reviewFields, rating: v.number() }, returns: v.id('reviews'),
   handler: async (ctx, args) => {
+    requireReviewWritesOpen()
     const { profile } = await requireProfile(ctx)
     const anime = await requireCachedAnime(ctx, args.anilistId)
     const body = parseBodyJson(args.bodyJson)
@@ -239,6 +245,7 @@ export const update = mutation({
   args: { reviewId: v.id('reviews'), rating: v.number(), summary: v.string(), summaryHasSpoiler: v.boolean(), bodyJson: v.string(), visibility: visibilityValidator },
   returns: v.id('reviews'),
   handler: async (ctx, args) => {
+    requireReviewWritesOpen()
     const { profile } = await requireProfile(ctx)
     const review = await readOwnedReview(ctx, args.reviewId, profile._id)
     const anime = await requireCachedAnime(ctx, review.anilistId)
@@ -387,6 +394,7 @@ export const getStats = query({
 export const setVisibility = mutation({
   args: { reviewId: v.id('reviews'), visibility: visibilityValidator }, returns: v.null(),
   handler: async (ctx, args) => {
+    requireReviewWritesOpen()
     const { profile } = await requireProfile(ctx)
     const review = await readOwnedReview(ctx, args.reviewId, profile._id)
     const anime = await requireCachedAnime(ctx, review.anilistId)
@@ -401,6 +409,7 @@ export const setVisibility = mutation({
 export const removeActivity = mutation({
   args: { reviewId: v.id('reviews') }, returns: v.null(),
   handler: async (ctx, args) => {
+    requireReviewWritesOpen()
     const { profile } = await requireProfile(ctx)
     const review = await readOwnedReview(ctx, args.reviewId, profile._id)
     if (review.state !== 'published') return fail('REVIEW_NOT_PUBLISHED', 'Activity can be removed only from published Reviews.')
@@ -415,6 +424,7 @@ export const removeActivity = mutation({
 export const remove = mutation({
   args: { reviewId: v.id('reviews') }, returns: v.null(),
   handler: async (ctx, args) => {
+    requireReviewWritesOpen()
     const { profile } = await requireProfile(ctx)
     const review = await readOwnedReview(ctx, args.reviewId, profile._id)
     await requireCachedAnime(ctx, review.anilistId)

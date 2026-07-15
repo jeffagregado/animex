@@ -52,6 +52,39 @@ const body = {
 const bodyJson = JSON.stringify(body)
 
 describe('social Convex integration', () => {
+  test('freezes every Review write while keeping Review reads available', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'maintenance-owner')
+    await insertAnime(t, 1)
+    const reviewId = await t.run(async (ctx) => await ctx.db.insert('reviews', {
+      userId: owner.profileId, anilistId: 1, requestId: 'maintenance-review', state: 'published', rating: 90,
+      summary: 'Readable during maintenance', summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      publishedAt: 1, updatedAt: 1, activityState: 'active', newestOrderKey: 'maintenance-new',
+      highRatingOrderKey: 'maintenance-high', lowRatingOrderKey: 'maintenance-low',
+      searchText: 'readable during maintenance', ratingBand: '90-100',
+    }))
+    const maintenanceMessage = 'Review maintenance is in progress. Try again shortly.'
+    const writes = [
+      () => owner.client.mutation(socialApi.reviews.saveDraft, {
+        anilistId: 1, requestId: 'maintenance-draft', rating: null, summary: '', summaryHasSpoiler: false,
+        bodyJson, visibility: 'private',
+      }),
+      () => owner.client.mutation(socialApi.reviews.publish, {
+        anilistId: 1, requestId: 'maintenance-publish', rating: 90, summary: 'Publish', summaryHasSpoiler: false,
+        bodyJson, visibility: 'public',
+      }),
+      () => owner.client.mutation(socialApi.reviews.update, {
+        reviewId, rating: 80, summary: 'Update', summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      }),
+      () => owner.client.mutation(socialApi.reviews.setVisibility, { reviewId, visibility: 'private' }),
+      () => owner.client.mutation(socialApi.reviews.removeActivity, { reviewId }),
+      () => owner.client.mutation(socialApi.reviews.remove, { reviewId }),
+    ]
+
+    for (const write of writes) await expect(write()).rejects.toThrow(maintenanceMessage)
+    expect(await owner.client.query(socialApi.reviews.getById, { reviewId })).toMatchObject({ id: reviewId, summary: 'Readable during maintenance' })
+  })
+
   test('discovers latest Public Reviews without leaking viewer-owned visibility', async () => {
     const t = createHarness()
     const viewer = await createOwner(t, 'discovery-viewer')
