@@ -1,6 +1,15 @@
 # Phase 5 Review Card, Avatar, And Rail Feedback Design
 
-Status: APPROVED WRITTEN SPECIFICATION. Implementation plan prepared for user review.
+Status: IMPLEMENTED on `jeff-cx/phase-5-feed-reviews`; final integrated/full/browser gates pending controller evidence.
+
+## Current Implementation
+
+- Review warning metadata is `containsSpoiler`. It renders `ReviewSpoilerBadge` only; it never hides Summary or ordinary Review body text. Rich-text spoiler blocks keep independent reveal behavior.
+- The bounded Review cleanup completed before the contract rename. The guarded development inventory contained 3 Reviews, 3 Review feed cards, and 2 Review-stat rows; cleanup deleted all 3 Reviews and 2 stats rows, removed their linked cards, and found 0 orphan Review cards. A second full pass deleted 0. Protected counts remained unchanged: 1 Post, 1 Post card, 4 Completed cards, and 1 Rewatched card. The temporary cleanup surface is removed; profiles, anime state/cache, and accounts remain outside the cleanup scope.
+- Shared UI is in place: `UserAvatar` provides cover-cropped images and accessible uppercase one-letter fallbacks; `ReviewSpoilerBadge` owns warning presentation; `PublishedReviewCard` is consumed by `/reviews` and Anime Detail Reviews.
+- Feed Review bodies are one whole-body link to Review Detail with visible Summary and no `Read Review` CTA. Latest Reviews rows are whole-row Review Detail links with anime title, author, timestamp, visible compact Summary, optional top-right badge, and no visible `Read review` CTA.
+- Review activity owner action is labeled `Delete` but calls `reviews.removeActivity`; confirmation and success copy remain activity-only. Review source deletion remains a Review Detail action.
+- `HorizontalRail` stretches direct children only within its own rail. Anime poster links/articles fill the row height and metadata uses a growing column with bottom-aligned year/format; rail width, ratio, snapping, scrolling, and breakpoints remain unchanged.
 
 ## Scope
 
@@ -10,7 +19,7 @@ No production dependency, new route, AniList query, Convex action, or deployment
 
 ## Review Spoiler Contract
 
-- Replace Review `summaryHasSpoiler` with Review-level `containsSpoiler`.
+- Review uses `containsSpoiler` as its Review-level warning field.
 - Writer label: `Review contains spoiler`.
 - Flag is warning metadata only. Summary and ordinary Review body stay visible.
 - Explicit rich-text spoiler blocks keep independent cover/reveal behavior.

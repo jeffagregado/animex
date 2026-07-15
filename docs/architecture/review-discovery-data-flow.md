@@ -34,11 +34,32 @@ Development migration verification for the final schema used indexed page size 5
 
 Verification found zero legacy Post IDs, zero `postImages` rows, and zero orphan Post feed projections. The preserved text Post had one empty legacy field cleared during final schema recovery; no Post content, media URL, or storage identifier was exposed. Final `convex/schema.ts` contains required nullable `posts.media` and no legacy Post image table or field.
 
-## Review writes
+## Review writes and warning flow
 
-Review create, draft save, publish, edit, and visibility mutations update the source Review and its discovery fields atomically. Discovery text contains normalized anime title, author name, and username. Rating bands are required; `none` is valid only for an unrated Draft. Published Reviews without a Rating fail explicitly.
+| Hop | Current state |
+| --- | --- |
+| Entry and input | `src/features/reviews/ui/review-editor-page.tsx` collects a text `rating` draft, Summary, `containsSpoiler`, visibility, and serialized rich-text body. Draft starts at Rating `50`; focused partial values remain text. |
+| Validation | `src/features/reviews/review-validation.ts` rejects nonnumeric, out-of-range, and over-one-decimal Rating values. Drafts may keep Rating empty; Publish/Update require a complete valid Rating and Summary. |
+| Transform | Complete Rating becomes `number | null`; `containsSpoiler` remains warning metadata. `ReviewSpoilerBadge` marks the warning, while Summary, ordinary body text, and independent rich-text spoiler blocks retain their own rendering/reveal behavior. |
+| Storage | `convex/reviews.ts` persists `containsSpoiler` on `reviews` and projects it to Review feed cards. Create, draft save, publish, edit, and visibility mutations update source and discovery fields atomically. |
+| External calls | Convex mutations/queries only; Review writes do not call AniList or another external service. |
+| Retry and error | Invalid fields stay in the editor with explicit errors. Convex failures surface through the existing error/toast paths; no fabricated Review fallback is rendered. |
+| Output | Feed Review body is one whole-body `/reviews/:reviewId` link with visible Summary and badge. Latest Reviews rows are whole-row Review Detail links with title, author, time, visible compact Summary, and optional badge. `/reviews` and Anime Detail Reviews render `PublishedReviewCard`; Review Detail uses `UserAvatar`, badge, Summary, and body. |
+| Owner | Editor and Review UI own draft/render state; `convex/reviews.ts` owns persistence, discovery projection, and source authorization; `convex/feed.ts` owns feed hydration and projection authorization. |
 
-Review deletion removes the source row. Activity deletion removes only the feed projection and does not remove Review discovery. New Review fields start from the author's account visibility after the complete profile resolves. Existing Drafts and published Reviews retain their stored visibility.
+Review source deletion is a Review Detail action. Review activity owner menu is labeled `Delete`, calls `reviews.removeActivity`, and removes only the Review feed projection; activity-only confirmation and success copy remain. Activity deletion does not remove Review discovery.
+
+## Review cleanup boundary
+
+The guarded development cleanup completed before the `containsSpoiler` schema contract was reopened. Bounded inventory was 3 Reviews, 3 Review feed cards, and 2 `animeReviewStats` rows. Cleanup deleted 3 Reviews and 2 stats rows, removed linked Review cards, found 0 orphan Review cards, and produced zero remaining rows in all three target sets. A second full pass deleted 0. Protected counts were unchanged: 1 Post, 1 Post card, 4 Completed cards, and 1 Rewatched card. The temporary cleanup functions and write gate are absent from the final source.
+
+## Shared author Avatar flow
+
+`src/components/user-avatar.tsx` receives avatar URL, display name, accessible label, and `sm`/`md`/`lg` size. A valid image uses a cover crop; missing or failed images render the uppercase first display-name character, or `?` for an empty name, with the label exposed once to assistive technology. URL changes reset the failure state. Feed Post, Review, Completed, and Rewatched cards plus Review Detail use this shared component; Review listing cards retain their approved anime-cover layout.
+
+## Discover rail layout boundary
+
+`HorizontalRail` applies `items-stretch` only to direct children in the current rail. `AnimePoster` link/article fill available height and the metadata column grows with year/format aligned at the bottom. Trending, Seasonal, Recommendations, and Home Seasonal inherit this per-rail equalization through `DiscoverSectionRail`; no cross-rail measurement, fixed global height, width, cover ratio, snap, or scroll-control change is involved.
 
 ## Feed projection reads
 

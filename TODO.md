@@ -771,7 +771,7 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migration, r
 
 # Phase 5 Review Card, Avatar, And Rail Feedback
 
-Status: IMPLEMENTATION PLAN READY on `jeff-cx/phase-5-feed-reviews`; awaiting plan approval.
+Status: IMPLEMENTATION COMPLETE on `jeff-cx/phase-5-feed-reviews`; final integrated/full/browser gates pending controller evidence.
 
 - [x] Inspect Feed Review, Review discovery, Anime Reviews, Latest Reviews, writer fields, avatar renderers, and anime rails.
 - [x] Lock whole-body Review links, activity-only Delete copy, exact shared Review card, and per-rail equal heights.
@@ -782,5 +782,12 @@ Status: IMPLEMENTATION PLAN READY on `jeff-cx/phase-5-feed-reviews`; awaiting pl
 - [x] Approve written design behavior.
 - [x] Review and approve written specification.
 - [x] Create detailed implementation plan.
-- [ ] Review and approve implementation plan.
-- [ ] Implement only after plan approval.
+- [x] Review and approve implementation plan.
+- [x] Complete guarded Review cleanup before schema rename: 3 Reviews, 3 Review feed cards, and 2 Review-stat rows inventoried; 3 Reviews and 2 stats rows deleted; linked cards removed; 0 orphan Review cards found; second full pass deleted 0. Protected counts unchanged: 1 Post, 1 Post card, 4 Completed cards, and 1 Rewatched card. Temporary cleanup surface removed. Owner: controller + Convex migration worker.
+- [x] Rename Review warning metadata to `containsSpoiler`; keep Summary and ordinary body visible; preserve independent rich-text spoiler blocks. Owner: controller + contracts worker.
+- [x] Add spinner-free Rating draft input (default `50`, partial text, `0–100`, max one decimal) and right-aligned `Review contains spoiler` writer checkbox. Owner: Review UI worker.
+- [x] Add shared `UserAvatar` and `ReviewSpoilerBadge`; replace feed activity icons and Review Detail avatar markup with shared primitives. Owner: shared UI worker.
+- [x] Link Feed Review bodies and Latest Review rows to Review Detail; remove visible `Read Review`/`Read review` CTAs. Keep Review activity `Delete` action mapped to `reviews.removeActivity` with activity-only semantics. Owner: feed/Home worker.
+- [x] Share `PublishedReviewCard` between `/reviews` and Anime Detail Reviews; preserve listing query, sorting, stats, pagination, visibility, and anime-cover layout. Owner: Review listing worker.
+- [x] Equalize anime card heights within each rail through shared `HorizontalRail`/`DiscoverSectionRail`; preserve width, ratio, snapping, scrolling, arrows, and responsive behavior. Owner: Discover rail worker.
+- [ ] Run final integrated reviewer, full automated gates, and responsive authenticated browser QA at 390, 768, and 1280 px. Owner: controller + reviewer + QA.
