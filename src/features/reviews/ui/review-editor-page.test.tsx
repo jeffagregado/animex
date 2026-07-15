@@ -57,6 +57,46 @@ const fillPublishableReview = (): void => {
 }
 
 describe('LoadedReviewEditor lifecycle', () => {
+  it('keeps rating text intact while focused and lays out spoiler control below the field grid', () => {
+    render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={null} mode="create" />)
+    const rating = screen.getByLabelText('Review Rating') as HTMLInputElement
+    expect(rating.type).toBe('text')
+    expect(rating.inputMode).toBe('decimal')
+    expect(rating.value).toBe('50')
+    fireEvent.change(rating, { target: { value: '9.' } })
+    expect(rating.value).toBe('9.')
+    const checkbox = screen.getByRole('checkbox', { name: 'Review contains spoiler' })
+    expect(checkbox.closest('[data-review-spoiler-row]')?.className).toContain('justify-end')
+  })
+
+  it('persists empty Draft rating as null and rejects empty Publish rating', async () => {
+    render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={null} mode="create" />)
+    fillPublishableReview()
+    fireEvent.change(screen.getByLabelText('Review Rating'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: /Save draft/ }))
+    await waitFor(() => expect(saveDraft).toHaveBeenCalledWith(expect.objectContaining({ rating: null })))
+    fireEvent.click(screen.getByRole('button', { name: /Publish review/ }))
+    expect(await screen.findByText('Published Review requires a Rating.')).toBeTruthy()
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('rejects invalid rating text instead of clamping or persisting it', async () => {
+    render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={null} mode="create" />)
+    fillPublishableReview()
+    fireEvent.change(screen.getByLabelText('Review Rating'), { target: { value: '100.1' } })
+    fireEvent.click(screen.getByRole('button', { name: /Save draft/ }))
+    expect(await screen.findByText('Rating must be between 0 and 100 with at most one decimal.')).toBeTruthy()
+    expect(saveDraft).not.toHaveBeenCalled()
+  })
+
+  it('hydrates existing rating text and persists containsSpoiler during Update', async () => {
+    render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={{ ...published, body: textDocument('Published body') } as never} mode="edit" />)
+    expect((screen.getByLabelText('Review Rating') as HTMLInputElement).value).toBe('90')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Review contains spoiler' }))
+    fireEvent.click(screen.getByRole('button', { name: /Update review/ }))
+    await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({ rating: 90, containsSpoiler: true })))
+  })
+
   it('saves Draft then publishes with distinct intent IDs and navigates after persistence', async () => {
     render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={null} mode="create" />)
     fillPublishableReview()

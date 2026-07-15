@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createEmptyReviewDocument } from './review-document-adapter'
-import { getReviewVisibleTextLength, validateReviewEditorFields } from './review-validation'
+import { getReviewVisibleTextLength, parseReviewRating, validateReviewEditorFields } from './review-validation'
 
 const textDocument = (text: string) => ({
   version: 1 as const,
@@ -30,5 +30,21 @@ describe('review editor validation', () => {
   it('enforces one-decimal rating and shared visible-character counting', () => {
     expect(validateReviewEditorFields({ body: textDocument('Good'), rating: 50.12, summary: 'Summary' }, 'draft')).toContain('Rating must be between 0 and 100 with at most one decimal.')
     expect(getReviewVisibleTextLength(textDocument('Good'))).toBe(4)
+  })
+
+  it.each([
+    ['0', 0], ['9', 9], ['9.5', 9.5], ['100', 100], ['100.0', 100],
+  ])('parses complete valid rating text %s', (value, expected) => {
+    expect(parseReviewRating(value)).toBe(expected)
+  })
+
+  it.each(['9.', '.5', '50.12', '-1', '100.1', 'abc'])('rejects incomplete or invalid rating text %s', (value) => {
+    expect(() => parseReviewRating(value)).toThrow('Rating must be between 0 and 100 with at most one decimal.')
+  })
+
+  it('maps empty rating text to null for Draft validation and rejects Publish', () => {
+    expect(parseReviewRating('')).toBeNull()
+    expect(validateReviewEditorFields({ body: textDocument('Good'), rating: '', summary: 'Summary' }, 'draft')).toEqual([])
+    expect(validateReviewEditorFields({ body: textDocument('Good'), rating: '', summary: 'Summary' }, 'publish')).toEqual(['Published Review requires a Rating.'])
   })
 })

@@ -24,7 +24,7 @@ export function ReviewDiscoveryCard({ review }: { review: ReviewListItem }) {
           <time dateTime={new Date(review.publishedAt).toISOString()} title={new Date(review.publishedAt).toLocaleString()}>{formatRelativeTime(review.publishedAt)}</time>
           {review.visibility === 'public' ? null : <Badge variant="outline">{review.visibility === 'followers' ? 'My Followers' : 'My Private'}</Badge>}
         </div>
-        <ReviewSummary hasSpoiler={review.containsSpoiler} summary={review.summary} variant="list" />
+        <ReviewSummary summary={review.summary} variant="list" />
       </div>
       <p aria-label={`Rating: ${review.rating} out of 100`} className="absolute top-4 right-4 text-xl font-black text-cyan-300 sm:text-3xl">{review.rating}<span className="text-sm font-normal text-muted-foreground sm:text-base">/100</span></p>
       <div className="col-start-2 flex min-w-0 items-end justify-end sm:col-start-3 sm:row-span-3 sm:row-start-1 sm:flex-col sm:justify-end">

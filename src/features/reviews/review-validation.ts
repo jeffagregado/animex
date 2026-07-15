@@ -7,6 +7,14 @@ import {
 type ReviewNode = ReviewDocumentV1['editorState']['root']['children'][number]
 type ReviewFields = { body: unknown; rating: unknown; summary: unknown }
 export type ReviewSaveMode = 'draft' | 'publish'
+const ratingError = 'Rating must be between 0 and 100 with at most one decimal.'
+
+/** Converts complete Rating text to its persistence value. */
+export const parseReviewRating = (value: string): number | null => {
+  if (value === '') return null
+  if (!/^(?:100(?:\.0)?|\d{1,2}(?:\.\d)?)$/.test(value)) throw new RangeError(ratingError)
+  return Number(value)
+}
 
 /** Counts visible text, image alt, and video label using validated structure. */
 export const getReviewVisibleTextLength = (value: unknown): number => {
@@ -31,7 +39,8 @@ const getRealText = (node: ReviewNode): string => {
 /** Returns ordered actionable validation messages for Draft or Publish. */
 export const validateReviewEditorFields = (fields: ReviewFields, mode: ReviewSaveMode): string[] => {
   try {
-    const draft = validateDraftReview(fields.body, fields.rating, fields.summary)
+    const rating = typeof fields.rating === 'string' ? parseReviewRating(fields.rating) : fields.rating
+    const draft = validateDraftReview(fields.body, rating, fields.summary)
     if (mode === 'draft') return []
 
     const errors: string[] = []
@@ -42,7 +51,7 @@ export const validateReviewEditorFields = (fields: ReviewFields, mode: ReviewSav
     return errors
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : 'Review fields are invalid.'
-    if (/rating|multiple/i.test(message)) return ['Rating must be between 0 and 100 with at most one decimal.']
+    if (/rating|multiple|too_big|too_small/i.test(message)) return [ratingError]
     return [message]
   }
 }

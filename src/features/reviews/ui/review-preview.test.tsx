@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { ReviewDocumentV1 } from '#/features/social/shared/review-document'
@@ -12,12 +12,12 @@ const document: ReviewDocumentV1 = { version: 1, editorState: { root: { ...field
 afterEach(cleanup)
 
 describe('ReviewPreview', () => {
-  it('matches published summary spoiler and document behavior', () => {
+  it('shows flagged summary with a non-interactive Spoiler badge', () => {
     render(<ReviewPreview document={document} rating={92} summary="Ending revealed" containsSpoiler />)
     expect(screen.getByText('Published body')).toBeTruthy()
-    expect(screen.queryByText('Ending revealed')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Reveal summary spoiler' }))
     expect(screen.getByText('Ending revealed')).toBeTruthy()
+    expect(screen.getByText('Spoiler')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Spoiler' })).toBeNull()
     expect(screen.getByText('92.0')).toBeTruthy()
   })
 
