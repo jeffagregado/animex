@@ -1,6 +1,6 @@
 # Phase 5 Editor, Post Media, And Feed Feedback Implementation Plan
 
-Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`. Unchecked steps preserve historical execution sequence; they are not open product work. Current closure is tracked in `TODO.md`, `design-qa.md`, and `docs/architecture/review-discovery-data-flow.md`.
+Status: COMPLETE and integrated on `dev`. Unchecked steps preserve historical execution sequence; they are not open product work. Current closure is tracked in `TODO.md`, `design-qa.md`, and `docs/architecture/review-discovery-data-flow.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use fresh orchestration workers only for disjoint owned files; integrate schema and generated files once.
 

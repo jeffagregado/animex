@@ -1,6 +1,6 @@
 # Review Layout, Media, And Checkbox Feedback Design
 
-Status: IMPLEMENTED AND VERIFIED.
+Status: IMPLEMENTED, VERIFIED, and integrated on `dev`.
 
 ## Scope
 
@@ -46,7 +46,7 @@ Add official shadcn Base UI Checkbox from the direct `base-nova` registry item. 
 - Replace native Review `Review contains spoiler` checkbox.
 - Replace native Post `Hide whole Post as spoiler` checkbox.
 - Preserve controlled booleans, label activation, disabled state, keyboard toggle, focus-visible ring, and dark/cyan theme.
-- Existing `DropdownMenuCheckboxItem` remains unchanged because it is a menu-selection primitive, not standalone checkbox markup.
+- Unused dropdown menu-selection primitives, including `DropdownMenuCheckboxItem`, were removed during Phase 5 cumulative dead-code cleanup; current owner menus use only the retained menu primitives.
 - Before new UI primitives are created, inspect installed shadcn components and registry availability first.
 
 ## Boundaries

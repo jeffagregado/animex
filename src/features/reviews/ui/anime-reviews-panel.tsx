@@ -9,6 +9,7 @@ import {
   reviewStatsSchema,
   type ReviewListItem,
   type ReviewSort,
+  type ReviewStatsDto,
 } from '#/features/social/shared/social-contracts'
 import { PublishedReviewCard } from './published-review-card'
 import { parseReviewWireDetail } from '../review-document-adapter'
@@ -24,21 +25,52 @@ export function AnimeReviewsPanel(props: AnimeReviewsPanelProps) {
 }
 
 export function AnimeReviewsContent({ anilistId, slug }: AnimeReviewsPanelProps) {
-  const auth = usePublicAuthState()
-  const convexAuth = useConvexAuth()
   const [sort, setSort] = useState<ReviewSort>('newest')
   const [cursor, setCursor] = useState<string | null>(null)
   const [items, setItems] = useState<ReviewListItem[]>([])
   const rawPage = useQuery(api.reviews.listForAnime, { anilistId, sort, cursor })
   const rawStats = useQuery(api.reviews.getStats, { anilistId })
-  const signedIn = auth.status === 'ready' && auth.authState.status === 'complete' && convexAuth.isAuthenticated
+  const signedIn = useSignedInReviewViewer()
   const page = rawPage === undefined ? undefined : parseReviewPage(rawPage)
   const stats = rawStats === undefined ? undefined : reviewStatsSchema.parse(rawStats)
 
   useEffect(() => { if (page) setItems((current) => reconcileReviewItems(current, page.items, cursor)) }, [cursor, rawPage])
   const changeSort = (value: string | null): void => { if (!value) return; setSort(value as ReviewSort); setCursor(null); setItems([]) }
 
-  return <div className="space-y-5"><header className="flex flex-col gap-4 rounded-xl border border-border bg-card/40 p-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-bold uppercase tracking-wider text-cyan-300">Viewer-visible reviews</p><h2 className="mt-1 text-2xl font-black">{stats ? `${stats.count} ${stats.count === 1 ? 'review' : 'reviews'}` : 'Loading reviews…'}</h2><p className="mt-1 text-muted-foreground">{stats?.average === null ? 'Average rating unavailable' : stats ? `${stats.average.toFixed(1)} average rating` : 'Loading rating summary…'}</p></div><div className="flex flex-wrap gap-3">{signedIn ? <PrivateWriteReview anilistId={anilistId} slug={slug} /> : null}<Select onValueChange={changeSort} value={sort}><SelectTrigger aria-label="Sort reviews" className="min-w-44"><SelectValue>{sortLabels[sort]}</SelectValue></SelectTrigger><SelectContent>{sorts.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div></header>{stats ? <RatingBands bands={stats.bands} count={stats.count} /> : <PanelSkeleton />}{rawPage === undefined && items.length === 0 ? <PanelSkeleton /> : null}{page && items.length === 0 ? <div className="rounded-xl border border-border bg-card/40 p-8 text-center"><h2 className="text-xl font-black">No reviews yet</h2><p className="mt-2 text-muted-foreground">Average rating unavailable · 0 reviews</p></div> : null}<div className="space-y-4">{items.map((review) => <PublishedReviewCard key={review.id} review={review} />)}</div>{page?.hasMore ? <button className="min-h-11 w-full rounded-lg border border-border font-bold hover:border-cyan-300 hover:text-cyan-300" disabled={rawPage === undefined} onClick={() => setCursor(page.cursor)} type="button">{rawPage === undefined ? 'Loading more…' : 'Load more reviews'}</button> : items.length > 0 ? <p className="text-center text-sm text-muted-foreground">You reached the end.</p> : null}</div>
+  return <div className="space-y-5"><ReviewPanelHeader anilistId={anilistId} signedIn={signedIn} slug={slug} sort={sort} stats={stats} onSortChange={changeSort} />{stats ? <RatingBands bands={stats.bands} count={stats.count} /> : <PanelSkeleton />}<ReviewResults items={items} loading={rawPage === undefined} page={page} onLoadMore={setCursor} /></div>
+}
+
+/** Reads signed-in state only when public and Convex auth agree. */
+function useSignedInReviewViewer(): boolean {
+  const auth = usePublicAuthState()
+  const convexAuth = useConvexAuth()
+  return auth.status === 'ready' && auth.authState.status === 'complete' && convexAuth.isAuthenticated
+}
+
+function ReviewPanelHeader({ anilistId, signedIn, slug, sort, stats, onSortChange }: AnimeReviewsPanelProps & { signedIn: boolean; sort: ReviewSort; stats: ReviewStatsDto | undefined; onSortChange: (value: string | null) => void }) {
+  return <header className="flex flex-col gap-4 rounded-xl border border-border bg-card/40 p-5 sm:flex-row sm:items-end sm:justify-between"><ReviewStatsSummary stats={stats} /><div className="flex flex-wrap gap-3">{signedIn ? <PrivateWriteReview anilistId={anilistId} slug={slug} /> : null}<Select onValueChange={onSortChange} value={sort}><SelectTrigger aria-label="Sort reviews" className="min-w-44"><SelectValue>{sortLabels[sort]}</SelectValue></SelectTrigger><SelectContent>{sorts.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div></header>
+}
+
+function ReviewStatsSummary({ stats }: { stats: ReviewStatsDto | undefined }) {
+  const count = stats ? `${stats.count} ${stats.count === 1 ? 'review' : 'reviews'}` : 'Loading reviews…'
+  const average = getAverageRatingLabel(stats)
+  return <div><p className="text-sm font-bold uppercase tracking-wider text-cyan-300">Viewer-visible reviews</p><h2 className="mt-1 text-2xl font-black">{count}</h2><p className="mt-1 text-muted-foreground">{average}</p></div>
+}
+
+const getAverageRatingLabel = (stats: ReviewStatsDto | undefined): string => {
+  if (!stats) return 'Loading rating summary…'
+  return stats.average === null ? 'Average rating unavailable' : `${stats.average.toFixed(1)} average rating`
+}
+
+function ReviewResults({ items, loading, page, onLoadMore }: { items: ReviewListItem[]; loading: boolean; page: ReviewPage | undefined; onLoadMore: (cursor: string | null) => void }) {
+  return <>{loading && items.length === 0 ? <PanelSkeleton /> : null}{page && items.length === 0 ? <EmptyReviews /> : null}<div className="space-y-4">{items.map((review) => <PublishedReviewCard key={review.id} review={review} />)}</div><ReviewPagination items={items} loading={loading} page={page} onLoadMore={onLoadMore} /></>
+}
+
+function EmptyReviews() { return <div className="rounded-xl border border-border bg-card/40 p-8 text-center"><h2 className="text-xl font-black">No reviews yet</h2><p className="mt-2 text-muted-foreground">Average rating unavailable · 0 reviews</p></div> }
+
+function ReviewPagination({ items, loading, page, onLoadMore }: { items: ReviewListItem[]; loading: boolean; page: ReviewPage | undefined; onLoadMore: (cursor: string | null) => void }) {
+  if (page?.hasMore) return <button className="min-h-11 w-full rounded-lg border border-border font-bold hover:border-cyan-300 hover:text-cyan-300" disabled={loading} onClick={() => onLoadMore(page.cursor)} type="button">{loading ? 'Loading more…' : 'Load more reviews'}</button>
+  return items.length > 0 ? <p className="text-center text-sm text-muted-foreground">You reached the end.</p> : null
 }
 
 function PrivateWriteReview({ anilistId, slug }: AnimeReviewsPanelProps) {

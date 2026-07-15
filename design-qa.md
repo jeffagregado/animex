@@ -42,6 +42,8 @@ Viewports: 1280 x 900, 768 x 1024, 390 x 844. Theme: dark. States: signed out an
 
 - 91 test files passed, 2 skipped.
 - 637 tests passed, 3 skipped.
-- Route generation, Convex sync, TypeScript, client and SSR build, Fallow new-only audit, client AniList endpoint scan, and diff check pass.
-- Build retains existing large-chunk warning; no new-only audit finding was introduced.
+- Route generation, Convex sync, TypeScript, client and SSR build, cumulative Fallow new-only audit, client AniList endpoint scan, and diff check pass. Cumulative Fallow reports zero introduced dead-code, complexity, or duplication findings; the inherited `react-dom` advisory remains.
+- React Doctor completes with exit 0 and 69 advisory warnings but no errors. Zod-v4 migration warnings are false positives under installed Zod 4.4.3; remaining hook, accessibility, performance, and conventional shared-component advisories stay optional technical debt.
+- Build retains the existing large-chunk warning.
 - Final mobile Review action-row alignment, pending spoiler-checkbox lock, desktop Rating placement, and Base UI `data-disabled` styling follow-up pass at 390/768/1280 px.
+- Final signed-in in-app browser smoke verifies Home feed, owner menu and destructive hover theme, Review Detail, Anime Reviews, Review editor, and a clean browser console after cumulative quality cleanup.

@@ -1,6 +1,6 @@
 # Phase 5 Editor, Post Media, And Feed Feedback Design
 
-Status: IMPLEMENTED AND VERIFIED on `jeff-cx/phase-5-feed-reviews`; final closure is tracked in `TODO.md`, `design-qa.md`, and `docs/architecture/review-discovery-data-flow.md`.
+Status: IMPLEMENTED, VERIFIED, and integrated on `dev`; final closure is tracked in `TODO.md`, `design-qa.md`, and `docs/architecture/review-discovery-data-flow.md`.
 
 ## Scope
 

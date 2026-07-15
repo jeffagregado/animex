@@ -16,16 +16,21 @@ export function FeedCardDetailPage({ cardId }: { cardId: string }) {
 function FeedCardDetailContent({ cardId }: { cardId: string }) {
   const [editOpen, setEditOpen] = useState(false)
   const raw = useQuery(api.feed.getById, { cardId })
-  const auth = usePublicAuthState()
-  const convexAuth = useConvexAuth()
-  const signedIn = auth.status === 'ready' && isCompleteAuthState(auth.authState) && convexAuth.isAuthenticated
-  const ownerId = signedIn && auth.status === 'ready' && auth.authState.status === 'complete' ? auth.authState.profile.id : null
+  const viewer = useFeedViewer()
   if (raw === undefined) return <DetailState title="Loading activity…" message="Fetching latest activity." />
   if (raw === null) return <DetailState title="Activity not found" message="This activity is missing, private, malformed, or unavailable." />
   const card = feedCardSchema.parse(raw)
   const edit = editOpen && card.kind === 'post' ? card : null
-  const visibility = signedIn && auth.status === 'ready' && auth.authState.status === 'complete' ? auth.authState.profile.visibility : 'public'
-  return <main className="mx-auto min-h-[55dvh] max-w-3xl px-4 py-8"><a className="mb-5 inline-block font-bold text-cyan-300 hover:underline" href="/home">← Back to feed</a><FeedCard card={card} onChanged={() => undefined} onEdit={() => setEditOpen(true)} owner={ownerId === card.author.id} signedIn={signedIn} /><PostComposerDialog edit={edit} initialVisibility={visibility} onClose={() => setEditOpen(false)} onSaved={() => setEditOpen(false)} open={edit !== null} /></main>
+  return <main className="mx-auto min-h-[55dvh] max-w-3xl px-4 py-8"><a className="mb-5 inline-block font-bold text-cyan-300 hover:underline" href="/home">← Back to feed</a><FeedCard card={card} onChanged={() => undefined} onEdit={() => setEditOpen(true)} owner={viewer.ownerId === card.author.id} signedIn={viewer.signedIn} /><PostComposerDialog edit={edit} initialVisibility={viewer.visibility} onClose={() => setEditOpen(false)} onSaved={() => setEditOpen(false)} open={edit !== null} /></main>
+}
+
+/** Derives Feed viewer identity only after both auth layers agree. */
+function useFeedViewer() {
+  const auth = usePublicAuthState()
+  const convexAuth = useConvexAuth()
+  const signedIn = auth.status === 'ready' && isCompleteAuthState(auth.authState) && convexAuth.isAuthenticated
+  if (!signedIn || auth.status !== 'ready' || auth.authState.status !== 'complete') return { ownerId: null, signedIn: false, visibility: 'public' as const }
+  return { ownerId: auth.authState.profile.id, signedIn: true, visibility: auth.authState.profile.visibility }
 }
 
 class FeedDetailBoundary extends Component<{ cardId: string; children: ReactNode }, { error: Error | null; retry: number }> {

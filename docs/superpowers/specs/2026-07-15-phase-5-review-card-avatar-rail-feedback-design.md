@@ -1,6 +1,6 @@
 # Phase 5 Review Card, Avatar, And Rail Feedback Design
 
-Status: IMPLEMENTED AND VERIFIED on `jeff-cx/phase-5-feed-reviews`; final reviewer, independent QA, automated gates, and authenticated Chrome browser QA at 390, 768, and 1280 px pass.
+Status: IMPLEMENTED, VERIFIED, and integrated on `dev`; final reviewer, independent QA, automated gates, and authenticated Chrome browser QA at 390, 768, and 1280 px pass.
 
 ## Current Implementation
 

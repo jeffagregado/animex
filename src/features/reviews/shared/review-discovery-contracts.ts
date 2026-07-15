@@ -8,8 +8,8 @@ import {
 } from '../../social/shared/social-contracts'
 
 export const REVIEW_DISCOVERY_PAGE_SIZE = 12 as const
-export const REVIEW_DISCOVERY_QUERY_MIN_LENGTH = 2 as const
-export const REVIEW_DISCOVERY_QUERY_MAX_LENGTH = 100 as const
+const REVIEW_DISCOVERY_QUERY_MIN_LENGTH = 2 as const
+const REVIEW_DISCOVERY_QUERY_MAX_LENGTH = 100 as const
 
 export const reviewDiscoveryQuerySchema = z.string().trim()
   .min(REVIEW_DISCOVERY_QUERY_MIN_LENGTH)

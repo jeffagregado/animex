@@ -19,6 +19,8 @@ import {
 import {
   decodeReviewDiscoveryCursor,
   normalizeReviewDiscoveryQuery,
+  type ReviewDiscoveryCursorState,
+  type ReviewDiscoveryLane,
   type ReviewDiscoveryCursorScope,
 } from './reviewDiscoveryPolicy'
 import { assertRequestId, canReadSocialRecord, decodeReviewCursor, encodeReviewCursor, mergeReviewPage, transitionReviewAggregate } from './socialPolicy'
@@ -158,6 +160,53 @@ const toReviewDetail = async (ctx: QueryCtx, review: Doc<'reviews'>) => {
   parseReviewDocument(JSON.parse(review.bodyJson))
   return { ...await toReviewList(ctx, review), bodyJson: review.bodyJson }
 }
+
+type DiscoveryPage = { reviews: Doc<'reviews'>[]; cursor: string | null; hasMore: boolean }
+
+/** Restricts anonymous discovery reads to Public Reviews. */
+const resolveDiscoveryAccess = (
+  viewer: Doc<'users'> | null,
+  requestedVisibility: ReviewDiscoveryVisibility,
+): { viewerId: Id<'users'> | null; visibility: ReviewDiscoveryVisibility } => {
+  if (!viewer) return { viewerId: null, visibility: 'public' }
+  return { viewerId: viewer._id, visibility: requestedVisibility }
+}
+
+/** Normalizes an optional discovery query. */
+const normalizeOptionalDiscoveryQuery = (queryText: string | null): string | null => queryText === null
+  ? null
+  : normalizeReviewDiscoveryQuery(queryText)
+
+/** Restores cursor state or creates its first-page state. */
+const resolveDiscoveryState = (
+  cursor: string | null,
+  scope: ReviewDiscoveryCursorScope,
+  active: ReviewDiscoveryLane[],
+): ReviewDiscoveryCursorState => cursor === null
+  ? createDiscoveryCursorState(scope.query, active)
+  : decodeReviewDiscoveryCursor(cursor, scope).state
+
+/** Reads ordered or search discovery from its matching cursor state. */
+const readDiscoveryPage = async (
+  ctx: QueryCtx,
+  scope: ReviewDiscoveryCursorScope,
+  active: ReviewDiscoveryLane[],
+  state: ReviewDiscoveryCursorState,
+): Promise<DiscoveryPage> => {
+  if (scope.query === null) {
+    if (state.mode !== 'ordered') return fail('INVALID_REVIEW_CURSOR', 'Search cursor cannot continue ordered Review discovery.')
+    return await readOrderedDiscoveryPage(ctx, scope, active, state)
+  }
+  if (state.mode !== 'search') return fail('INVALID_REVIEW_CURSOR', 'Ordered cursor cannot continue Review search.')
+  return await readSearchDiscoveryPage(ctx, { ...scope, query: scope.query }, active, state)
+}
+
+/** Hydrates indexed discovery rows into API Review cards. */
+const hydrateDiscoveryPage = async (ctx: QueryCtx, page: DiscoveryPage) => ({
+  items: await Promise.all(page.reviews.map((review) => toReviewList(ctx, review))),
+  cursor: page.cursor,
+  hasMore: page.hasMore,
+})
 
 export const getMineForAnime = query({
   args: { anilistId: v.number() }, returns: v.union(reviewDetailValidator, v.null()),
@@ -353,20 +402,16 @@ export const listDiscovery = query({
   returns: discoveryPageValidator,
   handler: async (ctx, args) => {
     const viewer = await getOptionalProfile(ctx)
-    const visibility: ReviewDiscoveryVisibility = viewer ? args.visibility : 'public'
-    const queryText = args.query === null ? null : normalizeReviewDiscoveryQuery(args.query)
-    const scope: ReviewDiscoveryCursorScope = { viewerId: viewer?._id ?? null, query: queryText, sort: args.sort, ratingBand: args.ratingBand, visibility }
-    const active = getActiveDiscoveryLanes(visibility, viewer?._id ?? null)
-    const initialState = createDiscoveryCursorState(queryText, active)
-    const state = args.cursor === null ? initialState : decodeReviewDiscoveryCursor(args.cursor, scope).state
-    if (queryText === null) {
-      if (state.mode !== 'ordered') return fail('INVALID_REVIEW_CURSOR', 'Search cursor cannot continue ordered Review discovery.')
-      const page = await readOrderedDiscoveryPage(ctx, scope, active, state)
-      return { items: await Promise.all(page.reviews.map((review) => toReviewList(ctx, review))), cursor: page.cursor, hasMore: page.hasMore }
+    const access = resolveDiscoveryAccess(viewer, args.visibility)
+    const scope: ReviewDiscoveryCursorScope = {
+      ...access,
+      query: normalizeOptionalDiscoveryQuery(args.query),
+      sort: args.sort,
+      ratingBand: args.ratingBand,
     }
-    if (state.mode !== 'search') return fail('INVALID_REVIEW_CURSOR', 'Ordered cursor cannot continue Review search.')
-    const page = await readSearchDiscoveryPage(ctx, { ...scope, query: queryText }, active, state)
-    return { items: await Promise.all(page.reviews.map((review) => toReviewList(ctx, review))), cursor: page.cursor, hasMore: page.hasMore }
+    const active = getActiveDiscoveryLanes(scope.visibility, access.viewerId)
+    const state = resolveDiscoveryState(args.cursor, scope, active)
+    return await hydrateDiscoveryPage(ctx, await readDiscoveryPage(ctx, scope, active, state))
   },
 })
 

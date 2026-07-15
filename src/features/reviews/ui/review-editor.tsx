@@ -90,7 +90,11 @@ const restoreReviewEditorState = (editor: ReviewEditorChange['editor'], document
 const getSerializedVisibleTextLength = (value: unknown): number => {
   if (Array.isArray(value)) return value.reduce((sum, item) => sum + getSerializedVisibleTextLength(item), 0)
   if (typeof value !== 'object' || value === null) return 0
-  const node = value as Record<string, unknown>
+  return getSerializedNodeVisibleTextLength(value as Record<string, unknown>)
+}
+
+/** Counts one serialized node before descending into nested values. */
+const getSerializedNodeVisibleTextLength = (node: Record<string, unknown>): number => {
   if (node.type === 'text' && typeof node.text === 'string') return node.text.length
   if (node.type === 'review-image' && typeof node.alt === 'string') return node.alt.length
   if (node.type === 'review-video' && typeof node.label === 'string') return node.label.length

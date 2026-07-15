@@ -13,20 +13,33 @@ export function ReviewDocumentRenderer({ document }: RendererProps) {
 }
 
 function ReviewNodeView({ node }: { node: ReviewNode }) {
+  if (isContainerNode(node)) return <ReviewContainerNode node={node} />
+  if (node.type === 'spoiler') return <SpoilerBlock node={node} />
+  if (node.type === 'review-image' || node.type === 'review-video') return <ReviewMediaNode node={node} />
+  if (node.type === 'linebreak') return <br />
+  if (node.type === 'text') return renderText(node.text, node.format)
+  return null
+}
+
+type ReviewContainer = Extract<ReviewNode, { type: 'paragraph' | 'heading' | 'quote' | 'list' | 'listitem' }>
+type ReviewMedia = Extract<ReviewNode, { type: 'review-image' | 'review-video' }>
+
+const isContainerNode = (node: ReviewNode): node is ReviewContainer => ['paragraph', 'heading', 'quote', 'list', 'listitem'].includes(node.type)
+
+/** Renders structural Review nodes without mixing leaf dispatch. */
+function ReviewContainerNode({ node }: { node: ReviewContainer }) {
   if (node.type === 'paragraph') return <p>{renderChildren(node.children)}</p>
   if (node.type === 'heading') return node.tag === 'h2' ? <h2 className="text-2xl font-black">{renderChildren(node.children)}</h2> : <h3 className="text-xl font-black">{renderChildren(node.children)}</h3>
   if (node.type === 'quote') return <blockquote className="border-l-2 border-cyan-300 pl-4 italic text-muted-foreground">{renderChildren(node.children)}</blockquote>
   if (node.type === 'listitem') return <li>{renderChildren(node.children)}</li>
-  if (node.type === 'list') {
-    const items = node.children.map((child, index) => <ReviewNodeView key={`${child.type}-${index}`} node={child} />)
-    return node.listType === 'number' ? <ol className="list-decimal space-y-1 pl-6" start={node.start}>{items}</ol> : <ul className="list-disc space-y-1 pl-6 marker:text-cyan-300">{items}</ul>
-  }
-  if (node.type === 'spoiler') return <SpoilerBlock node={node} />
+  const items = node.children.map((child, index) => <ReviewNodeView key={`${child.type}-${index}`} node={child} />)
+  return node.listType === 'number' ? <ol className="list-decimal space-y-1 pl-6" start={node.start}>{items}</ol> : <ul className="list-disc space-y-1 pl-6 marker:text-cyan-300">{items}</ul>
+}
+
+/** Renders validated external Review media. */
+function ReviewMediaNode({ node }: { node: ReviewMedia }) {
   if (node.type === 'review-image') return <ReviewImage alt={node.alt} url={node.url} />
-  if (node.type === 'review-video') return <ReviewVideo label={node.label} provider={node.provider} url={node.url} />
-  if (node.type === 'linebreak') return <br />
-  if (node.type === 'text') return renderText(node.text, node.format)
-  return null
+  return <ReviewVideo label={node.label} provider={node.provider} url={node.url} />
 }
 
 const renderChildren = (children: ReviewNode[]): ReactNode => children.map((child, index) => <ReviewNodeView key={`${child.type}-${index}`} node={child} />)

@@ -1,6 +1,6 @@
 # Phase 5 Home And Review Discovery Feedback Design
 
-Status: IMPLEMENTED AND VERIFIED on `jeff-cx/phase-5-feed-reviews`; final closure is tracked in `TODO.md` and `design-qa.md`.
+Status: IMPLEMENTED, VERIFIED, and integrated on `dev`; final closure is tracked in `TODO.md` and `design-qa.md`.
 
 ## Scope
 

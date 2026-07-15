@@ -51,31 +51,6 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-/** Renders supporting card text. */
-function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-description"
-      className={cn("text-sm text-muted-foreground", className)}
-      {...props}
-    />
-  )
-}
-
-/** Positions a card header action. */
-function CardAction({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-action"
-      className={cn(
-        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
 /** Renders primary card content. */
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -87,26 +62,9 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-/** Renders card footer content. */
-function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-footer"
-      className={cn(
-        "flex items-center rounded-b-xl border-t bg-muted/50 p-(--card-spacing)",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
 export {
   Card,
   CardHeader,
-  CardFooter,
   CardTitle,
-  CardAction,
-  CardDescription,
   CardContent,
 }

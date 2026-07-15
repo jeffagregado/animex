@@ -1,6 +1,6 @@
 # Review Layout, Media, And Checkbox Feedback Implementation Plan
 
-Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`. Unchecked steps preserve historical execution sequence; they are not open product work. Current closure is tracked in `TODO.md` and `design-qa.md`.
+Status: COMPLETE and integrated on `dev`. Unchecked steps preserve historical execution sequence; they are not open product work. Current closure is tracked in `TODO.md` and `design-qa.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

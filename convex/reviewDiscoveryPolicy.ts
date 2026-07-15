@@ -84,18 +84,29 @@ const assertScope = (actual: ReviewDiscoveryCursorScope, expected: ReviewDiscove
 }
 
 const isLane = (value: unknown): value is ReviewDiscoveryLane => typeof value === 'string' && DISCOVERY_LANES.includes(value as ReviewDiscoveryLane)
-const assertLaneRecords = (state: ReviewDiscoveryCursorState): void => {
-  for (const lane of DISCOVERY_LANES) {
-    if (state.mode === 'ordered') {
-      const laneState = state.lanes?.[lane]
-      if (!laneState || (laneState.anchor !== null && typeof laneState.anchor !== 'string') || typeof laneState.done !== 'boolean') {
-        throw new TypeError('Invalid ordered Review discovery cursor state.')
-      }
-    } else if ((state.cursors?.[lane] !== null && typeof state.cursors?.[lane] !== 'string') || typeof state.done?.[lane] !== 'boolean') {
-      throw new TypeError('Invalid search Review discovery cursor state.')
-    }
+const isCursorValue = (value: unknown): value is string | null => value === null || typeof value === 'string'
+
+/** Validates one ordered discovery lane record. */
+const assertOrderedLaneRecord = (laneState: OrderedLaneState | undefined): void => {
+  if (!laneState || !isCursorValue(laneState.anchor) || typeof laneState.done !== 'boolean') {
+    throw new TypeError('Invalid ordered Review discovery cursor state.')
   }
-  if (state.mode === 'search' && !isLane(state.phase)) throw new TypeError('Invalid Review discovery search phase.')
+}
+
+/** Validates one search discovery lane record. */
+const assertSearchLaneRecord = (state: Extract<ReviewDiscoveryCursorState, { mode: 'search' }>, lane: ReviewDiscoveryLane): void => {
+  if (!isCursorValue(state.cursors?.[lane]) || typeof state.done?.[lane] !== 'boolean') {
+    throw new TypeError('Invalid search Review discovery cursor state.')
+  }
+}
+
+const assertLaneRecords = (state: ReviewDiscoveryCursorState): void => {
+  if (state.mode === 'ordered') {
+    for (const lane of DISCOVERY_LANES) assertOrderedLaneRecord(state.lanes?.[lane])
+    return
+  }
+  for (const lane of DISCOVERY_LANES) assertSearchLaneRecord(state, lane)
+  if (!isLane(state.phase)) throw new TypeError('Invalid Review discovery search phase.')
 }
 
 /** Validates and decodes an access-scoped Review discovery cursor. */

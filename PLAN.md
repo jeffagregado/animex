@@ -120,7 +120,7 @@ Phase 4 status: COMPLETE on `jeff-cx/phase-4-anime-detail`; automated gates, Con
 
 ### Phase 5: Feed, Posts, Reviews
 
-Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; closure details and latest validation live in `TODO.md` and `design-qa.md`.
+Status: COMPLETE and integrated on `dev`; closure details and latest validation live in `TODO.md` and `design-qa.md`.
 
 - Build Home, Following, Global feed views.
 - Add Post Composer.

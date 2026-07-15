@@ -53,4 +53,4 @@ function Button({ className, variant, size, ...props }: ButtonPrimitive.Props & 
   )
 }
 
-export { Button, buttonVariants }
+export { Button }

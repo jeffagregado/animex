@@ -1,6 +1,6 @@
 # Phase 5 Feed, Posts, Reviews
 
-Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`. This baseline plan is historical; current contracts and validation live in `TODO.md` and `docs/architecture/review-discovery-data-flow.md`.
+Status: COMPLETE and integrated on `dev`. This baseline plan is historical; current contracts and validation live in `TODO.md` and `docs/architecture/review-discovery-data-flow.md`.
 
 ## Outcome
 

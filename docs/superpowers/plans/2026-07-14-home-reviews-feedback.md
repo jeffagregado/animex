@@ -1,6 +1,6 @@
 # Phase 5 Home And Review Discovery Feedback Implementation Plan
 
-Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`. Unchecked steps below preserve historical execution sequence; they are not open product work. Current closure is tracked in `TODO.md` and `design-qa.md`.
+Status: COMPLETE and integrated on `dev`. Unchecked steps below preserve historical execution sequence; they are not open product work. Current closure is tracked in `TODO.md` and `design-qa.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use fresh orchestration workers only for disjoint owned files; integrate generated files once.
 

@@ -703,7 +703,7 @@ Status: COMPLETE on `jeff-cx/phase-4-anime-detail`.
 
 # Phase 5 Feed, Posts, Reviews
 
-Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; authenticated browser QA and closure gates pass.
+Status: COMPLETE and integrated on `dev`; authenticated browser QA and closure gates pass.
 
 - [x] Create feature branch; verify clean 349-pass baseline. Owner: controller.
 - [x] Add approved direct Lexical dependencies. Owner: controller.
@@ -724,10 +724,11 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; authenticated browser QA and
 
 - [ ] Optional anime attachment in Post Composer.
 - [ ] Mobile Home Explore tab or sheet for utility modules.
+- [ ] Optional React Doctor advisory cleanup for Phase 5 hook, accessibility, performance, and maintainability warnings; keep Zod 4.4.3 and conventional shared-component false positives triaged separately.
 
 # Phase 5 Home And Review Discovery Feedback
 
-Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migrations, browser QA, and closure gates pass.
+Status: COMPLETE and integrated on `dev`; implementation, migrations, browser QA, and closure gates pass.
 
 - [x] Inspect current Home, Discover, feed, Review, user-anime, and cache flows.
 - [x] Lock Home Seasonal, desktop utility order, List Progress metrics, and removed placeholders.
@@ -748,7 +749,7 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migrations, 
 
 # Phase 5 Editor, Post Media, And Feed Feedback
 
-Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migration, review, authenticated browser QA, and closure gates pass.
+Status: COMPLETE and integrated on `dev`; implementation, migration, review, authenticated browser QA, and closure gates pass.
 
 - [x] Inspect Review editor, Post storage, feed cards, Home utility, and Discover layout flows.
 - [x] Verify RichTextEditor caret insertion, selection replacement, and Backspace media deletion behavior.
@@ -771,7 +772,7 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migration, r
 
 # Phase 5 Review Card, Avatar, And Rail Feedback
 
-Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; final reviewer, independent QA, automated gates, and authenticated Chrome browser QA at 390, 768, and 1280 px pass.
+Status: COMPLETE and integrated on `dev`; final reviewer, independent QA, automated gates, and authenticated Chrome browser QA at 390, 768, and 1280 px pass.
 
 - [x] Inspect Feed Review, Review discovery, Anime Reviews, Latest Reviews, writer fields, avatar renderers, and anime rails.
 - [x] Lock whole-body Review links, activity-only Delete copy, exact shared Review card, and per-rail equal heights.
@@ -794,7 +795,7 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; final reviewer, independent 
 
 # Phase 5 Review Layout, Media, And Checkbox Feedback
 
-Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; final review, automated gates, and authenticated browser QA pass.
+Status: COMPLETE and integrated on `dev`; final review, automated gates, and authenticated browser QA pass.
 
 - [x] Inspect shared Review card, Home desktop grid, Review/Post image renderers, and native checkbox usage.
 - [x] Lock mobile Rating/action row, 430px desktop utility column, scoped 4:5 image geometry, and responsive 65% cap.
@@ -811,12 +812,16 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; final review, automated gate
 
 # Phase 5 Formal Closure
 
-Status: IN PROGRESS; stale-doc audit and local `dev` integration approved.
+Status: COMPLETE on `dev`; stale docs, cumulative quality blockers, integration, validation, review, and signed-in browser smoke are complete.
 
 - [x] Verify Phase 5 implementation, feedback rounds, migrations, automated gates, and authenticated browser QA are complete.
 - [x] Confirm `dev` is an ancestor of `jeff-cx/phase-5-feed-reviews` and fast-forward integration is available.
 - [x] Remove stale Phase 5 status, Post-media, Review-spoiler, owner-action, README, and QA-summary claims.
 - [x] Commit reviewed closure docs on the feature branch.
-- [ ] Fast-forward `dev` to the verified feature branch without push or deployment.
-- [ ] Run post-merge full tests, TypeScript, production build, React Doctor, Fallow, endpoint scan, and diff/status checks.
-- [ ] Record Phase 5 complete on `dev`; keep optional anime attachment and mobile Home Explore outside closure.
+- [x] Fast-forward `dev` to the verified feature branch without push or deployment.
+- [x] Run post-merge full tests, TypeScript, production build, React Doctor, Fallow, endpoint scan, and diff/status checks.
+- [x] Remove cumulative Phase 5 Fallow blockers: 23 introduced dead-code findings and 11 introduced complexity findings reduced to zero without schema, dependency, or product-behavior changes.
+- [x] Complete signed-in in-app browser smoke for Home feed, owner menu and destructive hover theme, Review Detail, Anime Reviews, Review editor, and clean console.
+- [x] Record Phase 5 complete on `dev`; keep optional anime attachment, mobile Home Explore, and advisory cleanup outside closure.
+
+Post-merge validation: 91 test files passed / 2 skipped; 637 tests passed / 3 skipped; Convex sync, TypeScript, client and SSR production build, cumulative Fallow new-only audit with zero introduced dead-code, complexity, or duplication findings, client AniList endpoint scan, reviewer, QA, browser smoke, and diff check pass. React Doctor completed with exit 0 and 69 advisory warnings; no errors. The advisories are recorded as optional technical debt, led by Zod-v4 migration false positives under installed Zod 4.4.3 and conventional shared-component guidance. The inherited Fallow `react-dom` advisory and existing client chunk-size warning remain.

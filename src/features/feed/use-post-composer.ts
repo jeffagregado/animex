@@ -19,6 +19,16 @@ interface PostComposerInitial {
   visibility: Visibility
 }
 
+interface PostSubmitInput {
+  text: string
+  mediaDraft: PostMediaDraft | null
+  hasSpoiler: boolean
+  visibility: Visibility
+  setText: (text: string) => void
+  setMediaDraft: (draft: PostMediaDraft | null) => void
+  setHasSpoiler: (hasSpoiler: boolean) => void
+}
+
 const newId = (): string => crypto.randomUUID()
 
 /** Converts editable media fields into strict shared Post media. */
@@ -38,15 +48,11 @@ const toDraft = (media: PostMedia | null): PostMediaDraft | null => media
 
 /** Owns one external Post media draft and Post mutations. */
 export function usePostComposer(initial: PostComposerInitial) {
-  const create = useMutation(api.posts.create)
-  const update = useMutation(api.posts.update)
-  const operationId = useRef(newId())
-  const submittingRef = useRef(false)
   const [text, setText] = useState(initial.text)
   const [mediaDraft, setMediaDraft] = useState<PostMediaDraft | null>(() => toDraft(initial.media))
   const [hasSpoiler, setHasSpoiler] = useState(initial.hasSpoiler)
   const [visibility, setVisibility] = useState<Visibility>(initial.visibility)
-  const [submitting, setSubmitting] = useState(false)
+  const submission = usePostSubmission({ text, mediaDraft, hasSpoiler, visibility, setText, setMediaDraft, setHasSpoiler })
 
   const setMediaType = (type: PostMediaDraft['type']): void => setMediaDraft((draft) => ({ type, url: draft?.url ?? '', copy: draft?.copy ?? '' }))
   const setMediaUrl = (url: string): void => setMediaDraft((draft) => {
@@ -58,29 +64,37 @@ export function usePostComposer(initial: PostComposerInitial) {
     return { ...draft, copy }
   })
   const removeMedia = (): void => {
-    if (submittingRef.current) throw new Error('Wait for Post submission to finish.')
+    if (submission.isSubmitting()) throw new Error('Wait for Post submission to finish.')
     setMediaDraft(null)
   }
 
-  let mediaError: string | null = null
-  if (mediaDraft) {
-    try { parseMediaDraft(mediaDraft) }
-    catch (cause) { mediaError = cause instanceof Error ? cause.message : 'Invalid Post media.' }
-  }
+  const mediaError = getMediaError(mediaDraft)
+  const dirty = isPostComposerDirty(initial, { text, mediaDraft, hasSpoiler, visibility })
+
+  return { text, setText, mediaDraft, mediaError, setMediaType, setMediaUrl, setMediaCopy, removeMedia, hasSpoiler, setHasSpoiler, visibility, setVisibility, submitting: submission.submitting, dirty, submit: submission.submit }
+}
+
+/** Owns Post mutation idempotency and submission locking. */
+function usePostSubmission(input: PostSubmitInput) {
+  const create = useMutation(api.posts.create)
+  const update = useMutation(api.posts.update)
+  const operationId = useRef(newId())
+  const submittingRef = useRef(false)
+  const [submitting, setSubmitting] = useState(false)
 
   const submit = async (postId: string | null): Promise<void> => {
     if (submittingRef.current) throw new Error('Post submission is already running.')
-    const media = parseMediaDraft(mediaDraft)
-    const parsed = createPostInputSchema.safeParse({ requestId: operationId.current, text, media, hasSpoiler, visibility })
+    const media = parseMediaDraft(input.mediaDraft)
+    const parsed = createPostInputSchema.safeParse({ requestId: operationId.current, text: input.text, media, hasSpoiler: input.hasSpoiler, visibility: input.visibility })
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Post could not be validated.')
     submittingRef.current = true
     setSubmitting(true)
     try {
       if (postId) await update({ postId: postId as Id<'posts'>, ...parsed.data })
       else await create(parsed.data)
-      setText('')
-      setMediaDraft(null)
-      setHasSpoiler(false)
+      input.setText('')
+      input.setMediaDraft(null)
+      input.setHasSpoiler(false)
       operationId.current = newId()
     } finally {
       submittingRef.current = false
@@ -88,10 +102,18 @@ export function usePostComposer(initial: PostComposerInitial) {
     }
   }
 
-  const dirty = text !== initial.text
-    || JSON.stringify(mediaDraft) !== JSON.stringify(toDraft(initial.media))
-    || hasSpoiler !== initial.hasSpoiler
-    || visibility !== initial.visibility
-
-  return { text, setText, mediaDraft, mediaError, setMediaType, setMediaUrl, setMediaCopy, removeMedia, hasSpoiler, setHasSpoiler, visibility, setVisibility, submitting, dirty, submit }
+  return { submitting, submit, isSubmitting: (): boolean => submittingRef.current }
 }
+
+/** Returns current media validation message without mutating draft state. */
+const getMediaError = (draft: PostMediaDraft | null): string | null => {
+  if (!draft) return null
+  try { parseMediaDraft(draft); return null }
+  catch (cause) { return cause instanceof Error ? cause.message : 'Invalid Post media.' }
+}
+
+/** Compares editable fields with initial Post values. */
+const isPostComposerDirty = (initial: PostComposerInitial, current: Omit<PostSubmitInput, 'setText' | 'setMediaDraft' | 'setHasSpoiler'>): boolean => current.text !== initial.text
+  || JSON.stringify(current.mediaDraft) !== JSON.stringify(toDraft(initial.media))
+  || current.hasSpoiler !== initial.hasSpoiler
+  || current.visibility !== initial.visibility
