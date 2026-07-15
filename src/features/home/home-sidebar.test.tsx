@@ -96,7 +96,7 @@ describe('Home utility data states', () => {
     expect(reviewLink.textContent).toContain('Mika')
     expect(reviewLink.textContent).toContain('2m ago')
     expect(reviewLink.textContent).toContain('A patient and thoughtful journey.')
-    expect(screen.queryByText('Read review')).toBeNull()
+    expect(screen.queryByText(/read\s+review/i)).toBeNull()
     expect(screen.getByRole('link', { name: 'See more reviews' }).getAttribute('href')).toBe('/reviews')
     expect(screen.queryByText(/91/)).toBeNull()
   })
