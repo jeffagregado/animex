@@ -743,7 +743,7 @@ Status: COMPLETE and integrated on `dev`; implementation, migrations, browser QA
 - [x] Implement indexed Review discovery and verified migration. Owner: Convex Review worker.
 - [x] Implement atomic List Progress projection and verified migration. Owner: Convex user-anime worker.
 - [x] Reuse Discover Seasonal/This Week/Upcoming and restore Home desktop utilities. Owner: Home workers.
-- [x] Match approved feed-card structure without fake Phase 6 data. Owner: feed UI worker.
+- [x] Match approved feed-card structure without fake Phase 7 data. Owner: feed UI worker.
 - [x] Build `/reviews` search, filters, visibility, and infinite pagination. Owner: Review discovery UI worker.
 - [x] Integrate generated files and run closure gates: 83 test files passed / 2 skipped; 566 tests passed / 3 skipped; routes, Convex sync, TypeScript, client + SSR build, Fallow new-only audit, client AniList endpoint scan, and diff check pass. Authenticated browser QA covers full Review toolbar and owner actions, Home utility order, Review visibility/search/filter states, account-default visibility, 44 px touch targets, console, requests, and responsive overflow. Owner: controller + reviewer + QA.
 
@@ -825,3 +825,14 @@ Status: COMPLETE on `dev`; stale docs, cumulative quality blockers, integration,
 - [x] Record Phase 5 complete on `dev`; keep optional anime attachment, mobile Home Explore, and advisory cleanup outside closure.
 
 Post-merge validation: 91 test files passed / 2 skipped; 637 tests passed / 3 skipped; Convex sync, TypeScript, client and SSR production build, cumulative Fallow new-only audit with zero introduced dead-code, complexity, or duplication findings, client AniList endpoint scan, reviewer, QA, browser smoke, and diff check pass. React Doctor completed with exit 0 and 69 advisory warnings; no errors. The advisories are recorded as optional technical debt, led by Zod-v4 migration false positives under installed Zod 4.4.3 and conventional shared-component guidance. The inherited Fallow `react-dom` advisory and existing client chunk-size warning remain.
+
+# Phase 6 Quiet Signal Landing
+
+Status: DESIGN LOCKED. Clarifying questions and implementation planning deferred to a later session.
+
+- [x] Select Quiet Signal as approved landing-page direction.
+- [x] Save approved desktop reference under `docs/visual/landing`.
+- [x] Insert landing work as Phase 6; move Profile And Social to Phase 7 and Notifications, Privacy, Moderation to Phase 8.
+- [x] Record locked root, shared-header, hero-copy, and Discover-action decisions.
+- [ ] Ask deferred clarifying questions and write detailed implementation plan in a later session.
+- [ ] Implement only after plan approval.

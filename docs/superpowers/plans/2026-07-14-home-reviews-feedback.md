@@ -380,7 +380,7 @@ git commit -m "feat: restore home utility column"
 3. Replace Eye-triggered owner Dialog entry with Base UI Dropdown Menu overflow trigger. Keep confirmations in accessible Dialogs, and keep edit/visibility/delete mutations unchanged.
 4. Add explicit cover-image unavailable state using the existing Discover image-failure pattern. Preserve card geometry after failure.
 5. Convert Home feed pagination to IntersectionObserver-driven infinite loading. Keep scoped retry/terminal rows and an accessible manual Load more fallback when IntersectionObserver is unavailable.
-6. Preserve Post whole-Post spoiler reveal, Review-level `containsSpoiler` warning metadata, independent rich-text spoiler blocks, direct activity links, Review Detail links, owner edit/visibility/delete, and disabled Phase 6 Like/Comment labels.
+6. Preserve Post whole-Post spoiler reveal, Review-level `containsSpoiler` warning metadata, independent rich-text spoiler blocks, direct activity links, Review Detail links, owner edit/visibility/delete, and disabled Phase 7 Like/Comment labels.
 7. Assert absent fake reaction counts, bookmarks, milestone Score/descriptions, and Post anime attachment.
 8. Test hover, focus-visible, pending, disabled, spoiler-covered, spoiler-revealed, image-error, owner-menu-open, observer load, duplicate-intersection guard, retry, and terminal states.
 9. Run:
@@ -557,7 +557,7 @@ git commit -m "chore: integrate home review feedback"
 
 - Home matches the approved public/signed-in desktop compositions and contains no removed placeholders.
 - Seasonal, This Week, and Upcoming reuse the existing Discover cache/data flow.
-- Feed cards match approved visual structure without fake Phase 6 data.
+- Feed cards match approved visual structure without fake Phase 7 data.
 - `/reviews` access, search, sort, bands, visibility, cursors, retry, and infinite scroll are correct.
 - List Progress stays atomic across every status-changing path and verified backfill.
 - No private Review or progress data leaks to public viewers.

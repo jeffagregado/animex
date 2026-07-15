@@ -12,7 +12,7 @@ If any other production package is needed, pause and request approval first.
 
 ## Key Routes And Interfaces
 
-- `/` redirects to `/home`.
+- `/` public Quiet Signal landing page.
 - `/home` public/signed-in feed.
 - `/discover` cached AniList browse page.
 - `/anime/$anilistId/$slug` anime detail page.
@@ -129,7 +129,20 @@ Status: COMPLETE and integrated on `dev`; closure details and latest validation 
 - Generate Review activity cards with current Review Rating and Review Summary.
 - Stop after validation and wait for approval.
 
-### Phase 6: Profile And Social
+### Phase 6: Quiet Signal Landing
+
+Status: DESIGN LOCKED. Clarifying questions and implementation planning are deferred to a later session.
+
+- Replace the `/` redirect with the public Quiet Signal landing page.
+- Reuse the existing `/home` site header and auth-aware header controls.
+- Show the landing page to signed-out and signed-in visitors.
+- Use the approved desktop reference at `docs/visual/landing/quiet-signal-landing-desktop.png`.
+- Lock hero copy to `Find anime worth remembering.` and `Build your list. Share what stays with you.`
+- Link the single `Discover anime` action to `/discover`.
+- Keep implementation, responsive translation, motion, testing, and validation decisions for the later approved plan.
+- Stop after validation and wait for approval.
+
+### Phase 7: Profile And Social
 
 - Build User Profile from locked design.
 - Add Review tab, latest favorites, anime stats, visible profile activity.
@@ -138,7 +151,7 @@ Status: COMPLETE and integrated on `dev`; closure details and latest validation 
 - Add comments and flat comment replies.
 - Stop after validation and wait for approval.
 
-### Phase 7: Notifications, Privacy, Moderation
+### Phase 8: Notifications, Privacy, Moderation
 
 - Add notification preview and notification page.
 - Add account default visibility and bulk visibility tools under Privacy Settings.

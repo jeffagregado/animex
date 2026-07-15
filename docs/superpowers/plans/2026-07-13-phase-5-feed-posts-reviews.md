@@ -10,12 +10,12 @@ Status: COMPLETE and integrated on `dev`. This baseline plan is historical; curr
 - Validated Lexical JSON, live Preview, Review Detail, Anime Reviews.
 - Post, Review, Completed, Rewatched feed cards.
 - Visibility-aware reads, routes, metrics, deletion.
-- Likes, Comments, Follow mutations remain Phase 6.
+- Likes, Comments, Follow mutations remain Phase 7.
 
 ## Contracts
 
 - Feed projection is authoritative only for display; source Post, Review, and milestone rows remain truth.
-- Global shows public cards. Following excludes owner and stays empty until Phase 6. Home interleaves two owner/following cards then one Global card, fills short streams, deduplicates IDs.
+- Global shows public cards. Following excludes owner and stays empty until Phase 7. Home interleaves two owner/following cards then one Global card, fills short streams, deduplicates IDs.
 - Feed pages use opaque cursor pagination at 20. Anime Reviews use 12.
 - Review Rating is `0–100`, one decimal, default `50`; anime list Score remains `0–10`.
 - Review body stores versioned allowlisted Lexical JSON. No HTML, embeds, iframe, code, table, or arbitrary metadata fetch.
