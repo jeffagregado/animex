@@ -41,7 +41,7 @@ describe('FeedCard Post media', () => {
   })
 
   it('routes Review cards and reveals only their Summary', () => {
-    const card: FeedCardData = { ...common, kind: 'review', anime: { ...anime, coverImageUrl: 'https://example.test/cover.jpg' }, reviewId: 'review', rating: 91, summary: 'Summary', summaryHasSpoiler: true, visibility: 'public', publishedAt: Date.now() - 3_600_000, updatedAt: Date.now() - 3_600_000 }
+    const card: FeedCardData = { ...common, kind: 'review', anime: { ...anime, coverImageUrl: 'https://example.test/cover.jpg' }, reviewId: 'review', rating: 91, summary: 'Summary', containsSpoiler: true, visibility: 'public', publishedAt: Date.now() - 3_600_000, updatedAt: Date.now() - 3_600_000 }
     render(<FeedCard card={card} onChanged={() => undefined} onEdit={() => undefined} owner signedIn={false} />)
     expect(screen.getByRole('article').className).toContain('border-l-cyan-300')
     expect(screen.getByText('Mika reviewed Frieren')).toBeTruthy()
@@ -56,7 +56,7 @@ describe('FeedCard Post media', () => {
   })
 
   it('preserves Review cover geometry after image failure', () => {
-    const card: FeedCardData = { ...common, kind: 'review', anime: { ...anime, coverImageUrl: 'https://example.test/broken.jpg' }, reviewId: 'review', rating: 91, summary: 'Summary', summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }
+    const card: FeedCardData = { ...common, kind: 'review', anime: { ...anime, coverImageUrl: 'https://example.test/broken.jpg' }, reviewId: 'review', rating: 91, summary: 'Summary', containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }
     render(<FeedCard card={card} onChanged={() => undefined} onEdit={() => undefined} owner={false} signedIn={false} />)
     fireEvent.error(screen.getByRole('img', { name: 'Frieren cover' }))
     expect(screen.getByText('Image unavailable').parentElement?.parentElement?.className).toContain('aspect-[2/3]')

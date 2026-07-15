@@ -13,7 +13,7 @@ afterEach(cleanup)
 
 describe('ReviewPreview', () => {
   it('matches published summary spoiler and document behavior', () => {
-    render(<ReviewPreview document={document} rating={92} summary="Ending revealed" summaryHasSpoiler />)
+    render(<ReviewPreview document={document} rating={92} summary="Ending revealed" containsSpoiler />)
     expect(screen.getByText('Published body')).toBeTruthy()
     expect(screen.queryByText('Ending revealed')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Reveal summary spoiler' }))
@@ -26,7 +26,7 @@ describe('ReviewPreview', () => {
       { alt: 'Frieren sunset', type: 'review-image', url: 'https://images.example/frieren.jpg', version: 1 },
       { label: 'Trailer', provider: 'youtube', type: 'review-video', url: 'https://youtu.be/dQw4w9WgXcQ', version: 1 },
     ] } } }
-    const { container } = render(<ReviewPreview document={mediaDocument} rating={80} summary="Media review" summaryHasSpoiler={false} />)
+    const { container } = render(<ReviewPreview document={mediaDocument} rating={80} summary="Media review" containsSpoiler={false} />)
     expect(screen.getByAltText('Frieren sunset')).toBeTruthy()
     expect(screen.getByRole('link', { name: /Trailer/ }).getAttribute('rel')).toBe('noreferrer noopener')
     expect(container.querySelector('[dangerouslySetInnerHTML]')).toBeNull()

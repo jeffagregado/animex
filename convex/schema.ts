@@ -173,7 +173,7 @@ export default defineSchema({
   reviews: defineTable({
     userId: v.id('users'), anilistId: v.number(), requestId: v.string(),
     state: v.union(v.literal('draft'), v.literal('published')), rating: v.union(v.number(), v.null()),
-    summary: v.string(), summaryHasSpoiler: v.boolean(), bodyJson: v.string(),
+    summary: v.string(), containsSpoiler: v.boolean(), bodyJson: v.string(),
     visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
     publishedAt: v.optional(v.number()), updatedAt: v.number(), activityState: v.union(v.literal('active'), v.literal('deleted')),
     newestOrderKey: v.string(), highRatingOrderKey: v.string(), lowRatingOrderKey: v.string(),

@@ -33,6 +33,8 @@ const anime = {
   coverImageUrl: null,
 }
 
+const removedSpoilerField = ['summary', 'HasSpoiler'].join('')
+
 describe('social contracts', () => {
   test('locks Phase 5 collection, post, and rating constants', () => {
     expect(FEED_PAGE_SIZE).toBe(20)
@@ -61,7 +63,7 @@ describe('social contracts', () => {
     const page = {
       items: [
         { id: 'post-1', postId: 'source-post-1', kind: 'post', author, text: 'Magic.', media: null, hasSpoiler: false, visibility: 'public', createdAt: 10, updatedAt: 10 },
-        { id: 'review-1', reviewId: 'source-review-1', kind: 'review', author, anime, rating: 90, summary: 'Excellent.', summaryHasSpoiler: false, visibility: 'public', publishedAt: 9, updatedAt: 9 },
+        { id: 'review-1', reviewId: 'source-review-1', kind: 'review', author, anime, rating: 90, summary: 'Excellent.', containsSpoiler: false, visibility: 'public', publishedAt: 9, updatedAt: 9 },
         { id: 'completed-1', kind: 'completed', author, anime: { ...anime, seasonYear: 2023, format: 'TV' }, settledAt: 8, visibility: 'public' },
         { id: 'rewatched-1', kind: 'rewatched', author, anime: { ...anime, seasonYear: null, format: null }, settledAt: 7, visibility: 'private' },
       ],
@@ -101,7 +103,7 @@ describe('social contracts', () => {
   test('validates review list, detail, and ten-band stats DTOs', () => {
     const listItem = {
       id: 'review-1', author, anime, state: 'published', rating: 91.5,
-      summary: 'Excellent.', summaryHasSpoiler: false, visibility: 'public',
+      summary: 'Excellent.', containsSpoiler: false, visibility: 'public',
       publishedAt: 10, updatedAt: 10,
     }
     const detail = { ...listItem, body: { version: 1, editorState: { root: { children: [], direction: null, format: '', indent: 0, type: 'root', version: 1 } } } }
@@ -109,6 +111,7 @@ describe('social contracts', () => {
 
     expect(reviewListItemSchema.parse(listItem)).toEqual(listItem)
     expect(reviewDetailSchema.parse(detail)).toEqual(detail)
+    expect(() => reviewListItemSchema.parse({ ...listItem, containsSpoiler: undefined, [removedSpoilerField]: false })).toThrow()
     expect(reviewStatsSchema.parse(stats)).toEqual(stats)
     expect(() => reviewStatsSchema.parse({ ...stats, bands: stats.bands.slice(1) })).toThrow()
   })
@@ -116,7 +119,7 @@ describe('social contracts', () => {
   test('requires publish rating, trimmed summary, and strict bounded IDs', () => {
     const input = {
       requestId: 'request-1', animeId: 'anime-1', rating: 50, summary: 'Good.',
-      summaryHasSpoiler: false, visibility: 'followers',
+      containsSpoiler: false, visibility: 'followers',
       body: { version: 1, editorState: { root: { children: [], direction: null, format: '', indent: 0, type: 'root', version: 1 } } },
     }
 

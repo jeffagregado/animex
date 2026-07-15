@@ -30,7 +30,7 @@ const postMediaValidator = v.union(
 )
 const feedCardValidator = v.union(
   v.object({ id: v.string(), postId: v.string(), kind: v.literal('post'), author: authorValidator, text: v.string(), media: v.union(postMediaValidator, v.null()), hasSpoiler: v.boolean(), visibility: visibilityValidator, createdAt: v.number(), updatedAt: v.number() }),
-  v.object({ id: v.string(), reviewId: v.string(), kind: v.literal('review'), author: authorValidator, anime: animeValidator, rating: v.number(), summary: v.string(), summaryHasSpoiler: v.boolean(), visibility: visibilityValidator, publishedAt: v.number(), updatedAt: v.number() }),
+  v.object({ id: v.string(), reviewId: v.string(), kind: v.literal('review'), author: authorValidator, anime: animeValidator, rating: v.number(), summary: v.string(), containsSpoiler: v.boolean(), visibility: visibilityValidator, publishedAt: v.number(), updatedAt: v.number() }),
   v.object({ id: v.string(), kind: v.literal('completed'), author: authorValidator, anime: activityAnimeValidator, settledAt: v.number(), visibility: visibilityValidator }),
   v.object({ id: v.string(), kind: v.literal('rewatched'), author: authorValidator, anime: activityAnimeValidator, settledAt: v.number(), visibility: visibilityValidator }),
 )
@@ -126,7 +126,7 @@ const resolveReviewCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: Fe
   const source = getActiveReviewSource(review)
   if (!source || !matchesReviewProjection(card, source.review)) return null
   if (!canReadSource(source.review.visibility, source.review.userId, read)) return null
-  return { id: card._id, reviewId: source.review._id, kind: 'review', author: await getAuthor(ctx, source.review.userId), anime: await getAnime(ctx, source.review.anilistId), rating: source.rating, summary: source.review.summary, summaryHasSpoiler: source.review.summaryHasSpoiler, visibility: source.review.visibility, publishedAt: source.publishedAt, updatedAt: source.review.updatedAt }
+  return { id: card._id, reviewId: source.review._id, kind: 'review', author: await getAuthor(ctx, source.review.userId), anime: await getAnime(ctx, source.review.anilistId), rating: source.rating, summary: source.review.summary, containsSpoiler: source.review.containsSpoiler, visibility: source.review.visibility, publishedAt: source.publishedAt, updatedAt: source.review.updatedAt }
 }
 
 const resolveMilestoneCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {

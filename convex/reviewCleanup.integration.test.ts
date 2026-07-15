@@ -27,7 +27,7 @@ const cleanupReviewStatsPage = makeFunctionReference<'mutation', PageArgs, Clean
 
 const reviewFields = (userId: Id<'users'>, anilistId: number, index: number, state: 'draft' | 'published') => ({
   userId, anilistId, requestId: `review-${index}`, state, rating: state === 'published' ? 80 + index : null,
-  summary: `Review ${index}`, summaryHasSpoiler: false, bodyJson: `{"private":"body-${index}"}`,
+  summary: `Review ${index}`, containsSpoiler: false, bodyJson: `{"private":"body-${index}"}`,
   visibility: state === 'published' ? 'public' as const : 'private' as const,
   ...(state === 'published' ? { publishedAt: index } : {}),
   updatedAt: index, activityState: 'active' as const,

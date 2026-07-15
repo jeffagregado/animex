@@ -33,14 +33,14 @@ const ratingBandValidator = v.union(
 )
 const reviewFields = {
   anilistId: v.number(), requestId: v.string(), rating: v.union(v.number(), v.null()), summary: v.string(),
-  summaryHasSpoiler: v.boolean(), bodyJson: v.string(), visibility: visibilityValidator,
+  containsSpoiler: v.boolean(), bodyJson: v.string(), visibility: visibilityValidator,
 }
 const authorValidator = v.object({ id: v.string(), username: v.string(), displayName: v.string(), avatarUrl: v.union(v.string(), v.null()) })
 const animeValidator = v.object({ anilistId: v.number(), slug: v.string(), title: v.string(), coverImageUrl: v.union(v.string(), v.null()) })
 const reviewListFields = {
   id: v.string(), author: authorValidator, anime: animeValidator,
   state: v.union(v.literal('draft'), v.literal('published')), rating: v.union(v.number(), v.null()),
-  summary: v.string(), summaryHasSpoiler: v.boolean(), visibility: visibilityValidator,
+  summary: v.string(), containsSpoiler: v.boolean(), visibility: visibilityValidator,
   publishedAt: v.union(v.number(), v.null()), updatedAt: v.number(),
 }
 const reviewListValidator = v.object(reviewListFields)
@@ -58,14 +58,14 @@ const fail = (code: string, message: string): never => { throw new ConvexError({
 /** Blocks public Review writes during destructive maintenance. */
 const requireReviewWritesOpen = (): never => fail('REVIEW_MAINTENANCE', REVIEW_MAINTENANCE_MESSAGE)
 
-type PublishIntent = { anilistId: number; rating: number; summary: string; summaryHasSpoiler: boolean; visibility: Doc<'reviews'>['visibility'] }
+type PublishIntent = { anilistId: number; rating: number; summary: string; containsSpoiler: boolean; visibility: Doc<'reviews'>['visibility'] }
 
 const readMatchingPublishRequest = (review: Doc<'reviews'> | null, intent: PublishIntent, bodyJson: string): Id<'reviews'> | null => {
   if (!review) return null
   if (review.anilistId !== intent.anilistId || review.state !== 'published') return fail('REVIEW_REQUEST_COLLISION', 'Review request collision with another Anime or Draft.')
   const differs = review.rating !== intent.rating
     || review.summary !== intent.summary
-    || review.summaryHasSpoiler !== intent.summaryHasSpoiler
+    || review.containsSpoiler !== intent.containsSpoiler
     || review.visibility !== intent.visibility
     || review.bodyJson !== bodyJson
   if (differs) return fail('REVIEW_REQUEST_COLLISION', 'Review request collision with a different publish request.')
@@ -154,7 +154,7 @@ const toReviewList = async (ctx: QueryCtx, review: Doc<'reviews'>) => {
   return {
     id: review._id, author: { id: author._id, username: author.username, displayName: author.name, avatarUrl },
     anime: { anilistId: anime.anilistId, slug: anime.slug, title: anime.titles.display, coverImageUrl: anime.coverImageUrl },
-    state: review.state, rating: review.rating, summary: review.summary, summaryHasSpoiler: review.summaryHasSpoiler,
+    state: review.state, rating: review.rating, summary: review.summary, containsSpoiler: review.containsSpoiler,
     visibility: review.visibility, publishedAt: review.publishedAt ?? null, updatedAt: review.updatedAt,
   }
 }
@@ -192,11 +192,11 @@ export const saveDraft = mutation({
     const now = Date.now()
     if (existing) {
       const discovery = buildReviewDiscoveryFields(existing._id, 'draft', parsed.rating, undefined, now, profile, anime)
-      await ctx.db.patch('reviews', existing._id, { requestId, rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
+      await ctx.db.patch('reviews', existing._id, { requestId, rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
       return existing._id
     }
     const discovery = buildReviewDiscoveryFields(`${profile._id}:${args.anilistId}`, 'draft', parsed.rating, undefined, now, profile, anime)
-    const reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'draft', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, activityState: 'active', ...discovery })
+    const reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'draft', rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, activityState: 'active', ...discovery })
     await ctx.db.patch('reviews', reviewId, buildReviewDiscoveryFields(reviewId, 'draft', parsed.rating, undefined, now, profile, anime))
     return reviewId
   },
@@ -225,12 +225,12 @@ export const publish = mutation({
     let reviewId: Id<'reviews'>
     if (existing) {
       const discovery = buildReviewDiscoveryFields(existing._id, 'published', parsed.rating, publishedAt, now, profile, anime)
-      await ctx.db.patch('reviews', existing._id, { requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, ...discovery })
+      await ctx.db.patch('reviews', existing._id, { requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, ...discovery })
       reviewId = existing._id
     } else {
       const source = `${profile._id}:${args.anilistId}`
       const discovery = buildReviewDiscoveryFields(source, 'published', parsed.rating, publishedAt, now, profile, anime)
-      reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, activityState: 'active', ...discovery })
+      reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, activityState: 'active', ...discovery })
       await ctx.db.patch('reviews', reviewId, buildReviewDiscoveryFields(reviewId, 'published', parsed.rating, publishedAt, now, profile, anime))
     }
     const next = await ctx.db.get('reviews', reviewId)
@@ -242,7 +242,7 @@ export const publish = mutation({
 })
 
 export const update = mutation({
-  args: { reviewId: v.id('reviews'), rating: v.number(), summary: v.string(), summaryHasSpoiler: v.boolean(), bodyJson: v.string(), visibility: visibilityValidator },
+  args: { reviewId: v.id('reviews'), rating: v.number(), summary: v.string(), containsSpoiler: v.boolean(), bodyJson: v.string(), visibility: visibilityValidator },
   returns: v.id('reviews'),
   handler: async (ctx, args) => {
     requireReviewWritesOpen()
@@ -254,7 +254,7 @@ export const update = mutation({
     const parsed = validatePublishedReview(body.body, args.rating, args.summary)
     const now = Date.now()
     const discovery = buildReviewDiscoveryFields(review._id, 'published', parsed.rating, review.publishedAt, now, profile, anime)
-    await ctx.db.patch('reviews', review._id, { rating: parsed.rating, summary: parsed.summary, summaryHasSpoiler: args.summaryHasSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
+    await ctx.db.patch('reviews', review._id, { rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
     const next = await ctx.db.get('reviews', review._id)
     if (!next) return fail('REVIEW_WRITE_FAILED', 'Review update failed.')
     await applyAggregate(ctx, review.anilistId, review, next)

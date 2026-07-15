@@ -28,6 +28,8 @@ const paragraphState = {
   },
 }
 
+const removedSpoilerField = ['summary', 'HasSpoiler'].join('')
+
 describe('review document wire adapter', () => {
   it('wraps Lexical state, validates it, and emits canonical body JSON', () => {
     const bodyJson = serializeReviewEditorState(paragraphState)
@@ -42,9 +44,10 @@ describe('review document wire adapter', () => {
 
   it('strictly adapts bodyJson Review detail at the feature boundary', () => {
     const bodyJson = serializeReviewEditorState(paragraphState)
-    const detail = parseReviewWireDetail({ id: 'review-1', author: { id: 'author-1', username: 'fan', displayName: 'Fan', avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: 'Summary', summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1, bodyJson })
+    const detail = parseReviewWireDetail({ id: 'review-1', author: { id: 'author-1', username: 'fan', displayName: 'Fan', avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: 'Summary', containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1, bodyJson })
     expect(detail.body).toEqual(parseReviewBodyJson(bodyJson))
     expect(() => parseReviewWireDetail({ ...detail, bodyJson, unexpected: true })).toThrow()
+    expect(() => parseReviewWireDetail({ ...detail, containsSpoiler: undefined, [removedSpoilerField]: false, bodyJson })).toThrow()
   })
 
   it('creates exact canonical empty paragraph state for new drafts', () => {

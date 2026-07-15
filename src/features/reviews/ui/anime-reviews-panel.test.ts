@@ -7,7 +7,7 @@ const item = (id: string): ReviewListItem => ({
   id,
   author: { id: `author-${id}`, username: `user-${id}`, displayName: `User ${id}`, avatarUrl: null },
   anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null },
-  state: 'published', rating: 90, summary: 'Summary', summaryHasSpoiler: false,
+  state: 'published', rating: 90, summary: 'Summary', containsSpoiler: false,
   visibility: 'public', publishedAt: 1, updatedAt: 1,
 })
 

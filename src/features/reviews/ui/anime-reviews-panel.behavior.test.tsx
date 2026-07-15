@@ -18,7 +18,7 @@ vi.mock('#/components/ui/select', () => ({
 }))
 vi.mock('./review-card', () => ({ ReviewCard: ({ review }: { review: { id: string } }) => <div>Review {review.id}</div> }))
 
-const item = (id: string) => ({ id, author: { id: `author-${id}`, username: `user-${id}`, displayName: `User ${id}`, avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: `Summary ${id}`, summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 })
+const item = (id: string) => ({ id, author: { id: `author-${id}`, username: `user-${id}`, displayName: `User ${id}`, avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: `Summary ${id}`, containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 })
 const stats = { count: 2, average: 90, bands: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
 const firstPage = { items: [item('a')], cursor: 'next', hasMore: true }
 const nextPage = { items: [item('b')], cursor: null, hasMore: false }

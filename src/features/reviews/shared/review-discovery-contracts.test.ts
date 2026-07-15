@@ -20,10 +20,12 @@ const review = {
   rating: 95,
   state: 'published' as const,
   summary: 'Worth watching.',
-  summaryHasSpoiler: false,
+  containsSpoiler: false,
   updatedAt: 100,
   visibility: 'public' as const,
 }
+
+const removedSpoilerField = ['summary', 'HasSpoiler'].join('')
 
 describe('review discovery contracts', () => {
   test('trims a valid discovery query', () => {
@@ -67,6 +69,7 @@ describe('review discovery contracts', () => {
 
   test('accepts strict pages containing at most 12 shared Review items', () => {
     expect(reviewDiscoveryPageSchema.parse({ cursor: null, hasMore: false, items: [review] }).items[0]).toEqual(review)
+    expect(reviewDiscoveryPageSchema.safeParse({ cursor: null, hasMore: false, items: [{ ...review, containsSpoiler: undefined, [removedSpoilerField]: false }] }).success).toBe(false)
     expect(reviewDiscoveryPageSchema.safeParse({ cursor: null, hasMore: false, items: Array.from({ length: 13 }, () => review) }).success).toBe(false)
     expect(reviewDiscoveryPageSchema.safeParse({ cursor: null, hasMore: false, items: [], extra: true }).success).toBe(false)
   })

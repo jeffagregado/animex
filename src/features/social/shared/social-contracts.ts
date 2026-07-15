@@ -89,7 +89,7 @@ const reviewFeedCardSchema = z.object({
   rating: reviewRatingSchema.unwrap(),
   reviewId: idSchema,
   summary: z.string().trim().min(1).max(REVIEW_SUMMARY_LIMIT),
-  summaryHasSpoiler: z.boolean(),
+  containsSpoiler: z.boolean(),
   updatedAt: timestampSchema,
   visibility: visibilitySchema,
 }).strict()
@@ -128,7 +128,7 @@ export const feedPageSchema: z.ZodType<FeedPage<FeedCard>> = z.object({
 
 export interface ReviewListItem {
   id: string; author: SocialAuthor; anime: SocialAnime; state: ReviewState; rating: number | null
-  summary: string; summaryHasSpoiler: boolean; visibility: Visibility; publishedAt: number | null; updatedAt: number
+  summary: string; containsSpoiler: boolean; visibility: Visibility; publishedAt: number | null; updatedAt: number
 }
 
 export interface ReviewDetail extends ReviewListItem { body: ReviewDocumentV1 }
@@ -147,7 +147,7 @@ const reviewListItemFields = {
   rating: reviewRatingSchema,
   state: reviewStateSchema,
   summary: z.string().trim().max(REVIEW_SUMMARY_LIMIT),
-  summaryHasSpoiler: z.boolean(),
+  containsSpoiler: z.boolean(),
   updatedAt: timestampSchema,
   visibility: visibilitySchema,
 }
@@ -180,7 +180,7 @@ export const reviewStatsSchema: z.ZodType<ReviewStatsDto> = z.object({
 
 export interface ReviewDraftInput {
   requestId: string; animeId: string; rating: number | null; summary: string
-  summaryHasSpoiler: boolean; visibility: Visibility; body: ReviewDocumentV1
+  containsSpoiler: boolean; visibility: Visibility; body: ReviewDocumentV1
 }
 export interface ReviewPublishInput extends Omit<ReviewDraftInput, 'rating'> { rating: number }
 
@@ -190,7 +190,7 @@ const reviewDraftInputFields = {
   rating: reviewRatingSchema,
   requestId: idSchema,
   summary: z.string().trim().max(REVIEW_SUMMARY_LIMIT),
-  summaryHasSpoiler: z.boolean(),
+  containsSpoiler: z.boolean(),
   visibility: visibilitySchema,
 }
 

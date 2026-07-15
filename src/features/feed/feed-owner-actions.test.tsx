@@ -48,7 +48,7 @@ describe('FeedOwnerActions', () => {
   })
 
   it('offers Review edit and routes Review visibility by review ID', async () => {
-    render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
     expect((await screen.findByRole('menuitem', { name: 'Edit Review' })).getAttribute('href')).toBe('/reviews/review-source/edit')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Followers' }))
@@ -56,7 +56,7 @@ describe('FeedOwnerActions', () => {
   })
 
   it('offers only destructive Remove for Review activity deletion', async () => {
-    render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', summaryHasSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
     expect(mocks.mutationNames).not.toContain('reviews:remove')
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
     const removeItem = await screen.findByRole('menuitem', { name: 'Remove' })

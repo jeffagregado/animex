@@ -58,7 +58,7 @@ describe('social Convex integration', () => {
     await insertAnime(t, 1)
     const reviewId = await t.run(async (ctx) => await ctx.db.insert('reviews', {
       userId: owner.profileId, anilistId: 1, requestId: 'maintenance-review', state: 'published', rating: 90,
-      summary: 'Readable during maintenance', summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      summary: 'Readable during maintenance', containsSpoiler: false, bodyJson, visibility: 'public',
       publishedAt: 1, updatedAt: 1, activityState: 'active', newestOrderKey: 'maintenance-new',
       highRatingOrderKey: 'maintenance-high', lowRatingOrderKey: 'maintenance-low',
       searchText: 'readable during maintenance', ratingBand: '90-100',
@@ -66,15 +66,15 @@ describe('social Convex integration', () => {
     const maintenanceMessage = 'Review maintenance is in progress. Try again shortly.'
     const writes = [
       () => owner.client.mutation(socialApi.reviews.saveDraft, {
-        anilistId: 1, requestId: 'maintenance-draft', rating: null, summary: '', summaryHasSpoiler: false,
+        anilistId: 1, requestId: 'maintenance-draft', rating: null, summary: '', containsSpoiler: false,
         bodyJson, visibility: 'private',
       }),
       () => owner.client.mutation(socialApi.reviews.publish, {
-        anilistId: 1, requestId: 'maintenance-publish', rating: 90, summary: 'Publish', summaryHasSpoiler: false,
+        anilistId: 1, requestId: 'maintenance-publish', rating: 90, summary: 'Publish', containsSpoiler: false,
         bodyJson, visibility: 'public',
       }),
       () => owner.client.mutation(socialApi.reviews.update, {
-        reviewId, rating: 80, summary: 'Update', summaryHasSpoiler: false, bodyJson, visibility: 'public',
+        reviewId, rating: 80, summary: 'Update', containsSpoiler: false, bodyJson, visibility: 'public',
       }),
       () => owner.client.mutation(socialApi.reviews.setVisibility, { reviewId, visibility: 'private' }),
       () => owner.client.mutation(socialApi.reviews.removeActivity, { reviewId }),
@@ -94,16 +94,16 @@ describe('social Convex integration', () => {
     for (let index = 0; index < authors.length; index += 1) {
       await authors[index]!.client.mutation(socialApi.reviews.publish, {
         anilistId: index + 1, requestId: `latest-${index}`, rating: 50 + index,
-        summary: `Latest ${index}`, summaryHasSpoiler: false, bodyJson, visibility: 'public',
+        summary: `Latest ${index}`, containsSpoiler: false, bodyJson, visibility: 'public',
       })
     }
     const followersId = await viewer.client.mutation(socialApi.reviews.publish, {
       anilistId: 8, requestId: 'own-followers', rating: 88,
-      summary: 'Own Followers', summaryHasSpoiler: false, bodyJson, visibility: 'followers',
+      summary: 'Own Followers', containsSpoiler: false, bodyJson, visibility: 'followers',
     })
     const privateId = await viewer.client.mutation(socialApi.reviews.publish, {
       anilistId: 9, requestId: 'own-private', rating: 77,
-      summary: 'Own Private', summaryHasSpoiler: false, bodyJson, visibility: 'private',
+      summary: 'Own Private', containsSpoiler: false, bodyJson, visibility: 'private',
     })
 
     const latest = await t.query(socialApi.reviews.listLatestPublic, { limit: 99 })
@@ -146,7 +146,7 @@ describe('social Convex integration', () => {
     for (let index = 0; index < ratings.length; index += 1) {
       await authors[index]!.client.mutation(socialApi.reviews.publish, {
         anilistId: index + 1, requestId: `band-${index}`, rating: ratings[index]!,
-        summary: `Band ${index}`, summaryHasSpoiler: false, bodyJson, visibility: 'public',
+        summary: `Band ${index}`, containsSpoiler: false, bodyJson, visibility: 'public',
       })
     }
 
@@ -190,16 +190,16 @@ describe('social Convex integration', () => {
     for (let index = 0; index < authors.length; index += 1) {
       await authors[index]!.client.mutation(socialApi.reviews.publish, {
         anilistId: index + 1, requestId: `cursor-${index}`, rating: 60 + index,
-        summary: `Cursor public ${index}`, summaryHasSpoiler: false, bodyJson, visibility: 'public',
+        summary: `Cursor public ${index}`, containsSpoiler: false, bodyJson, visibility: 'public',
       })
     }
     await viewer.client.mutation(socialApi.reviews.publish, {
       anilistId: 15, requestId: 'cursor-followers', rating: 88,
-      summary: 'Cursor own followers', summaryHasSpoiler: false, bodyJson, visibility: 'followers',
+      summary: 'Cursor own followers', containsSpoiler: false, bodyJson, visibility: 'followers',
     })
     await viewer.client.mutation(socialApi.reviews.publish, {
       anilistId: 16, requestId: 'cursor-private', rating: 77,
-      summary: 'Cursor own private', summaryHasSpoiler: false, bodyJson, visibility: 'private',
+      summary: 'Cursor own private', containsSpoiler: false, bodyJson, visibility: 'private',
     })
     const input = { query: null, sort: 'newest', ratingBand: null, visibility: 'all', cursor: null }
     const first = await viewer.client.query(socialApi.reviews.listDiscovery, input)
@@ -242,11 +242,11 @@ describe('social Convex integration', () => {
     await insertAnime(t, 2)
     const draftId = await owner.client.mutation(socialApi.reviews.saveDraft, {
       anilistId: 1, requestId: 'backfill-draft', rating: null, summary: '',
-      summaryHasSpoiler: false, bodyJson, visibility: 'private',
+      containsSpoiler: false, bodyJson, visibility: 'private',
     })
     const publishedId = await owner.client.mutation(socialApi.reviews.publish, {
       anilistId: 2, requestId: 'backfill-published', rating: 90, summary: 'Published',
-      summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      containsSpoiler: false, bodyJson, visibility: 'public',
     })
     await t.run(async (ctx) => {
       await ctx.db.patch('reviews', draftId, { searchText: 'stale draft', ratingBand: '0-9' })
@@ -274,7 +274,7 @@ describe('social Convex integration', () => {
     await insertAnime(t, 2)
     const draftId = await owner.client.mutation(socialApi.reviews.saveDraft, {
       anilistId: 1, requestId: 'null-rating-draft', rating: null, summary: '',
-      summaryHasSpoiler: false, bodyJson, visibility: 'private',
+      containsSpoiler: false, bodyJson, visibility: 'private',
     })
     await t.run(async (ctx) => await ctx.db.patch('reviews', draftId, { searchText: 'stale', ratingBand: '0-9' }))
     await t.mutation(socialInternal.reviews.backfillDiscoveryFields, { paginationOpts: { numItems: 1, cursor: null } })
@@ -283,7 +283,7 @@ describe('social Convex integration', () => {
     await t.run(async (ctx) => {
       await ctx.db.insert('reviews', {
         userId: owner.profileId, anilistId: 2, requestId: 'corrupt-published-null', state: 'published', rating: null,
-        summary: 'Corrupt', summaryHasSpoiler: false, bodyJson, visibility: 'public', publishedAt: 1,
+        summary: 'Corrupt', containsSpoiler: false, bodyJson, visibility: 'public', publishedAt: 1,
         updatedAt: 1, activityState: 'active', newestOrderKey: 'corrupt', highRatingOrderKey: 'corrupt', lowRatingOrderKey: 'corrupt',
         searchText: 'corrupt', ratingBand: 'none',
       })
@@ -302,7 +302,7 @@ describe('social Convex integration', () => {
     await insertAnime(t, 1)
     const reviewId = await owner.client.mutation(socialApi.reviews.saveDraft, {
       anilistId: 1, requestId: 'draft-activity', rating: null, summary: '',
-      summaryHasSpoiler: false, bodyJson, visibility: 'private',
+      containsSpoiler: false, bodyJson, visibility: 'private',
     })
     const before = await t.run(async (ctx) => await ctx.db.get('reviews', reviewId))
 
@@ -318,7 +318,7 @@ describe('social Convex integration', () => {
     await insertAnime(t, 1)
     await owner.client.mutation(socialApi.reviews.publish, {
       anilistId: 1, requestId: 'missing-discovery-author', rating: 75, summary: 'Source required',
-      summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      containsSpoiler: false, bodyJson, visibility: 'public',
     })
     await t.run(async (ctx) => await ctx.db.delete('users', owner.profileId))
 
@@ -334,16 +334,16 @@ describe('social Convex integration', () => {
     await insertAnime(t, 1)
 
     await expect(t.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'signed-out', rating: null, summary: '', summaryHasSpoiler: false,
+      anilistId: 1, requestId: 'signed-out', rating: null, summary: '', containsSpoiler: false,
       bodyJson, visibility: 'private',
     })).rejects.toThrow('Unauthenticated')
     await expect(owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'forged-owner', rating: null, summary: '', summaryHasSpoiler: false,
+      anilistId: 1, requestId: 'forged-owner', rating: null, summary: '', containsSpoiler: false,
       bodyJson, visibility: 'private', userId: viewer.profileId,
     })).rejects.toThrow('Validator error')
 
     const draftId = await owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'draft-1', rating: null, summary: '', summaryHasSpoiler: false,
+      anilistId: 1, requestId: 'draft-1', rating: null, summary: '', containsSpoiler: false,
       bodyJson, visibility: 'private',
     })
     const draft = await owner.client.query(socialApi.reviews.getById, { reviewId: draftId })
@@ -351,19 +351,19 @@ describe('social Convex integration', () => {
     expect(JSON.parse(draft.bodyJson)).toEqual(body)
     expect(await viewer.client.query(socialApi.reviews.getById, { reviewId: draftId })).toBeNull()
     expect(await owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'draft-2', rating: 80, summary: 'Draft', summaryHasSpoiler: false,
+      anilistId: 1, requestId: 'draft-2', rating: 80, summary: 'Draft', containsSpoiler: false,
       bodyJson, visibility: 'private',
     })).toBe(draftId)
 
     const publishedId = await owner.client.mutation(socialApi.reviews.publish, {
-      anilistId: 1, requestId: 'publish-1', rating: 95, summary: 'Great', summaryHasSpoiler: false,
+      anilistId: 1, requestId: 'publish-1', rating: 95, summary: 'Great', containsSpoiler: false,
       bodyJson, visibility: 'public',
     })
     expect(publishedId).toBe(draftId)
     const reviewFeed = await viewer.client.query(socialApi.feed.listGlobal, { cursor: null })
     expect(reviewFeed.items).toContainEqual(expect.objectContaining({ kind: 'review', reviewId: draftId }))
     expect(await owner.client.mutation(socialApi.reviews.publish, {
-      anilistId: 1, requestId: 'publish-1', rating: 95, summary: 'Great', summaryHasSpoiler: false,
+      anilistId: 1, requestId: 'publish-1', rating: 95, summary: 'Great', containsSpoiler: false,
       bodyJson, visibility: 'public',
     })).toBe(draftId)
     expect(await viewer.client.query(socialApi.reviews.getStats, { anilistId: 1 })).toMatchObject({ count: 1, average: 95, bands: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0] })
@@ -375,13 +375,13 @@ describe('social Convex integration', () => {
     expect(await owner.client.query(socialApi.reviews.getStats, { anilistId: 1 })).toMatchObject({ count: 1, average: 95 })
 
     await owner.client.mutation(socialApi.reviews.update, {
-      reviewId: draftId, rating: 85, summary: 'Updated', summaryHasSpoiler: true, bodyJson, visibility: 'public',
+      reviewId: draftId, rating: 85, summary: 'Updated', containsSpoiler: true, bodyJson, visibility: 'public',
     })
     expect(await viewer.client.query(socialApi.reviews.getStats, { anilistId: 1 })).toMatchObject({ count: 1, average: 85, bands: [0, 1, 0, 0, 0, 0, 0, 0, 0, 0] })
     await owner.client.mutation(socialApi.reviews.removeActivity, { reviewId: draftId })
     expect(await t.run(async (ctx) => (await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `review:${draftId}`)).unique())?.active)).toBe(false)
     await owner.client.mutation(socialApi.reviews.update, {
-      reviewId: draftId, rating: 80, summary: 'Still hidden', summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      reviewId: draftId, rating: 80, summary: 'Still hidden', containsSpoiler: false, bodyJson, visibility: 'public',
     })
     expect(await t.run(async (ctx) => (await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `review:${draftId}`)).unique())?.active)).toBe(false)
     await owner.client.mutation(socialApi.reviews.remove, { reviewId: draftId })
@@ -396,7 +396,7 @@ describe('social Convex integration', () => {
     const paddedBodyJson = `${' '.repeat((64 * 1024) + 1)}${bodyJson}`
 
     const reviewId = await owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'canonical-review', rating: null, summary: '', summaryHasSpoiler: false,
+      anilistId: 1, requestId: 'canonical-review', rating: null, summary: '', containsSpoiler: false,
       bodyJson: paddedBodyJson, visibility: 'private',
     })
 
@@ -554,11 +554,11 @@ describe('social Convex integration', () => {
     await insertAnime(t, 90)
     const reviewId = await owner.client.mutation(socialApi.reviews.publish, {
       anilistId: 89, requestId: 'source-review', rating: 90, summary: 'Source Review',
-      summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      containsSpoiler: false, bodyJson, visibility: 'public',
     })
     const otherReviewId = await viewer.client.mutation(socialApi.reviews.publish, {
       anilistId: 90, requestId: 'source-review-other', rating: 80, summary: 'Other Review',
-      summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      containsSpoiler: false, bodyJson, visibility: 'public',
     })
     const card = await t.run(async (ctx) => await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `review:${reviewId}`)).unique())
     if (!card) throw new Error('Expected Review feed projection.')
@@ -619,13 +619,13 @@ describe('social Convex integration', () => {
     await insertAnime(t, 1)
     await insertAnime(t, 2)
     await owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 2, requestId: 'collision', rating: null, summary: '', summaryHasSpoiler: false, bodyJson, visibility: 'private',
+      anilistId: 2, requestId: 'collision', rating: null, summary: '', containsSpoiler: false, bodyJson, visibility: 'private',
     })
     await expect(owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'collision', rating: null, summary: '', summaryHasSpoiler: false, bodyJson, visibility: 'private',
+      anilistId: 1, requestId: 'collision', rating: null, summary: '', containsSpoiler: false, bodyJson, visibility: 'private',
     })).rejects.toThrow('collision')
     await expect(owner.client.mutation(socialApi.reviews.publish, {
-      anilistId: 1, requestId: 'collision', rating: 90, summary: 'Collision', summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      anilistId: 1, requestId: 'collision', rating: 90, summary: 'Collision', containsSpoiler: false, bodyJson, visibility: 'public',
     })).rejects.toThrow('collision')
   }, 20_000)
 
@@ -676,13 +676,13 @@ describe('social Convex integration', () => {
     const owner = await createOwner(t, 'cache-owner')
     await insertAnime(t, 1)
     const reviewId = await owner.client.mutation(socialApi.reviews.publish, {
-      anilistId: 1, requestId: 'cache-review', rating: 90, summary: 'Cached', summaryHasSpoiler: false, bodyJson, visibility: 'public',
+      anilistId: 1, requestId: 'cache-review', rating: 90, summary: 'Cached', containsSpoiler: false, bodyJson, visibility: 'public',
     })
     await t.run(async (ctx) => {
       const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', 1)).unique()
       if (anime) await ctx.db.delete('animeSummaries', anime._id)
     })
-    await expect(owner.client.mutation(socialApi.reviews.update, { reviewId, rating: 80, summary: 'No cache', summaryHasSpoiler: false, bodyJson, visibility: 'public' })).rejects.toThrow('loaded')
+    await expect(owner.client.mutation(socialApi.reviews.update, { reviewId, rating: 80, summary: 'No cache', containsSpoiler: false, bodyJson, visibility: 'public' })).rejects.toThrow('loaded')
     await expect(owner.client.mutation(socialApi.reviews.setVisibility, { reviewId, visibility: 'private' })).rejects.toThrow('loaded')
     await expect(owner.client.mutation(socialApi.reviews.removeActivity, { reviewId })).rejects.toThrow('loaded')
     await expect(owner.client.mutation(socialApi.reviews.remove, { reviewId })).rejects.toThrow('loaded')
@@ -786,14 +786,14 @@ describe('social Convex integration', () => {
         const key = String(index * 2).padStart(4, '0')
         await ctx.db.insert('reviews', {
           userId, anilistId: 1, requestId: `public-${index}`, state: 'published', rating: 50,
-          summary: `Public ${index}`, summaryHasSpoiler: false, bodyJson, visibility: 'public',
+          summary: `Public ${index}`, containsSpoiler: false, bodyJson, visibility: 'public',
           publishedAt: now, updatedAt: now, activityState: 'active', newestOrderKey: key,
           highRatingOrderKey: key, lowRatingOrderKey: key, searchText: `author ${index}`, ratingBand: '50-59',
         })
       }
       await ctx.db.insert('reviews', {
         userId: viewer.profileId, anilistId: 1, requestId: 'private-own', state: 'published', rating: 50,
-        summary: 'Private own', summaryHasSpoiler: false, bodyJson, visibility: 'private',
+        summary: 'Private own', containsSpoiler: false, bodyJson, visibility: 'private',
         publishedAt: 13, updatedAt: 13, activityState: 'active', newestOrderKey: '0025',
         highRatingOrderKey: '0025', lowRatingOrderKey: '0025', searchText: 'private own', ratingBand: '50-59',
       })

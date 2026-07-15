@@ -33,7 +33,7 @@ const anime: AnimeSummary = {
 const ready = (key: 'trending' | 'upcoming') => ({ status: 'ready' as const, section: { key, items: [anime], refreshedAt: 1, expiresAt: 2 } })
 const retryProps = { onRetry: vi.fn(), isRetrying: false, retryError: null }
 const review: ReviewListItem = {
-  id: 'review-1', author: { id: 'author-1', username: 'mika', displayName: 'Mika', avatarUrl: null }, anime: { anilistId: 1, slug: 'loader-anime', title: 'Loader Anime', coverImageUrl: 'https://example.test/loader.jpg' }, state: 'published', rating: 91, summary: 'A patient and thoughtful journey.', summaryHasSpoiler: false, visibility: 'public', publishedAt: Date.now() - 120_000, updatedAt: Date.now() - 120_000,
+  id: 'review-1', author: { id: 'author-1', username: 'mika', displayName: 'Mika', avatarUrl: null }, anime: { anilistId: 1, slug: 'loader-anime', title: 'Loader Anime', coverImageUrl: 'https://example.test/loader.jpg' }, state: 'published', rating: 91, summary: 'A patient and thoughtful journey.', containsSpoiler: false, visibility: 'public', publishedAt: Date.now() - 120_000, updatedAt: Date.now() - 120_000,
 }
 
 afterEach(() => {
