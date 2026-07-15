@@ -388,7 +388,7 @@ Expected: FAIL on 320px sidebar, 16:9/full-width Post image, and native checkbox
 <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_430px]">
 
 // post-media-card.tsx image branch only
-<div className="mt-3 aspect-4/5 w-full max-h-[32rem] overflow-hidden rounded-lg border border-white/10 bg-black/20 sm:max-w-[65%]">
+<div className="mt-3 aspect-4/5 w-full overflow-hidden rounded-lg border border-white/10 bg-black/20 sm:max-w-[65%]">
 
 // post-composer.tsx
 <div className="flex min-h-11 items-center gap-3 rounded-lg border border-white/10 px-3">
