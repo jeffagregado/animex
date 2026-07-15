@@ -15,6 +15,7 @@ describe('PostMediaCard', () => {
     expect(media?.className).toContain('aspect-4/5')
     expect(media?.className).toContain('w-full')
     expect(media?.className).toContain('sm:max-w-[65%]')
+    expect(media?.className).not.toContain('max-h-[32rem]')
     expect(image.getAttribute('loading')).toBe('lazy')
     expect(image.getAttribute('referrerpolicy')).toBe('no-referrer')
     fireEvent.error(image)
