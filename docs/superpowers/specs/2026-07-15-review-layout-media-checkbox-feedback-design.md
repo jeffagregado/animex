@@ -1,6 +1,6 @@
 # Review Layout, Media, And Checkbox Feedback Design
 
-Status: APPROVED DESIGN; AWAITING WRITTEN SPEC REVIEW.
+Status: APPROVED WRITTEN SPEC; IMPLEMENTATION PLAN READY FOR REVIEW.
 
 ## Scope
 
