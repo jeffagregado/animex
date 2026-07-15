@@ -11,10 +11,17 @@ describe('PostMediaCard', () => {
   it('renders secure lazy images with contextual alt and stable broken geometry', () => {
     render(<PostMediaCard media={{ type: 'image', url: 'https://media.example/image', description: null }} username="mika" />)
     const image = screen.getByRole('img', { name: 'Image attached to post by mika' })
+    const media = image.parentElement
+    expect(media?.className).toContain('aspect-4/5')
+    expect(media?.className).toContain('w-full')
+    expect(media?.className).toContain('sm:max-w-[65%]')
     expect(image.getAttribute('loading')).toBe('lazy')
     expect(image.getAttribute('referrerpolicy')).toBe('no-referrer')
     fireEvent.error(image)
-    expect(screen.getByText('Image unavailable').parentElement?.parentElement?.className).toContain('aspect-video')
+    const unavailable = screen.getByText('Image unavailable').parentElement?.parentElement
+    expect(unavailable?.className).toContain('aspect-4/5')
+    expect(unavailable?.className).toContain('w-full')
+    expect(unavailable?.className).toContain('sm:max-w-[65%]')
   })
 
   it('renders YouTube as linked thumbnail without playback', () => {
@@ -24,6 +31,8 @@ describe('PostMediaCard', () => {
     expect(link.getAttribute('rel')).toBe('noreferrer noopener')
     expect(document.querySelector('img')?.getAttribute('src')).toContain('dQw4w9WgXcQ')
     expect(document.querySelector('iframe')).toBeNull()
+    expect(link.className).not.toContain('aspect-4/5')
+    expect(link.className).not.toContain('max-w-[65%]')
   })
 
   it('renders external videos as truthful domain cards', () => {

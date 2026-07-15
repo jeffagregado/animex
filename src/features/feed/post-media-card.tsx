@@ -23,7 +23,7 @@ export function PostMediaCard({ media, username }: PostMediaCardProps) {
   useEffect(() => setBroken(false), [media.type, media.url])
   if (media.type === 'image') {
     const alt = media.description?.trim() || `Image attached to post by ${username}`
-    return <div className="mt-3 aspect-video max-h-[32rem] overflow-hidden rounded-lg border border-white/10 bg-black/20">{broken
+    return <div className="mt-3 aspect-4/5 w-full max-h-[32rem] overflow-hidden rounded-lg border border-white/10 bg-black/20 sm:max-w-[65%]">{broken
       ? <div className="grid h-full min-h-40 place-items-center text-muted-foreground"><span className="flex items-center gap-2"><ImageOffIcon className="size-5" />Image unavailable</span></div>
       : <img alt={alt} className="h-full w-full object-cover" loading="lazy" onError={() => setBroken(true)} referrerPolicy="no-referrer" src={media.url} />}</div>
   }

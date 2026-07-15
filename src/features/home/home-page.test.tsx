@@ -173,6 +173,8 @@ describe('HomePage', () => {
     expect(screen.getByRole('heading', { name: 'Seasonal Anime' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Latest Reviews' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'This Week' })).toBeTruthy()
+    const sidebar = screen.getByLabelText('Home utility column')
+    expect(sidebar.parentElement?.className).toContain('lg:grid-cols-[minmax(0,1fr)_430px]')
     expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'My Anime' })).toBeNull()
     expect(screen.queryByText('Community feed')).toBeNull()

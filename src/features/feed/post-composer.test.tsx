@@ -56,6 +56,16 @@ describe('PostComposer', () => {
     expect(mocks.composer.removeMedia).toHaveBeenCalled()
   })
 
+  it('uses the shared checkbox and toggles spoiler state from its label', () => {
+    render(<PostComposer initial={initial} onCancel={mocks.onCancel} onSaved={mocks.onSaved} postId={null} registerClose={() => undefined} />)
+    const checkbox = screen.getByRole('checkbox', { name: 'Hide whole Post as spoiler' })
+    expect(checkbox.tagName).toBe('SPAN')
+    expect(checkbox.getAttribute('data-slot')).toBe('checkbox')
+    expect(document.querySelector('input[type="checkbox"]')?.getAttribute('aria-hidden')).toBe('true')
+    fireEvent.click(screen.getByText('Hide whole Post as spoiler'))
+    expect(mocks.composer.setHasSpoiler).toHaveBeenCalledWith(true)
+  })
+
   it('publishes successfully, clears blocker predicates, and uses Sonner', async () => {
     mocks.onSaved.mockImplementationOnce(() => {
       expect(mocks.blockerOptions?.shouldBlockFn()).toBe(false)
