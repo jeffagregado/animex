@@ -1,6 +1,6 @@
 # Phase 5 Review Card, Avatar, And Rail Feedback Design
 
-Status: IMPLEMENTED on `jeff-cx/phase-5-feed-reviews`; final reviewer, independent QA, automated gates, and authenticated 1280 px browser QA pass. Exact 390/768 px and live pointer-hover checks remain pending because the Chrome extension connection is unavailable.
+Status: IMPLEMENTED AND VERIFIED on `jeff-cx/phase-5-feed-reviews`; final reviewer, independent QA, automated gates, and authenticated Chrome browser QA at 390, 768, and 1280 px pass.
 
 ## Current Implementation
 
@@ -127,7 +127,7 @@ User authorizes deletion of all existing Review records, including drafts.
 - Latest Reviews tests cover title/author/time/Summary/badge and absent `Read review`.
 - Rail tests cover per-row equal height without fixed global height or changed scroll controls.
 - Run focused tests, full suite, TypeScript, build, Convex sync/cleanup verification, Fallow new-only, client AniList endpoint scan, and `git diff --check`.
-- Authenticated browser QA at 390, 768, and 1280 px covers writer input, Avatar fallbacks, Review links, badges, menus, shared cards, Latest Reviews, rail heights, hover/focus/touch, console, network, hydration, and overflow.
+- Authenticated Chrome browser QA passes at 390, 768, and 1280 px. It verifies writer partial Rating/Preview behavior, accessible Avatar fallback, Review links and menus, exact shared-card parity, Latest Reviews, desktop-only sidebar behavior, equal heights within every Home/Discover rail, pointer hover and exit restoration, keyboard focus-visible, narrow-screen activation, themed Select options, stable scrollbar geometry, clean console/network exception checks, and no horizontal overflow. Live data exposed the Review activity kind; Post/Completed/Rewatched Avatar variants remain covered by integration tests.
 
 ## Locked Boundaries
 

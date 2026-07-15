@@ -771,7 +771,7 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; implementation, migration, r
 
 # Phase 5 Review Card, Avatar, And Rail Feedback
 
-Status: IMPLEMENTATION COMPLETE on `jeff-cx/phase-5-feed-reviews`; final reviewer, independent QA, automated gates, and authenticated 1280 px browser QA pass. Exact 390/768 px and live pointer-hover checks remain pending because the Chrome extension connection is unavailable.
+Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; final reviewer, independent QA, automated gates, and authenticated Chrome browser QA at 390, 768, and 1280 px pass.
 
 - [x] Inspect Feed Review, Review discovery, Anime Reviews, Latest Reviews, writer fields, avatar renderers, and anime rails.
 - [x] Lock whole-body Review links, activity-only Delete copy, exact shared Review card, and per-rail equal heights.
@@ -790,4 +790,4 @@ Status: IMPLEMENTATION COMPLETE on `jeff-cx/phase-5-feed-reviews`; final reviewe
 - [x] Link Feed Review bodies and Latest Review rows to Review Detail; remove visible `Read Review`/`Read review` CTAs. Keep Review activity `Delete` action mapped to `reviews.removeActivity` with activity-only semantics. Owner: feed/Home worker.
 - [x] Share `PublishedReviewCard` between `/reviews` and Anime Detail Reviews; preserve listing query, sorting, stats, pagination, visibility, and anime-cover layout. Owner: Review listing worker.
 - [x] Equalize anime card heights within each rail through shared `HorizontalRail`/`DiscoverSectionRail`; preserve width, ratio, snapping, scrolling, arrows, and responsive behavior. Owner: Discover rail worker.
-- [ ] Finish responsive authenticated browser QA at 390 and 768 px plus live pointer-hover checks after the Chrome extension connection is available. Final integrated reviewer, independent QA, serialized full tests, Convex sync, TypeScript, build, Fallow new-only, client AniList endpoint scan, diff check, and authenticated 1280 px browser QA pass. Owner: controller + reviewer + QA.
+- [x] Complete final integrated review, independent QA, serialized full tests (631 passed / 3 skipped), Convex sync, TypeScript, client + SSR build, Fallow new-only, client AniList endpoint scan, diff check, and authenticated Chrome browser QA at 390, 768, and 1280 px. Responsive checks cover writer input/Preview, shared card parity, Review Detail, Avatar fallback, Latest Reviews, owner menu, desktop-only sidebar, per-rail equal heights, pointer hover/exit restoration, keyboard focus, themed Select options, scrollbar stability, console, failed requests, hydration symptoms, and horizontal overflow. Owner: controller + reviewer + QA.

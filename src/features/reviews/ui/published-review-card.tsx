@@ -32,7 +32,7 @@ export function PublishedReviewCard({ review }: { review: ReviewListItem }) {
         <p aria-label={`Rating: ${review.rating} out of 100`} className="text-xl font-black text-cyan-300 sm:text-3xl">{review.rating}<span className="text-sm font-normal text-muted-foreground sm:text-base">/100</span></p>
       </div>
       <div className="col-start-2 flex min-w-0 items-end justify-end sm:col-start-3 sm:row-span-3 sm:row-start-1 sm:flex-col sm:justify-end">
-        <a className="inline-flex min-h-11 items-center gap-1 font-bold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/reviews/${review.id}`}>Review Detail<ChevronRightIcon aria-hidden="true" className="size-4" /></a>
+        <a className="inline-flex min-h-11 items-center gap-1 font-bold text-cyan-300 hover:text-cyan-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/reviews/${review.id}`}>Review Detail<ChevronRightIcon aria-hidden="true" className="size-4" /></a>
       </div>
     </CardContent>
   </Card>
