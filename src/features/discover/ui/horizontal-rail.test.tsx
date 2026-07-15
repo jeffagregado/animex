@@ -39,6 +39,15 @@ afterEach(() => {
 })
 
 describe('HorizontalRail', () => {
+  it('stretches direct children only within its own row', () => {
+    const view = render(<HorizontalRail label="Trending Anime"><article>Short poster</article><article>Tall poster title</article></HorizontalRail>)
+    const viewport = view.getByRole('region', { name: 'Trending Anime' })
+    const row = viewport.firstElementChild
+
+    expect(row?.className).toContain('items-stretch')
+    expect(row?.className).toContain('[&>*]:h-auto')
+  })
+
   it('scrolls one viewport smoothly and updates boundary controls from scroll events', () => {
     const view = render(<HorizontalRail label="Trending Anime"><article>First poster</article><article>Second poster</article></HorizontalRail>)
     const viewport = view.getByRole('region', { name: 'Trending Anime' })

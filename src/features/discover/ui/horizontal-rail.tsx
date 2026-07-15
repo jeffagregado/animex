@@ -60,7 +60,7 @@ export function HorizontalRail({ children, label }: HorizontalRailProps) {
         <button className="inline-flex size-9 items-center justify-center rounded-md border border-border bg-card text-foreground outline-none transition hover:border-cyan-300 hover:bg-cyan-300/10 focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:pointer-events-none disabled:opacity-45" type="button" onClick={() => scrollViewport(1)} aria-label={`Next ${label}`} disabled={position.isAtEnd}><ChevronRight aria-hidden="true" className="size-4" /></button>
       </div>
       <div ref={viewportRef} role="region" aria-label={label} tabIndex={0} className="scrollbar-none overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2">
-        <div ref={contentRef} className="flex w-max gap-3 [&>*]:snap-start">
+        <div ref={contentRef} className="flex w-max items-stretch gap-3 [&>*]:h-auto [&>*]:snap-start">
           {children}
         </div>
       </div>

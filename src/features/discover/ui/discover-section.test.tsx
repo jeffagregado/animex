@@ -26,6 +26,20 @@ afterEach(() => {
 })
 
 describe('DiscoverSectionRail', () => {
+  it('fills the rail row and keeps poster metadata aligned at the bottom', () => {
+    render(<DiscoverSectionRail title="Trending Anime" state={{ status: 'ready', section: { key: 'trending', items: [anime], refreshedAt: 1, expiresAt: 2 } }} onRetry={vi.fn()} isRetrying={false} retryError={null} />)
+
+    const link = screen.getByRole('link', { name: /Frieren/ })
+    const article = link.firstElementChild
+    const metadata = screen.getByText('2023 · TV').parentElement
+
+    expect(link.className).toContain('h-full')
+    expect(article?.className).toContain('h-full')
+    expect(metadata?.className).toContain('flex-1')
+    expect(metadata?.className).toContain('flex-col')
+    expect(screen.getByText('2023 · TV').className).toContain('mt-auto')
+  })
+
   it('links a rail card to its canonical anime route', () => {
     render(<DiscoverSectionRail title="Trending Anime" state={{ status: 'ready', section: { key: 'trending', items: [anime], refreshedAt: 1, expiresAt: 2 } }} onRetry={vi.fn()} isRetrying={false} retryError={null} />)
 

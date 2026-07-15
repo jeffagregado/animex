@@ -29,13 +29,13 @@ function AnimePoster({ anime, rank }: AnimePosterProps) {
   }, [imageUrl])
 
   return (
-    <Link to="/anime/$anilistId/$slug" params={{ anilistId: String(anime.anilistId), slug: anime.slug }} className="block shrink-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
-    <article className="relative w-36 overflow-hidden rounded-lg border border-border bg-card sm:w-40">
+    <Link to="/anime/$anilistId/$slug" params={{ anilistId: String(anime.anilistId), slug: anime.slug }} className="block h-full shrink-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
+    <article className="relative flex h-full w-36 flex-col overflow-hidden rounded-lg border border-border bg-card sm:w-40">
       <div className="aspect-[2/3] bg-muted">
         {imageUrl !== null && !hasImageError ? <img className="size-full object-cover" src={imageUrl} alt={`${anime.titles.display} cover`} onError={() => setHasImageError(true)} /> : <div className="flex size-full flex-col items-center justify-center gap-2 px-3 text-center text-xs text-muted-foreground"><ImageOff aria-hidden="true" className="size-5" /><span>Image unavailable</span></div>}
       </div>
       {rank !== null ? <span className="absolute left-2 top-2 rounded bg-coral-500 px-2 py-1 text-sm font-bold text-white">{rank}</span> : null}
-      <div className="min-h-16 space-y-1 p-3"><h3 className="line-clamp-2 text-sm font-bold leading-4">{anime.titles.display}</h3><p className="text-xs text-muted-foreground">{anime.seasonYear ?? 'TBA'} · {label}</p></div>
+      <div className="flex min-h-16 flex-1 flex-col gap-1 p-3"><h3 className="line-clamp-2 text-sm font-bold leading-4">{anime.titles.display}</h3><p className="mt-auto text-xs text-muted-foreground">{anime.seasonYear ?? 'TBA'} · {label}</p></div>
     </article>
     </Link>
   )
