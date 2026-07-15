@@ -39,6 +39,9 @@ export const cleanupReviewsPage = internalMutation({
     for (const review of page.page) {
       const cards = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `review:${review._id}`)).take(2)
       if (cards.length > 1) throw new Error(`Multiple feed cards found for Review ${review._id}.`)
+      if (cards[0] && cards[0].kind !== 'review') {
+        throw new Error(`Feed card ${cards[0]._id} for Review ${review._id} has kind ${cards[0].kind}; expected review.`)
+      }
       if (cards[0]) await ctx.db.delete('feedCards', cards[0]._id)
       await ctx.db.delete('reviews', review._id)
     }

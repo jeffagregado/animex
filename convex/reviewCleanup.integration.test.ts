@@ -1,16 +1,13 @@
 /// <reference types="vite/client" />
 
 import { convexTest } from 'convex-test'
-import type { FunctionReference } from 'convex/server'
+import { makeFunctionReference, type FunctionReference } from 'convex/server'
 import { describe, expect, test } from 'vitest'
 
-import { internal } from './_generated/api'
 import type { Doc, Id, TableNames } from './_generated/dataModel'
 import schema from './schema'
 
 const modules = import.meta.glob(['./_generated/**/*.*', './reviewCleanup.ts'])
-// Generated API is controller-owned and intentionally not regenerated in this worker commit.
-const cleanup = (internal as any).reviewCleanup
 const createHarness = () => convexTest(schema, modules)
 
 const listTable = async <TableName extends TableNames>(
@@ -19,9 +16,14 @@ const listTable = async <TableName extends TableNames>(
 ): Promise<Array<Doc<TableName>>> => await t.run(async (ctx) => await ctx.db.query(table).collect())
 
 type CleanupPageResult = { cursor: string; isDone: boolean; processedCount: number; deletedCount: number }
-type CleanupFunction = FunctionReference<'mutation', 'internal', {
-  paginationOpts: { numItems: number; cursor: string | null }
-}, CleanupPageResult>
+type PageArgs = { paginationOpts: { numItems: number; cursor: string | null } }
+type CleanupFunction = FunctionReference<'mutation', 'public', PageArgs, CleanupPageResult>
+type InspectionTarget = 'reviews' | 'reviewCards' | 'reviewStats'
+type InspectionResult = { cursor: string; isDone: boolean; processedCount: number }
+const inspectReviewDataPage = makeFunctionReference<'query', PageArgs & { target: InspectionTarget }, InspectionResult>('reviewCleanup:inspectReviewDataPage')
+const cleanupReviewsPage = makeFunctionReference<'mutation', PageArgs, CleanupPageResult>('reviewCleanup:cleanupReviewsPage')
+const cleanupOrphanReviewCardsPage = makeFunctionReference<'mutation', PageArgs, CleanupPageResult>('reviewCleanup:cleanupOrphanReviewCardsPage')
+const cleanupReviewStatsPage = makeFunctionReference<'mutation', PageArgs, CleanupPageResult>('reviewCleanup:cleanupReviewStatsPage')
 
 const reviewFields = (userId: Id<'users'>, anilistId: number, index: number, state: 'draft' | 'published') => ({
   userId, anilistId, requestId: `review-${index}`, state, rating: state === 'published' ? 80 + index : null,
@@ -50,7 +52,7 @@ describe('bounded Review cleanup', () => {
       await ctx.db.insert('animeReviewStats', { anilistId: 1, count: 1, ratingSum: 90, bands: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0], updatedAt: 1 })
     })
 
-    const inspect = async (target: 'reviews' | 'reviewCards' | 'reviewStats') => await t.query(cleanup.inspectReviewDataPage, {
+    const inspect = async (target: InspectionTarget) => await t.query(inspectReviewDataPage, {
       target, paginationOpts: { numItems: 1, cursor: null },
     })
 
@@ -58,6 +60,32 @@ describe('bounded Review cleanup', () => {
     expect(await inspect('reviewCards')).toMatchObject({ isDone: true, processedCount: 1 })
     expect(await inspect('reviewStats')).toMatchObject({ isDone: true, processedCount: 1 })
     expect(JSON.stringify(await inspect('reviews'))).not.toContain('private')
+  })
+
+  test('rejects a linked source-key collision with the wrong card kind without deleting either document', async () => {
+    const t = createHarness()
+    const ids = await t.run(async (ctx) => {
+      const userId = await ctx.db.insert('users', {
+        authId: 'collision-owner', username: 'CollisionOwner', usernameKey: 'collisionowner', name: 'Collision Owner',
+        visibility: 'public', createdAt: 1, updatedAt: 1,
+      })
+      const reviewId = await ctx.db.insert('reviews', reviewFields(userId, 1, 1, 'published'))
+      const postId = await ctx.db.insert('posts', {
+        userId, requestId: 'collision-post', text: 'Must survive', hasSpoiler: false,
+        visibility: 'public', media: null, createdAt: 1, updatedAt: 1,
+      })
+      const cardId = await ctx.db.insert('feedCards', {
+        sourceKey: `review:${reviewId}`, kind: 'post', userId, sourceId: postId,
+        visibility: 'public', active: true, orderKey: 'collision-card', occurredAt: 1, updatedAt: 1,
+      })
+      return { reviewId, cardId }
+    })
+
+    await expect(t.mutation(cleanupReviewsPage, {
+      paginationOpts: { numItems: 1, cursor: null },
+    })).rejects.toThrow(`Feed card ${ids.cardId} for Review ${ids.reviewId} has kind post; expected review.`)
+    expect(await t.run(async (ctx) => await ctx.db.get('reviews', ids.reviewId))).not.toBeNull()
+    expect(await t.run(async (ctx) => await ctx.db.get('feedCards', ids.cardId))).not.toBeNull()
   })
 
   test('deletes Review data in resumable pages and preserves every unrelated document', async () => {
@@ -80,7 +108,9 @@ describe('bounded Review cleanup', () => {
       await ctx.db.insert('animeMilestones', { userId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: 6, updatedAt: 6 })
       await ctx.db.insert('animeMilestones', { userId, anilistId: 1, kind: 'rewatched', visibility: 'public', occurredAt: 7, updatedAt: 7 })
       const postId = await ctx.db.insert('posts', {
-        userId, requestId: 'post-1', text: 'Keep post', hasSpoiler: false, visibility: 'public', media: null, createdAt: 8, updatedAt: 8,
+        userId, requestId: 'post-1', text: 'Keep post', hasSpoiler: false, visibility: 'public',
+        media: { type: 'image', url: 'https://cdn.example.com/keep-post.jpg', description: 'Preserved external media' },
+        createdAt: 8, updatedAt: 8,
       })
       for (const kind of ['post', 'completed', 'rewatched'] as const) {
         await ctx.db.insert('feedCards', {
@@ -122,12 +152,12 @@ describe('bounded Review cleanup', () => {
       return results
     }
 
-    const reviewPages = await runPages(cleanup.cleanupReviewsPage, 2)
+    const reviewPages = await runPages(cleanupReviewsPage, 2)
     expect(reviewPages.map((page) => page.processedCount)).toEqual([2, 1])
     expect(reviewPages.reduce((sum, page) => sum + page.deletedCount, 0)).toBe(3)
-    const orphanPages = await runPages(cleanup.cleanupOrphanReviewCardsPage, 1)
+    const orphanPages = await runPages(cleanupOrphanReviewCardsPage, 1)
     expect(orphanPages.reduce((sum, page) => sum + page.deletedCount, 0)).toBe(1)
-    const statPages = await runPages(cleanup.cleanupReviewStatsPage, 1)
+    const statPages = await runPages(cleanupReviewStatsPage, 1)
     expect(statPages.map((page) => page.deletedCount)).toEqual([1, 1])
 
     expect(await listTable(t, 'reviews')).toEqual([])
@@ -136,8 +166,8 @@ describe('bounded Review cleanup', () => {
     expect((await listTable(t, 'feedCards')).filter((card) => card.kind !== 'review')).toEqual(nonReviewCardsBefore)
     for (const table of preservedTables) expect(await listTable(t, table)).toEqual(before[table])
 
-    expect(await runPages(cleanup.cleanupReviewsPage, 2)).toEqual([expect.objectContaining({ isDone: true, processedCount: 0, deletedCount: 0 })])
-    expect(await runPages(cleanup.cleanupOrphanReviewCardsPage, 2)).toEqual([expect.objectContaining({ isDone: true, processedCount: 0, deletedCount: 0 })])
-    expect(await runPages(cleanup.cleanupReviewStatsPage, 2)).toEqual([expect.objectContaining({ isDone: true, processedCount: 0, deletedCount: 0 })])
+    expect(await runPages(cleanupReviewsPage, 2)).toEqual([expect.objectContaining({ isDone: true, processedCount: 0, deletedCount: 0 })])
+    expect(await runPages(cleanupOrphanReviewCardsPage, 2)).toEqual([expect.objectContaining({ isDone: true, processedCount: 0, deletedCount: 0 })])
+    expect(await runPages(cleanupReviewStatsPage, 2)).toEqual([expect.objectContaining({ isDone: true, processedCount: 0, deletedCount: 0 })])
   })
 })
