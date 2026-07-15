@@ -264,8 +264,10 @@ Extend editor-page test:
 
 ```tsx
 const checkbox = screen.getByRole('checkbox', { name: 'Review contains spoiler' })
-expect(checkbox.tagName).toBe('BUTTON')
-expect(document.querySelector('input[type="checkbox"]')).toBeNull()
+expect(checkbox.tagName).toBe('SPAN')
+expect(checkbox.getAttribute('data-slot')).toBe('checkbox')
+const internalInput = document.querySelector('input[type="checkbox"]')
+expect(internalInput?.getAttribute('aria-hidden')).toBe('true')
 fireEvent.click(screen.getByText('Review contains spoiler'))
 expect(checkbox.getAttribute('aria-checked')).toBe('true')
 ```
@@ -363,7 +365,8 @@ expect(media?.className).toContain('w-full')
 expect(media?.className).toContain('sm:max-w-[65%]')
 
 const checkbox = screen.getByRole('checkbox', { name: 'Hide whole Post as spoiler' })
-expect(checkbox.tagName).toBe('BUTTON')
+expect(checkbox.tagName).toBe('SPAN')
+expect(checkbox.getAttribute('data-slot')).toBe('checkbox')
 fireEvent.click(screen.getByText('Hide whole Post as spoiler'))
 expect(mocks.composer.setHasSpoiler).toHaveBeenCalledWith(true)
 ```
