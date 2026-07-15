@@ -2,9 +2,11 @@ import { $applyNodeReplacement, DecoratorNode, type EditorConfig, type NodeKey, 
 import { useLexicalNodeSelection } from '@lexical/react/useLexicalNodeSelection'
 import type { JSX } from 'react'
 
+import { cn } from '#/lib/utils'
+
 function ReviewImage({ alt, nodeKey, url }: { alt: string; nodeKey: NodeKey; url: string }) {
   const [isSelected] = useLexicalNodeSelection(nodeKey)
-  return <div className={isSelected ? 'rounded-lg ring-2 ring-cyan-300' : 'rounded-lg'} data-review-media><img alt={alt} className="aspect-video w-full rounded-lg border border-border object-cover" src={url} /></div>
+  return <div className={cn('w-full rounded-lg sm:max-w-[65%]', isSelected && 'ring-2 ring-cyan-300')} data-review-media><img alt={alt} className="aspect-4/5 w-full rounded-lg border border-border object-cover" src={url} /></div>
 }
 
 export type SerializedReviewImageNode = SerializedLexicalNode & { alt: string; type: 'review-image'; url: string; version: 1 }

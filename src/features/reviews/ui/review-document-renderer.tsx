@@ -47,7 +47,7 @@ function SpoilerBlock({ node }: { node: Extract<ReviewNode, { type: 'spoiler' }>
 
 function ReviewImage({ alt, url }: { alt: string; url: string }) {
   const [failed, setFailed] = useState(false)
-  return <figure className="overflow-hidden rounded-lg border border-border bg-card">{failed ? <div className="grid aspect-video place-items-center text-muted-foreground"><span className="flex items-center gap-2"><ImageOffIcon className="size-5" />Image unavailable</span></div> : <img alt={alt} className="aspect-video w-full object-cover" onError={() => setFailed(true)} src={url} />}{failed ? <figcaption className="sr-only">{alt}</figcaption> : null}</figure>
+  return <figure className="w-full overflow-hidden rounded-lg border border-border bg-card sm:max-w-[65%]">{failed ? <div className="grid aspect-4/5 place-items-center text-muted-foreground"><span className="flex items-center gap-2"><ImageOffIcon className="size-5" />Image unavailable</span></div> : <img alt={alt} className="aspect-4/5 w-full object-cover" onError={() => setFailed(true)} src={url} />}{failed ? <figcaption className="sr-only">{alt}</figcaption> : null}</figure>
 }
 
 function ReviewVideo({ label, provider, url }: { label?: string; provider: 'youtube' | 'vimeo' | 'external'; url: string }) {

@@ -66,7 +66,12 @@ describe('LoadedReviewEditor lifecycle', () => {
     fireEvent.change(rating, { target: { value: '9.' } })
     expect(rating.value).toBe('9.')
     const checkbox = screen.getByRole('checkbox', { name: 'Review contains spoiler' })
+    expect(checkbox.tagName).toBe('SPAN')
+    expect(checkbox.getAttribute('data-slot')).toBe('checkbox')
+    expect(document.querySelector('input[type="checkbox"]')?.getAttribute('aria-hidden')).toBe('true')
     expect(checkbox.closest('[data-review-spoiler-row]')?.className).toContain('justify-end')
+    fireEvent.click(screen.getByText('Review contains spoiler'))
+    expect(checkbox.getAttribute('aria-checked')).toBe('true')
   })
 
   it('persists empty Draft rating as null and rejects empty Publish rating', async () => {

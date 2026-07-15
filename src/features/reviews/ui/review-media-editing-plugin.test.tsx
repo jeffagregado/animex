@@ -27,7 +27,13 @@ describe('ReviewMediaEditingPlugin', () => {
     editor.update(() => { $getRoot().append($createReviewImageNode('https://images.example/frieren.jpg', 'Frieren')) }, { discrete: true })
     const image = await screen.findByAltText('Frieren')
     fireEvent.click(image)
-    await waitFor(() => expect(image.closest('[data-review-media]')?.className).toContain('ring-cyan-300'))
+    await waitFor(() => {
+      const media = image.closest('[data-review-media]')
+      expect(media?.className).toContain('ring-cyan-300')
+      expect(media?.className).toContain('w-full')
+      expect(media?.className).toContain('sm:max-w-[65%]')
+      expect(image.className).toContain('aspect-4/5')
+    })
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Editor' }), { key: 'Delete' })
     await waitFor(() => expect(types()).toEqual(['paragraph']))

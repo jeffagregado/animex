@@ -58,11 +58,16 @@ describe('ReviewDocumentRenderer', () => {
   it('uses safe linked video cards and explicit image failure state', () => {
     render(<ReviewDocumentRenderer document={document} />)
     const link = screen.getByRole('link', { name: /Official trailer/ })
+    const image = screen.getByAltText('Frieren sunset')
+    const figure = image.closest('figure')
     expect(link.getAttribute('target')).toBe('_blank')
     expect(link.getAttribute('rel')).toBe('noreferrer noopener')
-    expect(screen.getByAltText('Frieren sunset')).toBeTruthy()
-    fireEvent.error(screen.getByAltText('Frieren sunset'))
-    expect(screen.getByText('Image unavailable')).toBeTruthy()
+    expect(link.className).not.toContain('max-w-[65%]')
+    expect(image.className).toContain('aspect-4/5')
+    expect(figure?.className).toContain('w-full')
+    expect(figure?.className).toContain('sm:max-w-[65%]')
+    fireEvent.error(image)
+    expect(screen.getByText('Image unavailable').parentElement?.className).toContain('aspect-4/5')
   })
 
   it('renders only validated structured nodes without raw HTML paths', () => {
