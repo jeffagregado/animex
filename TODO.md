@@ -791,3 +791,16 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; final reviewer, independent 
 - [x] Share `PublishedReviewCard` between `/reviews` and Anime Detail Reviews; preserve listing query, sorting, stats, pagination, visibility, and anime-cover layout. Owner: Review listing worker.
 - [x] Equalize anime card heights within each rail through shared `HorizontalRail`/`DiscoverSectionRail`; preserve width, ratio, snapping, scrolling, arrows, and responsive behavior. Owner: Discover rail worker.
 - [x] Complete final integrated review, independent QA, serialized full tests (631 passed / 3 skipped), Convex sync, TypeScript, client + SSR build, Fallow new-only, client AniList endpoint scan, diff check, and authenticated Chrome browser QA at 390, 768, and 1280 px. Responsive checks cover writer input/Preview, shared card parity, Review Detail, Avatar fallback, Latest Reviews, owner menu, desktop-only sidebar, per-rail equal heights, pointer hover/exit restoration, keyboard focus, themed Select options, scrollbar stability, console, failed requests, hydration symptoms, and horizontal overflow. Owner: controller + reviewer + QA.
+
+# Phase 5 Review Layout, Media, And Checkbox Feedback
+
+Status: DESIGN APPROVED on `jeff-cx/phase-5-feed-reviews`; awaiting written-spec review and implementation plan.
+
+- [x] Inspect shared Review card, Home desktop grid, Review/Post image renderers, and native checkbox usage.
+- [x] Lock mobile Rating/action row, 430px desktop utility column, scoped 4:5 image geometry, and responsive 65% cap.
+- [x] Verify official shadcn Base UI Checkbox and existing `@base-ui/react`; no dependency addition needed.
+- [x] Write and self-review current-state design specification.
+- [ ] User reviews written specification.
+- [ ] Create detailed implementation plan.
+- [ ] User reviews and approves implementation plan.
+- [ ] Implement only after plan approval.
