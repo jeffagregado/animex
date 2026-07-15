@@ -1,7 +1,10 @@
 import { useState, type ReactNode } from 'react'
-import { CheckIcon, FileTextIcon, HeartIcon, MessageCircleIcon, Repeat2Icon, StarIcon } from 'lucide-react'
+import { HeartIcon, MessageCircleIcon } from 'lucide-react'
 
+import { UserAvatar } from '#/components/user-avatar'
 import type { FeedCard as FeedCardData } from '../social/shared/social-contracts'
+import { ReviewSpoilerBadge } from '../reviews/ui/review-spoiler-badge'
+import { ReviewSummary } from '../reviews/ui/review-summary'
 import { FeedCoverImage } from './feed-cover-image'
 import { FeedOwnerActions } from './feed-owner-actions'
 import { PostMediaCard } from './post-media-card'
@@ -35,14 +38,6 @@ const activityText = (card: FeedCardData): string => {
   return `${card.author.displayName} rewatched ${card.anime.title}`
 }
 
-const activityIcon = (card: FeedCardData): ReactNode => {
-  const className = `size-4 ${card.kind === 'post' ? 'text-coral-400' : 'text-cyan-300'}`
-  if (card.kind === 'post') return <FileTextIcon aria-hidden="true" className={className} />
-  if (card.kind === 'review') return <StarIcon aria-hidden="true" className={className} />
-  if (card.kind === 'completed') return <CheckIcon aria-hidden="true" className={className} />
-  return <Repeat2Icon aria-hidden="true" className={className} />
-}
-
 /** Renders one strict discriminated feed card. */
 export function FeedCard({ card, owner, signedIn, onEdit, onChanged }: FeedCardProps) {
   const [revealed, setRevealed] = useState(false)
@@ -53,7 +48,7 @@ export function FeedCard({ card, owner, signedIn, onEdit, onChanged }: FeedCardP
   return (
     <article className={`rounded-lg border border-white/8 border-l-2 ${accent} bg-card/55 px-4 py-3 shadow-lg shadow-black/10 transition hover:border-y-white/15 hover:border-r-white/15 sm:px-5`}>
       <header className="flex min-w-0 items-center gap-3">
-        <span className={`grid size-9 shrink-0 place-items-center rounded-full border ${card.kind === 'post' ? 'border-coral-400/35 bg-coral-400/10' : 'border-cyan-300/35 bg-cyan-300/10'}`}>{activityIcon(card)}</span>
+        <UserAvatar avatarUrl={card.author.avatarUrl} displayName={card.author.displayName} label={`${card.author.displayName} avatar`} size="sm" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold text-slate-100">{activityText(card)}</p>
           <a className="inline-flex rounded text-xs text-muted-foreground hover:text-cyan-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/feed/${card.id}`} title={new Date(occurredAt).toISOString()}><time dateTime={new Date(occurredAt).toISOString()}>{relativeTime(occurredAt)}</time>{edited ? ' · Edited' : ''}</a>
@@ -72,6 +67,6 @@ const renderBody = (card: FeedCardData, revealed: boolean, reveal: () => void): 
     if (card.hasSpoiler && !revealed) return <button className="min-h-24 w-full rounded-lg border border-cyan-300/30 bg-cyan-300/5 font-bold text-cyan-200 hover:bg-cyan-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={reveal} type="button">Reveal Post spoiler</button>
     return <>{card.text ? <p className="whitespace-pre-wrap text-sm leading-6 text-slate-200">{card.text}</p> : null}{card.media ? <PostMediaCard media={card.media} username={card.author.username} /> : null}</>
   }
-  if (card.kind === 'review') return <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4 sm:grid-cols-[6rem_minmax(0,1fr)]"><a className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/anime/${card.anime.anilistId}/${card.anime.slug}`}><FeedCoverImage alt={`${card.anime.title} cover`} className="aspect-[2/3] w-20 rounded-lg sm:w-24" src={card.anime.coverImageUrl} /></a><div className="min-w-0"><h2 className="truncate font-black">{card.anime.title}</h2><p className="mt-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Rating</p><p className="text-2xl font-black tabular-nums text-cyan-300">{card.rating.toFixed(card.rating % 1 === 0 ? 0 : 1)}<span className="text-sm font-medium text-muted-foreground"> / 100</span></p>{card.containsSpoiler && !revealed ? <button className="mt-2 min-h-11 rounded-lg border border-cyan-300/30 px-4 text-sm font-bold text-cyan-200 hover:bg-cyan-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={reveal} type="button">Reveal Summary spoiler</button> : <p className="mt-2 text-sm leading-6 text-slate-200">{card.summary}</p>}<a className="mt-2 inline-flex rounded text-sm font-bold text-cyan-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/reviews/${card.reviewId}`}>Read Review</a></div></div>
+  if (card.kind === 'review') return <a aria-label={`Read ${card.anime.title} review by ${card.author.displayName}`} className="block rounded-lg border border-white/8 p-4 outline-none transition hover:border-cyan-300/50 hover:bg-cyan-300/5 focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/reviews/${card.reviewId}`}><h2 className="truncate font-black">{card.anime.title}</h2>{card.containsSpoiler ? <div className="mt-2"><ReviewSpoilerBadge /></div> : null}<p className="mt-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Rating</p><p className="text-2xl font-black tabular-nums text-cyan-300">{card.rating.toFixed(card.rating % 1 === 0 ? 0 : 1)}<span className="text-sm font-medium text-muted-foreground"> / 100</span></p><ReviewSummary summary={card.summary} variant="list" /></a>
   return <a className="flex gap-4 rounded-lg border border-white/8 p-3 outline-none transition hover:border-cyan-300/50 hover:bg-cyan-300/5 focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/anime/${card.anime.anilistId}/${card.anime.slug}`}><FeedCoverImage alt={`${card.anime.title} cover`} className="aspect-[2/3] w-16 rounded-md" src={card.anime.coverImageUrl} /><div className="min-w-0"><p className="text-xs font-black uppercase tracking-wider text-cyan-300">{card.kind === 'completed' ? 'Completed' : 'Rewatched'}</p><h2 className="mt-1 line-clamp-2 font-black">{card.anime.title}</h2><p className="mt-1 text-sm text-muted-foreground">{card.anime.seasonYear ?? 'TBA'} · {card.anime.format ?? 'Anime'}</p></div></a>
 }

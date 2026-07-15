@@ -78,18 +78,24 @@ describe('HomeSidebar', () => {
 })
 
 describe('Home utility data states', () => {
-  it('shows Latest Reviews rows without Rating and links to discovery and detail', async () => {
-    mocks.query.mockResolvedValue([review])
+  it('shows each Latest Review as a compact whole-row link with optional spoiler warning', async () => {
+    mocks.query.mockResolvedValue([{ ...review, containsSpoiler: true }])
     render(<HomeLatestReviews />)
 
     expect(await screen.findByText('A patient and thoughtful journey.')).toBeTruthy()
     expect(screen.getByText('Mika')).toBeTruthy()
     expect(screen.getByText('2m ago')).toBeTruthy()
     expect(screen.getByAltText('Loader Anime cover')).toBeTruthy()
+    expect(screen.getByText('Loader Anime')).toBeTruthy()
+    expect(screen.getByText('Spoiler')).toBeTruthy()
     const reviewLink = screen.getByRole('link', { name: 'Read Loader Anime review by Mika' })
     expect(reviewLink.getAttribute('href')).toBe('/reviews/review-1')
-    expect(reviewLink.className).toContain('after:inset-0')
-    expect(reviewLink.closest('li')?.className).toContain('relative')
+    expect(reviewLink.className).toContain('flex')
+    expect(reviewLink.textContent).toContain('Loader Anime')
+    expect(reviewLink.textContent).toContain('Mika')
+    expect(reviewLink.textContent).toContain('2m ago')
+    expect(reviewLink.textContent).toContain('A patient and thoughtful journey.')
+    expect(screen.queryByText('Read review')).toBeNull()
     expect(screen.getByRole('link', { name: 'See more reviews' }).getAttribute('href')).toBe('/reviews')
     expect(screen.queryByText(/91/)).toBeNull()
   })

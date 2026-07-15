@@ -55,11 +55,11 @@ describe('FeedOwnerActions', () => {
     await waitFor(() => expect(mocks.reviewVisibility).toHaveBeenCalledWith({ reviewId: 'review-source', visibility: 'followers' }))
   })
 
-  it('offers only destructive Remove for Review activity deletion', async () => {
+  it('labels Review activity removal Delete while preserving activity-only behavior', async () => {
     render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
     expect(mocks.mutationNames).not.toContain('reviews:remove')
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
-    const removeItem = await screen.findByRole('menuitem', { name: 'Remove' })
+    const removeItem = await screen.findByRole('menuitem', { name: 'Delete' })
     expect(removeItem.getAttribute('data-variant')).toBe('destructive')
     expect(screen.queryByRole('menuitem', { name: 'Delete Review' })).toBeNull()
     fireEvent.click(removeItem)
@@ -67,6 +67,7 @@ describe('FeedOwnerActions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(mocks.removeReviewActivity).toHaveBeenCalledWith({ reviewId: 'review-source' }))
     expect(mocks.removeReview).not.toHaveBeenCalled()
+    expect(mocks.success).toHaveBeenCalledWith('Activity removed.')
   })
 
   it('opens an overflow menu and keeps delete confirmation in a dialog', async () => {
