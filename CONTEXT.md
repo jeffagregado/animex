@@ -49,7 +49,7 @@ A change to an existing Review source, including its text, Review Summary, or Re
 _Avoid_: New review activity, feed repost, review deletion
 
 **Post**:
-A short user-created feed entry that is not a Review or generated Activity. A post may optionally attach one anime and may include image attachments.
+A short user-created feed entry that is not a Review or generated Activity. A Post may contain text and zero or one safe external HTTPS image/video media item. Post anime attachment and first-party Post media uploads are not part of Phase 5; anime attachment remains optional backlog.
 _Avoid_: Review, activity
 
 **Post Composer**:
@@ -353,7 +353,7 @@ A non-MVP notification that tells a reporter how a Moderation Case was resolved.
 _Avoid_: Case status notification, moderation result message
 
 **Report Snapshot**:
-A private moderation record of the reported content as it existed when the Content Report was created. Report Snapshots preserve report-time text, Image Attachment copies, attached anime metadata, author identity, Reply Tag when present, and any moderation-needed Review Like snapshot if the reported content is a Review; snapshots are not live Like records, do not count in user-visible totals, and are not shown to public users.
+A private moderation record of the reported content as it existed when the Content Report was created. Report Snapshots preserve report-time text, Post-media copies and display metadata, attached anime metadata when present on the source type, author identity, Reply Tag when present, and any moderation-needed Review Like snapshot if the reported content is a Review; snapshots are not live Like records, do not count in user-visible totals, and are not shown to public users.
 _Avoid_: Public revision history, user-visible archive
 
 **Report Uniqueness**:
@@ -417,7 +417,7 @@ The visual source marker shown on an In-App Notification row. User-caused notifi
 _Avoid_: Reporter avatar, hidden actor avatar
 
 **Notification Target Thumbnail**:
-An optional visual target marker shown on an In-App Notification row when it helps identify the target. Anime-related notifications may show an anime cover, image Posts may show the first Post image, and plain comments, likes, follows, or moderation notices do not need a target thumbnail.
+An optional visual target marker shown on an In-App Notification row when it helps identify the target. Anime-related notifications may show an anime cover, Posts with external image media may show that image, and plain comments, likes, follows, or moderation notices do not need a target thumbnail.
 _Avoid_: Required notification image, source avatar
 
 **Notification Timestamp**:
@@ -713,7 +713,7 @@ The locked visual direction for the AnimeX search modal follows `docs/visual/qui
 _Avoid_: Discover page clone, AniList column clone, active Manga results in MVP, full search page as default interaction
 
 **AniList Metadata Flow**:
-The MVP anime metadata flow uses the AniList GraphQL API. Search requests return candidate anime results for Quick Search, Discover linking, Post anime attachment, and anime detail entry points; AnimeX must let the user or app select the exact anime candidate, store the AniList `id` as the canonical external anime identifier, and fetch canonical anime metadata by AniList `id` after selection. Search rank is not treated as source of truth because queries can return specials, shorts, or related entries before the main series. Stored metadata may include AniList `id`, MAL `idMal` when available, titles, format, status, season, season year, episodes, duration, genres, description, studio, cover image, banner image, and AniList URL. AniList API errors should fail clearly at the metadata operation boundary rather than silently substituting another anime.
+The MVP anime metadata flow uses the AniList GraphQL API. Search requests return candidate anime results for Quick Search, Discover linking, and anime detail entry points; AnimeX must let the user or app select the exact anime candidate, store the AniList `id` as the canonical external anime identifier, and fetch canonical anime metadata by AniList `id` after selection. Search rank is not treated as source of truth because queries can return specials, shorts, or related entries before the main series. Stored metadata may include AniList `id`, MAL `idMal` when available, titles, format, status, season, season year, episodes, duration, genres, description, studio, cover image, banner image, and AniList URL. AniList API errors should fail clearly at the metadata operation boundary rather than silently substituting another anime.
 _Avoid_: Search-first match as canonical anime, title-only anime records, silent metadata fallback, wrong related special as main anime
 
 **Favorite Anime**:
@@ -725,7 +725,7 @@ Personal anime-list summary shown on a user's profile. Anime stats include compl
 _Avoid_: Global anime stats, rating summary, watch time
 
 **Image Attachment**:
-An optional image added to a post. A post may have up to four image attachments, and each image may be up to 5 MB after compression.
+Legacy Post-media term. Current Posts use one optional external HTTPS image/video media item; AnimeX performs no file upload, compression, or first-party Post media storage during normal Post creation. Keep this term only when referring to the historical migration or future moderation snapshot copies.
 _Avoid_: Gallery item, media blob
 
 **Comment**:
@@ -769,7 +769,7 @@ A non-MVP private conversation between users. AnimeX MVP does not include Direct
 _Avoid_: DM, private chat, inbox message
 
 **Spoiler**:
-A warning on a post or review that hides body text and images until the viewer chooses to reveal them. Safe metadata, such as author, anime title, and timestamp, remains visible.
+A warning on a Post or Review. A Post spoiler covers its body text and external media until revealed. Review-level `containsSpoiler` is warning metadata only: Summary stays visible, while validated rich-text spoiler blocks reveal independently. Safe metadata, such as author, anime title, and timestamp, remains visible.
 _Avoid_: Content warning
 
 ## Example Dialogue
@@ -886,7 +886,7 @@ Developer: Do users need approval before following another user?
 Domain Expert: No. Following is open by default. The UI should make clear that public accounts can be followed without approval.
 
 Developer: Should short text posts exist separately from reviews and activities?
-Domain Expert: Yes. They are called posts, and they can optionally include up to four image attachments.
+Domain Expert: Yes. They are called Posts, and each may include zero or one external HTTPS image/video media item. AnimeX does not upload or compress Post media; Post anime attachment remains optional backlog.
 
 Developer: Does creating a review create activity?
 Domain Expert: Yes. Creating a review creates one combined Review Activity card that includes the rating.
@@ -1027,10 +1027,10 @@ Developer: What happens if reported content is edited after the Content Report?
 Domain Expert: The Content Report stays active, its Report Snapshot preserves the report-time content, Reporter Hide remains active for the reporter, and Report Uniqueness still prevents the same reporter from reporting that content item again.
 
 Developer: What does a Report Snapshot preserve?
-Domain Expert: It preserves the reported content's text, Image Attachment copies, attached anime metadata, author identity, and Reply Tag when present as they existed when the Content Report was created.
+Domain Expert: It preserves the reported content's text, Post-media copies and display metadata, attached anime metadata when present on the source type, author identity, and Reply Tag when present as they existed when the Content Report was created.
 
-Developer: If a reported Post's images are deleted or replaced later, what happens to the Report Snapshot?
-Domain Expert: The Report Snapshot keeps the report-time Image Attachment copies. It does not depend on the Post's current Image Attachments.
+Developer: If a reported Post's external media is removed or replaced later, what happens to the Report Snapshot?
+Domain Expert: The Report Snapshot keeps the report-time Post-media copy and display metadata. It does not depend on the Post's current media field.
 
 Developer: What happens if reported content is deleted after the Content Report?
 Domain Expert: The Content Report and Report Snapshot stay active as moderation records, but the reported content becomes unavailable because it was deleted. Reporter Hide no longer affects display because there is no content to show.
@@ -1153,7 +1153,7 @@ Developer: What source icon should notification rows show?
 Domain Expert: User-caused notifications show the actor's User Avatar. System or moderation notifications show a neutral AnimeX/Ami system icon and do not expose reporter identity.
 
 Developer: Should notification rows show a target thumbnail?
-Domain Expert: Yes, selectively. Anime-related notifications may show an anime cover, image Posts may show the first Post image, and plain comments, likes, follows, or moderation notices can omit the target thumbnail.
+Domain Expert: Yes, selectively. Anime-related notifications may show an anime cover, Posts with external image media may show that image, and plain comments, likes, follows, or moderation notices can omit the target thumbnail.
 
 Developer: Can users delete or clear notifications from history?
 Domain Expert: No. Notification history is read-only in MVP. Old notifications may only be removed by a future optional automatic cleanup.
@@ -1392,8 +1392,8 @@ Domain Expert: No. Score starts empty until the user intentionally sets one; Rev
 Developer: Can users discuss and react to feed cards?
 Domain Expert: Yes. Feed cards support short comments and like or unlike.
 
-Developer: Is the 5 MB image limit per image or per post?
-Domain Expert: The limit is 5 MB per image after compression.
+Developer: Does AnimeX upload or compress Post media?
+Domain Expert: No. A Post may reference one safe external HTTPS image or video URL. AnimeX validates and stores the reference but does not upload, compress, or proxy the remote file.
 
 Developer: Can comments include image attachments?
 Domain Expert: No. Comments are text-only.
@@ -1416,11 +1416,11 @@ Domain Expert: No. Mention is not in MVP, so Posts and Comments do not have gene
 Developer: Does AnimeX MVP include Direct Messages?
 Domain Expert: No. AnimeX MVP has no Direct Messages. User communication stays on feed cards through text-only Comments and Comment Replies.
 
-Developer: How many anime can a post attach?
-Domain Expert: A post can attach one optional anime. The post composer should make the one-anime limit, four-image limit, and 5 MB per-image compressed limit clear to users.
+Developer: Can a Post attach an anime or multiple media items?
+Domain Expert: Not in Phase 5. Anime attachment remains optional backlog, and a Post may reference at most one safe external HTTPS image or video URL.
 
-Developer: Do posts and reviews need spoiler controls?
-Domain Expert: Yes. Posts and reviews can be marked as spoilers, hiding body text and images until revealed.
+Developer: Do Posts and Reviews need spoiler controls?
+Domain Expert: Yes. A Post spoiler covers its body text and external media until revealed. A Review-level spoiler flag warns readers without hiding Summary, while rich-text spoiler blocks reveal independently.
 
 Developer: Do comments and likes have their own visibility?
 Domain Expert: No. Comments, feed-card Likes, and Comment Likes inherit feed-card visibility. Private feed cards have no audience, so comments and likes are disabled.

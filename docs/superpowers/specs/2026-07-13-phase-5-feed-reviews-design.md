@@ -1,5 +1,7 @@
 # Phase 5 Feed And Review Design
 
+Status: SUPERSEDED by the implemented Phase 5 specs dated 2026-07-14 and 2026-07-15; retained as historical design baseline.
+
 ## Visual Source
 
 - Home and Anime Detail approved references remain base system.
@@ -12,7 +14,7 @@
 - Desktop: editor left, live Preview right.
 - Mobile: Editor and Preview tabs.
 - Header retains anime identity and clear Draft/Publish actions.
-- Rating, Summary, summary spoiler, visibility precede body editor.
+- Rating, Summary, Review-level `containsSpoiler` warning, and visibility precede body editor.
 - New Reviews start from Account-Level Default Visibility; saved Drafts and published Reviews keep their own visibility while editing.
 - Toolbar stays one readable row where possible; mobile wraps without horizontal page overflow.
 - Save Draft accepts partial content. Publish requires body text, Rating, Summary.
@@ -21,7 +23,7 @@
 
 - Preview and published Review share one structured React renderer.
 - Review cards show Rating and Summary only. Review Detail shows full body.
-- Spoiler blocks reveal independently. Summary has separate reveal.
+- Review-level `containsSpoiler` is warning metadata and never hides Summary. Rich-text spoiler blocks reveal independently.
 - Image blocks use fixed frames and explicit unavailable state.
 - Video nodes render linked YouTube/Vimeo/provider cards, never playback.
 

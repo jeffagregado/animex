@@ -1,5 +1,7 @@
 # Phase 5 Editor, Post Media, And Feed Feedback Design
 
+Status: IMPLEMENTED AND VERIFIED on `jeff-cx/phase-5-feed-reviews`; final closure is tracked in `TODO.md`, `design-qa.md`, and `docs/architecture/review-discovery-data-flow.md`.
+
 ## Scope
 
 Improve Review authoring media placement and spoiler editing, replace Post file uploads with one external media URL, simplify feed owner actions, add activity metadata, align Home utility surfaces, and remove the Discover main-column Genres section.
@@ -102,8 +104,8 @@ Migration must report processed, deleted, preserved, and storage-deletion counts
 - Post menu destructive source action reads `Delete`.
 - Completed and Rewatched menu destructive activity action reads `Delete`.
 - Review feed menu removes `Delete Review` entirely.
-- Review feed activity action reads `Remove` and uses destructive red styling.
-- `Remove` deletes only the Review feed activity; Review source and Anime Reviews entry remain.
+- Review feed activity action reads `Delete` and uses destructive red styling.
+- `Delete` removes only the Review feed activity; Review source and Anime Reviews entry remain.
 - Review source deletion stays available only on Review Detail.
 - Existing confirmation dialog titles, descriptions, mutation behavior, and Sonner messages remain unchanged.
 

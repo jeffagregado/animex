@@ -1,5 +1,7 @@
 # Review Layout, Media, And Checkbox Feedback Implementation Plan
 
+Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`. Unchecked steps preserve historical execution sequence; they are not open product work. Current closure is tracked in `TODO.md` and `design-qa.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remove shared Review-card overlap, widen Home desktop utility column to 430px, render Review/Post images at responsive 4:5 geometry, and replace native standalone checkboxes with official shadcn Base UI Checkbox.

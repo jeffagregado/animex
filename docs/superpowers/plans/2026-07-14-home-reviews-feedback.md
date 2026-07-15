@@ -1,5 +1,7 @@
 # Phase 5 Home And Review Discovery Feedback Implementation Plan
 
+Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`. Unchecked steps below preserve historical execution sequence; they are not open product work. Current closure is tracked in `TODO.md` and `design-qa.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use fresh orchestration workers only for disjoint owned files; integrate generated files once.
 
 **Goal:** Restore the approved Home desktop utility column, reuse Discover Seasonal data, align feed cards with the approved Home reference, and add indexed Review discovery at `/reviews`.
@@ -338,8 +340,8 @@ git commit -m "refactor: reuse discover seasonal on home"
 2. Write failing tests for exact signed-in order: List Progress, Latest Reviews, This Week, Upcoming.
 3. Prove public rendering does not issue `getMyProgress` and the sidebar is hidden below `lg`.
 4. Build scoped loading, empty, error, and retry states for Latest Reviews and List Progress. Preserve loaded content on a retryable refresh error.
-5. Add explicit `detail | list` Review Summary variants. `list` preserves independent spoiler reveal while using compact typography and two-line clamping; existing Detail/Anime Reviews call sites retain `detail` behavior.
-6. Latest Reviews rows show cover, author, relative timestamp, compact `list` Summary, no Rating, Review Detail link, and `See more` to `/reviews`. Reject non-published or missing-`publishedAt` data into the scoped error state; never substitute `updatedAt`.
+5. Add explicit `detail | list` Review Summary variants. Both variants keep Summary visible; `list` adds compact typography and two-line clamping. Rich-text spoiler blocks retain independent reveal behavior.
+6. Latest Reviews rows show cover, author, relative timestamp, compact `list` Summary, optional `containsSpoiler` badge, no Rating, Review Detail link, and `See more` to `/reviews`. Reject non-published or missing-`publishedAt` data into the scoped error state; never substitute `updatedAt`.
 7. Reuse `DiscoverWeeklyList` and `DiscoverUpcomingList`; do not copy their markup.
 8. Remove `Community feed` and signed-in `What are you watching?`. Keep the Create Post button and existing feed tabs.
 9. At desktop, use the approved main/feed plus compact right-column geometry. At 390/768, render no utility column and no unreachable modules after the infinite feed.
@@ -378,7 +380,7 @@ git commit -m "feat: restore home utility column"
 3. Replace Eye-triggered owner Dialog entry with Base UI Dropdown Menu overflow trigger. Keep confirmations in accessible Dialogs, and keep edit/visibility/delete mutations unchanged.
 4. Add explicit cover-image unavailable state using the existing Discover image-failure pattern. Preserve card geometry after failure.
 5. Convert Home feed pagination to IntersectionObserver-driven infinite loading. Keep scoped retry/terminal rows and an accessible manual Load more fallback when IntersectionObserver is unavailable.
-6. Preserve Post spoiler reveal, Review Summary spoiler reveal, direct activity links, Review Detail links, owner edit/visibility/delete, and disabled Phase 6 Like/Comment labels.
+6. Preserve Post whole-Post spoiler reveal, Review-level `containsSpoiler` warning metadata, independent rich-text spoiler blocks, direct activity links, Review Detail links, owner edit/visibility/delete, and disabled Phase 6 Like/Comment labels.
 7. Assert absent fake reaction counts, bookmarks, milestone Score/descriptions, and Post anime attachment.
 8. Test hover, focus-visible, pending, disabled, spoiler-covered, spoiler-revealed, image-error, owner-menu-open, observer load, duplicate-intersection guard, retry, and terminal states.
 9. Run:
@@ -419,7 +421,7 @@ git commit -m "style: align home feed cards"
 4. Active search disables the sort Select and labels it `Relevance`; rating and visibility remain active.
 5. Build a scope/epoch-isolated cursor hook following `useFeedPages`: ignore stale auth/filter responses, dedupe IDs, retain loaded cards during pagination failure, retry the failed cursor, and prevent duplicate in-flight requests.
 6. Use `IntersectionObserver` for 12-item infinite pages and the existing Discover test shim pattern. Provide skeleton, empty, retry, and terminal rows that preserve list geometry.
-7. Card fields: anime cover/title, Rating, compact `list` Summary, author, timestamp, visibility where owner-only content needs disclosure, spoiler reveal, and Review Detail action. Never render the full body.
+7. Card fields: anime cover/title, Rating, compact `list` Summary, author, timestamp, optional `containsSpoiler` badge, visibility where owner-only content needs disclosure, and Review Detail action. Never render the full body.
 8. Match the approved desktop/mobile references. Use a two-column mobile/tablet filter grid with Search and Visibility spanning both columns until `lg`; Sort and Rating stay paired. Use `min-w-0`, overflow containment, and mobile bottom-navigation clearance (`pb-28`). Use AnimeX shell navigation rather than older reference-only navigation.
 9. Assert no horizontal overflow at 390 px and no discovery query before auth-ready visibility normalization.
 10. Run:
@@ -524,7 +526,7 @@ git commit -m "chore: integrate home review feedback"
 
 **Fixtures and lifecycle:**
 
-1. Create a real text Post and a one-image Post through Composer. Verify publish, image upload, spoiler reveal, edit, visibility change, direct activity, and owner delete.
+1. Create a real text Post and an external-image or external-video Post through Composer. Verify publish, external media validation/rendering, spoiler reveal, edit, visibility change, direct activity, and owner delete.
 2. On Anime Detail pages, verify first-score auto-Watching, explicit Plan to Watch/Completed/Dropped transitions, Score editing, Favorite, Rewatch History eligibility, 750 ms autosave and focus preservation, Sonner states, and List Progress count changes.
 3. Create and resume a Review draft, then publish one Review with Summary/body/spoiler/media-preview coverage. Verify edit, Public/Followers/Private visibility, Review Detail, Anime Reviews, Home Latest Reviews, and `/reviews` discovery.
 4. Create enough Review records through normal authenticated UI across cached anime when practical to cross the 12-item boundary. If the dev dataset still cannot reach 13 visible Reviews, validate pagination with Convex integration tests and record browser pagination as data-blocked; do not add or retain a production QA seed endpoint.

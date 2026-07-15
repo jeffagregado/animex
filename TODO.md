@@ -231,7 +231,7 @@ Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified 
 - [x] Decide whether deleting reported content removes Content Reports.
 - [x] Decide whether Content Reports preserve report-time content.
 - [x] Decide what Report Snapshots preserve.
-- [x] Decide whether Report Snapshot image attachments are copies or current upload references.
+- [x] Decide that Report Snapshots preserve report-time Post-media copies and display metadata rather than depending on current external references.
 - [x] Decide whether reported content is hidden immediately from the reporting user.
 - [x] Decide whether reporters can undo Reporter Hide.
 - [x] Decide what Comment Reply reporting hides from the reporting user.
@@ -558,7 +558,7 @@ Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified 
 - [x] Decide that sign-out keeps users on public pages but sends account-only or non-public pages to the public Home Feed.
 - [x] Decide that signed-out mobile navigation hides the Profile tab.
 - [x] Decide that signed-out mobile header shows `Sign in` instead of a notification icon.
-- [x] Decide whether the 5 MB compressed image limit is per image or per post.
+- [x] Decide that Posts reference one external HTTPS media URL and do not upload or compress media files.
 - [x] Decide whether comments are text-only or can include image attachments.
 - [x] Decide whether comments support replies and nested threads.
 - [x] Decide whether Comment Replies include removable Reply Tags.
@@ -808,3 +808,15 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; final review, automated gate
 - [x] Authenticated browser QA passed at 390, 768, and 1280px: exact Review/Post media geometry, 430px Home sidebar, responsive Review Rating placement, Checkbox hover/focus/pending states, no overflow, no console errors, and no failed requests.
 - [x] Browser-found desktop Rating, Review pending lock, and Base UI `data-disabled` styling gaps were fixed and regression-tested. No Convex, dependency, route, generated-file, or global-style changes.
 - [x] Mobile Review Rating and Review Detail now share one centered action row; focused/full tests, TypeScript, build, React Doctor, Fallow, and live 390/768/1280px browser QA pass.
+
+# Phase 5 Formal Closure
+
+Status: IN PROGRESS; stale-doc audit and local `dev` integration approved.
+
+- [x] Verify Phase 5 implementation, feedback rounds, migrations, automated gates, and authenticated browser QA are complete.
+- [x] Confirm `dev` is an ancestor of `jeff-cx/phase-5-feed-reviews` and fast-forward integration is available.
+- [x] Remove stale Phase 5 status, Post-media, Review-spoiler, owner-action, README, and QA-summary claims.
+- [x] Commit reviewed closure docs on the feature branch.
+- [ ] Fast-forward `dev` to the verified feature branch without push or deployment.
+- [ ] Run post-merge full tests, TypeScript, production build, React Doctor, Fallow, endpoint scan, and diff/status checks.
+- [ ] Record Phase 5 complete on `dev`; keep optional anime attachment and mobile Home Explore outside closure.

@@ -120,10 +120,11 @@ Phase 4 status: COMPLETE on `jeff-cx/phase-4-anime-detail`; automated gates, Con
 
 ### Phase 5: Feed, Posts, Reviews
 
+Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; closure details and latest validation live in `TODO.md` and `design-qa.md`.
+
 - Build Home, Following, Global feed views.
 - Add Post Composer.
-- Support one optional attached anime per Post.
-- Support up to four compressed images, max 5MB each after compression.
+- Posts currently accept zero or one safe external HTTPS image/video URL. Post anime attachment remains optional backlog, not implemented in Phase 5.
 - Add Review creation from anime detail only.
 - Generate Review activity cards with current Review Rating and Review Summary.
 - Stop after validation and wait for approval.
@@ -164,6 +165,6 @@ Each phase must run only relevant checks, then stop:
 - Slug is display/SEO only and can be regenerated from AniList metadata.
 - Local app env is stored in `.env.local`; Convex server env such as `SITE_URL`, Resend, and Google OAuth stays in Convex dashboard.
 - AniList image URLs may be stored as external URLs in MVP.
-- User uploads use Convex storage.
+- Post media uses external HTTPS URLs; no Post file upload, compression, or first-party Post media storage exists. Other user-owned upload features may use Convex Storage under their own contract.
 - Manga remains future placeholder.
 - No phase continues automatically into the next phase.

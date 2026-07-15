@@ -27,7 +27,7 @@ Viewports: 1280 x 900, 768 x 1024, 390 x 844. Theme: dark. States: signed out an
 - Review discovery preserves signed-in visibility lanes, full-row Latest Review links, two-column mobile/tablet filters, 44 px touch targets, and zero horizontal overflow. A fresh Review inherits the account's Private default; the reusable QA fixture was restored to Private after visibility testing.
 - Home feed, Seasonal rail, `/reviews`, Anime Reviews, owner menus, visibility changes, Post lifecycle, anime controls, and responsive navigation match approved geometry and theme.
 - Authenticated live-browser toolbar pass covers H2, H3, quote, ordered list, unordered list, bold, italic, underline, strikethrough, image URL plus alt, video URL, block spoiler, undo, and redo. Undo removed and redo restored the linked video card.
-- Editor Preview and published renderer preserve structure, inline marks, media cards, covered spoilers, and independent reveal behavior.
+- Editor Preview and published renderer preserve structure, inline marks, media cards, visible Review Summary, and independent rich-text spoiler reveal behavior. Review-level `containsSpoiler` remains warning metadata.
 - Draft save, navigation away, resume, publish, edit, and owner actions work through authenticated UI.
 - All 14 rich-text toolbar controls keep dark/cyan hover and keyboard `focus-visible` ring states. Mobile Preview keeps 44 px controls and zero document overflow. No native white or browser-blue surfaces, stuck touch-hover state, scrollbar-gutter change, layout movement, horizontal overflow, hydration error, failed dynamic request, or fresh runtime error occurred.
 - Review list pagination above 12 visible records is integration-tested. Dev data did not reach the live threshold, so no production QA seed path was added.
@@ -40,7 +40,8 @@ Viewports: 1280 x 900, 768 x 1024, 390 x 844. Theme: dark. States: signed out an
 
 ## Closure gates
 
-- 83 test files passed, 2 skipped.
-- 566 tests passed, 3 skipped.
+- 91 test files passed, 2 skipped.
+- 637 tests passed, 3 skipped.
 - Route generation, Convex sync, TypeScript, client and SSR build, Fallow new-only audit, client AniList endpoint scan, and diff check pass.
 - Build retains existing large-chunk warning; no new-only audit finding was introduced.
+- Final mobile Review action-row alignment, pending spoiler-checkbox lock, desktop Rating placement, and Base UI `data-disabled` styling follow-up pass at 390/768/1280 px.

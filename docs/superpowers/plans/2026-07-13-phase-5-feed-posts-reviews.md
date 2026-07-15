@@ -1,11 +1,11 @@
 # Phase 5 Feed, Posts, Reviews
 
-Status: IN PROGRESS on `jeff-cx/phase-5-feed-reviews`.
+Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`. This baseline plan is historical; current contracts and validation live in `TODO.md` and `docs/architecture/review-discovery-data-flow.md`.
 
 ## Outcome
 
 - Real Home, Following, Global feeds.
-- Text/image Posts with owner lifecycle.
+- Text/media Posts with owner lifecycle; each Post accepts zero or one safe external HTTPS image/video URL.
 - One draft/published Review per user and anime.
 - Validated Lexical JSON, live Preview, Review Detail, Anime Reviews.
 - Post, Review, Completed, Rewatched feed cards.
@@ -21,7 +21,7 @@ Status: IN PROGRESS on `jeff-cx/phase-5-feed-reviews`.
 - Review body stores versioned allowlisted Lexical JSON. No HTML, embeds, iframe, code, table, or arbitrary metadata fetch.
 - Body limit: 2,500 visible characters, 8 depth, 400 nodes, 64 KiB JSON, four combined media nodes, 2,048-character HTTPS URLs.
 - Editor supports H2/H3, quote, ordered/unordered lists, bold, italic, underline, strikethrough, image URL, linked video card, block spoiler, undo/redo.
-- Posts accept 280 text characters and/or one to four images. Static images compress client-side; GIF stays unchanged only at 5 MB or less. No anime attachment in Phase 5.
+- Posts accept 280 text characters and/or one safe external HTTPS image/video URL. No file upload, client compression, GIF-size path, first-party Post media storage, or anime attachment exists in Phase 5; anime attachment remains optional backlog.
 - Convex queries/mutations/storage only. No actions. No new AniList transport.
 
 ## Execution

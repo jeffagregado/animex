@@ -1,5 +1,7 @@
 # Phase 5 Editor, Post Media, And Feed Feedback Implementation Plan
 
+Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`. Unchecked steps preserve historical execution sequence; they are not open product work. Current closure is tracked in `TODO.md`, `design-qa.md`, and `docs/architecture/review-discovery-data-flow.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use fresh orchestration workers only for disjoint owned files; integrate schema and generated files once.
 
 **Goal:** Improve Review media editing and spoiler toggling, replace Post file uploads with one safe external image/video URL, simplify feed activity cards and owner menus, align Home utility cards, and remove only Discover's main-column Genres section.
@@ -327,7 +329,7 @@ git commit -m "feat: attach post media by url"
 - [ ] Write RED owner-menu tests for exact labels and actions:
   - Post source action: `Delete`, destructive.
   - Completed/Rewatched activity action: `Delete`, destructive.
-  - Review activity action: `Remove`, destructive.
+  - Review activity action: `Delete`, destructive; mutation remains activity-only.
   - Review feed menu has no `Delete Review`.
 - [ ] Keep current confirmation dialog titles/descriptions, mutations, ownership checks, and Sonner messages. Review source deletion remains only on Review Detail.
 - [ ] Run:
@@ -433,7 +435,7 @@ git commit -m "docs: record post media data flow"
 - [ ] At 1280 px, exercise full Review toolbar: H2/H3, quote, both list types, bold/italic/underline/strikethrough, image URL + alt, video URL, spoiler wrap/unwrap, Undo/Redo, Preview parity, draft resume, publish/edit, and published rendering.
 - [ ] For both Review image and video, verify caret insertion, selected-text replacement, no-valid-selection top insertion, click selection, Backspace/Delete from selected and adjacent positions, caret recovery, and Undo restoration.
 - [ ] Create text-only, media-only, image, and video Posts through real UI. Verify invalid URL retention, optional description/label, contextual image alt, linked video cards, broken-image state, spoiler reveal, edit/replace/remove media, visibility, owner delete, and Sonner states.
-- [ ] Verify Review feed menu only shows destructive `Remove`; Post and milestone menus show destructive `Delete`; Review Detail still provides Review deletion with unchanged confirmation.
+- [ ] Verify Review feed menu only shows destructive `Delete` mapped to activity-only removal; Post and milestone menus show destructive `Delete`; Review Detail still provides Review deletion with unchanged confirmation.
 - [ ] Verify Completed/Rewatched metadata and fallback, whole-row navigation, Home This Week/Upcoming card surfaces, removed Discover main Genres, retained Top Genres, and functional genre filters.
 - [ ] Use locator-driven hover at 1280 px on toolbar buttons, media nodes, dialogs, Post media controls/cards, feed rows, owner menus, destructive actions, Home utility rows, Top Genres, and filters. Capture default/hover/open/focus/selected/error states and inspect computed background, foreground, border, and icon colors.
 - [ ] At 390 and 768 px, verify touch/pressed and keyboard-focus states, dialogs/sheets, Review media editing, Post media layout, feed cards, no sticky hover, no clipping, and no horizontal overflow.

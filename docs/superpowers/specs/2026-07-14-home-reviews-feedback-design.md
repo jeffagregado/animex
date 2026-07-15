@@ -1,5 +1,7 @@
 # Phase 5 Home And Review Discovery Feedback Design
 
+Status: IMPLEMENTED AND VERIFIED on `jeff-cx/phase-5-feed-reviews`; final closure is tracked in `TODO.md` and `design-qa.md`.
+
 ## Scope
 
 Refresh Home layout, restore desktop utility content, align feed cards with approved Home reference, and add searchable global Review discovery at `/reviews`.
@@ -69,7 +71,7 @@ Signed-in utility order:
 - Compact activity header, timestamp, owner overflow menu, spacing, typography, and media framing.
 - Review card shows anime cover, title, Rating, and Summary.
 - Completed/Rewatched cards show available activity and anime metadata only.
-- Posts keep text, image grid, and spoiler behavior. No anime attachment.
+- Posts keep text, one optional external image/video media item, and whole-Post spoiler behavior. No Post anime attachment in Phase 5; anime attachment remains optional backlog.
 - Preserve owner edit, visibility, delete, Review Detail, direct activity links, and spoiler reveal.
 - Signed-in Like and Comment affordances remain disabled and labeled `Coming in Phase 6`.
 - No fake reaction counts, bookmark state, milestone Score, descriptions, or Phase 6 mutations.
@@ -83,7 +85,7 @@ Signed-in utility order:
 - Public viewers see Public Reviews only.
 - Signed-in viewers see Public Reviews plus their own Followers and Private Reviews.
 - Review card: anime cover, Rating, Summary, author, timestamp, spoiler state, Review Detail action.
-- Summary spoilers remain covered until independently revealed.
+- Review Summary remains visible. `containsSpoiler` renders warning metadata; only rich-text spoiler blocks remain independently revealable.
 - Twelve Reviews per cursor page with intersection-observer infinite scroll.
 - Loading skeleton, empty state, pagination retry, and terminal state preserve geometry.
 

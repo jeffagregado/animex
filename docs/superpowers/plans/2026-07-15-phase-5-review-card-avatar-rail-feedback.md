@@ -1,5 +1,7 @@
 # Phase 5 Review Card, Avatar, And Rail Feedback Implementation Plan
 
+Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`. Unchecked steps preserve historical execution sequence; they are not open product work. Current closure is tracked in `TODO.md`, `design-qa.md`, and `docs/architecture/review-discovery-data-flow.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use fresh orchestration workers from the repository TOML files, with no model or reasoning overrides. Integrate shared contracts, schema, and generated files once.
 
 **Goal:** Unify published Review cards, make Review activity bodies directly navigable, replace activity icons with a reusable author Avatar, simplify Review spoiler/rating behavior, and equalize anime-card heights within each horizontal rail.
