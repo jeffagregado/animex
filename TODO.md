@@ -807,3 +807,4 @@ Status: COMPLETE on `jeff-cx/phase-5-feed-reviews`; final review, automated gate
 - [x] Final suite: 91 test files passed, 2 skipped; 637 tests passed, 3 skipped. TypeScript, production build, scoped React Doctor, Fallow, client AniList endpoint scan, and diff check passed. Build retains the existing client chunk-size warning.
 - [x] Authenticated browser QA passed at 390, 768, and 1280px: exact Review/Post media geometry, 430px Home sidebar, responsive Review Rating placement, Checkbox hover/focus/pending states, no overflow, no console errors, and no failed requests.
 - [x] Browser-found desktop Rating, Review pending lock, and Base UI `data-disabled` styling gaps were fixed and regression-tested. No Convex, dependency, route, generated-file, or global-style changes.
+- [x] Mobile Review Rating and Review Detail now share one centered action row; focused/full tests, TypeScript, build, React Doctor, Fallow, and live 390/768/1280px browser QA pass.
