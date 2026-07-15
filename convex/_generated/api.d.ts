@@ -35,6 +35,7 @@ import type * as otpSendLimits from "../otpSendLimits.js";
 import type * as passwordResets from "../passwordResets.js";
 import type * as pendingOauthSignups from "../pendingOauthSignups.js";
 import type * as posts from "../posts.js";
+import type * as reviewCleanup from "../reviewCleanup.js";
 import type * as reviewDiscovery from "../reviewDiscovery.js";
 import type * as reviewDiscoveryPolicy from "../reviewDiscoveryPolicy.js";
 import type * as reviews from "../reviews.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   passwordResets: typeof passwordResets;
   pendingOauthSignups: typeof pendingOauthSignups;
   posts: typeof posts;
+  reviewCleanup: typeof reviewCleanup;
   reviewDiscovery: typeof reviewDiscovery;
   reviewDiscoveryPolicy: typeof reviewDiscoveryPolicy;
   reviews: typeof reviews;
