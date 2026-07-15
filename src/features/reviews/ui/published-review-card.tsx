@@ -4,6 +4,7 @@ import { ChevronRightIcon, ImageOffIcon } from 'lucide-react'
 import { Badge } from '#/components/ui/badge'
 import { Card, CardContent } from '#/components/ui/card'
 import type { ReviewListItem } from '#/features/social/shared/social-contracts'
+import { cn } from '#/lib/utils'
 import { ReviewSpoilerBadge } from './review-spoiler-badge'
 import { ReviewSummary } from './review-summary'
 
@@ -13,6 +14,7 @@ export function PublishedReviewCard({ review }: { review: ReviewListItem }) {
   if (review.state !== 'published' || review.rating === null || review.publishedAt === null) {
     throw new TypeError('Published Review cards require published Review metadata.')
   }
+  const ratingTop = review.containsSpoiler ? 'sm:top-14' : 'sm:top-4'
   return <Card className="min-w-0 border-l-4 border-l-cyan-300 bg-card/55 py-0">
     <CardContent className="relative grid min-w-0 grid-cols-[5.25rem_minmax(0,1fr)] gap-4 p-4 sm:grid-cols-[5.75rem_minmax(0,1fr)_auto]">
       <a aria-label={`View ${review.anime.title}`} className="row-span-3 block min-w-0 overflow-hidden rounded-lg bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/anime/${review.anime.anilistId}/${review.anime.slug}`}>
@@ -27,11 +29,9 @@ export function PublishedReviewCard({ review }: { review: ReviewListItem }) {
         </div>
         <ReviewSummary summary={review.summary} variant="list" />
       </div>
-      <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-        {review.containsSpoiler ? <ReviewSpoilerBadge /> : null}
-        <p aria-label={`Rating: ${review.rating} out of 100`} className="text-xl font-black text-cyan-300 sm:text-3xl">{review.rating}<span className="text-sm font-normal text-muted-foreground sm:text-base">/100</span></p>
-      </div>
-      <div className="col-start-2 flex min-w-0 items-end justify-end sm:col-start-3 sm:row-span-3 sm:row-start-1 sm:flex-col sm:justify-end">
+      {review.containsSpoiler ? <div className="absolute top-4 right-4"><ReviewSpoilerBadge /></div> : null}
+      <p aria-label={`Rating: ${review.rating} out of 100`} className={cn('col-start-2 row-start-3 self-end justify-self-start text-xl font-black text-cyan-300 sm:absolute sm:right-4 sm:text-3xl', ratingTop)}>{review.rating}<span className="text-sm font-normal text-muted-foreground sm:text-base">/100</span></p>
+      <div className="col-start-2 row-start-3 flex min-w-0 self-end justify-self-end sm:col-start-3 sm:row-span-3 sm:row-start-1 sm:flex-col sm:justify-end">
         <a className="inline-flex min-h-11 items-center gap-1 font-bold text-cyan-300 hover:text-cyan-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/reviews/${review.id}`}>Review Detail<ChevronRightIcon aria-hidden="true" className="size-4" /></a>
       </div>
     </CardContent>

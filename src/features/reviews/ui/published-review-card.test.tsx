@@ -28,15 +28,48 @@ describe('PublishedReviewCard', () => {
     expect(screen.getByRole('img', { name: 'Frieren cover' })).toBeTruthy()
     expect(screen.getByText('Author')).toBeTruthy()
     expect(screen.getByText('2h ago')).toBeTruthy()
-    expect(screen.getByLabelText('Rating: 90 out of 100')).toBeTruthy()
+    const rating = screen.getByLabelText('Rating: 90 out of 100')
     expect(screen.getByText('Visible ending summary')).toBeTruthy()
     expect(screen.getByText('My Followers')).toBeTruthy()
     expect(screen.getByText('Spoiler')).toBeTruthy()
     const detailLink = screen.getByRole('link', { name: 'Review Detail' })
+    expect(screen.getAllByLabelText('Rating: 90 out of 100')).toHaveLength(1)
+    expect(rating.className).toContain('col-start-2')
+    expect(rating.className).toContain('row-start-3')
+    expect(rating.className).toContain('justify-self-start')
+    expect(rating.className).toContain('sm:absolute')
+    expect(detailLink.parentElement?.className).toContain('row-start-3')
+    expect(detailLink.parentElement?.className).toContain('justify-self-end')
     expect(detailLink.getAttribute('href')).toBe('/reviews/review-1')
     expect(detailLink.className).toContain('hover:underline')
     expect(screen.queryByRole('img', { name: /avatar/i })).toBeNull()
     expect(screen.queryByText(/body/i)).toBeNull()
+  })
+
+  it('keeps long listing content separate from mobile rating and detail actions', () => {
+    const longReview: ReviewListItem = {
+      ...publishedReview,
+      author: {
+        ...publishedReview.author,
+        displayName: 'A very long Review author display name that must wrap safely',
+      },
+      anime: {
+        ...publishedReview.anime,
+        title: 'Frieren Beyond Journey End With An Intentionally Long Anime Title',
+      },
+      summary: 'A long Summary that remains readable without overlapping the mobile Rating or Review Detail action row.',
+    }
+    render(<PublishedReviewCard review={longReview} />)
+
+    const title = screen.getByRole('heading', { name: longReview.anime.title })
+    const content = title.parentElement
+    const rating = screen.getByLabelText('Rating: 90 out of 100')
+    const detail = screen.getByRole('link', { name: 'Review Detail' })
+
+    expect(title.className).toContain('truncate')
+    expect(content?.className).toContain('min-w-0')
+    expect(rating.className).toContain('justify-self-start')
+    expect(detail.parentElement?.className).toContain('justify-self-end')
   })
 
   it('preserves cover geometry after image failure', () => {
