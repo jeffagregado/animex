@@ -102,6 +102,21 @@ describe('LoadedReviewEditor lifecycle', () => {
     await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({ rating: 90, containsSpoiler: true })))
   })
 
+  it('disables the spoiler checkbox during Publish and preserves its state', async () => {
+    publish.mockImplementation(() => new Promise(() => {}))
+    render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={null} mode="create" />)
+    fillPublishableReview()
+    fireEvent.click(screen.getByRole('button', { name: /Publish review/ }))
+    const checkbox = screen.getByRole('checkbox', { name: 'Review contains spoiler' })
+    await waitFor(() => expect(checkbox.getAttribute('aria-disabled')).toBe('true'))
+
+    fireEvent.click(screen.getByText('Review contains spoiler'))
+    expect(checkbox.getAttribute('aria-checked')).toBe('false')
+    fireEvent.keyDown(checkbox, { key: ' ' })
+    fireEvent.keyUp(checkbox, { key: ' ' })
+    expect(checkbox.getAttribute('aria-checked')).toBe('false')
+  })
+
   it('saves Draft then publishes with distinct intent IDs and navigates after persistence', async () => {
     render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={null} mode="create" />)
     fillPublishableReview()
