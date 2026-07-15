@@ -30,4 +30,12 @@ describe('Checkbox', () => {
     fireEvent.click(screen.getByText('Probe'))
     expect(checkbox.getAttribute('aria-checked')).toBe('false')
   })
+
+  it('styles the Base UI disabled state', () => {
+    render(<CheckboxProbe disabled />)
+    const checkbox = screen.getByRole('checkbox', { name: 'Probe' })
+    expect(checkbox.getAttribute('data-disabled')).not.toBeNull()
+    expect(checkbox.classList).toContain('data-disabled:cursor-not-allowed')
+    expect(checkbox.classList).toContain('data-disabled:opacity-50')
+  })
 })
