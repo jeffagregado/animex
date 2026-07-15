@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createEmptyReviewDocument } from './review-document-adapter'
-import { getReviewVisibleTextLength, parseReviewRating, validateReviewEditorFields } from './review-validation'
+import { getReviewVisibleTextLength, isCompleteReviewRating, parseReviewRating, validateReviewEditorFields } from './review-validation'
 
 const textDocument = (text: string) => ({
   version: 1 as const,
@@ -35,10 +35,12 @@ describe('review editor validation', () => {
   it.each([
     ['0', 0], ['9', 9], ['9.5', 9.5], ['100', 100], ['100.0', 100],
   ])('parses complete valid rating text %s', (value, expected) => {
+    expect(isCompleteReviewRating(value)).toBe(true)
     expect(parseReviewRating(value)).toBe(expected)
   })
 
   it.each(['9.', '.5', '50.12', '-1', '100.1', 'abc'])('rejects incomplete or invalid rating text %s', (value) => {
+    expect(isCompleteReviewRating(value)).toBe(false)
     expect(() => parseReviewRating(value)).toThrow('Rating must be between 0 and 100 with at most one decimal.')
   })
 

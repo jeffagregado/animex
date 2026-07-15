@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type UserAvatarSize = 'sm' | 'md' | 'lg'
 type UserAvatarProps = {
@@ -17,6 +17,7 @@ const sizeClasses: Record<UserAvatarSize, string> = {
 /** Renders a stable user image or explicit initial fallback. */
 export function UserAvatar({ avatarUrl, displayName, label, size }: UserAvatarProps) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  useEffect(() => { setFailedUrl(null) }, [avatarUrl])
   const className = `${sizeClasses[size]} shrink-0 rounded-full border border-border`
   if (avatarUrl !== null && avatarUrl !== failedUrl) {
     return <img alt={label} className={`${className} object-cover`} onError={() => setFailedUrl(avatarUrl)} src={avatarUrl} />

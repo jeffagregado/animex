@@ -30,6 +30,15 @@ describe('UserAvatar', () => {
     expect(screen.getByRole('img').getAttribute('src')).toBe('https://example.test/two.jpg')
   })
 
+  it('retries the same URL after an intervening missing URL', () => {
+    const avatarUrl = 'https://example.test/reused.jpg'
+    const view = render(<UserAvatar avatarUrl={avatarUrl} displayName="Mika" label="Mika avatar" size="md" />)
+    fireEvent.error(screen.getByRole('img'))
+    view.rerender(<UserAvatar avatarUrl={null} displayName="Mika" label="Mika avatar" size="md" />)
+    view.rerender(<UserAvatar avatarUrl={avatarUrl} displayName="Mika" label="Mika avatar" size="md" />)
+    expect(screen.getByRole('img').getAttribute('src')).toBe(avatarUrl)
+  })
+
   it('shows explicit unavailable state for an empty name', () => {
     render(<UserAvatar avatarUrl={null} displayName="   " label="Unknown avatar" size="md" />)
     expect(screen.getByLabelText('Unknown avatar').textContent).toBe('?')

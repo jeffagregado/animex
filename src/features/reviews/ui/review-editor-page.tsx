@@ -12,7 +12,7 @@ import type { AnimeDetail } from '#/features/anime-detail/shared/anime-detail-co
 import { REVIEW_RATING_DEFAULT, type ReviewDetail, type Visibility } from '#/features/social/shared/social-contracts'
 import { REVIEW_DOCUMENT_MAX_VISIBLE_TEXT, REVIEW_SUMMARY_LIMIT, type ReviewDocumentV1 } from '#/features/social/shared/review-document'
 import { createEmptyReviewDocument, parseReviewWireDetail, serializeReviewEditorState } from '../review-document-adapter'
-import { getReviewVisibleTextLength, parseReviewRating, validateReviewEditorFields, type ReviewSaveMode } from '../review-validation'
+import { getReviewVisibleTextLength, isCompleteReviewRating, parseReviewRating, validateReviewEditorFields, type ReviewSaveMode } from '../review-validation'
 import { usePublicAuthState } from '#/features/shell/public-auth-context'
 import { getVisibilityLabel } from '#/features/social/visibility'
 import { createReviewRequestState, getReviewRequestId, settleReviewRequest } from '../review-request-ids'
@@ -118,4 +118,4 @@ function AnimeIdentity({ anime }: { anime: ReviewEditorAnime }) { return <header
 function EditorLoading() { return <main className="mx-auto max-w-[1480px] px-4 py-10"><div className="h-32 animate-pulse rounded-xl bg-white/5" /><div className="mt-6 h-96 animate-pulse rounded-xl bg-white/5" /></main> }
 function EditorState({ title, message }: { title: string; message: string }) { return <main className="mx-auto grid min-h-[55dvh] max-w-3xl place-items-center px-4 text-center"><div><h1 className="text-2xl font-black">{title}</h1><p className="mt-2 text-muted-foreground">{message}</p></div></main> }
 const fromExisting = (review: ReviewDetail): EditorFields => ({ body: review.body, rating: review.rating === null ? '' : String(review.rating), summary: review.summary, containsSpoiler: review.containsSpoiler, visibility: review.visibility })
-const getPreviewRating = (value: string): number | null => /^(?:100(?:\.0)?|\d{1,2}(?:\.\d)?)$/.test(value) ? Number(value) : null
+const getPreviewRating = (value: string): number | null => isCompleteReviewRating(value) ? Number(value) : null

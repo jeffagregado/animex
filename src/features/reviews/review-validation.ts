@@ -8,11 +8,15 @@ type ReviewNode = ReviewDocumentV1['editorState']['root']['children'][number]
 type ReviewFields = { body: unknown; rating: unknown; summary: unknown }
 export type ReviewSaveMode = 'draft' | 'publish'
 const ratingError = 'Rating must be between 0 and 100 with at most one decimal.'
+const ratingPattern = /^(?:100(?:\.0)?|\d{1,2}(?:\.\d)?)$/
+
+/** Returns whether Rating text is complete and ready for persistence. */
+export const isCompleteReviewRating = (value: string): boolean => ratingPattern.test(value)
 
 /** Converts complete Rating text to its persistence value. */
 export const parseReviewRating = (value: string): number | null => {
   if (value === '') return null
-  if (!/^(?:100(?:\.0)?|\d{1,2}(?:\.\d)?)$/.test(value)) throw new RangeError(ratingError)
+  if (!isCompleteReviewRating(value)) throw new RangeError(ratingError)
   return Number(value)
 }
 
