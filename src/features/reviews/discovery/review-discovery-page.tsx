@@ -7,7 +7,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Skeleton } from '#/components/ui/skeleton'
 import type { ClientAuthState } from '#/features/auth/use-auth-state'
 import { usePublicAuthState } from '#/features/shell/public-auth-context'
-import { ReviewDiscoveryCard } from './review-discovery-card'
+import { PublishedReviewCard } from '../ui/published-review-card'
 import { ReviewDiscoveryFilters } from './review-discovery-filters'
 import {
   getReviewDiscoveryNavigationOptions,
@@ -98,7 +98,7 @@ function ReviewDiscoveryList({ pages }: { pages: ReturnType<typeof useReviewDisc
   const sentinelRef = useReviewIntersection(pages)
   return <section aria-label="Review results" className="mt-5 grid min-w-0 gap-3">
     {pages.initialLoading ? <ReviewSkeletons /> : null}
-    {pages.items.map((review) => <ReviewDiscoveryCard key={review.id} review={review} />)}
+    {pages.items.map((review) => <PublishedReviewCard key={review.id} review={review} />)}
     <ReviewDiscoveryStatus pages={pages} />
     <ReviewDiscoveryPagination pages={pages} sentinelRef={sentinelRef} />
   </section>

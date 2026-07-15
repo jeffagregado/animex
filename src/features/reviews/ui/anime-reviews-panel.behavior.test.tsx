@@ -16,7 +16,7 @@ vi.mock('#/components/ui/select', () => ({
   SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => <option value={value}>{children}</option>,
 }))
-vi.mock('./review-card', () => ({ ReviewCard: ({ review }: { review: { id: string } }) => <div>Review {review.id}</div> }))
+vi.mock('./published-review-card', () => ({ PublishedReviewCard: ({ review }: { review: { id: string } }) => <div>Published Review {review.id}</div> }))
 
 const item = (id: string) => ({ id, author: { id: `author-${id}`, username: `user-${id}`, displayName: `User ${id}`, avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: `Summary ${id}`, containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 })
 const stats = { count: 2, average: 90, bands: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
@@ -36,12 +36,12 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 describe('AnimeReviewsPanel behavior', () => {
   it('sorts, paginates, and hides private write actions when signed out', async () => {
     render(<AnimeReviewsContent anilistId={1} slug="frieren" />)
-    expect(await screen.findByText('Review a')).toBeTruthy()
+    expect(await screen.findByText('Published Review a')).toBeTruthy()
     expect(screen.queryByText('Write a review')).toBeNull()
     fireEvent.change(screen.getByLabelText('Sort reviews'), { target: { value: 'rating-high' } })
     await waitFor(() => expect(mocks.query).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ sort: 'rating-high', cursor: null })))
     fireEvent.click(screen.getByRole('button', { name: 'Load more reviews' }))
-    expect(await screen.findByText('Review b')).toBeTruthy()
+    expect(await screen.findByText('Published Review b')).toBeTruthy()
   })
 
   it('shows an actionable Retry after query failure', async () => {

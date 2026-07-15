@@ -8,12 +8,14 @@ import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import { Dialog, DialogContent } from '#/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select'
+import { UserAvatar } from '#/components/user-avatar'
 import type { ClientAuthState } from '#/features/auth/use-auth-state'
 import { usePublicAuthState } from '#/features/shell/public-auth-context'
 import { reviewListItemSchema, type ReviewDetail, type ReviewListItem, type Visibility } from '#/features/social/shared/social-contracts'
 import { parseReviewWireDetail } from '../review-document-adapter'
 import { getVisibilityLabel } from '#/features/social/visibility'
 import { ReviewDocumentRenderer } from './review-document-renderer'
+import { ReviewSpoilerBadge } from './review-spoiler-badge'
 import { ReviewSummary } from './review-summary'
 
 /** Loads one public/owner-visible Review and renders its strict document. */
@@ -37,7 +39,7 @@ function MoreReviews({ anilistId, currentReviewId, slug }: { anilistId: number; 
   const raw = useQuery(api.reviews.listForAnime, { anilistId, sort: 'newest', cursor: null })
   if (raw === undefined) return <section aria-busy="true" className="rounded-xl border border-border bg-card/40 p-5"><h2 className="font-black">More reviews</h2><p className="mt-3 text-muted-foreground">Loading reviews…</p></section>
   const reviews = raw.items.map((item: unknown) => reviewListItemSchema.parse(item)).filter((item: ReviewListItem) => item.id !== currentReviewId).slice(0, 3)
-  return <section className="rounded-xl border border-border bg-card/40 p-5"><h2 className="font-black">More reviews</h2>{reviews.length > 0 ? <ul className="mt-3 space-y-3">{reviews.map((item: ReviewListItem) => <li key={item.id}><a className="block rounded-lg border border-border p-3 hover:border-cyan-300" href={`/reviews/${item.id}`}><span className="font-bold">{item.author.displayName}</span><span className="mt-1 block line-clamp-2 text-sm text-muted-foreground">{item.containsSpoiler ? 'Spoiler summary hidden' : item.summary}</span></a></li>)}</ul> : <p className="mt-3 text-muted-foreground">No other reviews yet.</p>}<a className="mt-4 inline-block text-cyan-300 hover:underline" href={`/anime/${anilistId}/${slug}?tab=reviews`}>View all reviews for this anime</a></section>
+  return <section className="rounded-xl border border-border bg-card/40 p-5"><h2 className="font-black">More reviews</h2>{reviews.length > 0 ? <ul className="mt-3 space-y-3">{reviews.map((item: ReviewListItem) => <li key={item.id}><a className="block rounded-lg border border-border p-3 hover:border-cyan-300" href={`/reviews/${item.id}`}><span className="flex items-center justify-between gap-2"><span className="font-bold">{item.author.displayName}</span>{item.containsSpoiler ? <ReviewSpoilerBadge /> : null}</span><span className="mt-1 block line-clamp-2 text-sm text-muted-foreground">{item.summary}</span></a></li>)}</ul> : <p className="mt-3 text-muted-foreground">No other reviews yet.</p>}<a className="mt-4 inline-block text-cyan-300 hover:underline" href={`/anime/${anilistId}/${slug}?tab=reviews`}>View all reviews for this anime</a></section>
 }
 
 class ReviewDetailBoundary extends Component<{ children: ReactNode }, { error: Error | null; key: number }> {
@@ -47,9 +49,9 @@ class ReviewDetailBoundary extends Component<{ children: ReactNode }, { error: E
 }
 
 function AnimeHeader({ review }: { review: ReviewDetail }) { return <header className="mt-4 flex items-center gap-4 border-b border-border pb-4">{review.anime.coverImageUrl ? <img alt="" className="h-20 w-14 rounded object-cover" src={review.anime.coverImageUrl} /> : null}<div><h1 className="text-2xl font-black">{review.anime.title}</h1><p className="mt-1 text-muted-foreground">Full Review</p></div></header> }
-function AuthorHeader({ review }: { review: ReviewDetail }) { return <header className="flex items-center gap-3 border-b border-border py-4">{review.author.avatarUrl ? <img alt={`${review.author.displayName} avatar`} className="size-12 rounded-full object-cover" src={review.author.avatarUrl} /> : <span className="grid size-12 place-items-center rounded-full bg-cyan-300/10 font-black text-cyan-300">{review.author.displayName.slice(0, 1)}</span>}<div><p className="font-black">{review.author.displayName}</p><p className="text-sm text-muted-foreground">Published {new Date(review.publishedAt ?? review.updatedAt).toLocaleDateString()} · Visibility: <span className="capitalize text-cyan-300">{review.visibility}</span>{review.updatedAt !== review.publishedAt ? ' · Updated' : ''}</p></div></header> }
+function AuthorHeader({ review }: { review: ReviewDetail }) { return <header className="flex items-center gap-3 border-b border-border py-4"><UserAvatar avatarUrl={review.author.avatarUrl} displayName={review.author.displayName} label={`${review.author.displayName} avatar`} size="lg" /><div className="min-w-0"><p className="font-black">{review.author.displayName}</p><div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><p>Published {new Date(review.publishedAt ?? review.updatedAt).toLocaleDateString()} · Visibility: <span className="capitalize text-cyan-300">{review.visibility}</span>{review.updatedAt !== review.publishedAt ? ' · Updated' : ''}</p>{review.containsSpoiler ? <ReviewSpoilerBadge /> : null}</div></div></header> }
 
-function Summary({ review }: { review: ReviewDetail }) { return <div><p className="text-xs font-bold uppercase tracking-wider text-cyan-300">Summary</p><ReviewSummary summary={review.summary} variant="detail" /><p className="mt-1 text-sm text-muted-foreground">Summary contains {review.containsSpoiler ? '' : 'no '}spoilers</p></div> }
+function Summary({ review }: { review: ReviewDetail }) { return <div><p className="text-xs font-bold uppercase tracking-wider text-cyan-300">Summary</p><ReviewSummary summary={review.summary} variant="detail" /></div> }
 
 function OwnerActions({ review }: { review: ReviewDetail }) {
   const [confirm, setConfirm] = useState<'activity' | 'delete' | null>(null)

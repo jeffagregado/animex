@@ -20,7 +20,7 @@ vi.mock('#/components/ui/select', () => ({
 const fields = { direction: null, format: '', indent: 0, version: 1 }
 const bodyJson = JSON.stringify({ version: 1, editorState: { root: { ...fields, type: 'root', children: [{ ...fields, children: [{ detail: 0, format: 0, mode: 'normal', style: '', text: 'Review body', type: 'text', version: 1 }], textFormat: 0, textStyle: '', type: 'paragraph' }] } } })
 const item = (id: string, authorId: string) => ({ id, author: { id: authorId, username: `user-${id}`, displayName: `User ${id}`, avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: `Summary ${id}`, containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 })
-const detail = { ...item('current', 'author-1'), bodyJson }
+const detail = { ...item('current', 'author-1'), bodyJson, containsSpoiler: true }
 const morePage = { items: [item('current', 'author-1'), { ...item('other', 'author-2'), summary: 'Secret ending', containsSpoiler: true }], cursor: null, hasMore: false }
 
 beforeEach(() => {
@@ -42,8 +42,9 @@ describe('ReviewDetailContent behavior', () => {
     expect(screen.getByText('Review body')).toBeTruthy()
     expect(screen.getByRole('link', { name: /User other/ }).getAttribute('href')).toBe('/reviews/other')
     expect(screen.queryByRole('link', { name: /User current/ })).toBeNull()
-    expect(screen.queryByText('Secret ending')).toBeNull()
-    expect(screen.getByText('Spoiler summary hidden')).toBeTruthy()
+    expect(screen.getByText('Secret ending')).toBeTruthy()
+    expect(screen.getAllByText('Spoiler')).toHaveLength(2)
+    expect(screen.getByRole('img', { name: 'User current avatar' })).toBeTruthy()
   })
 
   it('renders explicit loading and not-found states', () => {
