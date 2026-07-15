@@ -67,6 +67,17 @@ const renderBody = (card: FeedCardData, revealed: boolean, reveal: () => void): 
     if (card.hasSpoiler && !revealed) return <button className="min-h-24 w-full rounded-lg border border-cyan-300/30 bg-cyan-300/5 font-bold text-cyan-200 hover:bg-cyan-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={reveal} type="button">Reveal Post spoiler</button>
     return <>{card.text ? <p className="whitespace-pre-wrap text-sm leading-6 text-slate-200">{card.text}</p> : null}{card.media ? <PostMediaCard media={card.media} username={card.author.username} /> : null}</>
   }
-  if (card.kind === 'review') return <a aria-label={`Read ${card.anime.title} review by ${card.author.displayName}`} className="block rounded-lg border border-white/8 p-4 outline-none transition hover:border-cyan-300/50 hover:bg-cyan-300/5 focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/reviews/${card.reviewId}`}><h2 className="truncate font-black">{card.anime.title}</h2>{card.containsSpoiler ? <div className="mt-2"><ReviewSpoilerBadge /></div> : null}<p className="mt-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Rating</p><p className="text-2xl font-black tabular-nums text-cyan-300">{card.rating.toFixed(card.rating % 1 === 0 ? 0 : 1)}<span className="text-sm font-medium text-muted-foreground"> / 100</span></p><ReviewSummary summary={card.summary} variant="list" /></a>
+  if (card.kind === 'review') return (
+    <a aria-label={`Read ${card.anime.title} review by ${card.author.displayName}`} className="flex gap-4 rounded-lg border border-white/8 p-3 outline-none transition hover:border-cyan-300/50 hover:bg-cyan-300/5 focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/reviews/${card.reviewId}`}>
+      <FeedCoverImage alt={`${card.anime.title} cover`} className="aspect-[2/3] w-20 rounded-md" src={card.anime.coverImageUrl} />
+      <div className="min-w-0 flex-1">
+        <h2 className="truncate font-black">{card.anime.title}</h2>
+        {card.containsSpoiler ? <div className="mt-2"><ReviewSpoilerBadge /></div> : null}
+        <p className="mt-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Rating</p>
+        <p className="text-2xl font-black tabular-nums text-cyan-300">{card.rating.toFixed(card.rating % 1 === 0 ? 0 : 1)}<span className="text-sm font-medium text-muted-foreground"> / 100</span></p>
+        <ReviewSummary summary={card.summary} variant="list" />
+      </div>
+    </a>
+  )
   return <a className="flex gap-4 rounded-lg border border-white/8 p-3 outline-none transition hover:border-cyan-300/50 hover:bg-cyan-300/5 focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/anime/${card.anime.anilistId}/${card.anime.slug}`}><FeedCoverImage alt={`${card.anime.title} cover`} className="aspect-[2/3] w-16 rounded-md" src={card.anime.coverImageUrl} /><div className="min-w-0"><p className="text-xs font-black uppercase tracking-wider text-cyan-300">{card.kind === 'completed' ? 'Completed' : 'Rewatched'}</p><h2 className="mt-1 line-clamp-2 font-black">{card.anime.title}</h2><p className="mt-1 text-sm text-muted-foreground">{card.anime.seasonYear ?? 'TBA'} · {card.anime.format ?? 'Anime'}</p></div></a>
 }

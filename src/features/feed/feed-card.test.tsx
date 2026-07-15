@@ -69,7 +69,7 @@ describe('FeedCard Post media', () => {
     expect(reviewLink.contains(screen.getByRole('link', { name: '1h ago' }))).toBe(false)
     expect(screen.getByText('Summary')).toBeTruthy()
     expect(screen.queryByText(/read\s+review/i)).toBeNull()
-    expect(screen.queryByRole('img', { name: 'Frieren cover' })).toBeNull()
+    expect(reviewLink.contains(screen.getByRole('img', { name: 'Frieren cover' }))).toBe(true)
     expect(screen.queryByRole('button', { name: /Coming in Phase 6/ })).toBeNull()
   })
 
