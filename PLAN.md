@@ -160,6 +160,22 @@ Status: DESIGN LOCKED. Clarifying questions and implementation planning are defe
 - Do not allow reports for generated anime status activity cards.
 - Stop after validation and wait for approval.
 
+## Optional Future Features
+
+### Metadata Image Proxy
+
+Status: NOT SCHEDULED. This infrastructure feature is separate from the phased MVP and other optional product features.
+
+- Replace client-visible AniList image URLs with provider-neutral URLs shaped as `/media/$entity/$id/$variant?v=$version`.
+- Support `anime` cover/banner and Character/Staff portrait variants without naming AniList in the public route.
+- Keep upstream image URLs server-only. Store URL metadata and a source-version fingerprint in Convex; do not store image bytes in Convex and do not use Convex actions.
+- Resolve an image through an indexed internal Convex read. A proxy cache miss must fetch only the stored image URL and must never call AniList GraphQL.
+- Preserve metadata cache policy independently: Trending 3 hours, Seasonal and Recommendations 24 hours, Upcoming 6 hours, and Anime Detail/people pages 24 hours.
+- Cache image responses in the browser for 24 hours and shared CDN/reverse-proxy cache for 30 days, with a 7-day stale-while-revalidate window and no stale-if-error fallback. A changed source fingerprint creates a new public URL and cache key.
+- Validate entity, ID, variant, version, HTTPS, upstream host, redirects, image content type, response size, and timeout. Do not accept a client-supplied source URL.
+- Use the same TanStack Start server-route contract on Vercel or a VPS. Vercel uses response cache headers; VPS deployments place an equivalent Nginx/Caddy cache in front.
+- Keep Post and Review external media outside this proxy contract.
+
 ## Test Plan
 
 Each phase must run only relevant checks, then stop:
@@ -178,6 +194,7 @@ Each phase must run only relevant checks, then stop:
 - Slug is display/SEO only and can be regenerated from AniList metadata.
 - Local app env is stored in `.env.local`; Convex server env such as `SITE_URL`, Resend, and Google OAuth stays in Convex dashboard.
 - AniList image URLs may be stored as external URLs in MVP.
+- Metadata Image Proxy remains optional and unimplemented; direct external AniList image URLs remain current MVP behavior until it is scheduled.
 - Post media uses external HTTPS URLs; no Post file upload, compression, or first-party Post media storage exists. Other user-owned upload features may use Convex Storage under their own contract.
 - Manga remains future placeholder.
 - No phase continues automatically into the next phase.

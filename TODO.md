@@ -722,6 +722,19 @@ Status: COMPLETE and integrated on `dev`; authenticated browser QA and closure g
 
 ## Optional Backlog
 
+### Optional Metadata Image Proxy
+
+Status: NOT SCHEDULED. Separate infrastructure feature; current MVP continues using direct external AniList image URLs.
+
+- [x] Lock provider-neutral `/media/$entity/$id/$variant?v=$version` route and independent metadata/image cache strategy.
+- [ ] Add server-only image-source/version storage and ensure public Convex payloads expose only proxy URLs.
+- [ ] Add validated TanStack Start image route with indexed Convex resolution, allowlisted upstream fetch, bounded redirects/type/size/timeout, and no AniList GraphQL call.
+- [ ] Add 24-hour browser, 30-day shared, and 7-day stale-while-revalidate cache headers without stale-if-error; verify Vercel and VPS cache parity.
+- [ ] Migrate Anime, Character, and Staff image consumers; confirm Post and Review external media remain outside proxy scope.
+- [ ] Validate cache hits/misses/version changes, abuse resistance, responsive image rendering, client bundle/network exposure, and direct-source removal.
+
+### Other Optional Work
+
 - [ ] Optional anime attachment in Post Composer.
 - [ ] Mobile Home Explore tab or sheet for utility modules.
 - [ ] Optional React Doctor advisory cleanup for Phase 5 hook, accessibility, performance, and maintainability warnings; keep Zod 4.4.3 and conventional shared-component false positives triaged separately.
