@@ -144,17 +144,19 @@ Status: COMPLETE. Approved landing and AnimeX favicon set are implemented and va
 
 ### Pre-Phase 7: Social UI Embargo Cleanup
 
-Status: SCOPE LOCKED. Detailed implementation planning starts later; no cleanup implementation has started.
+Status: COMPLETE. Implementation, review, responsive browser QA, cleanup, and Convex dev redeploy pass.
 
-- Remove existing Follow, Like, Comment, Comment Reply, and Following-feed UI before Phase 7.
-- Remove social placeholders from the DOM; do not CSS-hide them or leave disabled `Coming later` controls.
-- Normalize direct Following-feed selection to Home until Phase 9.
-- Hide Followers-only choices from creation, owner-action, discovery-filter, and privacy-setting UI until Phase 9.
-- Preserve social schemas, stored visibility values, authorization contracts, and existing Followers-only records.
-- Let owners of existing Followers-only content change it to Public or Private during the embargo.
+- Active Home views are Home and Global. Direct stale Following selection replaces to Home before a Following query can mount.
+- Active Post and Review visibility choices are Public and Private. A stored Followers account default maps to Private for new content.
+- Active Review discovery choices are All, Public, and My Private. A stale Followers URL replaces before discovery queries mount.
+- Legacy Followers Posts and Reviews stay owner-readable. Unrelated edits preserve Followers; explicit Public/Private selection migrates the record.
+- Social controls, counts, labels, Followers choices, and phase placeholders are absent from active UI.
+- Backend schemas, stored Followers data, authorization, and Phase 9 social contracts remain intact. No migration ran.
 - Stop after validation and wait for approval before Phase 7.
 
 ### Phase 7: User Profile And Quick Search
+
+Status: NEXT. Design/spec, implementation plan, and implementation are unstarted.
 
 - Build User Profile from locked design.
 - Add Review tab, latest favorites, anime stats, and viewer-allowed profile activity.

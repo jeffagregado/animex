@@ -1,6 +1,6 @@
 # Phase 7-9 Feature Sequencing
 
-Status: APPROVED. Scheduling contract locked; implementation planning starts later.
+Status: ACTIVE. Pre-Phase 7 embargo is implemented and validated. Phase 7 is next and unstarted.
 
 ## Phase Map
 
@@ -11,7 +11,7 @@ Status: APPROVED. Scheduling contract locked; implementation planning starts lat
 
 ## Social UI Embargo
 
-Before Phase 7, all existing social interaction UI must be absent from the DOM:
+Active UI through Phase 8 keeps these social surfaces absent from the DOM:
 
 - Follow and Unfollow actions.
 - Follower and following counts.
@@ -23,7 +23,7 @@ Before Phase 7, all existing social interaction UI must be absent from the DOM:
 - Followers-only choices in creation, owner-action, discovery-filter, and privacy-setting UI.
 - Disabled or phase-labeled social placeholders.
 
-Do not use CSS hiding. Do not leave disabled controls. Direct Following-feed selection normalizes to Home.
+No CSS hiding or disabled controls remain. Home exposes Home and Global. Direct stale Following-feed selection replaces to Home before a Following query mounts. Review discovery exposes All, Public, and My Private; stale Followers selection replaces before discovery queries mount.
 
 ## Preserved Backend Contracts
 
@@ -31,7 +31,10 @@ Do not use CSS hiding. Do not leave disabled controls. Direct Following-feed sel
 - Keep Public, Followers only, and Private storage semantics.
 - Keep existing Followers-only content readable under current access rules.
 - During the embargo, owners may change existing Followers-only content to Public or Private.
+- Unrelated edits preserve existing Followers visibility.
+- A Followers account default maps to Private for new Posts and Reviews.
 - Do not expose a new Followers-only selection until Phase 9.
+- No migration rewrites stored Followers data.
 
 ## Phase 7: User Profile And Quick Search
 
@@ -102,7 +105,7 @@ Phase 9 acceptance requires every approved social control to be visible and func
 ## Planning Boundary
 
 - This document locks scheduling and visibility only.
-- Pre-Phase 7 cleanup receives a separate detailed implementation plan later.
+- Pre-Phase 7 cleanup is complete under its approved design and implementation plan.
 - Phase 7 receives one approved design/spec and implementation plan covering User Profile and Quick Search.
 - Phase 8 and Phase 9 each receive separate approved design/spec and implementation plans.
-- No source implementation is authorized by this scheduling update.
+- Phase 7 implementation has not started. Phase 9 retains social UI reactivation ownership.

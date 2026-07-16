@@ -1,4 +1,19 @@
-# Phase 5 Design QA
+# Design QA
+
+## Pre-Phase 7 Social UI Embargo — 2026-07-16
+
+Final result: PASS
+
+- No new visual asset required. Existing AnimeX surfaces retained their approved layout and theme.
+- Signed-out and signed-in browser QA passed at 390 and 1280 px with clean console and network.
+- Home exposes Home/Global only. Review discovery exposes All/Public/My Private only.
+- Public/Private are the only new/edit owner choices. Social controls, counts, labels, Followers choices, and placeholders are absent.
+- Stale Following-feed and Followers-discovery URLs replace before forbidden queries mount.
+- Authorized development fixtures verified new-content defaults, legacy Followers preservation, and explicit Public/Private migration. All five modified account/Post/Post-card/Review/Review-card visibility values were restored to Followers.
+- Feed owner action target is 44 x 44. Review Detail restores visibility focus after async mutation. Keyboard focus and touch targets pass.
+- Temporary restore functions are removed. Development Convex deployment is clean. No migration ran.
+
+## Phase 5
 
 Final result: PASS
 

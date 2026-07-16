@@ -1,6 +1,6 @@
 # Pre-Phase 7 Social UI Embargo Implementation Plan
 
-Status: IMPLEMENTATION IN PROGRESS. Tasks 1-3 are complete and independently reviewed; Task 4 is next.
+Status: COMPLETE. Implementation, review, automated gates, responsive browser QA, cleanup, and Convex dev redeploy pass. Phase 7 is next and unstarted.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use the repo-local `$orchestrating-coding-work` custom role agents from `.codex/agents/`; do not use generic bootstrap agents.
 
@@ -26,8 +26,8 @@ Status: IMPLEMENTATION IN PROGRESS. Tasks 1-3 are complete and independently rev
 - `/reviews?visibility=followers` removes the visibility query through replace navigation before discovery mounts; signed-in state becomes All, signed-out state becomes Public.
 - Signed-in All discovery may continue to include owner-readable legacy Followers records through the preserved backend lane.
 - Keep `convex/feed.ts:listFollowing`, Followers discovery lanes, validators, schemas, and authorization unchanged.
-- No production dependency, image, schema, migration, data rewrite, global feature flag, ADR, or deployment.
-- No `convex dev --once` unless implementation evidence forces a Convex edit; a client-only implementation skips it.
+- No production dependency, image, schema, migration, persistent data rewrite, global feature flag, ADR, production deployment, or persistent QA helper.
+- Explicitly authorized temporary development fixture helpers must be removed after restoration, followed by `convex dev --once` to redeploy clean source.
 - Keep changes responsive, keyboard-accessible, and consistent with existing Base UI controls.
 - Comparison baseline: `e8e9fd7cf171b8d2ac7109460399f311874d8bc5`.
 
@@ -80,7 +80,7 @@ Serialized locks:
 - Read-only: `package.json`, `pnpm-lock.yaml`, `skills-lock.json`
 - No committed source or data changes
 
-- [ ] **Step 1: Confirm repository baseline**
+- [x] **Step 1: Confirm repository baseline**
 
 ```powershell
 git status --short
@@ -89,7 +89,7 @@ git rev-parse HEAD
 
 Expected: clean implementation worktree; HEAD is based on `e8e9fd7cf171b8d2ac7109460399f311874d8bc5` plus approved planning commits.
 
-- [ ] **Step 2: Restore declared tooling if required**
+- [x] **Step 2: Restore declared tooling if required**
 
 Fallow is already a committed dev dependency from the repository baseline. It is not a new dependency.
 
@@ -100,7 +100,7 @@ pnpm exec fallow --version
 
 Expected: install does not change `package.json` or `pnpm-lock.yaml`; Fallow prints a version. If it remains unavailable, stop and report the exact failure. Do not install it globally, edit `skills-lock.json`, or add another package.
 
-- [ ] **Step 3: Prepare one development-only legacy acceptance fixture**
+- [x] **Step 3: Prepare one development-only legacy acceptance fixture**
 
 Before removing Followers creation UI, identify or create through existing app behavior:
 
@@ -110,7 +110,7 @@ Before removing Followers creation UI, identify or create through existing app b
 
 Record only non-secret fixture identifiers in the execution checkpoint. Do not commit credentials, tokens, or fixture data. If no safe development account is available, stop browser acceptance and request user access; automated implementation may continue, but closure cannot pass.
 
-- [ ] **Step 4: Run baseline contract checks**
+- [x] **Step 4: Run baseline contract checks**
 
 ```powershell
 pnpm exec vitest run convex/social.integration.test.ts src/features/social/shared/social-contracts.test.ts src/features/reviews/shared/review-discovery-contracts.test.ts
@@ -746,7 +746,7 @@ type ReviewSaveContext = {
 }
 ```
 
-- [ ] **Step 1: Add red Review editor tests**
+- [x] **Step 1: Add red Review editor tests**
 
 Update the account-default parameter test:
 
@@ -781,7 +781,7 @@ it('migrates an existing Followers Review after explicit selection', async () =>
 
 Open the visibility Select and assert Followers is absent.
 
-- [ ] **Step 2: Add red detail/card tests**
+- [x] **Step 2: Add red detail/card tests**
 
 In `review-detail-page.behavior.test.tsx`:
 
@@ -803,7 +803,7 @@ render(<PublishedReviewCard review={{ ...review, visibility: 'private' }} />)
 expect(screen.getByText('My Private')).toBeTruthy()
 ```
 
-- [ ] **Step 3: Verify the red state**
+- [x] **Step 3: Verify the red state**
 
 ```powershell
 pnpm exec vitest run src/features/reviews/ui/review-editor-page.test.tsx src/features/reviews/ui/review-detail-page.behavior.test.tsx src/features/reviews/ui/published-review-card.test.tsx
@@ -811,7 +811,7 @@ pnpm exec vitest run src/features/reviews/ui/review-editor-page.test.tsx src/fea
 
 Expected: FAIL because Followers remains visible and Review Like remains in the DOM.
 
-- [ ] **Step 4: Add nullable legacy selection to the Review editor**
+- [x] **Step 4: Add nullable legacy selection to the Review editor**
 
 In `LoadedReviewEditor`:
 
@@ -846,7 +846,7 @@ Use `resolvedVisibility` in the request payload and every Draft/Publish/Update m
 
 Render the Select with the same `activeVisibilityOptions` and `Change visibility` placeholder used by Post composer.
 
-- [ ] **Step 5: Remove Review Like and suppress legacy labels**
+- [x] **Step 5: Remove Review Like and suppress legacy labels**
 
 In `review-detail-page.tsx`:
 
@@ -865,7 +865,7 @@ In `published-review-card.tsx`:
   : null}
 ```
 
-- [ ] **Step 6: Remove the temporary visibility-label bridge**
+- [x] **Step 6: Remove the temporary visibility-label bridge**
 
 After the Post and Review consumers use the typed embargo helpers, delete the
 temporary `getVisibilityLabel` export from `src/features/social/visibility.ts`.
@@ -880,7 +880,7 @@ rg -n "getVisibilityLabel" src
 
 Expected: exit `1` with no matches.
 
-- [ ] **Step 7: Run focused checks**
+- [x] **Step 7: Run focused checks**
 
 ```powershell
 pnpm exec vitest run src/features/social/visibility.test.ts src/features/reviews/ui/review-editor-page.test.tsx src/features/reviews/ui/review-detail-page.test.ts src/features/reviews/ui/review-detail-page.behavior.test.tsx src/features/reviews/ui/published-review-card.test.tsx
@@ -889,7 +889,7 @@ pnpm exec tsc --noEmit
 
 Expected: PASS; no Review Like or Followers label; legacy preservation and explicit migration are covered.
 
-- [ ] **Step 8: Commit Review embargo behavior**
+- [x] **Step 8: Commit Review embargo behavior**
 
 ```powershell
 git add -- src/features/social/visibility.ts src/features/social/visibility.test.ts src/features/reviews/ui/review-editor-page.tsx src/features/reviews/ui/review-editor-page.test.tsx src/features/reviews/ui/review-detail-page.tsx src/features/reviews/ui/review-detail-page.behavior.test.tsx src/features/reviews/ui/published-review-card.tsx src/features/reviews/ui/published-review-card.test.tsx
@@ -938,7 +938,7 @@ export interface ReviewDiscoveryNavigationOptions {
 }
 ```
 
-- [ ] **Step 1: Rewrite route tests to canonical defaults**
+- [x] **Step 1: Rewrite route tests to canonical defaults**
 
 Update `src/routes/_public/reviews/-review-search.test.ts`:
 
@@ -977,7 +977,7 @@ Repeat signed out. Neither case may query Followers.
 
 4. Signed-in explicit Public/Private/All remain valid and query directly.
 
-- [ ] **Step 2: Add red filter UI coverage**
+- [x] **Step 2: Add red filter UI coverage**
 
 In `review-discovery-page.test.tsx`, open the signed-in visibility Select and assert:
 
@@ -988,7 +988,7 @@ expect(screen.getByRole('option', { name: 'My Private' })).toBeTruthy()
 expect(screen.queryByRole('option', { name: 'My Followers' })).toBeNull()
 ```
 
-- [ ] **Step 3: Verify the red state**
+- [x] **Step 3: Verify the red state**
 
 ```powershell
 pnpm exec vitest run src/routes/_public/reviews/-review-search.test.ts src/features/reviews/discovery/review-discovery-page.test.tsx
@@ -996,7 +996,7 @@ pnpm exec vitest run src/routes/_public/reviews/-review-search.test.ts src/featu
 
 Expected: FAIL because Followers URLs still query and the filter option remains visible.
 
-- [ ] **Step 4: Resolve active state separately from replacement URL**
+- [x] **Step 4: Resolve active state separately from replacement URL**
 
 In `review-discovery-state.ts`:
 
@@ -1074,7 +1074,7 @@ export const getReviewDiscoveryReplacementOptions = (
 })
 ```
 
-- [ ] **Step 5: Block query mounting until replacement completes**
+- [x] **Step 5: Block query mounting until replacement completes**
 
 In `review-discovery-page.tsx`:
 
@@ -1106,7 +1106,7 @@ return (
 
 Only mount `ReviewDiscoveryPage` after replacement is unnecessary. Pass `resolution.signedIn` into navigation serialization.
 
-- [ ] **Step 6: Remove Followers from visible filter options**
+- [x] **Step 6: Remove Followers from visible filter options**
 
 In `review-discovery-filters.tsx`, use:
 
@@ -1123,7 +1123,7 @@ const visibilityOptions: Array<{
 
 Keep the shared Zod schema accepting Followers for backend compatibility and stale URL parsing.
 
-- [ ] **Step 7: Run focused checks**
+- [x] **Step 7: Run focused checks**
 
 ```powershell
 pnpm exec vitest run src/routes/_public/reviews/-review-search.test.ts src/features/reviews/discovery/review-discovery-page.test.tsx src/features/reviews/discovery/use-review-discovery-pages.test.tsx src/features/reviews/shared/review-discovery-contracts.test.ts
@@ -1132,7 +1132,7 @@ pnpm exec tsc --noEmit
 
 Expected: PASS; stale Followers state is replaced before query; shared contracts still accept Followers.
 
-- [ ] **Step 8: Commit Review discovery contraction**
+- [x] **Step 8: Commit Review discovery contraction**
 
 ```powershell
 git add -- src/features/reviews/discovery/review-discovery-state.ts src/features/reviews/discovery/review-discovery-page.tsx src/features/reviews/discovery/review-discovery-filters.tsx src/features/reviews/discovery/review-discovery-page.test.tsx src/routes/_public/reviews/-review-search.test.ts
@@ -1153,7 +1153,7 @@ git commit -m "refactor: embargo followers review discovery"
 - Modify after all gates pass: `docs/architecture/review-discovery-data-flow.md`
 - Read-only: Convex social/feed/review files unless a failed contract check proves a compatibility defect
 
-- [ ] **Step 1: Audit active client strings and query references**
+- [x] **Step 1: Audit active client strings and query references**
 
 Run:
 
@@ -1168,7 +1168,7 @@ Expected:
 - `listFollowing` may remain only in preserved backend/generated code or backend tests, not active client feed selection.
 - Unrelated anime Favorite controls are outside scope and must remain.
 
-- [ ] **Step 2: Run route generation**
+- [x] **Step 2: Run route generation**
 
 ```powershell
 pnpm run generate-routes
@@ -1177,7 +1177,7 @@ git diff -- src/routeTree.gen.ts
 
 Expected: generation succeeds; route identities are unchanged, so no semantic generated-tree drift.
 
-- [ ] **Step 3: Run focused suite**
+- [x] **Step 3: Run focused suite**
 
 ```powershell
 pnpm exec vitest run src/features/social/visibility.test.ts src/routes/_public/-home.test.tsx src/features/home/home-page.test.tsx src/features/feed/use-feed-pages.test.tsx src/features/feed/feed-list.test.tsx src/features/feed/feed-card.test.tsx src/features/feed/feed-card-detail-page.test.tsx src/features/feed/use-post-composer.test.tsx src/features/feed/post-composer.test.tsx src/features/feed/post-composer-dialog.test.tsx src/features/feed/feed-owner-actions.test.tsx src/features/reviews/ui/review-editor-page.test.tsx src/features/reviews/ui/review-detail-page.test.ts src/features/reviews/ui/review-detail-page.behavior.test.tsx src/features/reviews/ui/published-review-card.test.tsx src/routes/_public/reviews/-review-search.test.ts src/features/reviews/discovery/review-discovery-page.test.tsx src/features/reviews/discovery/use-review-discovery-pages.test.tsx src/features/reviews/shared/review-discovery-contracts.test.ts convex/social.integration.test.ts
@@ -1185,7 +1185,7 @@ pnpm exec vitest run src/features/social/visibility.test.ts src/routes/_public/-
 
 Expected: zero failures.
 
-- [ ] **Step 4: Run full automated gates**
+- [x] **Step 4: Run full automated gates**
 
 ```powershell
 pnpm test
@@ -1211,7 +1211,7 @@ Expected:
 
 If the implementation baseline changes before work starts, resolve the actual pre-implementation commit and replace the recorded SHA everywhere. Do not use an arbitrary branch label.
 
-- [ ] **Step 5: Run custom implementation review**
+- [x] **Step 5: Run custom implementation review**
 
 Use `orchestration_reviewer` against the concrete integrated diff and accepted design. Block on:
 
@@ -1226,7 +1226,7 @@ Use `orchestration_reviewer` against the concrete integrated diff and accepted d
 
 Fix the smallest root cause and rerun affected focused tests before re-review.
 
-- [ ] **Step 6: Run browser QA**
+- [x] **Step 6: Run browser QA**
 
 Start `pnpm dev`. Use the repo-required in-app browser.
 
@@ -1248,7 +1248,7 @@ For every case:
 - Console has no runtime/hydration errors.
 - Network has no failed hidden social query.
 
-- [ ] **Step 7: Update current-state docs after green evidence**
+- [x] **Step 7: Update current-state docs after green evidence**
 
 `TODO.md`:
 
@@ -1282,7 +1282,7 @@ Through Phase 8, active UI omits Follow, Like, Comment, Following-feed, social-c
 
 `docs/architecture/review-discovery-data-flow.md`: update the existing Review discovery description to distinguish active All/Public/Private client choices from the preserved backend Followers lane. Do not create a new data-flow document.
 
-- [ ] **Step 8: Commit closure docs**
+- [x] **Step 8: Commit closure docs**
 
 ```powershell
 git add -- TODO.md PLAN.md CONTEXT.md docs/superpowers/specs/2026-07-16-phase-7-9-feature-sequencing.md design-qa.md docs/architecture/review-discovery-data-flow.md

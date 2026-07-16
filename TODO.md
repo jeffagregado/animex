@@ -852,23 +852,21 @@ Status: COMPLETE. Quiet Signal landing, AnimeX favicon set, automated gates, rev
 
 # Pre-Phase 7 Social UI Embargo
 
-Status: IMPLEMENTATION IN PROGRESS. Isolated worktree baseline passes; shared visibility contract is next.
+Status: COMPLETE. Active social interaction UI and Followers-only choices are absent; stale routes canonicalize before forbidden queries; preserved Followers records remain owner-readable.
 
-- [x] Move Follow, Like, Comment, Comment Reply, Following-feed behavior, and Followers-only UI activation to final Phase 9.
-- [x] Require social interaction UI to be absent from the DOM before Phase 7; no CSS hiding or disabled `Coming later` placeholders.
-- [x] Require direct Following-feed selection to normalize to Home until Phase 9.
-- [x] Hide Followers-only choices from creation, owner-action, discovery-filter, and privacy-setting UI while preserving backend contracts and stored values.
-- [x] Allow owners of existing Followers-only content to change visibility to Public or Private during the embargo.
-- [x] Inspect and lock the complete UI, route, query, visibility, test, and browser-QA cleanup surface.
-- [x] Write and self-review `docs/superpowers/specs/2026-07-16-pre-phase-7-social-ui-embargo-design.md`.
-- [x] Review and approve the committed written design spec.
-- [x] Write and self-review `docs/superpowers/plans/2026-07-16-pre-phase-7-social-ui-embargo.md`.
-- [x] Review and approve the detailed pre-Phase 7 cleanup implementation plan.
-- [ ] Implement and validate the approved cleanup plan.
+- [x] Move social UI activation to Phase 9 and lock the embargo design and implementation plan.
+- [x] Limit Home to Home/Global and Review discovery to All/Public/My Private.
+- [x] Limit new and explicit owner visibility choices to Public/Private.
+- [x] Map Followers account defaults to Private for new Posts and Reviews.
+- [x] Preserve Followers during unrelated legacy Post/Review edits; allow explicit Public/Private migration.
+- [x] Replace stale `feed=following` and `visibility=followers` URLs before hidden queries mount.
+- [x] Preserve backend schemas, stored Followers values, authorization, and Phase 9 contracts without migration.
+- [x] Remove social controls, counts, labels, placeholders, and temporary restore functions.
+- [x] Complete automated gates, review, Convex dev redeploy, and signed-out/signed-in browser QA at 390 and 1280.
 
 # Phase 7 User Profile And Quick Search
 
-Status: SCOPE ADJUSTED. Detailed planning has not started.
+Status: NEXT. Implementation has not started.
 
 - [x] Keep profile header, Review tab, latest favorites, anime stats, and viewer-allowed profile activity in Phase 7.
 - [x] Assign locked desktop-only Quick Search implementation to Phase 7.

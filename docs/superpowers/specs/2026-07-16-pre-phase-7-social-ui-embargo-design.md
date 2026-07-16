@@ -1,6 +1,6 @@
 # Pre-Phase 7 Social UI Embargo Design
 
-Status: DESIGN APPROVED. Written spec reviewed and approved. Detailed implementation plan is awaiting review.
+Status: IMPLEMENTED AND VALIDATED. The approved embargo is active; Phase 7 is next and unstarted.
 
 ## Goal
 
@@ -248,7 +248,7 @@ No ADR. No separate data-flow document.
 - No data migration.
 - No production dependency.
 - No visual redesign or generated asset.
-- No deployment.
+- No production deployment.
 
 ## Acceptance
 
@@ -262,4 +262,4 @@ No ADR. No separate data-flow document.
 
 ## Planning Boundary
 
-Written-spec review is complete. Source implementation remains unauthorized until the detailed plan is approved.
+The embargo implementation and validation are complete. Phase 7 User Profile and desktop Quick Search are next and unstarted; Phase 9 retains social UI activation.

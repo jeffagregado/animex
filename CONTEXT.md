@@ -2,6 +2,14 @@
 
 AnimeX is an anime community context centered on tracking anime and sharing user activity through a social feed.
 
+## Temporary Social UI Embargo
+
+Through Phase 8, active UI omits Follow, Like, Comment, Following-feed, social-count, and Followers-only choices. Home exposes Home and Global; Review discovery exposes All, Public, and My Private. Stale Following-feed and Followers-discovery URLs replace to canonical routes before hidden queries mount.
+
+Backend social contracts, schemas, authorization, and stored Followers visibility remain intact for Phase 9. New Post and Review creation maps a stored Followers account default to Private. Owner edits to legacy Followers Posts and Reviews preserve Followers unless Public or Private is explicitly selected. No migration rewrites stored data.
+
+Phase 7 User Profile and desktop Quick Search are next and unstarted. Mobile Search routes to `/discover`; Phase 9 owns social UI reactivation.
+
 ## Language
 
 **Activity**:

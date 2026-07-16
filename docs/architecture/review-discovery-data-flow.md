@@ -71,11 +71,15 @@ Every Post, Review, Completed, or Rewatched card resolves its source row before 
 - Empty search: indexed newest, highest Rating, or lowest Rating lanes.
 - Search: one Convex search index over `searchText`; equality filters cover state, visibility, owner, and Rating band.
 - Public viewers read only Public Reviews.
-- Signed-in visibility lanes are My Followers, My Private, then Public. Non-public lanes are owner-bound.
+- Active signed-in client choices are All, Public, and My Private. Signed-out discovery is Public only.
+- All reads the preserved owner-bound Followers and Private lanes plus Public. The backend Followers lane remains available for owner-readable legacy Reviews but has no active client option or label.
+- A stale `visibility=followers` URL is replaced before discovery mounts: signed-in resolves to All and signed-out resolves to Public. No forbidden Followers query runs before replacement.
 - Public-auth state first normalizes the URL. Viewer-scoped lanes wait for Convex authentication and use the resolved profile ID; an auth mismatch fails visibly without issuing a viewer query.
 - Cursors bind version, viewer, normalized query, sort, Rating band, and visibility. Each lane advances independently. Search relevance scores never merge across lanes.
 - Discovery pages cap at 12 items and hydrate through required author/anime source records. Missing source records fail explicitly.
 - Home Latest Reviews reads at most five indexed Public, published Reviews. Rows keep loaded content across retry errors, omit Rating, render compact spoiler-safe Summary and cover failure, and expose one full-row Review Detail target.
+
+Legacy Followers Review writes preserve the stored visibility during unrelated owner edits. Public or Private is written only after explicit owner selection. New Reviews map a Followers account default to Private. Schema, stored Followers values, and authorization remain unchanged; no migration is involved.
 
 ## List Progress
 
