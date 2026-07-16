@@ -35,7 +35,7 @@ export const Route = createFileRoute('/_public/home')({
 })
 
 /** Resolves a stale Following route to active Home state. */
-export const resolveHomeSearch = (search: HomeRouteSearch): ResolvedHomeSearch => ({
+const resolveHomeSearch = (search: HomeRouteSearch): ResolvedHomeSearch => ({
   state: {
     feed: search.feed === 'global' ? 'global' : 'home',
     compose: search.compose === true,
