@@ -21,27 +21,30 @@ interface MyRouterContext {
 
 const SHOW_TANSTACK_DEVTOOLS = false
 
+/** Returns shared document metadata and global assets. */
+export const getRootHead = () => ({
+  meta: [
+    { charSet: 'utf-8' },
+    { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+    { title: 'AnimeX' },
+    { name: 'theme-color', content: '#071522' },
+  ],
+  links: [
+    { rel: 'stylesheet', href: appCss },
+    { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+    {
+      rel: 'icon',
+      href: '/favicon.ico',
+      sizes: '16x16 32x32 48x48 64x64',
+      type: 'image/x-icon',
+    },
+    { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' },
+    { rel: 'manifest', href: '/manifest.json' },
+  ],
+})
+
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-  head: () => ({
-    meta: [
-      {
-        charSet: 'utf-8',
-      },
-      {
-        name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
-      },
-      {
-        title: 'AnimeX',
-      },
-    ],
-    links: [
-      {
-        rel: 'stylesheet',
-        href: appCss,
-      },
-    ],
-  }),
+  head: getRootHead,
   shellComponent: RootDocument,
 })
 
