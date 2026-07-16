@@ -1289,7 +1289,7 @@ git add -- TODO.md PLAN.md CONTEXT.md docs/superpowers/specs/2026-07-16-phase-7-
 git commit -m "docs: close pre-phase 7 social ui embargo"
 ```
 
-- [ ] **Step 9: Final post-commit evidence**
+- [x] **Step 9: Final post-commit evidence**
 
 ```powershell
 git status --short
