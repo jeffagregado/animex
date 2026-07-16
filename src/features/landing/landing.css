@@ -14,7 +14,8 @@
     position: relative;
     isolation: isolate;
     display: grid;
-    min-height: calc(100dvh - 4rem);
+    min-height: calc(100dvh - 4rem - 1px);
+    overflow: clip;
     place-items: center;
     padding: clamp(3.5rem, 9vh, 7rem) 1rem;
   }

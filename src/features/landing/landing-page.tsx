@@ -7,7 +7,7 @@ import { SiteHeader } from '../shell/site-header'
 export function LandingPage() {
   return (
     <PublicAuthStateProvider>
-      <div className="landing-page min-h-dvh bg-background text-foreground">
+      <div className="landing-page min-h-dvh text-foreground">
         <SiteHeader navItems={mainNavigationItems} showAuthAction={true} />
         <main className="landing-hero">
           <div className="landing-signal" aria-hidden="true">
