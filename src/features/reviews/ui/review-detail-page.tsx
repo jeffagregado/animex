@@ -61,11 +61,10 @@ function AuthorHeader({ review }: { review: ReviewDetail }) {
 function Summary({ review }: { review: ReviewDetail }) { return <div><p className="text-xs font-bold uppercase tracking-wider text-cyan-300">Summary</p><ReviewSummary summary={review.summary} variant="detail" /></div> }
 
 function OwnerActions({ review }: { review: ReviewDetail }) {
-  const [confirm, setConfirm] = useState<'activity' | 'delete' | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [pending, setPending] = useState(false)
   const visibilityTriggerRef = useRef<HTMLButtonElement>(null)
   const setVisibility = useMutation(api.reviews.setVisibility)
-  const removeActivity = useMutation(api.reviews.removeActivity)
   const remove = useMutation(api.reviews.remove)
   const navigate = useNavigate()
   const changeVisibility = async (visibility: ActiveVisibility): Promise<void> => {
@@ -80,24 +79,17 @@ function OwnerActions({ review }: { review: ReviewDetail }) {
       requestAnimationFrame(() => visibilityTriggerRef.current?.focus())
     }
   }
-  const confirmed = async (): Promise<void> => {
-    if (!confirm) return
+  const deleteReview = async (): Promise<void> => {
     setPending(true)
     try {
-      if (confirm === 'activity') {
-        await removeActivity({ reviewId: review.id as Id<'reviews'> })
-        toast.success('Review activity removed from feed.')
-        setConfirm(null)
-      } else {
-        await remove({ reviewId: review.id as Id<'reviews'> })
-        toast.success('Review deleted.')
-        await navigate({
-          to: '/anime/$anilistId/$slug',
-          params: { anilistId: String(review.anime.anilistId), slug: review.anime.slug },
-          search: { tab: 'reviews' },
-          replace: true,
-        })
-      }
+      await remove({ reviewId: review.id as Id<'reviews'> })
+      toast.success('Review deleted.')
+      await navigate({
+        to: '/anime/$anilistId/$slug',
+        params: { anilistId: String(review.anime.anilistId), slug: review.anime.slug },
+        search: { tab: 'reviews' },
+        replace: true,
+      })
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Review action failed.')
     } finally {
@@ -108,7 +100,7 @@ function OwnerActions({ review }: { review: ReviewDetail }) {
   return (
     <section aria-label="Owner actions" className="border-t border-border pt-5">
       <p className="text-xs font-bold uppercase tracking-wider text-cyan-300">Owner actions</p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <a className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-cyan-400/60 text-cyan-300" href={`/reviews/${review.id}/edit`}><EditIcon className="size-4" />Edit review</a>
         <Select disabled={pending} onValueChange={(value) => { if (value) void changeVisibility(value as ActiveVisibility) }} value={selectedVisibility}>
           <SelectTrigger aria-label="Change visibility" className="min-h-11" ref={visibilityTriggerRef}>
@@ -117,16 +109,15 @@ function OwnerActions({ review }: { review: ReviewDetail }) {
           </SelectTrigger>
           <SelectContent>{activeVisibilityOptions.map((value) => <SelectItem key={value} value={value}>{getActiveVisibilityLabel(value)}</SelectItem>)}</SelectContent>
         </Select>
-        <button className="min-h-11 rounded-lg border border-border font-bold" disabled={pending} onClick={() => setConfirm('activity')} type="button">Remove feed activity</button>
-        <button className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-500 text-red-300" disabled={pending} onClick={() => setConfirm('delete')} type="button"><Trash2Icon className="size-4" />Delete review</button>
+        <button className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-500 text-red-300" disabled={pending} onClick={() => setConfirmDelete(true)} type="button"><Trash2Icon className="size-4" />Delete review</button>
       </div>
-      <Dialog onOpenChange={(open) => { if (!open) setConfirm(null) }} open={confirm !== null}>
-        {confirm ? (
-          <DialogContent title={confirm === 'delete' ? 'Delete Review?' : 'Remove feed activity?'}>
-            <p className="mt-4 text-muted-foreground">{confirm === 'delete' ? 'This permanently deletes the Review.' : 'The Review stays on Anime Reviews and Review Detail.'}</p>
+      <Dialog onOpenChange={(open) => { if (!open) setConfirmDelete(false) }} open={confirmDelete}>
+        {confirmDelete ? (
+          <DialogContent title="Delete Review?">
+            <p className="mt-4 text-muted-foreground">This permanently deletes the Review.</p>
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <button className="min-h-11 rounded-lg border border-border" onClick={() => setConfirm(null)} type="button">Cancel</button>
-              <button className="min-h-11 rounded-lg bg-red-500 font-black text-white" disabled={pending} onClick={() => void confirmed()} type="button">Confirm</button>
+              <button className="min-h-11 rounded-lg border border-border" onClick={() => setConfirmDelete(false)} type="button">Cancel</button>
+              <button className="min-h-11 rounded-lg bg-red-500 font-black text-white" disabled={pending} onClick={() => void deleteReview()} type="button">Confirm</button>
             </div>
           </DialogContent>
         ) : null}

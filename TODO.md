@@ -863,6 +863,7 @@ Status: COMPLETE. Active social interaction UI and Followers-only choices are ab
 - [x] Preserve backend schemas, stored Followers values, authorization, and Phase 9 contracts without migration.
 - [x] Remove social controls, counts, labels, placeholders, and temporary restore functions.
 - [x] Complete automated gates, review, Convex dev redeploy, and signed-out/signed-in browser QA at 390 and 1280.
+- [x] Keep `Remove feed activity` available only from Home feed owner actions, not Review Detail.
 
 # Phase 7 User Profile And Quick Search
 

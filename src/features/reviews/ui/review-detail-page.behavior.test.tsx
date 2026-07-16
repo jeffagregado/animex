@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ReviewDetailContent } from './review-detail-page'
 
-const mocks = vi.hoisted(() => ({ query: vi.fn(), mutation: vi.fn(), auth: vi.fn(), publicAuth: vi.fn(), navigate: vi.fn(), success: vi.fn(), error: vi.fn(), visibility: vi.fn(), activity: vi.fn(), remove: vi.fn() }))
+const mocks = vi.hoisted(() => ({ query: vi.fn(), mutation: vi.fn(), auth: vi.fn(), publicAuth: vi.fn(), navigate: vi.fn(), success: vi.fn(), error: vi.fn(), visibility: vi.fn(), remove: vi.fn() }))
 
 vi.mock('convex/react', () => ({ useQuery: mocks.query, useMutation: mocks.mutation, useConvexAuth: mocks.auth }))
 vi.mock('#/features/shell/public-auth-context', () => ({ usePublicAuthState: mocks.publicAuth }))
@@ -27,9 +27,9 @@ beforeEach(() => {
   mocks.auth.mockReturnValue({ isAuthenticated: true })
   mocks.publicAuth.mockReturnValue({ status: 'ready', authState: { status: 'complete', email: 'fan@example.com', profile: { id: 'author-1', username: 'fan', name: 'Fan', avatarUrl: null, visibility: 'public' } } })
   let mutationCall = 0
-  const mutations = [mocks.visibility, mocks.activity, mocks.remove]
+  const mutations = [mocks.visibility, mocks.remove]
   mocks.mutation.mockImplementation(() => mutations[mutationCall++ % mutations.length])
-  mocks.visibility.mockResolvedValue(undefined); mocks.activity.mockResolvedValue(undefined); mocks.remove.mockResolvedValue(undefined)
+  mocks.visibility.mockResolvedValue(undefined); mocks.remove.mockResolvedValue(undefined)
   mocks.query.mockImplementation((_query, args: { reviewId?: string }) => args.reviewId ? detail : morePage)
 })
 
@@ -39,6 +39,7 @@ describe('ReviewDetailContent behavior', () => {
   it('renders owner actions and API-backed other reviews while excluding current', () => {
     render(<ReviewDetailContent reviewId="current" />)
     expect(screen.getByRole('region', { name: 'Owner actions' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Remove feed activity' })).toBeNull()
     expect(screen.getByText('Review body')).toBeTruthy()
     expect(screen.getByRole('link', { name: /User other/ }).getAttribute('href')).toBe('/reviews/other')
     expect(screen.queryByRole('link', { name: /User current/ })).toBeNull()
@@ -56,13 +57,10 @@ describe('ReviewDetailContent behavior', () => {
     expect(screen.getByText('Review not found')).toBeTruthy()
   })
 
-  it('runs owner visibility, activity, and delete mutations with effects', async () => {
+  it('runs owner visibility and delete mutations with effects', async () => {
     render(<ReviewDetailContent reviewId="current" />)
     fireEvent.change(screen.getByLabelText('Change visibility'), { target: { value: 'private' } })
     await waitFor(() => expect(mocks.visibility).toHaveBeenCalledWith({ reviewId: 'current', visibility: 'private' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove feed activity' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
-    await waitFor(() => expect(mocks.activity).toHaveBeenCalledWith({ reviewId: 'current' }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete review' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith({ reviewId: 'current' }))
