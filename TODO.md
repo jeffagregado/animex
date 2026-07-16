@@ -852,14 +852,16 @@ Status: COMPLETE. Quiet Signal landing, AnimeX favicon set, automated gates, rev
 
 # Pre-Phase 7 Social UI Embargo
 
-Status: SCOPE LOCKED. Detailed cleanup planning happens later; no source implementation has started.
+Status: DESIGN APPROVED. Written spec review pending; implementation planning and source work have not started.
 
 - [x] Move Follow, Like, Comment, Comment Reply, Following-feed behavior, and Followers-only UI activation to final Phase 9.
 - [x] Require social interaction UI to be absent from the DOM before Phase 7; no CSS hiding or disabled `Coming later` placeholders.
 - [x] Require direct Following-feed selection to normalize to Home until Phase 9.
 - [x] Hide Followers-only choices from creation, owner-action, discovery-filter, and privacy-setting UI while preserving backend contracts and stored values.
 - [x] Allow owners of existing Followers-only content to change visibility to Public or Private during the embargo.
-- [ ] Inspect and lock the complete UI, route, query, visibility, test, and browser-QA cleanup surface.
+- [x] Inspect and lock the complete UI, route, query, visibility, test, and browser-QA cleanup surface.
+- [x] Write and self-review `docs/superpowers/specs/2026-07-16-pre-phase-7-social-ui-embargo-design.md`.
+- [ ] Review and approve the committed written design spec.
 - [ ] Write, review, and approve the detailed pre-Phase 7 cleanup implementation plan.
 - [ ] Implement and validate the approved cleanup plan.
 
