@@ -48,7 +48,7 @@
   .landing-signal {
     position: absolute;
     display: none;
-    width: min(72vw, 50rem);
+    width: min(72vw, 50rem, calc(100dvh - 4rem - 1px));
     aspect-ratio: 1;
     place-items: center;
     pointer-events: none;
@@ -178,6 +178,12 @@
   .landing-hero__action:focus-visible {
     outline: 3px solid var(--foreground);
     outline-offset: 4px;
+  }
+
+  @media (max-width: 430px) {
+    .landing-hero {
+      min-height: calc(100dvh - 4.4rem - 1px);
+    }
   }
 
   @media (min-width: 48rem) {
