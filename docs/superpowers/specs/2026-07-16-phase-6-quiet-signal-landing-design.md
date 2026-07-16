@@ -35,7 +35,7 @@ Use Approach 1: a dedicated landing composition for the root route.
 - Full-height midnight navy field beneath the existing header.
 - Faint geometric grid supplies depth without becoming content.
 - At `768px` and wider, the centered brand signal uses live CSS rings, restrained cyan-to-coral glow, and an oversized outlined `AX` monogram.
-- The text stack sits above the signal: eyebrow, headline, supporting copy, then the single cyan action.
+- The text stack overlays the signal: headline, supporting copy, then the single cyan action.
 - The PNG reference guides composition and mood only. The production artwork is CSS and text, not an embedded raster image.
 - Use existing application tokens where they fit. Add landing-local values only for the signal artwork and ambient effects.
 

@@ -131,7 +131,7 @@ Status: COMPLETE and integrated on `dev`; closure details and latest validation 
 
 ### Phase 6: Quiet Signal Landing
 
-Status: DESIGN LOCKED. Clarifying questions and implementation planning are deferred to a later session.
+Status: DESIGN APPROVED. IMPLEMENTATION PLAN READY FOR REVIEW.
 
 - Replace the `/` redirect with the public Quiet Signal landing page.
 - Reuse the existing `/home` site header and auth-aware header controls.
@@ -139,7 +139,11 @@ Status: DESIGN LOCKED. Clarifying questions and implementation planning are defe
 - Use the approved desktop reference at `docs/visual/landing/quiet-signal-landing-desktop.png`.
 - Lock hero copy to `Find anime worth remembering.` and `Build your list. Share what stays with you.`
 - Link the single `Discover anime` action to `/discover`.
-- Keep implementation, responsive translation, motion, testing, and validation decisions for the later approved plan.
+- Use a dedicated landing composition without `PublicShell` or mobile bottom navigation.
+- Hide rings and oversized `AX` below `768px`; use CSS artwork at `768px` and wider.
+- Use native CSS ambient motion with static reduced-motion behavior.
+- Replace TanStack starter favicons with assets derived from the existing AnimeX circular mark.
+- Follow `docs/superpowers/plans/2026-07-16-phase-6-quiet-signal-landing.md` after user approval.
 - Stop after validation and wait for approval.
 
 ### Phase 7: Profile And Social

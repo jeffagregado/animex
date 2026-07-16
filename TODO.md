@@ -841,11 +841,13 @@ Post-merge validation: 91 test files passed / 2 skipped; 637 tests passed / 3 sk
 
 # Phase 6 Quiet Signal Landing
 
-Status: DESIGN LOCKED. Clarifying questions and implementation planning deferred to a later session.
+Status: DESIGN APPROVED. IMPLEMENTATION PLAN READY FOR REVIEW. No app code has started.
 
 - [x] Select Quiet Signal as approved landing-page direction.
 - [x] Save approved desktop reference under `docs/visual/landing`.
 - [x] Insert landing work as Phase 6; move Profile And Social to Phase 7 and Notifications, Privacy, Moderation to Phase 8.
-- [x] Record locked root, shared-header, hero-copy, and Discover-action decisions.
-- [ ] Ask deferred clarifying questions and write detailed implementation plan in a later session.
+- [x] Lock root, shared-header, hero-copy, responsive, motion, accessibility, and Discover-action decisions.
+- [x] Approve Approach 1 dedicated landing composition and AnimeX-derived favicon set.
+- [x] Write and self-review detailed implementation plan.
+- [ ] User reviews and approves implementation plan.
 - [ ] Implement only after plan approval.
