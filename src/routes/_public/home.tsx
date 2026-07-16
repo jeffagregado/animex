@@ -55,10 +55,7 @@ function useResolvedHomeSearch() {
 
   useEffect(() => {
     if (!resolution.replace) return
-    const timer = setTimeout(() => {
-      void navigate({ search: serializeHomeSearch(resolution.state), replace: true })
-    }, 0)
-    return () => clearTimeout(timer)
+    void navigate({ search: serializeHomeSearch(resolution.state), replace: true })
   }, [navigate, resolution.replace, resolution.state.compose, resolution.state.feed])
 
   return {

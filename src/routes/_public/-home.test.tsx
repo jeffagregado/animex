@@ -18,7 +18,18 @@ import { Route } from './home'
 
 const convex = vi.hoisted(() => {
   const query = vi.fn(async (..._args: unknown[]) => ({ items: [], cursor: null, hasMore: false }))
-  return { authenticated: false, query, client: { query } }
+  const state = {
+    authenticated: false,
+    query,
+    querySearches: [] as string[],
+    getSearch: (): string => '',
+    client: { query: (..._args: unknown[]) => Promise.resolve({ items: [], cursor: null, hasMore: false }) },
+  }
+  state.client.query = (...args: unknown[]) => {
+    state.querySearches.push(state.getSearch())
+    return query(...args)
+  }
+  return state
 })
 vi.mock('convex/react', () => ({
   useConvexAuth: () => ({ isAuthenticated: convex.authenticated, isLoading: false }),
@@ -32,6 +43,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
   convex.authenticated = false
   convex.query.mockClear()
+  convex.querySearches.length = 0
+  convex.getSearch = () => ''
 })
 
 describe('Home route', () => {
@@ -96,17 +109,15 @@ describe('Home route', () => {
       pendingComponent,
       pendingMs: 0,
     })
-    const history = createMemoryHistory({ initialEntries: ['/home?feed=following'] })
+    const history = createMemoryHistory({ initialEntries: ['/home?feed=following&compose=true'] })
+    convex.getSearch = () => history.location.search
     const router = createRouter({ routeTree: rootRoute.addChildren([publicRoute.addChildren([homeRoute])]), history })
 
     render(<RouterProvider router={router} />)
 
     expect(await screen.findByLabelText('Normalizing Home feed')).toBeTruthy()
-    expect(convex.query).not.toHaveBeenCalled()
-    await waitFor(() => expect(history.location.search).toBe(''))
+    await waitFor(() => expect(history.location.search).toBe('?compose=true'))
     expect(await screen.findByLabelText('Seasonal Anime loading')).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'home' }).getAttribute('aria-selected')).toBe('true')
-    expect(screen.queryByRole('tab', { name: 'following' })).toBeNull()
     const feedCalls = convex.query.mock.calls.flatMap((call) => {
       const reference = call[0]
       if (reference === undefined) return []
@@ -117,9 +128,13 @@ describe('Home route', () => {
       feedCalls[0],
     ).toBe('feed:listHome')
     expect(feedCalls).not.toContain('feed:listFollowing')
+    expect(convex.querySearches.every((search) => !search.includes('feed=following'))).toBe(true)
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Close Post composer' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(screen.getAllByRole('navigation', { name: 'Primary' })).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: 'Create Post' }))
-    await waitFor(() => expect(history.location.search).toContain('compose=true'))
+    expect(screen.getByRole('tab', { name: 'home' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.queryByRole('tab', { name: 'following' })).toBeNull()
     expect(history.location.search).not.toContain('feed=following')
   })
 })
