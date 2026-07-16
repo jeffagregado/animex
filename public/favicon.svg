@@ -10,8 +10,10 @@
       <stop offset="1" stop-color="#ff7670" />
     </linearGradient>
   </defs>
-  <rect width="160" height="160" rx="28" fill="#071522" />
-  <circle cx="80" cy="80" r="63" fill="none" stroke="#22e6f0" stroke-width="7" />
-  <path fill="url(#cyan-fill)" d="M30 118 68 36l44 83-29-25-21 37 4-38-35 25Z" />
-  <path fill="url(#coral-fill)" d="M72 128 108 75 91 54l39-16-28 38 35 47h-27L88 95l-16 33Z" />
+  <rect width="160" height="160" fill="#071522" />
+  <g transform="translate(16 16) scale(0.8)">
+    <circle cx="80" cy="80" r="63" fill="none" stroke="#22e6f0" stroke-width="7" />
+    <path fill="url(#cyan-fill)" d="M30 118 68 36l44 83-29-25-21 37 4-38-35 25Z" />
+    <path fill="url(#coral-fill)" d="M72 128 108 75 91 54l39-16-28 38 35 47h-27L88 95l-16 33Z" />
+  </g>
 </svg>
