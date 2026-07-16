@@ -1,6 +1,6 @@
 # Pre-Phase 7 Social UI Embargo Design
 
-Status: DESIGN APPROVED. Written-spec review pending. Implementation planning not started.
+Status: DESIGN APPROVED. Written spec reviewed and approved. Detailed implementation plan is awaiting review.
 
 ## Goal
 
@@ -262,4 +262,4 @@ No ADR. No separate data-flow document.
 
 ## Planning Boundary
 
-This design authorizes implementation planning only after written-spec review. It does not authorize source implementation.
+Written-spec review is complete. Source implementation remains unauthorized until the detailed plan is approved.
