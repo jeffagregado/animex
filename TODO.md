@@ -852,7 +852,7 @@ Status: COMPLETE. Quiet Signal landing, AnimeX favicon set, automated gates, rev
 
 # Pre-Phase 7 Social UI Embargo
 
-Status: IMPLEMENTATION PLAN REVIEWED. User approval pending; source work has not started.
+Status: IMPLEMENTATION IN PROGRESS. Isolated worktree baseline passes; shared visibility contract is next.
 
 - [x] Move Follow, Like, Comment, Comment Reply, Following-feed behavior, and Followers-only UI activation to final Phase 9.
 - [x] Require social interaction UI to be absent from the DOM before Phase 7; no CSS hiding or disabled `Coming later` placeholders.
@@ -863,7 +863,7 @@ Status: IMPLEMENTATION PLAN REVIEWED. User approval pending; source work has not
 - [x] Write and self-review `docs/superpowers/specs/2026-07-16-pre-phase-7-social-ui-embargo-design.md`.
 - [x] Review and approve the committed written design spec.
 - [x] Write and self-review `docs/superpowers/plans/2026-07-16-pre-phase-7-social-ui-embargo.md`.
-- [ ] Review and approve the detailed pre-Phase 7 cleanup implementation plan.
+- [x] Review and approve the detailed pre-Phase 7 cleanup implementation plan.
 - [ ] Implement and validate the approved cleanup plan.
 
 # Phase 7 User Profile And Quick Search
