@@ -225,8 +225,9 @@ describe('HomePage', () => {
     expect(screen.queryByText('What are you watching?')).toBeNull()
     expect(screen.getByRole('button', { name: 'Create Post' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'List Progress' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'following' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'home' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'global' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: 'following' })).toBeNull()
   })
 
   it('keeps pending users signed in but hides private actions', async () => {

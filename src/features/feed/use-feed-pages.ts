@@ -5,7 +5,7 @@ import { api } from '../../../convex/_generated/api'
 import { feedPageSchema, type FeedCard } from '../social/shared/social-contracts'
 import { appendFeedPage, createFeedState } from './feed-state'
 
-export type FeedView = 'home' | 'following' | 'global'
+export type FeedView = 'home' | 'global'
 
 interface ScopedFeedState {
   scope: string
@@ -17,7 +17,8 @@ interface ScopedFeedState {
 }
 
 const emptyScope = (scope: string): ScopedFeedState => ({ scope, ...createFeedState(), loading: true, error: null })
-const feedQuery = (view: FeedView) => view === 'home' ? api.feed.listHome : view === 'following' ? api.feed.listFollowing : api.feed.listGlobal
+const feedQuery = (view: FeedView) =>
+  view === 'home' ? api.feed.listHome : api.feed.listGlobal
 
 /** Loads explicit cursor pages with auth/view race isolation. */
 export function useFeedPages(view: FeedView, authKey: string) {

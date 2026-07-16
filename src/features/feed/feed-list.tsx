@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 
 import type { FeedCard as FeedCardData } from '../social/shared/social-contracts'
 import { FeedCard } from './feed-card'
+import type { FeedView } from './use-feed-pages'
 
 interface FeedListProps {
   cards: FeedCardData[]
@@ -10,12 +11,11 @@ interface FeedListProps {
   initialLoading: boolean
   loadingMore: boolean
   ownerId: string | null
-  signedIn: boolean
   loadMore: () => void
   onChanged: () => void
   onEdit: (card: Extract<FeedCardData, { kind: 'post' }>) => void
   retry: () => void
-  view: 'home' | 'following' | 'global'
+  view: FeedView
 }
 
 /** Renders truthful feed loading, empty, error, paging, and terminal states. */
@@ -24,9 +24,9 @@ export function FeedList(props: FeedListProps) {
 
   if (props.initialLoading) return <section aria-busy="true" aria-label="Loading feed" className="space-y-3">{[1, 2, 3].map((item) => <div className="h-48 animate-pulse rounded-lg border border-white/8 bg-card/40" key={item} />)}</section>
   if (props.error && props.cards.length === 0) return <FeedState title="Feed unavailable" message={props.error} action="Retry" onAction={props.retry} />
-  if (props.cards.length === 0) return <FeedState title={props.view === 'following' ? 'Following feed is coming in Phase 6' : 'No activity yet'} message={props.view === 'following' ? 'Follow connections are not active yet. Try Home or Global.' : 'Nothing visible in this feed yet.'} />
+  if (props.cards.length === 0) return <FeedState title="No activity yet" message="Nothing visible in this feed yet." />
 
-  return <section aria-label={`${props.view} feed`} className="space-y-3">{props.cards.map((card) => <FeedCard card={card} key={card.id} onChanged={props.onChanged} onEdit={props.onEdit} owner={props.ownerId === card.author.id} signedIn={props.signedIn} />)}{props.error ? <FeedState title="Could not load more" message={props.error} action="Retry" onAction={props.retry} /> : null}<FeedPagination error={props.error} hasMore={props.hasMore} loadMore={props.loadMore} loadingMore={props.loadingMore} observerAvailable={pagination.observerAvailable} sentinelRef={pagination.sentinelRef} /></section>
+  return <section aria-label={`${props.view} feed`} className="space-y-3">{props.cards.map((card) => <FeedCard card={card} key={card.id} onChanged={props.onChanged} onEdit={props.onEdit} owner={props.ownerId === card.author.id} />)}{props.error ? <FeedState title="Could not load more" message={props.error} action="Retry" onAction={props.retry} /> : null}<FeedPagination error={props.error} hasMore={props.hasMore} loadMore={props.loadMore} loadingMore={props.loadingMore} observerAvailable={pagination.observerAvailable} sentinelRef={pagination.sentinelRef} /></section>
 }
 
 function useFeedPagination(props: FeedListProps): { observerAvailable: boolean | null; sentinelRef: RefObject<HTMLDivElement | null> } {

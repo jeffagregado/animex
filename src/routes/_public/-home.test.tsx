@@ -9,6 +9,7 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router'
+import { getFunctionName } from 'convex/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PublicAuthStateProvider } from '#/features/shell/public-auth-context'
@@ -16,7 +17,7 @@ import { PublicShell } from '#/features/shell/public-shell'
 import { Route } from './home'
 
 const convex = vi.hoisted(() => {
-  const query = vi.fn(async () => ({ items: [], cursor: null, hasMore: false }))
+  const query = vi.fn(async (..._args: unknown[]) => ({ items: [], cursor: null, hasMore: false }))
   return { authenticated: false, query, client: { query } }
 })
 vi.mock('convex/react', () => ({
@@ -72,7 +73,7 @@ describe('Home route', () => {
     expect(await screen.findByText('Loaded Home')).toBeTruthy()
   })
 
-  it('preserves signed-in feed and composer URL controls while pending', async () => {
+  it('canonicalizes stale Following search before loading the signed-in Home feed', async () => {
     convex.authenticated = true
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ status: 'complete', email: 'mika@example.com', profile: { id: 'profile-1', username: 'mika', name: 'Mika', avatarUrl: null, visibility: 'private' } }) }) as Response))
     vi.stubGlobal('scrollTo', vi.fn())
@@ -100,11 +101,25 @@ describe('Home route', () => {
 
     render(<RouterProvider router={router} />)
 
+    expect(await screen.findByLabelText('Normalizing Home feed')).toBeTruthy()
+    expect(convex.query).not.toHaveBeenCalled()
+    await waitFor(() => expect(history.location.search).toBe(''))
     expect(await screen.findByLabelText('Seasonal Anime loading')).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'following' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: 'home' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.queryByRole('tab', { name: 'following' })).toBeNull()
+    const feedCalls = convex.query.mock.calls.flatMap((call) => {
+      const reference = call[0]
+      if (reference === undefined) return []
+      const name = getFunctionName(reference as Parameters<typeof getFunctionName>[0])
+      return name.startsWith('feed:') ? [name] : []
+    })
+    expect(
+      feedCalls[0],
+    ).toBe('feed:listHome')
+    expect(feedCalls).not.toContain('feed:listFollowing')
     expect(screen.getAllByRole('navigation', { name: 'Primary' })).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Create Post' }))
     await waitFor(() => expect(history.location.search).toContain('compose=true'))
-    expect(history.location.search).toContain('feed=following')
+    expect(history.location.search).not.toContain('feed=following')
   })
 })

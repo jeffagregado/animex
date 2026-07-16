@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from 'react'
-import { HeartIcon, MessageCircleIcon } from 'lucide-react'
 
 import { UserAvatar } from '#/components/user-avatar'
 import type { FeedCard as FeedCardData } from '../social/shared/social-contracts'
@@ -12,7 +11,6 @@ import { PostMediaCard } from './post-media-card'
 interface FeedCardProps {
   card: FeedCardData
   owner: boolean
-  signedIn: boolean
   onEdit: (card: Extract<FeedCardData, { kind: 'post' }>) => void
   onChanged: () => void
 }
@@ -39,7 +37,7 @@ const activityText = (card: FeedCardData): string => {
 }
 
 /** Renders one strict discriminated feed card. */
-export function FeedCard({ card, owner, signedIn, onEdit, onChanged }: FeedCardProps) {
+export function FeedCard({ card, owner, onEdit, onChanged }: FeedCardProps) {
   const [revealed, setRevealed] = useState(false)
   const occurredAt = card.kind === 'post' ? card.createdAt : card.kind === 'review' ? card.publishedAt : card.settledAt
   const edited = (card.kind === 'post' || card.kind === 'review') && card.updatedAt > occurredAt
@@ -56,7 +54,6 @@ export function FeedCard({ card, owner, signedIn, onEdit, onChanged }: FeedCardP
         {owner ? <FeedOwnerActions card={card} onChanged={onChanged} onEdit={() => { if (card.kind === 'post') onEdit(card) }} /> : null}
       </header>
       <div className="mt-3">{renderBody(card, revealed, () => setRevealed(true))}</div>
-      {signedIn ? <footer className="mt-3 flex gap-2 border-t border-white/8 pt-2"><button aria-label="Like · Coming in Phase 6" className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-70" disabled title="Coming in Phase 6" type="button"><HeartIcon className="size-4" />Like</button><button aria-label="Comment · Coming in Phase 6" className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-70" disabled title="Coming in Phase 6" type="button"><MessageCircleIcon className="size-4" />Comment</button></footer> : null}
     </article>
   )
 }
