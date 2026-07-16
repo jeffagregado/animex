@@ -87,7 +87,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AuthState } from '#/features/auth/auth-contracts'
 import { LandingPage } from '#/features/landing/landing-page'
-import { Route, getLandingHead } from './index'
+import { getLandingHead } from './-index-head'
+import { Route } from './index'
 
 /** Stubs one successful public auth-state response. */
 const stubAuthState = (authState: AuthState) => {
@@ -246,6 +247,17 @@ Replace `src/routes/index.tsx` with:
 import { createFileRoute } from '@tanstack/react-router'
 
 import { LandingPage } from '#/features/landing/landing-page'
+import { getLandingHead } from './-index-head'
+
+export const Route = createFileRoute('/')({
+  head: getLandingHead,
+  component: LandingPage,
+})
+```
+
+Create `src/routes/-index-head.ts`:
+
+```ts
 
 /** Returns indexable metadata for the public landing page. */
 export const getLandingHead = () => ({
@@ -256,11 +268,6 @@ export const getLandingHead = () => ({
       content: 'Build your list. Share what stays with you.',
     },
   ],
-})
-
-export const Route = createFileRoute('/')({
-  head: getLandingHead,
-  component: LandingPage,
 })
 ```
 
@@ -485,7 +492,7 @@ Create `src/features/landing/landing.css`:
 
   .landing-hero__action {
     display: inline-flex;
-    width: min(100%, 24rem);
+    width: 100%;
     min-height: 3.75rem;
     align-items: center;
     justify-content: center;
@@ -705,10 +712,12 @@ Create `public/favicon.svg`:
       <stop offset="1" stop-color="#ff7670" />
     </linearGradient>
   </defs>
-  <rect width="160" height="160" rx="28" fill="#071522" />
-  <circle cx="80" cy="80" r="63" fill="none" stroke="#22e6f0" stroke-width="7" />
-  <path fill="url(#cyan-fill)" d="M30 118 68 36l44 83-29-25-21 37 4-38-35 25Z" />
-  <path fill="url(#coral-fill)" d="M72 128 108 75 91 54l39-16-28 38 35 47h-27L88 95l-16 33Z" />
+  <rect width="160" height="160" fill="#071522" />
+  <g transform="translate(16 16) scale(0.8)">
+    <circle cx="80" cy="80" r="63" fill="none" stroke="#22e6f0" stroke-width="7" />
+    <path fill="url(#cyan-fill)" d="M30 118 68 36l44 83-29-25-21 37 4-38-35 25Z" />
+    <path fill="url(#coral-fill)" d="M72 128 108 75 91 54l39-16-28 38 35 47h-27L88 95l-16 33Z" />
+  </g>
 </svg>
 ```
 
