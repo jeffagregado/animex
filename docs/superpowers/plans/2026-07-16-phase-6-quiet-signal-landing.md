@@ -1,6 +1,6 @@
 # Phase 6 Quiet Signal Landing Implementation Plan
 
-Status: APPROVED. Implementation is in progress on `jeff-cx/phase-6-quiet-signal-landing`.
+Status: COMPLETE. Implementation complete and validated on `jeff-cx/phase-6-quiet-signal-landing`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -68,7 +68,7 @@ Mode: controller-led, sequential. Task 1 locks route/component structure. Task 2
 - Produces: named `LandingPage`; named `getLandingHead`; root `Route` with no `beforeLoad` redirect.
 - Preserves: shared `PublicShell` and all `_public` routes.
 
-- [ ] **Step 1: Write failing route integration test**
+- [x] **Step 1: Write failing route integration test**
 
 Create `src/routes/-index.test.tsx`:
 
@@ -187,7 +187,7 @@ describe('Root landing route', () => {
 })
 ```
 
-- [ ] **Step 2: Run test and verify red state**
+- [x] **Step 2: Run test and verify red state**
 
 Run:
 
@@ -197,7 +197,7 @@ pnpm exec vitest run src/routes/-index.test.tsx
 
 Expected: FAIL because `LandingPage` and `getLandingHead` do not exist and `/` still owns a redirect.
 
-- [ ] **Step 3: Create dedicated landing composition**
+- [x] **Step 3: Create dedicated landing composition**
 
 Create `src/features/landing/landing-page.tsx`:
 
@@ -238,7 +238,7 @@ export function LandingPage() {
 }
 ```
 
-- [ ] **Step 4: Replace redirect with route metadata and component**
+- [x] **Step 4: Replace redirect with route metadata and component**
 
 Replace `src/routes/index.tsx` with:
 
@@ -284,7 +284,7 @@ export const usePublicAuthState = (): ClientAuthState => {
 }
 ```
 
-- [ ] **Step 5: Run focused checks and verify green state**
+- [x] **Step 5: Run focused checks and verify green state**
 
 Run:
 
@@ -295,7 +295,7 @@ pnpm exec tsc --noEmit
 
 Expected: both files PASS; TypeScript exits `0`; root route has no redirect; existing shell behavior remains green.
 
-- [ ] **Step 6: Commit route contract**
+- [x] **Step 6: Commit route contract**
 
 ```powershell
 git add -- src/features/landing/landing-page.tsx src/routes/index.tsx src/routes/-index.test.tsx src/features/shell/public-auth-context.tsx
@@ -318,7 +318,7 @@ git commit -m "feat: add Quiet Signal landing route"
 - Produces: desktop CSS signal, mobile content-only layout, reduced-motion contract.
 - Skips: new images, font packages, `motion`, shared-shell styling changes.
 
-- [ ] **Step 1: Add landing-local stylesheet import**
+- [x] **Step 1: Add landing-local stylesheet import**
 
 Add after auth CSS in `src/styles.css`:
 
@@ -326,7 +326,7 @@ Add after auth CSS in `src/styles.css`:
 @import './features/landing/landing.css';
 ```
 
-- [ ] **Step 2: Implement exact landing styles**
+- [x] **Step 2: Implement exact landing styles**
 
 Create `src/features/landing/landing.css`:
 
@@ -556,7 +556,7 @@ Create `src/features/landing/landing.css`:
 }
 ```
 
-- [ ] **Step 3: Run focused automated checks**
+- [x] **Step 3: Run focused automated checks**
 
 Run:
 
@@ -568,7 +568,7 @@ git diff --check
 
 Expected: test and TypeScript PASS; diff check emits no errors.
 
-- [ ] **Step 4: Run focused visual smoke**
+- [x] **Step 4: Run focused visual smoke**
 
 Run `pnpm dev`, then use repo-required in-app browser on `http://localhost:3000/`.
 
@@ -578,7 +578,7 @@ Run `pnpm dev`, then use repo-required in-app browser on `http://localhost:3000/
 - Reduced motion: ring and glow computed animations are `none`.
 - Console: no runtime, hydration, or failed-request errors.
 
-- [ ] **Step 5: Commit visual translation**
+- [x] **Step 5: Commit visual translation**
 
 ```powershell
 git add -- src/features/landing/landing.css src/styles.css
@@ -608,7 +608,7 @@ git commit -m "feat: style Quiet Signal landing"
 - Produces: `getRootHead`; shared SVG/ICO/touch/manifest links; branded manifest.
 - Asset source: exact existing AnimeX mark paths; no new icon library result and no image generation.
 
-- [ ] **Step 1: Write failing shared-head and asset test**
+- [x] **Step 1: Write failing shared-head and asset test**
 
 Create `src/routes/-root-head.test.ts`:
 
@@ -678,7 +678,7 @@ describe('Shared AnimeX head', () => {
 })
 ```
 
-- [ ] **Step 2: Run test and verify red state**
+- [x] **Step 2: Run test and verify red state**
 
 Run:
 
@@ -688,7 +688,7 @@ pnpm exec vitest run src/routes/-root-head.test.ts
 
 Expected: FAIL because `getRootHead`, AnimeX manifest values, and new icon files do not exist.
 
-- [ ] **Step 3: Add mark-only vector master**
+- [x] **Step 3: Add mark-only vector master**
 
 Create `public/favicon.svg`:
 
@@ -712,7 +712,7 @@ Create `public/favicon.svg`:
 </svg>
 ```
 
-- [ ] **Step 4: Generate deterministic PNG and ICO derivatives**
+- [x] **Step 4: Generate deterministic PNG and ICO derivatives**
 
 Run from repo root. Installed Edge and FFmpeg are pre-verified; command fails explicitly if either step fails.
 
@@ -751,7 +751,7 @@ try {
 Remove-Item -LiteralPath 'public/logo192.png', 'public/logo512.png'
 ```
 
-- [ ] **Step 5: Replace starter manifest**
+- [x] **Step 5: Replace starter manifest**
 
 Replace `public/manifest.json` with:
 
@@ -780,7 +780,7 @@ Replace `public/manifest.json` with:
 }
 ```
 
-- [ ] **Step 6: Add shared root-head links**
+- [x] **Step 6: Add shared root-head links**
 
 In `src/routes/__root.tsx`, replace inline head object with this named function; preserve `RootDocument` unchanged:
 
@@ -813,7 +813,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 })
 ```
 
-- [ ] **Step 7: Verify tests and binary dimensions**
+- [x] **Step 7: Verify tests and binary dimensions**
 
 Run:
 
@@ -833,7 +833,7 @@ Expected:
 - PNG dimensions: `180x180`, `192x192`, `512x512`.
 - TypeScript exits `0`.
 
-- [ ] **Step 8: Commit favicon and head set**
+- [x] **Step 8: Commit favicon and head set**
 
 ```powershell
 git add -- src/routes/__root.tsx src/routes/-root-head.test.ts public/favicon.svg public/favicon.ico public/apple-touch-icon.png public/icon-192.png public/icon-512.png public/manifest.json public/logo192.png public/logo512.png
@@ -856,7 +856,7 @@ git commit -m "feat: add AnimeX favicon set"
 - Produces: reviewed, validated Phase 6 implementation and current tracker state.
 - Skips: `convex dev --once`; Phase 6 changes no Convex surface.
 
-- [ ] **Step 1: Regenerate routes and inspect generated-file drift**
+- [x] **Step 1: Regenerate routes and inspect generated-file drift**
 
 Run:
 
@@ -867,7 +867,7 @@ git diff -- src/routeTree.gen.ts
 
 Expected: route generation succeeds. Existing `/` route identity is unchanged, so `src/routeTree.gen.ts` should have no semantic diff.
 
-- [ ] **Step 2: Run automated gates**
+- [x] **Step 2: Run automated gates**
 
 Run in order:
 
@@ -891,7 +891,7 @@ Expected:
 - Fallow: valid `audit` JSON, no new error verdict; report inherited warnings separately.
 - Diff check: no whitespace errors.
 
-- [ ] **Step 3: Run final browser QA**
+- [x] **Step 3: Run final browser QA**
 
 Start `pnpm dev`. Use in-app browser on `/`, `/home`, and `/discover`.
 
@@ -907,7 +907,7 @@ Start `pnpm dev`. Use in-app browser on `/`, `/home`, and `/discover`.
 
 For every viewport: keyboard activation works, focus order follows header then CTA, console has no error/warning regression, network has no failed request, and no hydration symptom appears.
 
-- [ ] **Step 4: Run implementation review gates**
+- [x] **Step 4: Run implementation review gates**
 
 Spec review compares concrete diff with `docs/superpowers/specs/2026-07-16-phase-6-quiet-signal-landing-design.md`.
 
@@ -922,7 +922,7 @@ Thermo review is required because root route, shared head, and shared auth-provi
 
 Block closure on P1/P2 findings or missing browser evidence. Fix smallest root cause, rerun affected gates, then rerun reviewer verdict.
 
-- [ ] **Step 5: Close current-state trackers after all gates pass**
+- [x] **Step 5: Close current-state trackers after all gates pass**
 
 Replace Phase 6 section in `TODO.md` with:
 
@@ -956,14 +956,14 @@ Status: COMPLETE. Approved landing and AnimeX favicon set are implemented and va
 - Stop and wait for approval before Phase 7.
 ```
 
-- [ ] **Step 6: Commit closure docs**
+- [x] **Step 6: Commit closure docs**
 
 ```powershell
 git add -- PLAN.md TODO.md
 git commit -m "docs: close phase 6 landing"
 ```
 
-- [ ] **Step 7: Final post-commit evidence**
+- [x] **Step 7: Final post-commit evidence**
 
 Run:
 
