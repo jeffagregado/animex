@@ -50,38 +50,63 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Review discovery route state', () => {
-  it('preserves absent visibility until signed-in auth replaces it with all', async () => {
+  it('queries auth defaults without adding visibility to the URL', async () => {
     mountRoute({}, signedIn)
-    expect(mocks.pages).not.toHaveBeenCalled()
-    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith({ search: { visibility: 'all' }, replace: true, resetScroll: false }))
-  })
-
-  it('replaces absent signed-out and invalid signed-in visibility with public', async () => {
-    mountRoute({}, signedOut)
-    expect(mocks.pages).not.toHaveBeenCalled()
-    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith({ search: { visibility: 'public' }, replace: true, resetScroll: false }))
-    cleanup()
-    mocks.navigate.mockReset()
-    mountRoute({ visibility: 'friends' }, signedIn)
-    expect(mocks.pages).not.toHaveBeenCalled()
-    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith({ search: { visibility: 'public' }, replace: true, resetScroll: false }))
-    cleanup()
-    mocks.navigate.mockReset()
-    mountRoute({ visibility: 'friends' }, signedOut)
-    expect(mocks.pages).not.toHaveBeenCalled()
-    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith({ search: { visibility: 'public' }, replace: true, resetScroll: false }))
-  })
-
-  it('queries resolved explicit values and locks signed-out non-public visibility', async () => {
-    mountRoute({ q: ' frieren ', sort: 'rating-high', rating: '80-89', visibility: 'followers' }, signedIn)
     await waitFor(() => expect(mocks.pages).toHaveBeenCalled())
-    expect(mocks.pages.mock.calls[0]?.[0]).toEqual({ query: 'frieren', sort: 'rating-high', ratingBand: '80-89', visibility: 'followers' })
+    expect(mocks.pages.mock.calls[0]?.[0].visibility).toBe('all')
+    expect(mocks.navigate).not.toHaveBeenCalled()
     cleanup()
     mocks.pages.mockReset()
-    mocks.navigate.mockReset()
-    mountRoute({ visibility: 'private' }, signedOut)
+    mocks.pages.mockReturnValue(pages)
+    mountRoute({}, signedOut)
+    await waitFor(() => expect(mocks.pages).toHaveBeenCalled())
+    expect(mocks.pages.mock.calls[0]?.[0].visibility).toBe('public')
+    expect(mocks.navigate).not.toHaveBeenCalled()
+  })
+
+  it('replaces stale Followers URLs before querying', async () => {
+    const search = {
+      q: ' frieren ',
+      sort: 'rating-high',
+      rating: '80-89',
+      visibility: 'followers',
+    }
+    const replacement = {
+      search: { q: 'frieren', sort: 'rating-high', rating: '80-89' },
+      replace: true,
+      resetScroll: false,
+    }
+    mountRoute(search, signedIn)
     expect(mocks.pages).not.toHaveBeenCalled()
-    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith({ search: { visibility: 'public' }, replace: true, resetScroll: false }))
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith(replacement))
+    cleanup()
+    mocks.pages.mockReset()
+    mocks.pages.mockReturnValue(pages)
+    mocks.navigate.mockReset()
+    mountRoute(search, signedOut)
+    expect(mocks.pages).not.toHaveBeenCalled()
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith(replacement))
+  })
+
+  it.each([
+    { visibility: 'all' },
+    { visibility: 'private' },
+    { visibility: 'friends' },
+  ])('replaces signed-out $visibility visibility with omitted visibility', async (search) => {
+    mountRoute(search, signedOut)
+    expect(mocks.pages).not.toHaveBeenCalled()
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith({
+      search: {},
+      replace: true,
+      resetScroll: false,
+    }))
+  })
+
+  it.each(['all', 'public', 'private'] as const)('queries signed-in explicit %s visibility directly', async (visibility) => {
+    mountRoute({ visibility }, signedIn)
+    await waitFor(() => expect(mocks.pages).toHaveBeenCalled())
+    expect(mocks.pages.mock.calls[0]?.[0].visibility).toBe(visibility)
+    expect(mocks.navigate).not.toHaveBeenCalled()
   })
 
   it('keeps auth errors query-disabled and renders the scoped message without false empty', () => {

@@ -8,11 +8,14 @@ import {
   type ReviewRatingBand,
 } from '../shared/review-discovery-contracts'
 
+export type ActiveReviewDiscoveryVisibility =
+  Exclude<ReviewDiscoveryVisibility, 'followers'>
+
 export interface ReviewDiscoverySearchState {
   query: string | null
   sort: ReviewDiscoverySort
   ratingBand: ReviewRatingBand | null
-  visibility: ReviewDiscoveryVisibility
+  visibility: ActiveReviewDiscoveryVisibility
 }
 
 export interface ReviewDiscoveryRouteState {
@@ -36,7 +39,14 @@ export interface ReviewDiscoveryValidatedSearch extends ReviewDiscoveryRouteSear
 
 export interface ResolvedReviewDiscoverySearch {
   state: ReviewDiscoverySearchState
-  replace: boolean
+  replacementSearch: ReviewDiscoveryValidatedSearch | null
+  signedIn: boolean
+}
+
+export interface ReviewDiscoveryNavigationOptions {
+  search: ReviewDiscoveryValidatedSearch
+  replace: true
+  resetScroll: false
 }
 
 /** Shape-normalizes URL fields while marking invalid visibility for safe replacement. */
@@ -65,6 +75,18 @@ export const getReviewDiscoveryRouteState = (search: ReviewDiscoveryValidatedSea
   visibilitySource: search.visibilityInvalid ? 'invalid' : search.visibility === undefined ? 'absent' : 'explicit',
 })
 
+const getDefaultVisibility = (
+  signedIn: boolean,
+): ActiveReviewDiscoveryVisibility => signedIn ? 'all' : 'public'
+
+const serializeRouteFields = (
+  routeState: ReviewDiscoveryRouteState,
+): ReviewDiscoveryValidatedSearch => ({
+  ...(routeState.query === null ? {} : { q: routeState.query }),
+  ...(routeState.sort === 'newest' ? {} : { sort: routeState.sort }),
+  ...(routeState.ratingBand === null ? {} : { rating: routeState.ratingBand }),
+})
+
 /** Resolves viewer-safe visibility only after public auth is ready. */
 export const resolveReviewDiscoverySearch = (
   routeState: ReviewDiscoveryRouteState,
@@ -72,12 +94,16 @@ export const resolveReviewDiscoverySearch = (
 ): ResolvedReviewDiscoverySearch | null => {
   if (auth.status !== 'ready') return null
   const signedIn = auth.authState.status === 'complete'
+  const defaultVisibility = getDefaultVisibility(signedIn)
   const explicitVisibility = routeState.visibilitySource === 'explicit' ? routeState.visibility : null
-  const visibility = routeState.visibilitySource === 'invalid'
-    ? 'public'
-    : explicitVisibility === null
-      ? signedIn ? 'all' : 'public'
-      : signedIn || explicitVisibility === 'public' ? explicitVisibility : 'public'
+  const mustReplace = routeState.visibilitySource === 'invalid'
+    || explicitVisibility === 'followers'
+    || (!signedIn
+      && explicitVisibility !== null
+      && explicitVisibility !== 'public')
+  const visibility = mustReplace || explicitVisibility === null
+    ? defaultVisibility
+    : explicitVisibility as ActiveReviewDiscoveryVisibility
   return {
     state: {
       query: routeState.query,
@@ -85,21 +111,33 @@ export const resolveReviewDiscoverySearch = (
       sort: routeState.sort,
       visibility,
     },
-    replace: routeState.visibilitySource !== 'explicit' || visibility !== explicitVisibility,
+    replacementSearch: mustReplace ? serializeRouteFields(routeState) : null,
+    signedIn,
   }
 }
 
-/** Serializes resolved state, including explicit visibility for stable auth defaults. */
-const serializeReviewDiscoverySearch = (state: ReviewDiscoverySearchState): ReviewDiscoveryValidatedSearch => ({
-  ...(state.query === null ? {} : { q: state.query }),
-  ...(state.sort === 'newest' ? {} : { sort: state.sort }),
-  ...(state.ratingBand === null ? {} : { rating: state.ratingBand }),
-  visibility: state.visibility,
+/** Builds canonical replace-only navigation for filter updates. */
+export const getReviewDiscoveryNavigationOptions = (
+  state: ReviewDiscoverySearchState,
+  signedIn: boolean,
+): ReviewDiscoveryNavigationOptions => ({
+  search: {
+    ...(state.query === null ? {} : { q: state.query }),
+    ...(state.sort === 'newest' ? {} : { sort: state.sort }),
+    ...(state.ratingBand === null ? {} : { rating: state.ratingBand }),
+    ...(state.visibility === getDefaultVisibility(signedIn)
+      ? {}
+      : { visibility: state.visibility }),
+  },
+  replace: true,
+  resetScroll: false,
 })
 
-/** Builds replace-only navigation for auth resolution and filter updates. */
-export const getReviewDiscoveryNavigationOptions = (state: ReviewDiscoverySearchState) => ({
-  search: serializeReviewDiscoverySearch(state),
+/** Preserves normalized route fields while replacing stale visibility. */
+export const getReviewDiscoveryReplacementOptions = (
+  search: ReviewDiscoveryValidatedSearch,
+): ReviewDiscoveryNavigationOptions => ({
+  search,
   replace: true,
   resetScroll: false,
 })

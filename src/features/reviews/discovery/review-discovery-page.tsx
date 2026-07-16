@@ -11,7 +11,9 @@ import { PublishedReviewCard } from '../ui/published-review-card'
 import { ReviewDiscoveryFilters } from './review-discovery-filters'
 import {
   getReviewDiscoveryNavigationOptions,
+  getReviewDiscoveryReplacementOptions,
   resolveReviewDiscoverySearch,
+  type ReviewDiscoveryNavigationOptions,
   type ReviewDiscoveryRouteState,
   type ReviewDiscoverySearchState,
 } from './review-discovery-state'
@@ -25,7 +27,7 @@ interface ReviewDiscoveryPageProps {
 interface ReviewDiscoveryRouteProps {
   auth: ClientAuthState
   routeState: ReviewDiscoveryRouteState
-  onNavigate: (options: ReturnType<typeof getReviewDiscoveryNavigationOptions>) => void
+  onNavigate: (options: ReviewDiscoveryNavigationOptions) => void
 }
 
 type ReviewDiscoveryAccess = {
@@ -40,11 +42,16 @@ type ReviewDiscoveryAccess = {
 export function ReviewDiscoveryRoute({ auth, routeState, onNavigate }: ReviewDiscoveryRouteProps) {
   const resolution = resolveReviewDiscoverySearch(routeState, auth)
   useEffect(() => {
-    if (resolution?.replace) onNavigate(getReviewDiscoveryNavigationOptions(resolution.state))
+    if (resolution?.replacementSearch === null) return
+    if (resolution?.replacementSearch) {
+      onNavigate(getReviewDiscoveryReplacementOptions(
+        resolution.replacementSearch,
+      ))
+    }
   }, [onNavigate, resolution])
   if (auth.status === 'error') return <ReviewDiscoveryAuthState message={auth.message} />
-  if (resolution === null || resolution.replace) return <ReviewDiscoveryAuthState message={null} />
-  return <ReviewDiscoveryPage searchState={resolution.state} onSearchStateChange={(state) => onNavigate(getReviewDiscoveryNavigationOptions(state))} />
+  if (resolution === null || resolution.replacementSearch !== null) return <ReviewDiscoveryAuthState message={null} />
+  return <ReviewDiscoveryPage searchState={resolution.state} onSearchStateChange={(state) => onNavigate(getReviewDiscoveryNavigationOptions(state, resolution.signedIn))} />
 }
 
 /** Renders public Review search, filters, cards, and infinite cursor states. */
