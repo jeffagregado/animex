@@ -153,7 +153,7 @@
 
   .landing-hero__action {
     display: inline-flex;
-    width: min(100%, 24rem);
+    width: 100%;
     min-height: 3.75rem;
     align-items: center;
     justify-content: center;
