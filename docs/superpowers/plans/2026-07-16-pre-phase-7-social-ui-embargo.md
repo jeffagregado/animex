@@ -1,6 +1,6 @@
 # Pre-Phase 7 Social UI Embargo Implementation Plan
 
-Status: SELF-REVIEWED. User approval pending; source implementation has not started.
+Status: IMPLEMENTATION IN PROGRESS. Tasks 1-3 are complete and independently reviewed; Task 4 is next.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use the repo-local `$orchestrating-coding-work` custom role agents from `.codex/agents/`; do not use generic bootstrap agents.
 
@@ -48,7 +48,8 @@ Controller-led orchestration:
 
 1. Task 1 locks `src/features/social/visibility.ts`.
 2. After Task 1 is green, Tasks 2-5 may use separate `orchestration_worker` agents because their write sets are disjoint.
-3. Workers treat the visibility policy as read-only after Task 1.
+3. Workers treat the visibility policy as read-only after Task 1, except Task 4
+   removes the approved temporary bridge and its test after all consumers migrate.
 4. The controller integrates once, runs full gates, then requests `orchestration_reviewer` and `orchestration_qa`.
 5. One `orchestration_docs_mapper` verifies and updates closure docs after implementation evidence is final.
 
@@ -57,13 +58,13 @@ Controller-led orchestration:
 | 1 | `src/features/social/visibility.ts`, `src/features/social/visibility.test.ts` |
 | 2 | Home route, feed view/query/list/card/detail files and their tests |
 | 3 | Post composer/dialog, feed owner actions, and their tests |
-| 4 | Review editor/detail/published-card files and their tests |
+| 4 | Review editor/detail/published-card files and tests; visibility bridge cleanup |
 | 5 | Review discovery state/page/filter files and their tests |
 | 6 | Integration fixes and closure docs; no concurrent writers |
 
 Serialized locks:
 
-- `src/features/social/visibility.ts` and its test are Task 1 exclusive until the focused contract tests pass.
+- `src/features/social/visibility.ts` and its test are Task 1 exclusive until the focused contract tests pass. Task 4 may reopen only these two files to remove the approved temporary bridge and bridge test after Task 3 consumers migrate.
 - Controller exclusively owns `src/routeTree.gen.ts`; workers do not edit generated routes.
 - Controller or `orchestration_docs_mapper` exclusively owns `TODO.md`, `PLAN.md`, `CONTEXT.md`, the phase sequencing spec, `design-qa.md`, and `docs/architecture/review-discovery-data-flow.md`.
 - Forbidden source writes without a separately approved scope expansion: `convex/**`, `src/features/auth/auth-contracts.ts`, `src/features/social/shared/social-contracts.ts`, and `src/features/reviews/shared/review-discovery-contracts.ts`.
@@ -293,7 +294,7 @@ interface ResolvedHomeSearch {
 }
 ```
 
-- [ ] **Step 1: Rewrite route and feed tests to the embargo behavior**
+- [x] **Step 1: Rewrite route and feed tests to the embargo behavior**
 
 In `src/routes/_public/-home.test.tsx`, replace the existing Following preservation test with a stale-route test that:
 
@@ -340,7 +341,7 @@ expect(document.querySelector('footer')).toBeNull()
 
 Update `src/features/feed/feed-list.test.tsx` to remove the obsolete `signedIn` fixture prop and keep pagination coverage green.
 
-- [ ] **Step 2: Verify the red state**
+- [x] **Step 2: Verify the red state**
 
 Run:
 
@@ -350,7 +351,7 @@ pnpm exec vitest run src/routes/_public/-home.test.tsx src/features/home/home-pa
 
 Expected: FAIL because Following remains active and feed social placeholders remain rendered.
 
-- [ ] **Step 3: Add route parsing, active resolution, and canonical serialization**
+- [x] **Step 3: Add route parsing, active resolution, and canonical serialization**
 
 In `src/routes/_public/home.tsx`:
 
@@ -411,7 +412,7 @@ function HomeRouteCanonicalizing() {
 
 Do not mount `HomePage` until replace navigation removes `feed=following`. The route test must assert `convex.query` has not run before replacement, then confirm the first feed request after replacement is `feed:listHome`.
 
-- [ ] **Step 4: Narrow the active feed contract**
+- [x] **Step 4: Narrow the active feed contract**
 
 In `src/features/feed/use-feed-pages.ts`:
 
@@ -440,7 +441,7 @@ In `src/features/feed/feed-list.tsx`:
 - Remove the Following empty-state branch.
 - Remove `signedIn` from props and from `FeedCard` calls.
 
-- [ ] **Step 5: Remove feed-card social DOM**
+- [x] **Step 5: Remove feed-card social DOM**
 
 In `src/features/feed/feed-card.tsx`:
 
@@ -453,7 +454,7 @@ In `src/features/feed/feed-card-detail-page.tsx`:
 - Stop passing `signedIn` to `FeedCard`.
 - Keep auth/ownership derivation only for `ownerId` and composer default visibility.
 
-- [ ] **Step 6: Run focused checks**
+- [x] **Step 6: Run focused checks**
 
 ```powershell
 pnpm exec vitest run src/routes/_public/-home.test.tsx src/features/home/home-page.test.tsx src/features/feed/use-feed-pages.test.tsx src/features/feed/feed-list.test.tsx src/features/feed/feed-card.test.tsx src/features/feed/feed-card-detail-page.test.tsx
@@ -462,7 +463,7 @@ pnpm exec tsc --noEmit
 
 Expected: PASS; no active Following tab/query branch; no Like/Comment/footer DOM.
 
-- [ ] **Step 7: Commit the feed contraction**
+- [x] **Step 7: Commit the feed contraction**
 
 ```powershell
 git add -- src/routes/_public/home.tsx src/routes/_public/-home.test.tsx src/features/feed/feed-page.tsx src/features/feed/use-feed-pages.ts src/features/feed/feed-list.tsx src/features/feed/feed-list.test.tsx src/features/feed/feed-card.tsx src/features/feed/feed-card-detail-page.tsx src/features/feed/feed-card.test.tsx src/features/home/home-page.test.tsx
@@ -521,7 +522,7 @@ visibility: VisibilitySelection
 setVisibility: (visibility: ActiveVisibility) => void
 ```
 
-- [ ] **Step 1: Add red hook coverage for new and legacy content**
+- [x] **Step 1: Add red hook coverage for new and legacy content**
 
 Update all existing test fixtures with `preserveOriginalVisibility`.
 
@@ -570,7 +571,7 @@ it('migrates a legacy Followers Post after explicit owner selection', async () =
 })
 ```
 
-- [ ] **Step 2: Add red UI and owner-menu coverage**
+- [x] **Step 2: Add red UI and owner-menu coverage**
 
 In `post-composer.test.tsx`, verify the opened visibility Select contains Public and Private, not Followers. When mocked selection is null, verify the trigger text is `Change visibility`.
 
@@ -592,7 +593,7 @@ In `feed-owner-actions.test.tsx`, replace Followers mutation expectations with:
 - Public or Private selection calls the existing source mutation.
 - Existing public/private cards keep their matching selected/disabled marker.
 
-- [ ] **Step 3: Verify the red state**
+- [x] **Step 3: Verify the red state**
 
 ```powershell
 pnpm exec vitest run src/features/feed/use-post-composer.test.tsx src/features/feed/post-composer.test.tsx src/features/feed/post-composer-dialog.test.tsx src/features/feed/feed-owner-actions.test.tsx
@@ -600,7 +601,7 @@ pnpm exec vitest run src/features/feed/use-post-composer.test.tsx src/features/f
 
 Expected: FAIL because Followers remains an active choice and legacy preservation is not modeled.
 
-- [ ] **Step 4: Resolve visibility only at the mutation boundary**
+- [x] **Step 4: Resolve visibility only at the mutation boundary**
 
 In `use-post-composer.ts`:
 
@@ -649,7 +650,7 @@ const isPostComposerDirty = (
 
 Call it with the same `initialSelection` used to initialize state.
 
-- [ ] **Step 5: Restrict composer choices**
+- [x] **Step 5: Restrict composer choices**
 
 In `post-composer.tsx`:
 
@@ -686,7 +687,7 @@ preserveOriginalVisibility: edit !== null
 
 New content receives the account default plus `false`; edit content receives stored visibility plus `true`.
 
-- [ ] **Step 6: Restrict feed owner actions**
+- [x] **Step 6: Restrict feed owner actions**
 
 In `feed-owner-actions.tsx`:
 
@@ -696,7 +697,7 @@ In `feed-owner-actions.tsx`:
 - Mark/disable a choice only when `card.visibility` already equals that active value.
 - For legacy Followers cards, Public and Private are both enabled and no selected marker appears.
 
-- [ ] **Step 7: Run focused checks**
+- [x] **Step 7: Run focused checks**
 
 ```powershell
 pnpm exec vitest run src/features/social/visibility.test.ts src/features/feed/use-post-composer.test.tsx src/features/feed/post-composer.test.tsx src/features/feed/post-composer-dialog.test.tsx src/features/feed/feed-owner-actions.test.tsx
@@ -705,7 +706,7 @@ pnpm exec tsc --noEmit
 
 Expected: PASS; new Followers defaults become Private; legacy unrelated edits preserve Followers; owner migration works.
 
-- [ ] **Step 8: Commit Post and owner-action policy**
+- [x] **Step 8: Commit Post and owner-action policy**
 
 ```powershell
 git add -- src/features/feed/use-post-composer.ts src/features/feed/use-post-composer.test.tsx src/features/feed/post-composer.tsx src/features/feed/post-composer.test.tsx src/features/feed/post-composer-dialog.tsx src/features/feed/post-composer-dialog.test.tsx src/features/feed/feed-owner-actions.tsx src/features/feed/feed-owner-actions.test.tsx
@@ -726,6 +727,7 @@ git commit -m "refactor: embargo followers post ui"
 - Modify: `src/features/reviews/ui/published-review-card.tsx`
 - Modify: `src/features/reviews/ui/published-review-card.test.tsx`
 - Modify: `src/features/social/visibility.ts`
+- Modify: `src/features/social/visibility.test.ts`
 
 **Editor contract:**
 
@@ -867,6 +869,8 @@ In `published-review-card.tsx`:
 
 After the Post and Review consumers use the typed embargo helpers, delete the
 temporary `getVisibilityLabel` export from `src/features/social/visibility.ts`.
+Delete its temporary compatibility test from
+`src/features/social/visibility.test.ts`.
 
 Run:
 
@@ -888,7 +892,7 @@ Expected: PASS; no Review Like or Followers label; legacy preservation and expli
 - [ ] **Step 8: Commit Review embargo behavior**
 
 ```powershell
-git add -- src/features/social/visibility.ts src/features/reviews/ui/review-editor-page.tsx src/features/reviews/ui/review-editor-page.test.tsx src/features/reviews/ui/review-detail-page.tsx src/features/reviews/ui/review-detail-page.behavior.test.tsx src/features/reviews/ui/published-review-card.tsx src/features/reviews/ui/published-review-card.test.tsx
+git add -- src/features/social/visibility.ts src/features/social/visibility.test.ts src/features/reviews/ui/review-editor-page.tsx src/features/reviews/ui/review-editor-page.test.tsx src/features/reviews/ui/review-detail-page.tsx src/features/reviews/ui/review-detail-page.behavior.test.tsx src/features/reviews/ui/published-review-card.tsx src/features/reviews/ui/published-review-card.test.tsx
 git commit -m "refactor: embargo followers review ui"
 ```
 
