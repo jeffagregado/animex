@@ -408,7 +408,7 @@ Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified 
 - [x] Note future Manga lists for Discover design.
 - [x] Decide Manga is a future Quick Search group.
 - [x] Decide Quick Search result layout.
-- [x] Decide mobile Quick Search and Notification placement.
+- [x] Decide mobile Search routes to `/discover`; Quick Search remains desktop-only and Notifications remain in the mobile header.
 - [x] Elaborate Create behavior after Discover/Search decisions.
 - [x] Decide desktop Create placement.
 - [x] Decide that signed-out desktop navigation shows `Sign in` and hides account-only controls.
@@ -863,13 +863,19 @@ Status: SCOPE LOCKED. Detailed cleanup planning happens later; no source impleme
 - [ ] Write, review, and approve the detailed pre-Phase 7 cleanup implementation plan.
 - [ ] Implement and validate the approved cleanup plan.
 
-# Phase 7 User Profile
+# Phase 7 User Profile And Quick Search
 
 Status: SCOPE ADJUSTED. Detailed planning has not started.
 
 - [x] Keep profile header, Review tab, latest favorites, anime stats, and viewer-allowed profile activity in Phase 7.
+- [x] Assign locked desktop-only Quick Search implementation to Phase 7.
+- [x] Open Quick Search from desktop header Search for signed-out and signed-in visitors.
+- [x] Route mobile Search navigation to `/discover` and reuse the existing Discover search.
+- [x] Use the locked dimmed-page modal, large input, category controls, and one unified ranked result list grouped by Anime, Characters, and Users.
+- [x] Use desktop category controls with explicit loading, empty, error, keyboard, focus, and desktop responsive states.
+- [x] Keep Discover separate and Manga future-only.
 - [x] Defer Follow actions, follower/following counts, Likes, Comments, Comment counts, Like counts, and social activity footers to Phase 9.
-- [ ] Write and approve Phase 7 design/spec and implementation plan after embargo cleanup passes.
+- [ ] Write and approve the combined Phase 7 User Profile and Quick Search design/spec and implementation plan after embargo cleanup passes.
 
 # Phase 8 Notifications, Privacy, Moderation
 

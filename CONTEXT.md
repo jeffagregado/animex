@@ -73,7 +73,7 @@ A minimal notice shown when a direct link or notification target points to conte
 _Avoid_: Non-public redirect, hidden-content sign-in page
 
 **Signed-Out Browsing**:
-A read-only visitor state for users who are not signed in. Signed-out users can browse public content, the public read-only Home Feed, Discover, Quick Search, anime detail pages, public User Profiles, public Reviews, Visible Like Counts, Visible Comment Counts, and visible Comments on public feed cards, but cannot create Posts, Reviews, Comments, Comment Replies, Likes, Follows, Blocks, or Content Reports; direct access to Account-Only Surfaces and Non-Public Direct Links sends them to the public Home Feed.
+A read-only visitor state for users who are not signed in. Signed-out users can browse public content, the public read-only Home Feed, Discover, desktop Quick Search, anime detail pages, public User Profiles, public Reviews, Visible Like Counts, Visible Comment Counts, and visible Comments on public feed cards, but cannot create Posts, Reviews, Comments, Comment Replies, Likes, Follows, Blocks, or Content Reports; direct access to Account-Only Surfaces and Non-Public Direct Links sends them to the public Home Feed.
 _Avoid_: Guest interaction, anonymous action
 
 **Post-Sign-In Return**:
@@ -685,7 +685,7 @@ The AnimeX brand mark used for navigation, favicon, and app identity. The primar
 _Avoid_: Unrelated logo, mascot portrait only, badge as primary nav logo
 
 **Site Navigation**:
-The primary way users move between AnimeX areas such as Home, Discover, search, creation, notifications, profile, and settings. Desktop Site Navigation uses a top navigation layout with Home, Discover, a search icon, notification icon, and profile/settings entry for signed-in users; it does not show `Community` or `Stats` in MVP. Desktop Post Create stays near the Home Feed composer entry rather than as a global header label. Signed-out desktop navigation hides account-only controls, including the notification icon and Post Create entry, and shows `Sign in`; signed-in mobile Site Navigation uses bottom tabs for Home, Discover, Search, Create, and Profile, where Create opens the Post Composer and Notifications stay in the mobile header; signed-out mobile navigation hides Create and Profile tabs, hides the notification icon, and shows `Sign in` in the header.
+The primary way users move between AnimeX areas such as Home, Discover, search, creation, notifications, profile, and settings. Desktop Site Navigation uses a top navigation layout with Home, Discover, a search icon, notification icon, and profile/settings entry for signed-in users; the desktop search icon opens Quick Search, and desktop navigation does not show `Community` or `Stats` in MVP. Desktop Post Create stays near the Home Feed composer entry rather than as a global header label. Signed-out desktop navigation hides account-only controls, including the notification icon and Post Create entry, and shows `Sign in`; signed-in mobile Site Navigation uses bottom tabs for Home, Discover, Search, Create, and Profile, where Search routes to `/discover`, Create opens the Post Composer, and Notifications stay in the mobile header; signed-out mobile navigation hides Create and Profile tabs, hides the notification icon, and shows `Sign in` in the header.
 _Avoid_: Desktop sidebar, Community nav before community features exist, top-level Stats page in MVP
 
 **Discover**:
@@ -705,11 +705,11 @@ The locked visual direction for AnimeX anime detail pages. Desktop follows `docs
 _Avoid_: Overview review cards, top characters, right-column character list, duplicate My Anime card, Community nav
 
 **Quick Search**:
-A search-triggered overlay for direct lookup across Anime, Characters, and Users, with Manga reserved for future Manga lists. Quick Search uses a distinct AnimeX layout with category controls and one unified ranked result list rather than copied AniList columns.
+A desktop-only search-triggered overlay for direct lookup across Anime, Characters, and Users, with Manga reserved for future Manga lists. Quick Search opens from desktop Site Navigation and uses a distinct AnimeX layout with category controls and one unified ranked result list rather than copied AniList columns. Mobile Search routes to `/discover` and uses the existing Discover search.
 _Avoid_: Discover, full browse page, AniList clone
 
 **Quick Search Visual Direction**:
-The locked visual direction for the AnimeX search modal follows `docs/visual/quick-search/quick-search-modal.png`. Quick Search opens as a focused overlay above the current page with the background dimmed, a large search input at the top, category controls, and one unified ranked result list grouped by Anime, Characters, and Users. Desktop may use a left category rail; mobile should adapt the same structure with horizontal category chips. Anime results can include compact metadata and direct add/open affordances, while Manga stays a future-only note until Manga lists are first-class.
+The locked visual direction for the desktop-only AnimeX search modal follows `docs/visual/quick-search/quick-search-modal.png`. Quick Search opens as a focused overlay above the current desktop page with the background dimmed, a large search input at the top, category controls, and one unified ranked result list grouped by Anime, Characters, and Users. Desktop may use a left category rail. Mobile does not render this modal; its Search navigation routes to `/discover`. Anime results can include compact metadata and direct add/open affordances, while Manga stays a future-only note until Manga lists are first-class.
 _Avoid_: Discover page clone, AniList column clone, active Manga results in MVP, full search page as default interaction
 
 **AniList Metadata Flow**:
@@ -1988,10 +1988,10 @@ Developer: Do creation surfaces show visibility before publishing?
 Domain Expert: Posts and Reviews show a Creation Visibility Selector defaulted to Account-Level Default Visibility, which is Private for new accounts. Generated Activity cards inherit Account-Level Default Visibility silently and can be changed after creation.
 
 Developer: Where does AnimeX mobile navigation live?
-Domain Expert: Signed-in mobile Site Navigation uses a bottom tab bar for Home, Discover, Search, Create, and Profile. The mobile Create tab opens the Post Composer, Notifications stay in the top mobile header, and mobile does not show a separate top-header Search icon. Signed-out users do not see the mobile Create tab, Profile tab, or notification icon; they see `Sign in` in the mobile header instead.
+Domain Expert: Signed-in mobile Site Navigation uses a bottom tab bar for Home, Discover, Search, Create, and Profile. The mobile Search tab routes to `/discover`, the Create tab opens the Post Composer, Notifications stay in the top mobile header, and mobile does not show a separate top-header Search icon. Signed-out users keep the Search tab routing to `/discover`, do not see the Create tab, Profile tab, or notification icon, and see `Sign in` in the mobile header instead.
 
 Developer: What is the difference between Discover and Quick Search?
-Domain Expert: Discover is a browse destination for trending anime, seasonal anime, genres, and recommendations, with room for future Manga lists. Quick Search opens from desktop search or the mobile Search tab and shows a distinct AnimeX overlay with live grouped results for Anime, Characters, and Users; Manga is a future Quick Search group.
+Domain Expert: Discover is a browse destination for trending anime, seasonal anime, genres, recommendations, and mobile search, with room for future Manga lists. Quick Search opens only from desktop search and shows a distinct AnimeX overlay with live grouped results for Anime, Characters, and Users; the mobile Search tab routes to `/discover`, and Manga is a future Quick Search group.
 
 Developer: Which Home Feed visual direction is locked?
 Domain Expert: Home Feed uses the locked poster-forward design at `docs/visual/home/home-desktop-feed.png` and `docs/visual/home/home-mobile-feed.png`. Desktop has only the main feed column and right utility column; Seasonal Anime sits above the feed; the right utility column includes anime-list modules and Trending, but excludes profile picture, follower/following/likes stats, average rating, and episodes watched. Mobile uses the same theme stacked with bottom navigation.
@@ -2003,13 +2003,13 @@ Developer: Is Manga available in Quick Search at MVP?
 Domain Expert: No. Manga is a future Quick Search group that becomes available when Manga lists become first-class in AnimeX.
 
 Developer: What is the AnimeX Quick Search layout?
-Domain Expert: Quick Search uses category controls and one unified ranked result list. Desktop may use a left category rail, while mobile uses horizontal category chips.
+Domain Expert: Quick Search uses desktop category controls and one unified ranked result list. It may use a left category rail. Mobile does not render Quick Search; mobile Search routes to `/discover`.
 
 Developer: Which User Profile visual direction is locked?
 Domain Expert: User Profile uses the locked design at `docs/visual/user-profile/user-profile-desktop-mobile.png`, with the same poster-forward dark theme, profile cover header, Review Tab cards, Anime Stats, Latest Favorites, and viewer-allowed Profile Activity.
 
 Developer: Which Quick Search visual direction is locked?
-Domain Expert: Quick Search uses the locked modal design at `docs/visual/quick-search/quick-search-modal.png`, with a dimmed-page overlay, large search input, category controls, and grouped unified results for Anime, Characters, and Users while Manga remains future-only.
+Domain Expert: Desktop Quick Search uses the locked modal design at `docs/visual/quick-search/quick-search-modal.png`, with a dimmed-page overlay, large search input, category controls, and grouped unified results for Anime, Characters, and Users while Manga remains future-only. Mobile Search routes to `/discover`.
 
 Developer: How does AnimeX get anime metadata?
 Domain Expert: AnimeX uses the AniList GraphQL API. Search returns candidates, then AnimeX stores the selected AniList `id` and fetches metadata by that ID so specials or related entries from search ranking do not become the canonical anime by accident.

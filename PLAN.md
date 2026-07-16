@@ -154,10 +154,16 @@ Status: SCOPE LOCKED. Detailed implementation planning starts later; no cleanup 
 - Let owners of existing Followers-only content change it to Public or Private during the embargo.
 - Stop after validation and wait for approval before Phase 7.
 
-### Phase 7: User Profile
+### Phase 7: User Profile And Quick Search
 
 - Build User Profile from locked design.
 - Add Review tab, latest favorites, anime stats, and viewer-allowed profile activity.
+- Build desktop-only Quick Search from the locked modal design.
+- Open Quick Search from the desktop header Search control for signed-out and signed-in visitors.
+- Route the mobile Search tab to `/discover`, where users use the existing Discover search.
+- Add live grouped results for Anime, Characters, and Users in one unified ranked list.
+- Use desktop category controls; include loading, empty, error, keyboard, focus, and desktop responsive states.
+- Keep Discover separate from Quick Search and keep Manga as a future-only group.
 - Omit Follow actions, follower/following counts, Like actions/counts, Comment actions/counts, and social activity footers.
 - Treat social elements in the locked profile reference as Phase 9 final-state elements.
 - Stop after validation and wait for approval.

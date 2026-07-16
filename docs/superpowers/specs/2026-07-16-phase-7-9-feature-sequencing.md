@@ -1,11 +1,11 @@
-# Phase 7-9 Social Sequencing
+# Phase 7-9 Feature Sequencing
 
 Status: APPROVED. Scheduling contract locked; implementation planning starts later.
 
 ## Phase Map
 
 - Pre-Phase 7: Social UI Embargo Cleanup.
-- Phase 7: User Profile.
+- Phase 7: User Profile and Quick Search.
 - Phase 8: Notifications, Privacy, Moderation.
 - Phase 9: Social Interactions. Final MVP phase.
 
@@ -33,9 +33,9 @@ Do not use CSS hiding. Do not leave disabled controls. Direct Following-feed sel
 - During the embargo, owners may change existing Followers-only content to Public or Private.
 - Do not expose a new Followers-only selection until Phase 9.
 
-## Phase 7: User Profile
+## Phase 7: User Profile And Quick Search
 
-Phase 7 shows:
+Phase 7 profile shows:
 
 - Profile cover, avatar, display name, username, and bio.
 - Review tab.
@@ -51,6 +51,18 @@ Phase 7 omits:
 - Social activity footers.
 
 Locked profile visual reference remains final-state direction. Phase 7 implements only non-social elements.
+
+Phase 7 desktop Quick Search includes:
+
+- Focused dimmed-page overlay using the locked Quick Search visual reference.
+- Large live-search input.
+- Desktop header Search entry for signed-out and signed-in visitors.
+- Desktop category controls, optionally using a left rail.
+- One unified ranked result list grouped by Anime, Characters, and Users.
+- Explicit loading, empty, error, keyboard, focus, and desktop responsive states.
+- Existing canonical destination behavior where supported by the selected result.
+
+Mobile does not render Quick Search. Mobile Search navigation routes to `/discover` and uses the existing Discover search. Discover remains separate from desktop Quick Search and serves as the mobile search destination. Manga remains a future-only Quick Search group.
 
 ## Phase 8: Notifications, Privacy, Moderation
 
@@ -91,5 +103,6 @@ Phase 9 acceptance requires every approved social control to be visible and func
 
 - This document locks scheduling and visibility only.
 - Pre-Phase 7 cleanup receives a separate detailed implementation plan later.
-- Phase 7, Phase 8, and Phase 9 each receive separate approved design/spec and implementation plans.
+- Phase 7 receives one approved design/spec and implementation plan covering User Profile and Quick Search.
+- Phase 8 and Phase 9 each receive separate approved design/spec and implementation plans.
 - No source implementation is authorized by this scheduling update.
