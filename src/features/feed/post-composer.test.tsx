@@ -4,13 +4,14 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PostComposer } from './post-composer'
+import type { VisibilitySelection } from '../social/visibility'
 
 const mocks = vi.hoisted(() => ({
   blocker: { status: 'idle' as 'idle' | 'blocked', reset: vi.fn(), proceed: vi.fn() },
   composer: {
     text: '', setText: vi.fn(), mediaDraft: null as { type: 'image' | 'video'; url: string; copy: string } | null, mediaError: null as string | null,
     setMediaType: vi.fn(), setMediaUrl: vi.fn(), setMediaCopy: vi.fn(), removeMedia: vi.fn(),
-    hasSpoiler: false, setHasSpoiler: vi.fn(), visibility: 'public' as const, setVisibility: vi.fn(), submitting: false, dirty: true, submit: vi.fn(),
+    hasSpoiler: false, setHasSpoiler: vi.fn(), visibility: 'public' as VisibilitySelection, setVisibility: vi.fn(), submitting: false, dirty: true, submit: vi.fn(),
   },
   blockerOptions: null as { shouldBlockFn: () => boolean; enableBeforeUnload: () => boolean } | null,
   onCancel: vi.fn(), onSaved: vi.fn(), success: vi.fn(), error: vi.fn(),
@@ -19,7 +20,13 @@ vi.mock('@tanstack/react-router', () => ({ useBlocker: (options: { shouldBlockFn
 vi.mock('sonner', () => ({ toast: { success: mocks.success, error: mocks.error } }))
 vi.mock('./use-post-composer', () => ({ usePostComposer: () => mocks.composer }))
 
-const initial = { text: '', media: null, hasSpoiler: false, visibility: 'public' as const }
+const initial = {
+  text: '',
+  media: null,
+  hasSpoiler: false,
+  visibility: 'public' as const,
+  preserveOriginalVisibility: false,
+}
 
 beforeEach(() => {
   mocks.blocker.status = 'idle'
@@ -66,6 +73,24 @@ describe('PostComposer', () => {
     expect(input?.getAttribute('aria-hidden')).toBe('true')
     fireEvent.click(screen.getByText('Hide whole Post as spoiler'))
     expect(mocks.composer.setHasSpoiler).toHaveBeenCalledWith(true)
+  })
+
+  it('offers only Public and Private visibility choices', async () => {
+    render(<PostComposer initial={initial} onCancel={mocks.onCancel} onSaved={mocks.onSaved} postId={null} registerClose={() => undefined} />)
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Post visibility' }))
+
+    expect(await screen.findByRole('option', { name: 'Public' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'Private' })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: 'Followers' })).toBeNull()
+  })
+
+  it('prompts legacy owners to change visibility', () => {
+    mocks.composer.visibility = null
+
+    render(<PostComposer initial={initial} onCancel={mocks.onCancel} onSaved={mocks.onSaved} postId="post-1" registerClose={() => undefined} />)
+
+    expect(screen.getByRole('combobox', { name: 'Post visibility' }).textContent).toContain('Change visibility')
   })
 
   it('publishes successfully, clears blocker predicates, and uses Sonner', async () => {

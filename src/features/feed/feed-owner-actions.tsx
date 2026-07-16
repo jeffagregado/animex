@@ -1,21 +1,25 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useMutation } from 'convex/react'
-import { CheckIcon, EditIcon, EllipsisIcon, Globe2Icon, LockIcon, Trash2Icon, UsersIcon } from 'lucide-react'
+import { CheckIcon, EditIcon, EllipsisIcon, Globe2Icon, LockIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { Dialog, DialogContent } from '#/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '#/components/ui/dropdown-menu'
-import type { FeedCard, Visibility } from '../social/shared/social-contracts'
-import { getVisibilityLabel } from '../social/visibility'
+import type { FeedCard } from '../social/shared/social-contracts'
+import {
+  activeVisibilityOptions,
+  getActiveVisibilityLabel,
+  type ActiveVisibility,
+} from '../social/visibility'
 
 type OwnerCard = FeedCard
 type DeleteAction = 'remove' | 'remove-review-activity' | null
 
 interface OwnerActionState {
   changeDeleteOpen: (open: boolean) => void
-  changeVisibility: (visibility: Visibility) => Promise<void>
+  changeVisibility: (visibility: ActiveVisibility) => Promise<void>
   deleteAction: DeleteAction
   pending: boolean
   requestDelete: (action: Exclude<DeleteAction, null>) => void
@@ -34,9 +38,8 @@ interface DeleteCopy {
   title: string
 }
 
-const visibilityIcon = (visibility: Visibility) => {
+const visibilityIcon = (visibility: ActiveVisibility) => {
   if (visibility === 'public') return <Globe2Icon />
-  if (visibility === 'followers') return <UsersIcon />
   return <LockIcon />
 }
 
@@ -65,7 +68,7 @@ const getDeleteCopy = (card: OwnerCard): DeleteCopy => {
 export function FeedOwnerActions({ card, onEdit, onChanged }: { card: OwnerCard; onEdit: () => void; onChanged: () => void }) {
   const actions = useOwnerActions(card, onChanged)
 
-  return <><DropdownMenu><DropdownMenuTrigger aria-busy={actions.pending} aria-label="Owner actions" className="grid size-10 place-items-center rounded-lg text-muted-foreground transition hover:bg-cyan-300/10 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 data-popup-open:bg-cyan-300/10 data-popup-open:text-cyan-300 data-popup-open:ring-2 data-popup-open:ring-cyan-300 disabled:cursor-wait disabled:bg-cyan-300/10 disabled:text-cyan-300 disabled:opacity-100" disabled={actions.pending} ref={actions.triggerRef}><EllipsisIcon className="size-5" /></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48" sideOffset={6}>{card.kind === 'post' ? <DropdownMenuItem disabled={actions.pending} onClick={onEdit}><EditIcon />Edit Post</DropdownMenuItem> : null}{card.kind === 'review' ? <DropdownMenuItem disabled={actions.pending} render={<a href={`/reviews/${card.reviewId}/edit`} />}><EditIcon />Edit Review</DropdownMenuItem> : null}{(['public', 'followers', 'private'] as Visibility[]).map((visibility) => <DropdownMenuItem disabled={actions.pending || visibility === card.visibility} key={visibility} onClick={() => void actions.changeVisibility(visibility)}>{visibilityIcon(visibility)}{getVisibilityLabel(visibility)}{visibility === card.visibility ? <CheckIcon className="ml-auto" /> : null}</DropdownMenuItem>)}<DropdownMenuSeparator />{card.kind === 'review' ? <DropdownMenuItem disabled={actions.pending} onClick={() => actions.requestDelete('remove-review-activity')} variant="destructive"><Trash2Icon />Delete</DropdownMenuItem> : <DropdownMenuItem disabled={actions.pending} onClick={() => actions.requestDelete('remove')} variant="destructive"><Trash2Icon />Delete</DropdownMenuItem>}</DropdownMenuContent></DropdownMenu><DeleteConfirmation action={actions.deleteAction} card={card} onOpenChange={actions.changeDeleteOpen} onRemove={actions.remove} pending={actions.pending} /></>
+  return <><DropdownMenu><DropdownMenuTrigger aria-busy={actions.pending} aria-label="Owner actions" className="grid size-10 place-items-center rounded-lg text-muted-foreground transition hover:bg-cyan-300/10 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 data-popup-open:bg-cyan-300/10 data-popup-open:text-cyan-300 data-popup-open:ring-2 data-popup-open:ring-cyan-300 disabled:cursor-wait disabled:bg-cyan-300/10 disabled:text-cyan-300 disabled:opacity-100" disabled={actions.pending} ref={actions.triggerRef}><EllipsisIcon className="size-5" /></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48" sideOffset={6}>{card.kind === 'post' ? <DropdownMenuItem disabled={actions.pending} onClick={onEdit}><EditIcon />Edit Post</DropdownMenuItem> : null}{card.kind === 'review' ? <DropdownMenuItem disabled={actions.pending} render={<a href={`/reviews/${card.reviewId}/edit`} />}><EditIcon />Edit Review</DropdownMenuItem> : null}{activeVisibilityOptions.map((visibility) => <DropdownMenuItem disabled={actions.pending || visibility === card.visibility} key={visibility} onClick={() => void actions.changeVisibility(visibility)}>{visibilityIcon(visibility)}{getActiveVisibilityLabel(visibility)}{visibility === card.visibility ? <CheckIcon className="ml-auto" /> : null}</DropdownMenuItem>)}<DropdownMenuSeparator />{card.kind === 'review' ? <DropdownMenuItem disabled={actions.pending} onClick={() => actions.requestDelete('remove-review-activity')} variant="destructive"><Trash2Icon />Delete</DropdownMenuItem> : <DropdownMenuItem disabled={actions.pending} onClick={() => actions.requestDelete('remove')} variant="destructive"><Trash2Icon />Delete</DropdownMenuItem>}</DropdownMenuContent></DropdownMenu><DeleteConfirmation action={actions.deleteAction} card={card} onOpenChange={actions.changeDeleteOpen} onRemove={actions.remove} pending={actions.pending} /></>
 }
 
 function useOwnerActions(card: OwnerCard, onChanged: () => void): OwnerActionState {
@@ -92,7 +95,7 @@ function useOwnerActions(card: OwnerCard, onChanged: () => void): OwnerActionSta
     if (!open) queueMicrotask(() => triggerRef.current?.focus())
   }
   const requestDelete = (action: Exclude<DeleteAction, null>): void => setDeleteAction(action)
-  const changeVisibility = async (visibility: Visibility): Promise<void> => {
+  const changeVisibility = async (visibility: ActiveVisibility): Promise<void> => {
     restoreAfterVisibilityRef.current = true
     setPending(true)
     try {

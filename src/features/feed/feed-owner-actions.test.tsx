@@ -40,19 +40,38 @@ describe('FeedOwnerActions', () => {
     expect(mocks.removeActivity).toHaveBeenCalledWith({ cardId: 'milestone-card' })
   })
 
-  it('binds milestone visibility into owner selector', async () => {
+  it('offers legacy Followers cards enabled Public and Private choices only', async () => {
     render(<FeedOwnerActions card={{ id: 'milestone-card', kind: 'rewatched', author, anime, settledAt: 1, visibility: 'followers' }} onChanged={() => undefined} onEdit={() => undefined} />)
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
     expect(await screen.findByRole('menu')).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: 'Followers' }).getAttribute('aria-disabled')).toBe('true')
+    const publicItem = screen.getByRole('menuitem', { name: 'Public' })
+    const privateItem = screen.getByRole('menuitem', { name: 'Private' })
+    expect(screen.queryByRole('menuitem', { name: 'Followers' })).toBeNull()
+    expect(publicItem.getAttribute('aria-disabled')).not.toBe('true')
+    expect(privateItem.getAttribute('aria-disabled')).not.toBe('true')
+    expect(publicItem.querySelector('.lucide-check')).toBeNull()
+    expect(privateItem.querySelector('.lucide-check')).toBeNull()
+
+    fireEvent.click(publicItem)
+    await waitFor(() => expect(mocks.activityVisibility).toHaveBeenCalledWith({ cardId: 'milestone-card', visibility: 'public' }))
   })
 
   it('offers Review edit and routes Review visibility by review ID', async () => {
     render(<FeedOwnerActions card={{ id: 'review-card', kind: 'review', reviewId: 'review-source', author, anime, rating: 91, summary: 'Summary', containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
     fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
     expect((await screen.findByRole('menuitem', { name: 'Edit Review' })).getAttribute('href')).toBe('/reviews/review-source/edit')
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Followers' }))
-    await waitFor(() => expect(mocks.reviewVisibility).toHaveBeenCalledWith({ reviewId: 'review-source', visibility: 'followers' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Private' }))
+    await waitFor(() => expect(mocks.reviewVisibility).toHaveBeenCalledWith({ reviewId: 'review-source', visibility: 'private' }))
+  })
+
+  it('marks active Public and Private choices as selected and disabled', async () => {
+    render(<FeedOwnerActions card={{ id: 'card', kind: 'post', postId: 'post', author, text: 'Post', media: null, hasSpoiler: false, visibility: 'private', createdAt: 1, updatedAt: 1 }} onChanged={() => undefined} onEdit={() => undefined} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Owner actions' }))
+
+    const privateItem = await screen.findByRole('menuitem', { name: 'Private' })
+    expect(privateItem.getAttribute('aria-disabled')).toBe('true')
+    expect(privateItem.querySelector('.lucide-check')).not.toBeNull()
+    expect(screen.getByRole('menuitem', { name: 'Public' }).getAttribute('aria-disabled')).not.toBe('true')
   })
 
   it('labels Review activity removal Delete while preserving activity-only behavior', async () => {
@@ -91,8 +110,8 @@ describe('FeedOwnerActions', () => {
     const trigger = screen.getByRole('button', { name: 'Owner actions' })
     trigger.focus()
     fireEvent.click(trigger)
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Followers' }))
-    await waitFor(() => expect(mocks.postVisibility).toHaveBeenCalledWith({ postId: 'post', visibility: 'followers' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Private' }))
+    await waitFor(() => expect(mocks.postVisibility).toHaveBeenCalledWith({ postId: 'post', visibility: 'private' }))
     expect(trigger.hasAttribute('disabled')).toBe(true)
     expect(trigger.getAttribute('aria-busy')).toBe('true')
     expect(trigger.className).toContain('disabled:bg-cyan-300/10')

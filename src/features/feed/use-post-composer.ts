@@ -5,6 +5,12 @@ import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { getVideoProvider, postMediaSchema, type PostMedia } from '../social/shared/external-media'
 import { createPostInputSchema, type Visibility } from '../social/shared/social-contracts'
+import {
+  getVisibilitySelection,
+  resolveVisibilitySelection,
+  type ActiveVisibility,
+  type VisibilitySelection,
+} from '../social/visibility'
 
 interface PostMediaDraft {
   type: 'image' | 'video'
@@ -17,16 +23,25 @@ interface PostComposerInitial {
   media: PostMedia | null
   hasSpoiler: boolean
   visibility: Visibility
+  preserveOriginalVisibility: boolean
 }
 
 interface PostSubmitInput {
   text: string
   mediaDraft: PostMediaDraft | null
   hasSpoiler: boolean
-  visibility: Visibility
+  originalVisibility: Visibility
+  visibility: VisibilitySelection
   setText: (text: string) => void
   setMediaDraft: (draft: PostMediaDraft | null) => void
   setHasSpoiler: (hasSpoiler: boolean) => void
+}
+
+interface PostComposerCurrent {
+  text: string
+  mediaDraft: PostMediaDraft | null
+  hasSpoiler: boolean
+  visibility: VisibilitySelection
 }
 
 const newId = (): string => crypto.randomUUID()
@@ -48,11 +63,24 @@ const toDraft = (media: PostMedia | null): PostMediaDraft | null => media
 
 /** Owns one external Post media draft and Post mutations. */
 export function usePostComposer(initial: PostComposerInitial) {
+  const initialSelection = getVisibilitySelection(
+    initial.visibility,
+    initial.preserveOriginalVisibility,
+  )
   const [text, setText] = useState(initial.text)
   const [mediaDraft, setMediaDraft] = useState<PostMediaDraft | null>(() => toDraft(initial.media))
   const [hasSpoiler, setHasSpoiler] = useState(initial.hasSpoiler)
-  const [visibility, setVisibility] = useState<Visibility>(initial.visibility)
-  const submission = usePostSubmission({ text, mediaDraft, hasSpoiler, visibility, setText, setMediaDraft, setHasSpoiler })
+  const [visibility, setVisibility] = useState<VisibilitySelection>(initialSelection)
+  const submission = usePostSubmission({
+    text,
+    mediaDraft,
+    hasSpoiler,
+    originalVisibility: initial.visibility,
+    visibility,
+    setText,
+    setMediaDraft,
+    setHasSpoiler,
+  })
 
   const setMediaType = (type: PostMediaDraft['type']): void => setMediaDraft((draft) => ({ type, url: draft?.url ?? '', copy: draft?.copy ?? '' }))
   const setMediaUrl = (url: string): void => setMediaDraft((draft) => {
@@ -69,9 +97,25 @@ export function usePostComposer(initial: PostComposerInitial) {
   }
 
   const mediaError = getMediaError(mediaDraft)
-  const dirty = isPostComposerDirty(initial, { text, mediaDraft, hasSpoiler, visibility })
+  const dirty = isPostComposerDirty(initial, initialSelection, { text, mediaDraft, hasSpoiler, visibility })
 
-  return { text, setText, mediaDraft, mediaError, setMediaType, setMediaUrl, setMediaCopy, removeMedia, hasSpoiler, setHasSpoiler, visibility, setVisibility, submitting: submission.submitting, dirty, submit: submission.submit }
+  return {
+    text,
+    setText,
+    mediaDraft,
+    mediaError,
+    setMediaType,
+    setMediaUrl,
+    setMediaCopy,
+    removeMedia,
+    hasSpoiler,
+    setHasSpoiler,
+    visibility,
+    setVisibility: (nextVisibility: ActiveVisibility): void => setVisibility(nextVisibility),
+    submitting: submission.submitting,
+    dirty,
+    submit: submission.submit,
+  }
 }
 
 /** Owns Post mutation idempotency and submission locking. */
@@ -85,7 +129,17 @@ function usePostSubmission(input: PostSubmitInput) {
   const submit = async (postId: string | null): Promise<void> => {
     if (submittingRef.current) throw new Error('Post submission is already running.')
     const media = parseMediaDraft(input.mediaDraft)
-    const parsed = createPostInputSchema.safeParse({ requestId: operationId.current, text: input.text, media, hasSpoiler: input.hasSpoiler, visibility: input.visibility })
+    const resolvedVisibility = resolveVisibilitySelection(
+      input.originalVisibility,
+      input.visibility,
+    )
+    const parsed = createPostInputSchema.safeParse({
+      requestId: operationId.current,
+      text: input.text,
+      media,
+      hasSpoiler: input.hasSpoiler,
+      visibility: resolvedVisibility,
+    })
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Post could not be validated.')
     submittingRef.current = true
     setSubmitting(true)
@@ -113,7 +167,11 @@ const getMediaError = (draft: PostMediaDraft | null): string | null => {
 }
 
 /** Compares editable fields with initial Post values. */
-const isPostComposerDirty = (initial: PostComposerInitial, current: Omit<PostSubmitInput, 'setText' | 'setMediaDraft' | 'setHasSpoiler'>): boolean => current.text !== initial.text
+const isPostComposerDirty = (
+  initial: PostComposerInitial,
+  initialVisibility: VisibilitySelection,
+  current: PostComposerCurrent,
+): boolean => current.text !== initial.text
   || JSON.stringify(current.mediaDraft) !== JSON.stringify(toDraft(initial.media))
   || current.hasSpoiler !== initial.hasSpoiler
-  || current.visibility !== initial.visibility
+  || current.visibility !== initialVisibility

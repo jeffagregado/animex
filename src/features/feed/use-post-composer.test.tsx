@@ -8,7 +8,13 @@ import { usePostComposer } from './use-post-composer'
 const mocks = vi.hoisted(() => ({ index: 0, create: vi.fn(), update: vi.fn() }))
 vi.mock('convex/react', () => ({ useMutation: () => [mocks.create, mocks.update][mocks.index++ % 2] }))
 
-const initial = { text: '', media: null, hasSpoiler: false, visibility: 'public' as const }
+const initial = {
+  text: '',
+  media: null,
+  hasSpoiler: false,
+  visibility: 'public' as const,
+  preserveOriginalVisibility: false,
+}
 
 beforeEach(() => {
   mocks.index = 0
@@ -65,5 +71,48 @@ describe('usePostComposer', () => {
     expect(result.current.text).toBe('Changed')
     expect(result.current.submitting).toBe(false)
     expect(result.current.dirty).toBe(true)
+  })
+
+  it('maps a Followers account default to Private for a new Post', async () => {
+    const { result } = renderHook(() => usePostComposer({
+      ...initial,
+      text: 'New Post',
+      visibility: 'followers',
+      preserveOriginalVisibility: false,
+    }))
+
+    expect(result.current.visibility).toBe('private')
+    await act(async () => result.current.submit(null))
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ visibility: 'private' }))
+  })
+
+  it('preserves a legacy Followers Post when visibility is untouched', async () => {
+    const { result } = renderHook(() => usePostComposer({
+      ...initial,
+      text: 'Original',
+      visibility: 'followers',
+      preserveOriginalVisibility: true,
+    }))
+
+    expect(result.current.visibility).toBeNull()
+    act(() => result.current.setText('Changed'))
+    await act(async () => result.current.submit('post-1'))
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
+      postId: 'post-1',
+      visibility: 'followers',
+    }))
+  })
+
+  it('migrates a legacy Followers Post after explicit owner selection', async () => {
+    const { result } = renderHook(() => usePostComposer({
+      ...initial,
+      text: 'Original',
+      visibility: 'followers',
+      preserveOriginalVisibility: true,
+    }))
+
+    act(() => result.current.setVisibility('public'))
+    await act(async () => result.current.submit('post-1'))
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ visibility: 'public' }))
   })
 })
