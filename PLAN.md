@@ -142,22 +142,48 @@ Status: COMPLETE. Approved landing and AnimeX favicon set are implemented and va
 - Phase 6 validation and responsive browser QA are complete.
 - Stop after validation and wait for approval.
 
-### Phase 7: Profile And Social
+### Pre-Phase 7: Social UI Embargo Cleanup
+
+Status: SCOPE LOCKED. Detailed implementation planning starts later; no cleanup implementation has started.
+
+- Remove existing Follow, Like, Comment, Comment Reply, and Following-feed UI before Phase 7.
+- Remove social placeholders from the DOM; do not CSS-hide them or leave disabled `Coming later` controls.
+- Normalize direct Following-feed selection to Home until Phase 9.
+- Hide Followers-only choices from creation, owner-action, discovery-filter, and privacy-setting UI until Phase 9.
+- Preserve social schemas, stored visibility values, authorization contracts, and existing Followers-only records.
+- Let owners of existing Followers-only content change it to Public or Private during the embargo.
+- Stop after validation and wait for approval before Phase 7.
+
+### Phase 7: User Profile
 
 - Build User Profile from locked design.
-- Add Review tab, latest favorites, anime stats, visible profile activity.
-- Add Follow/Unfollow.
-- Add likes for posts, reviews, activity cards, comments.
-- Add comments and flat comment replies.
+- Add Review tab, latest favorites, anime stats, and viewer-allowed profile activity.
+- Omit Follow actions, follower/following counts, Like actions/counts, Comment actions/counts, and social activity footers.
+- Treat social elements in the locked profile reference as Phase 9 final-state elements.
 - Stop after validation and wait for approval.
 
 ### Phase 8: Notifications, Privacy, Moderation
 
-- Add notification preview and notification page.
-- Add account default visibility and bulk visibility tools under Privacy Settings.
+- Add notification preview/page foundations and required moderation notifications.
+- Add account default visibility and bulk visibility tools under Privacy Settings; expose Public and Private choices only until Phase 9.
 - Add block/unblock.
-- Add reports for posts, reviews, comments, and comment replies.
+- Add reports and moderation for Posts and Reviews.
 - Do not allow reports for generated anime status activity cards.
+- Defer Follow, Like, Comment, and Comment Reply notifications, preferences, deduplication, reports, moderation, and Block integrations to Phase 9.
+- Keep all social interaction UI absent.
+- Stop after validation and wait for approval.
+
+### Phase 9: Social Interactions
+
+Status: FINAL MVP PHASE.
+
+- Add Follow/Unfollow, follower/following counts, Following feed behavior, and Followers-only visibility choices.
+- Add Likes for Posts, Reviews, Activity cards, and Comments.
+- Add text-only Comments, flat Comment Replies, and removable Reply Tags.
+- Add Comment and Comment Reply reporting/moderation plus full Block enforcement across social mutations.
+- Add social notification sources, preferences, target access, and deduplication.
+- Unhide and enable all approved social UI across feed, Review, User Profile, notifications, privacy, Block, report, and moderation surfaces.
+- Do not retain disabled social placeholders after functional UI is available.
 - Stop after validation and wait for approval.
 
 ## Optional Future Features

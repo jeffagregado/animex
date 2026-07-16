@@ -31,12 +31,12 @@ Status: SUPERSEDED by the implemented Phase 5 specs dated 2026-07-14 and 2026-07
 
 - Home retains approved desktop two-column and mobile single-column geometry.
 - Composer opens desktop dialog or mobile sheet.
-- Feed cards use one flat card boundary, readable author/time row, body/media, then disabled Phase 7 controls for signed-in viewers.
+- Feed cards use one flat card boundary, readable author/time row, and body/media; pre-Phase 7 cleanup removes disabled social controls from the DOM.
 - Post spoiler masks text/images. Owner menu holds edit, visibility, delete.
 - Loading, empty, error, retry, terminal states preserve layout.
 
 ## Review Detail
 
 - Public shell, centered readable article column, compact anime identity block, author/time/visibility metadata, Rating prominence, owner menu.
-- No separate Comments. Signed-in Like affordance remains disabled until Phase 7; signed-out hides it.
+- No separate Comments. Social Like UI stays absent until functional Phase 9 behavior is ready.
 - Responsive typography and media never exceed article width.

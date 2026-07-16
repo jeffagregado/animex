@@ -6,7 +6,7 @@ Status: IMPLEMENTED, VERIFIED, and integrated on `dev`; final closure is tracked
 
 Improve Review authoring media placement and spoiler editing, replace Post file uploads with one external media URL, simplify feed owner actions, add activity metadata, align Home utility surfaces, and remove the Discover main-column Genres section.
 
-No Phase 7 social behavior. No production deployment. No Convex actions. No new production dependency.
+No social mutation behavior. No production deployment. No Convex actions. No new production dependency.
 
 ## Reference Behavior
 
@@ -146,4 +146,4 @@ Migration must report processed, deleted, preserved, and storage-deletion counts
 - No random image alt identifiers.
 - No Review source deletion from feed cards.
 - No removal of desktop Top Genres or genre filters.
-- No Phase 7 Like, Comment, Follow, or bookmark behavior.
+- No Like, Comment, Follow, or bookmark behavior.

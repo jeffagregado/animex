@@ -756,7 +756,7 @@ Status: COMPLETE and integrated on `dev`; implementation, migrations, browser QA
 - [x] Implement indexed Review discovery and verified migration. Owner: Convex Review worker.
 - [x] Implement atomic List Progress projection and verified migration. Owner: Convex user-anime worker.
 - [x] Reuse Discover Seasonal/This Week/Upcoming and restore Home desktop utilities. Owner: Home workers.
-- [x] Match approved feed-card structure without fake Phase 7 data. Owner: feed UI worker.
+- [x] Match approved feed-card structure without fake social data. Owner: feed UI worker.
 - [x] Build `/reviews` search, filters, visibility, and infinite pagination. Owner: Review discovery UI worker.
 - [x] Integrate generated files and run closure gates: 83 test files passed / 2 skipped; 566 tests passed / 3 skipped; routes, Convex sync, TypeScript, client + SSR build, Fallow new-only audit, client AniList endpoint scan, and diff check pass. Authenticated browser QA covers full Review toolbar and owner actions, Home utility order, Review visibility/search/filter states, account-default visibility, 44 px touch targets, console, requests, and responsive overflow. Owner: controller + reviewer + QA.
 
@@ -849,3 +849,42 @@ Status: COMPLETE. Quiet Signal landing, AnimeX favicon set, automated gates, rev
 - [x] Implement responsive CSS signal, mobile content-only layout, and reduced-motion behavior.
 - [x] Replace TanStack starter icons with AnimeX SVG, ICO, Apple touch, and manifest assets.
 - [x] Complete focused/full tests, TypeScript, client/SSR build, React Doctor, Fallow, diff check, implementation review, and browser QA.
+
+# Pre-Phase 7 Social UI Embargo
+
+Status: SCOPE LOCKED. Detailed cleanup planning happens later; no source implementation has started.
+
+- [x] Move Follow, Like, Comment, Comment Reply, Following-feed behavior, and Followers-only UI activation to final Phase 9.
+- [x] Require social interaction UI to be absent from the DOM before Phase 7; no CSS hiding or disabled `Coming later` placeholders.
+- [x] Require direct Following-feed selection to normalize to Home until Phase 9.
+- [x] Hide Followers-only choices from creation, owner-action, discovery-filter, and privacy-setting UI while preserving backend contracts and stored values.
+- [x] Allow owners of existing Followers-only content to change visibility to Public or Private during the embargo.
+- [ ] Inspect and lock the complete UI, route, query, visibility, test, and browser-QA cleanup surface.
+- [ ] Write, review, and approve the detailed pre-Phase 7 cleanup implementation plan.
+- [ ] Implement and validate the approved cleanup plan.
+
+# Phase 7 User Profile
+
+Status: SCOPE ADJUSTED. Detailed planning has not started.
+
+- [x] Keep profile header, Review tab, latest favorites, anime stats, and viewer-allowed profile activity in Phase 7.
+- [x] Defer Follow actions, follower/following counts, Likes, Comments, Comment counts, Like counts, and social activity footers to Phase 9.
+- [ ] Write and approve Phase 7 design/spec and implementation plan after embargo cleanup passes.
+
+# Phase 8 Notifications, Privacy, Moderation
+
+Status: SCOPE ADJUSTED. Detailed planning has not started.
+
+- [x] Keep notification foundations, required moderation notifications, Public/Private privacy tools, Block/Unblock, and Post/Review reports in Phase 8.
+- [x] Defer social notifications, preferences, deduplication, Followers-only UI, Comment/Reply reports, social moderation, and social Block integrations to Phase 9.
+- [ ] Write and approve Phase 8 design/spec and implementation plan after Phase 7 closes.
+
+# Phase 9 Social Interactions
+
+Status: FINAL MVP PHASE. Scope locked; detailed planning has not started.
+
+- [x] Own Follow/Unfollow, follower/following counts, Following feed, and Followers-only UI.
+- [x] Own feed-card Likes, Review Likes, Comment Likes, text-only Comments, flat Comment Replies, and Reply Tags.
+- [x] Own social reports, moderation, Block enforcement, notifications, preferences, target access, and deduplication.
+- [x] Require all approved social UI to become functional and visible together; no disabled placeholders remain.
+- [ ] Write and approve Phase 9 design/spec and implementation plan after Phase 8 closes.

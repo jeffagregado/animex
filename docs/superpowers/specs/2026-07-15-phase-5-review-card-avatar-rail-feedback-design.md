@@ -13,7 +13,7 @@ Status: IMPLEMENTED, VERIFIED, and integrated on `dev`; final reviewer, independ
 
 ## Scope
 
-Refine existing Phase 5 Review and feed surfaces without changing unrelated feed behavior, visibility rules, routing, pagination, or Phase 7 controls.
+Refine existing Phase 5 Review and feed surfaces without changing unrelated feed behavior, visibility rules, routing, pagination, or deferred social controls.
 
 No production dependency, new route, AniList query, Convex action, or deployment.
 

@@ -81,7 +81,9 @@ Use Approach 1: a dedicated landing composition for the root route.
 ## Phase Order
 
 - Quiet Signal Landing is Phase 6.
-- Profile And Social is Phase 7.
+- Pre-Phase 7 cleanup removes all social interaction UI from the DOM.
+- User Profile is Phase 7.
 - Notifications, Privacy, Moderation is Phase 8.
+- Social Interactions is final Phase 9.
 
 No implementation starts before the Phase 6 implementation plan is approved.

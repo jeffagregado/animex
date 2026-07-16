@@ -6,7 +6,7 @@ Status: IMPLEMENTED, VERIFIED, and integrated on `dev`; final closure is tracked
 
 Refresh Home layout, restore desktop utility content, align feed cards with approved Home reference, and add searchable global Review discovery at `/reviews`.
 
-No Phase 7 social behavior. No production deployment. No Convex actions.
+No social mutation behavior. No production deployment. No Convex actions.
 
 ## Visual Sources
 
@@ -73,8 +73,8 @@ Signed-in utility order:
 - Completed/Rewatched cards show available activity and anime metadata only.
 - Posts keep text, one optional external image/video media item, and whole-Post spoiler behavior. No Post anime attachment in Phase 5; anime attachment remains optional backlog.
 - Preserve owner edit, visibility, delete, Review Detail, direct activity links, and spoiler reveal.
-- Signed-in Like and Comment affordances remain disabled and labeled `Coming in Phase 7`.
-- No fake reaction counts, bookmark state, milestone Score, descriptions, or Phase 7 mutations.
+- Pre-Phase 7 Social UI Embargo requires signed-in Like and Comment affordances to be absent from the DOM; functional controls belong to Phase 9.
+- No fake reaction counts, bookmark state, milestone Score, descriptions, or social mutations.
 
 ## Reviews Route
 
@@ -135,7 +135,7 @@ Behavior:
 - Review-query integration coverage: latest-public limit/order, visibility isolation, search fields, rating bands, each sort, composite cursor continuation, deduplication, retry, and terminal state.
 - Progress integration coverage: four counts, status transitions, unset state, idempotency, and backfill.
 - Home tests: auth-specific utility order, public query isolation, removed placeholders, reused Discover Seasonal/This Week/Upcoming, and `See more` route.
-- Feed-card tests: activity variants, accent classes, preserved owner/spoiler behavior, and absence of fake Phase 7 data.
+- Feed-card tests: activity variants, accent classes, preserved owner/spoiler behavior, and absence of fake social data.
 - Reviews route tests: URL normalization, debounce, Relevance mode, filters, infinite-scroll trigger, visibility controls, cards, and states.
 - Run Convex push, focused tests, full tests, TypeScript, build, Fallow new-only gate, client AniList-endpoint scan, and `git diff --check`.
 - Browser QA at 390, 768, and 1280 px covers hover, focus, touch, Select popup theming, infinite scroll, retry, auth states, console, failed requests, layout shift, and overflow.

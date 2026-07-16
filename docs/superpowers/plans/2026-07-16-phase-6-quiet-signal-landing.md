@@ -962,7 +962,7 @@ Status: COMPLETE. Approved landing and AnimeX favicon set are implemented and va
 - Native CSS ambient motion becomes static under reduced-motion preference.
 - Shared root head publishes AnimeX SVG, ICO, Apple touch, and manifest assets derived from the existing logo mark.
 - Phase 6 validation and responsive browser QA are complete.
-- Stop and wait for approval before Phase 7.
+- Stop and wait for approval before pre-Phase 7 Social UI Embargo cleanup.
 ```
 
 - [x] **Step 6: Commit closure docs**
@@ -987,6 +987,6 @@ Expected: clean worktree; Phase 6 commits visible; no diff-check errors.
 ## Handoff Boundaries
 
 - No deployment or push without explicit user request.
-- No Phase 7 work starts automatically.
+- No pre-Phase 7 cleanup or Phase 7 work starts automatically.
 - If browser QA exposes visual drift, fix Task 2 styles only unless evidence proves route/head cause.
 - If favicon render is unclear below 32px, refine only `public/favicon.svg`, regenerate derivatives, and rerun Task 3 checks.
