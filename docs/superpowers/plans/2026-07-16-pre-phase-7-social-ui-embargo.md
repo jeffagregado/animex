@@ -167,9 +167,18 @@ export function resolveVisibilitySelection(
 ): Visibility {
   return selection ?? original
 }
+
+/**
+ * Temporary compile bridge for consumers migrated in Tasks 3-4.
+ * Remove after the final consumer uses the typed embargo helpers.
+ */
+export function getVisibilityLabel(visibility: Visibility): string {
+  if (visibility === 'followers') return 'Followers'
+  return getActiveVisibilityLabel(visibility)
+}
 ```
 
-- [ ] **Step 1: Write the red policy tests**
+- [x] **Step 1: Write the red policy tests**
 
 Create `src/features/social/visibility.test.ts`:
 
@@ -210,7 +219,7 @@ describe('social visibility embargo policy', () => {
 })
 ```
 
-- [ ] **Step 2: Verify the red state**
+- [x] **Step 2: Verify the red state**
 
 Run:
 
@@ -220,11 +229,14 @@ pnpm exec vitest run src/features/social/visibility.test.ts
 
 Expected: FAIL because the embargo policy exports do not exist.
 
-- [ ] **Step 3: Replace the generic label map with the typed policy**
+- [x] **Step 3: Add the typed policy with a temporary compile bridge**
 
-Implement the contract above in `src/features/social/visibility.ts`. Do not edit shared visibility schemas or generated Convex contracts.
+Implement the contract above in `src/features/social/visibility.ts`. Keep the
+temporary `getVisibilityLabel` compatibility export until Tasks 3-4 migrate all
+four current consumers. Do not edit shared visibility schemas or generated
+Convex contracts.
 
-- [ ] **Step 4: Verify the contract**
+- [x] **Step 4: Verify the contract**
 
 Run:
 
@@ -235,7 +247,7 @@ pnpm exec tsc --noEmit
 
 Expected: both test files PASS; TypeScript exits `0`; shared `followers` parsing remains valid.
 
-- [ ] **Step 5: Commit the shared client contract**
+- [x] **Step 5: Commit the shared client contract**
 
 ```powershell
 git add -- src/features/social/visibility.ts src/features/social/visibility.test.ts
@@ -713,6 +725,7 @@ git commit -m "refactor: embargo followers post ui"
 - Verify: `src/features/reviews/ui/review-detail-page.test.ts`
 - Modify: `src/features/reviews/ui/published-review-card.tsx`
 - Modify: `src/features/reviews/ui/published-review-card.test.tsx`
+- Modify: `src/features/social/visibility.ts`
 
 **Editor contract:**
 
@@ -850,7 +863,20 @@ In `published-review-card.tsx`:
   : null}
 ```
 
-- [ ] **Step 6: Run focused checks**
+- [ ] **Step 6: Remove the temporary visibility-label bridge**
+
+After the Post and Review consumers use the typed embargo helpers, delete the
+temporary `getVisibilityLabel` export from `src/features/social/visibility.ts`.
+
+Run:
+
+```powershell
+rg -n "getVisibilityLabel" src
+```
+
+Expected: exit `1` with no matches.
+
+- [ ] **Step 7: Run focused checks**
 
 ```powershell
 pnpm exec vitest run src/features/social/visibility.test.ts src/features/reviews/ui/review-editor-page.test.tsx src/features/reviews/ui/review-detail-page.test.ts src/features/reviews/ui/review-detail-page.behavior.test.tsx src/features/reviews/ui/published-review-card.test.tsx
@@ -859,10 +885,10 @@ pnpm exec tsc --noEmit
 
 Expected: PASS; no Review Like or Followers label; legacy preservation and explicit migration are covered.
 
-- [ ] **Step 7: Commit Review embargo behavior**
+- [ ] **Step 8: Commit Review embargo behavior**
 
 ```powershell
-git add -- src/features/reviews/ui/review-editor-page.tsx src/features/reviews/ui/review-editor-page.test.tsx src/features/reviews/ui/review-detail-page.tsx src/features/reviews/ui/review-detail-page.behavior.test.tsx src/features/reviews/ui/published-review-card.tsx src/features/reviews/ui/published-review-card.test.tsx
+git add -- src/features/social/visibility.ts src/features/reviews/ui/review-editor-page.tsx src/features/reviews/ui/review-editor-page.test.tsx src/features/reviews/ui/review-detail-page.tsx src/features/reviews/ui/review-detail-page.behavior.test.tsx src/features/reviews/ui/published-review-card.tsx src/features/reviews/ui/published-review-card.test.tsx
 git commit -m "refactor: embargo followers review ui"
 ```
 
