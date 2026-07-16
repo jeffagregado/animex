@@ -30,7 +30,7 @@ describe('PublishedReviewCard', () => {
     expect(screen.getByText('2h ago')).toBeTruthy()
     const rating = screen.getByLabelText('Rating: 90 out of 100')
     expect(screen.getByText('Visible ending summary')).toBeTruthy()
-    expect(screen.getByText('My Followers')).toBeTruthy()
+    expect(screen.queryByText(/Followers/)).toBeNull()
     expect(screen.getByText('Spoiler')).toBeTruthy()
     const detailLink = screen.getByRole('link', { name: 'Review Detail' })
     expect(screen.getAllByLabelText('Rating: 90 out of 100')).toHaveLength(1)
@@ -43,6 +43,15 @@ describe('PublishedReviewCard', () => {
     expect(detailLink.className).toContain('hover:underline')
     expect(screen.queryByRole('img', { name: /avatar/i })).toBeNull()
     expect(screen.queryByText(/body/i)).toBeNull()
+  })
+
+  it('labels private owner-only Reviews without exposing Followers wording', () => {
+    render(<PublishedReviewCard review={{ ...publishedReview, visibility: 'followers' }} />)
+    expect(screen.queryByText(/Followers/)).toBeNull()
+    cleanup()
+
+    render(<PublishedReviewCard review={{ ...publishedReview, visibility: 'private' }} />)
+    expect(screen.getByText('My Private')).toBeTruthy()
   })
 
   it('keeps long listing content separate from mobile rating and detail actions', () => {

@@ -12,7 +12,7 @@ vi.mock('#/features/shell/public-auth-context', () => ({ usePublicAuthState: moc
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => mocks.navigate }))
 vi.mock('sonner', () => ({ toast: { error: mocks.error, success: mocks.success } }))
 vi.mock('#/components/ui/select', () => ({
-  Select: ({ children, onValueChange, value }: { children: React.ReactNode; onValueChange: (value: string) => void; value: string }) => <select aria-label="Change visibility" onChange={(event) => onValueChange(event.target.value)} value={value}>{children}</select>,
+  Select: ({ children, onValueChange, value }: { children: React.ReactNode; onValueChange: (value: string) => void; value: string | null }) => <select aria-label="Change visibility" onChange={(event) => onValueChange(event.target.value)} value={value ?? ''}>{children}</select>,
   SelectTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>, SelectValue: () => null, SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => <option value={value}>{children}</option>,
 }))
@@ -68,5 +68,22 @@ describe('ReviewDetailContent behavior', () => {
     await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith({ reviewId: 'current' }))
     expect(mocks.success).toHaveBeenCalledWith('Review deleted.')
     expect(mocks.navigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/anime/$anilistId/$slug' }))
+  })
+
+  it.each(['public', 'private'] as const)('embargoes Followers UI and lets owner select %s', async (visibility) => {
+    mocks.query.mockImplementation((_query, args: { reviewId?: string }) => args.reviewId ? { ...detail, visibility: 'followers' } : morePage)
+
+    render(<ReviewDetailContent reviewId="current" />)
+
+    expect(screen.queryByRole('button', { name: /Like/ })).toBeNull()
+    expect(screen.queryByText(/Followers/)).toBeNull()
+    const select = screen.getByLabelText('Change visibility')
+    expect(select.textContent).toContain('Public')
+    expect(select.textContent).toContain('Private')
+    expect(select.textContent).not.toContain('Followers')
+
+    fireEvent.change(select, { target: { value: visibility } })
+
+    await waitFor(() => expect(mocks.visibility).toHaveBeenCalledWith({ reviewId: 'current', visibility }))
   })
 })

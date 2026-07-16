@@ -25,7 +25,7 @@ export function PublishedReviewCard({ review }: { review: ReviewListItem }) {
         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span className="font-bold text-foreground">{review.author.displayName}</span>
           <time dateTime={new Date(review.publishedAt).toISOString()} title={new Date(review.publishedAt).toLocaleString()}>{formatRelativeTime(review.publishedAt)}</time>
-          {review.visibility === 'public' ? null : <Badge variant="outline">{review.visibility === 'followers' ? 'My Followers' : 'My Private'}</Badge>}
+          {review.visibility === 'private' ? <Badge variant="outline">My Private</Badge> : null}
         </div>
         <ReviewSummary summary={review.summary} variant="list" />
       </div>

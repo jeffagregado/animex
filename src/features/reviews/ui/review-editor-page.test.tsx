@@ -102,6 +102,43 @@ describe('LoadedReviewEditor lifecycle', () => {
     await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({ rating: 90, containsSpoiler: true })))
   })
 
+  it('preserves an existing Followers Review when visibility is untouched', async () => {
+    const followersReview = { ...published, body: textDocument('Published body'), visibility: 'followers' as const }
+    render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={followersReview as never} mode="edit" />)
+
+    expect(screen.getByRole('combobox').textContent).toContain('Change visibility')
+    fireEvent.change(screen.getByLabelText(/Summary/), { target: { value: 'Updated summary' } })
+    fireEvent.click(screen.getByRole('button', { name: /Update review/ }))
+
+    await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      reviewId: 'review-1',
+      visibility: 'followers',
+    })))
+  })
+
+  it('migrates an existing Followers Review after explicit selection', async () => {
+    const followersReview = { ...published, body: textDocument('Published body'), visibility: 'followers' as const }
+    render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={followersReview as never} mode="edit" />)
+
+    fireEvent.click(screen.getByRole('combobox'))
+    fireEvent.click(await screen.findByRole('option', { name: 'Public' }))
+    fireEvent.click(screen.getByRole('button', { name: /Update review/ }))
+
+    await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      visibility: 'public',
+    })))
+  })
+
+  it('offers Public and Private visibility choices only', async () => {
+    render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={null} mode="create" />)
+
+    fireEvent.click(screen.getByRole('combobox'))
+
+    expect(await screen.findByRole('option', { name: 'Public' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'Private' })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: 'Followers' })).toBeNull()
+  })
+
   it('disables the spoiler checkbox during Publish and preserves its state', async () => {
     publish.mockImplementation(() => new Promise(() => {}))
     render(<LoadedReviewEditor anime={anime} defaultVisibility="private" existing={null} mode="create" />)
@@ -170,9 +207,9 @@ describe('ReviewEditorPage existing Review routing', () => {
 
   it.each([
     ['public', 'Public'],
-    ['followers', 'Followers'],
     ['private', 'Private'],
-  ] as const)('defaults a new Review to the account %s visibility', (visibility, label) => {
+    ['followers', 'Private'],
+  ] as const)('maps a new Review account %s default to %s', (visibility, label) => {
     publicAuth.mockReturnValue({ status: 'ready', authState: { status: 'complete', email: 'fan@example.test', profile: { id: 'author-1', username: 'fan', name: 'Fan', avatarUrl: null, visibility } } })
     vi.mocked(useQuery).mockReturnValue(null as ReturnType<typeof useQuery>)
 

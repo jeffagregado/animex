@@ -15,14 +15,21 @@ import { REVIEW_DOCUMENT_MAX_VISIBLE_TEXT, REVIEW_SUMMARY_LIMIT, type ReviewDocu
 import { createEmptyReviewDocument, parseReviewWireDetail, serializeReviewEditorState } from '../review-document-adapter'
 import { getReviewVisibleTextLength, isCompleteReviewRating, parseReviewRating, validateReviewEditorFields, type ReviewSaveMode } from '../review-validation'
 import { usePublicAuthState } from '#/features/shell/public-auth-context'
-import { getVisibilityLabel } from '#/features/social/visibility'
+import {
+  activeVisibilityOptions,
+  getActiveVisibilityLabel,
+  getVisibilitySelection,
+  resolveVisibilitySelection,
+  type ActiveVisibility,
+  type VisibilitySelection,
+} from '#/features/social/visibility'
 import { createReviewRequestState, getReviewRequestId, settleReviewRequest } from '../review-request-ids'
 import { ReviewEditor } from './review-editor'
 import { ReviewPreview } from './review-preview'
 
 type ReviewEditorAnime = Pick<AnimeDetail, 'anilistId' | 'coverImageUrl' | 'episodes' | 'format' | 'seasonYear' | 'slug' | 'titles'>
 type ReviewEditorPageProps = { anime: ReviewEditorAnime | null; mode: 'create' | 'edit'; reviewId: string | null }
-type EditorFields = { body: ReviewDocumentV1; rating: string; summary: string; containsSpoiler: boolean; visibility: Visibility }
+type EditorFields = { body: ReviewDocumentV1; rating: string; summary: string; containsSpoiler: boolean; visibility: VisibilitySelection }
 type EditorChange = <K extends keyof EditorFields>(key: K, value: EditorFields[K]) => void
 type ReviewMutationFields = { rating: number | null; summary: string; containsSpoiler: boolean; bodyJson: string; visibility: Visibility }
 type PublishedReviewMutationFields = Omit<ReviewMutationFields, 'rating'> & { rating: number }
@@ -31,12 +38,12 @@ type ReviewSaveContext = {
   existing: ReviewDetail | null
   fields: EditorFields
   mode: 'create' | 'edit'
+  originalVisibility: Visibility
   publish: (input: PublishedReviewMutationFields & { anilistId: number; requestId: string }) => Promise<string>
   requestState: { current: ReturnType<typeof createReviewRequestState> }
   saveDraft: (input: ReviewMutationFields & { anilistId: number; requestId: string }) => Promise<unknown>
   update: (input: Omit<ReviewMutationFields, 'rating'> & { rating: number; reviewId: Id<'reviews'> }) => Promise<unknown>
 }
-const visibilityOptions: Visibility[] = ['private', 'followers', 'public']
 
 /** Owns Review Draft/Publish persistence, preview, and unsaved-navigation safety. */
 export function ReviewEditorPage({ anime, mode, reviewId }: ReviewEditorPageProps) {
@@ -78,7 +85,11 @@ function AuthenticatedReviewEditor({ anime, existing, mode }: { anime: ReviewEdi
 }
 
 export function LoadedReviewEditor({ anime, defaultVisibility, existing, mode }: { anime: ReviewEditorAnime; defaultVisibility: Visibility; existing: ReviewDetail | null; mode: 'create' | 'edit' }) {
-  const [fields, setFields] = useState<EditorFields>(() => existing ? fromExisting(existing) : { body: createEmptyReviewDocument(), rating: String(REVIEW_RATING_DEFAULT), summary: '', containsSpoiler: false, visibility: defaultVisibility })
+  const originalVisibility = existing?.visibility ?? defaultVisibility
+  const initialVisibility = getVisibilitySelection(originalVisibility, existing !== null)
+  const [fields, setFields] = useState<EditorFields>(() => existing
+    ? { ...fromExisting(existing), visibility: initialVisibility }
+    : { body: createEmptyReviewDocument(), rating: String(REVIEW_RATING_DEFAULT), summary: '', containsSpoiler: false, visibility: initialVisibility })
   const [tab, setTab] = useState<'editor' | 'preview'>('editor')
   const [dirty, setDirty] = useState(false)
   const [pending, setPending] = useState<ReviewSaveMode | null>(null)
@@ -105,8 +116,9 @@ export function LoadedReviewEditor({ anime, defaultVisibility, existing, mode }:
     setErrors([])
     try {
       const bodyJson = serializeReviewEditorState(fields.body.editorState)
-      const requestPayload = JSON.stringify({ rating, summary: fields.summary, containsSpoiler: fields.containsSpoiler, bodyJson, visibility: fields.visibility })
-      const completedId = await saveReview({ animeId: anime.anilistId, existing, fields, mode, publish, requestState, saveDraft, update }, intent, rating, bodyJson, requestPayload)
+      const resolvedVisibility = resolveVisibilitySelection(originalVisibility, fields.visibility)
+      const requestPayload = JSON.stringify({ rating, summary: fields.summary, containsSpoiler: fields.containsSpoiler, bodyJson, visibility: resolvedVisibility })
+      const completedId = await saveReview({ animeId: anime.anilistId, existing, fields, mode, originalVisibility, publish, requestState, saveDraft, update }, intent, rating, bodyJson, requestPayload)
       setDirty(false)
       setCompletedReviewId(completedId)
     } catch (cause) {
@@ -158,13 +170,13 @@ function UnsavedChangesDialog({ blocked, onDiscard, onStay }: { blocked: boolean
 }
 
 function ReviewFields({ disabled, fields, onChange }: { disabled: boolean; fields: EditorFields; onChange: EditorChange }) {
-  return <div className="mb-5 grid gap-4 md:grid-cols-[10rem_1fr_11rem]"><label className="text-sm font-bold">Review Rating<input aria-label="Review Rating" className="mt-2 min-h-12 w-full rounded-lg border border-border bg-card px-3 text-xl font-black" inputMode="decimal" onChange={(event) => onChange('rating', event.currentTarget.value)} type="text" value={fields.rating} /></label><label className="text-sm font-bold">Summary <span className="float-right font-normal text-muted-foreground">{fields.summary.length} / {REVIEW_SUMMARY_LIMIT}</span><input className="mt-2 min-h-12 w-full rounded-lg border border-border bg-card px-3" maxLength={REVIEW_SUMMARY_LIMIT} onChange={(event) => onChange('summary', event.currentTarget.value)} value={fields.summary} /></label><label className="text-sm font-bold">Visibility<Select onValueChange={(value) => { if (value) onChange('visibility', value as Visibility) }} value={fields.visibility}><SelectTrigger className="mt-2 min-h-12"><SelectValue>{getVisibilityLabel(fields.visibility)}</SelectValue></SelectTrigger><SelectContent>{visibilityOptions.map((value) => <SelectItem key={value} value={value}>{getVisibilityLabel(value)}</SelectItem>)}</SelectContent></Select></label><div className="flex min-h-11 w-full items-center justify-end gap-2 text-sm text-muted-foreground md:col-span-3" data-review-spoiler-row><Checkbox checked={fields.containsSpoiler} disabled={disabled} id="review-contains-spoiler" onCheckedChange={(checked) => onChange('containsSpoiler', checked)} /><label htmlFor="review-contains-spoiler">Review contains spoiler</label></div></div>
+  return <div className="mb-5 grid gap-4 md:grid-cols-[10rem_1fr_11rem]"><label className="text-sm font-bold">Review Rating<input aria-label="Review Rating" className="mt-2 min-h-12 w-full rounded-lg border border-border bg-card px-3 text-xl font-black" inputMode="decimal" onChange={(event) => onChange('rating', event.currentTarget.value)} type="text" value={fields.rating} /></label><label className="text-sm font-bold">Summary <span className="float-right font-normal text-muted-foreground">{fields.summary.length} / {REVIEW_SUMMARY_LIMIT}</span><input className="mt-2 min-h-12 w-full rounded-lg border border-border bg-card px-3" maxLength={REVIEW_SUMMARY_LIMIT} onChange={(event) => onChange('summary', event.currentTarget.value)} value={fields.summary} /></label><label className="text-sm font-bold">Visibility<Select onValueChange={(value) => { if (value) onChange('visibility', value as ActiveVisibility) }} value={fields.visibility}><SelectTrigger className="mt-2 min-h-12"><SelectValue>{fields.visibility === null ? 'Change visibility' : getActiveVisibilityLabel(fields.visibility)}</SelectValue></SelectTrigger><SelectContent>{activeVisibilityOptions.map((value) => <SelectItem key={value} value={value}>{getActiveVisibilityLabel(value)}</SelectItem>)}</SelectContent></Select></label><div className="flex min-h-11 w-full items-center justify-end gap-2 text-sm text-muted-foreground md:col-span-3" data-review-spoiler-row><Checkbox checked={fields.containsSpoiler} disabled={disabled} id="review-contains-spoiler" onCheckedChange={(checked) => onChange('containsSpoiler', checked)} /><label htmlFor="review-contains-spoiler">Review contains spoiler</label></div></div>
 }
 
 function AnimeIdentity({ anime }: { anime: ReviewEditorAnime }) { return <header className="flex items-center gap-4 border-b border-border pb-5">{anime.coverImageUrl ? <img alt={`${anime.titles.display} cover`} className="h-28 w-20 rounded-lg object-cover" src={anime.coverImageUrl} /> : null}<div><p className="text-2xl font-black">{anime.titles.display}</p><p className="mt-2 text-muted-foreground">{[anime.format, anime.seasonYear, anime.episodes === null ? null : `${anime.episodes} episodes`].filter(Boolean).join(' · ')}</p></div></header> }
 function EditorLoading() { return <main className="mx-auto max-w-[1480px] px-4 py-10"><div className="h-32 animate-pulse rounded-xl bg-white/5" /><div className="mt-6 h-96 animate-pulse rounded-xl bg-white/5" /></main> }
 function EditorState({ title, message }: { title: string; message: string }) { return <main className="mx-auto grid min-h-[55dvh] max-w-3xl place-items-center px-4 text-center"><div><h1 className="text-2xl font-black">{title}</h1><p className="mt-2 text-muted-foreground">{message}</p></div></main> }
-const fromExisting = (review: ReviewDetail): EditorFields => ({ body: review.body, rating: review.rating === null ? '' : String(review.rating), summary: review.summary, containsSpoiler: review.containsSpoiler, visibility: review.visibility })
+const fromExisting = (review: ReviewDetail): Omit<EditorFields, 'visibility'> => ({ body: review.body, rating: review.rating === null ? '' : String(review.rating), summary: review.summary, containsSpoiler: review.containsSpoiler })
 const getPreviewRating = (value: string): number | null => isCompleteReviewRating(value) ? Number(value) : null
 const getEditorSaveErrors = (editorInvalid: boolean, currentErrors: string[], fields: EditorFields, intent: ReviewSaveMode): string[] => {
   if (!editorInvalid) return validateReviewEditorFields(fields, intent)
@@ -174,7 +186,8 @@ const toEditorAnime = (review: ReviewDetail): ReviewEditorAnime => ({ anilistId:
 
 /** Runs one Review mutation while preserving request idempotency state. */
 const saveReview = async (context: ReviewSaveContext, intent: ReviewSaveMode, rating: number | null, bodyJson: string, requestPayload: string): Promise<string | null> => {
-  const fields = { rating, summary: context.fields.summary, containsSpoiler: context.fields.containsSpoiler, bodyJson, visibility: context.fields.visibility }
+  const visibility = resolveVisibilitySelection(context.originalVisibility, context.fields.visibility)
+  const fields = { rating, summary: context.fields.summary, containsSpoiler: context.fields.containsSpoiler, bodyJson, visibility }
   if (context.mode === 'edit') {
     if (!context.existing || rating === null) throw new Error('Published Review requires an editable Rating.')
     await context.update({ ...fields, rating, reviewId: context.existing.id as Id<'reviews'> })

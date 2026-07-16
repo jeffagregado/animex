@@ -14,11 +14,6 @@ export function getActiveVisibilityLabel(visibility: ActiveVisibility): string {
   return activeVisibilityLabels[visibility]
 }
 
-/** @deprecated Temporary bridge until legacy visibility consumers migrate. */
-export function getVisibilityLabel(visibility: Visibility): string {
-  return visibility === 'followers' ? 'Followers' : getActiveVisibilityLabel(visibility)
-}
-
 /** Hides legacy Followers wording while retaining Public/Private labels. */
 export function getVisibleVisibilityLabel(visibility: Visibility): string | null {
   return visibility === 'followers' ? null : getActiveVisibilityLabel(visibility)

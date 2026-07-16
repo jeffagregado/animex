@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   activeVisibilityOptions,
   getActiveVisibilityLabel,
-  getVisibilityLabel,
   getVisibilitySelection,
   getVisibleVisibilityLabel,
   resolveVisibilitySelection,
@@ -31,11 +30,5 @@ describe('social visibility embargo policy', () => {
     expect(getVisibleVisibilityLabel('followers')).toBeNull()
     expect(getVisibleVisibilityLabel('public')).toBe('Public')
     expect(getVisibleVisibilityLabel('private')).toBe('Private')
-  })
-
-  it('keeps the temporary legacy label bridge compile-compatible', () => {
-    expect(getVisibilityLabel('followers')).toBe('Followers')
-    expect(getVisibilityLabel('public')).toBe('Public')
-    expect(getVisibilityLabel('private')).toBe('Private')
   })
 })
