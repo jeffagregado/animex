@@ -12,7 +12,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AuthState } from '#/features/auth/auth-contracts'
 import { LandingPage } from '#/features/landing/landing-page'
-import { Route, getLandingHead } from './index'
+import { getLandingHead } from './-index-head'
+import { Route } from './index'
 
 /** Stubs one successful public auth-state response. */
 const stubAuthState = (authState: AuthState) => {
