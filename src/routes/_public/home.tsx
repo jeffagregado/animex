@@ -52,11 +52,12 @@ const serializeHomeSearch = (state: HomeFeedSearch): HomeRouteSearch => ({
 function useResolvedHomeSearch() {
   const resolution = resolveHomeSearch(Route.useSearch())
   const navigate = Route.useNavigate()
+  const { compose, feed } = resolution.state
 
   useEffect(() => {
     if (!resolution.replace) return
-    void navigate({ search: serializeHomeSearch(resolution.state), replace: true })
-  }, [navigate, resolution.replace, resolution.state.compose, resolution.state.feed])
+    void navigate({ search: serializeHomeSearch({ compose, feed }), replace: true })
+  }, [compose, feed, navigate, resolution.replace])
 
   return {
     replacing: resolution.replace,
