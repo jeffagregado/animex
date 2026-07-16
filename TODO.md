@@ -841,13 +841,11 @@ Post-merge validation: 91 test files passed / 2 skipped; 637 tests passed / 3 sk
 
 # Phase 6 Quiet Signal Landing
 
-Status: IMPLEMENTATION IN PROGRESS on `jeff-cx/phase-6-quiet-signal-landing`.
+Status: COMPLETE. Quiet Signal landing, AnimeX favicon set, automated gates, review, and responsive browser QA pass.
 
-- [x] Select Quiet Signal as approved landing-page direction.
-- [x] Save approved desktop reference under `docs/visual/landing`.
-- [x] Insert landing work as Phase 6; move Profile And Social to Phase 7 and Notifications, Privacy, Moderation to Phase 8.
-- [x] Lock root, shared-header, hero-copy, responsive, motion, accessibility, and Discover-action decisions.
-- [x] Approve Approach 1 dedicated landing composition and AnimeX-derived favicon set.
-- [x] Write and self-review detailed implementation plan.
-- [x] User reviews and approves implementation plan.
-- [ ] Implement only after plan approval.
+- [x] Select and approve Quiet Signal design, desktop reference, responsive behavior, motion, route, header, and favicon contracts.
+- [x] Write, review, and approve detailed implementation plan.
+- [x] Replace `/` redirect with dedicated signed-out/signed-in landing composition; preserve shared public-shell behavior.
+- [x] Implement responsive CSS signal, mobile content-only layout, and reduced-motion behavior.
+- [x] Replace TanStack starter icons with AnimeX SVG, ICO, Apple touch, and manifest assets.
+- [x] Complete focused/full tests, TypeScript, client/SSR build, React Doctor, Fallow, diff check, implementation review, and browser QA.

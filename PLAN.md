@@ -131,19 +131,15 @@ Status: COMPLETE and integrated on `dev`; closure details and latest validation 
 
 ### Phase 6: Quiet Signal Landing
 
-Status: DESIGN APPROVED. IMPLEMENTATION PLAN READY FOR REVIEW.
+Status: COMPLETE. Approved landing and AnimeX favicon set are implemented and validated.
 
-- Replace the `/` redirect with the public Quiet Signal landing page.
-- Reuse the existing `/home` site header and auth-aware header controls.
-- Show the landing page to signed-out and signed-in visitors.
-- Use the approved desktop reference at `docs/visual/landing/quiet-signal-landing-desktop.png`.
-- Lock hero copy to `Find anime worth remembering.` and `Build your list. Share what stays with you.`
-- Link the single `Discover anime` action to `/discover`.
-- Use a dedicated landing composition without `PublicShell` or mobile bottom navigation.
-- Hide rings and oversized `AX` below `768px`; use CSS artwork at `768px` and wider.
-- Use native CSS ambient motion with static reduced-motion behavior.
-- Replace TanStack starter favicons with assets derived from the existing AnimeX circular mark.
-- Follow `docs/superpowers/plans/2026-07-16-phase-6-quiet-signal-landing.md` after user approval.
+- `/` shows the Quiet Signal landing to signed-out and signed-in visitors.
+- Dedicated composition reuses `SiteHeader` and auth controls without `PublicShell` or mobile bottom navigation.
+- Hero copy and single `/discover` action match the accepted design contract.
+- Desktop/tablet use CSS rings and outlined `AX`; widths below `768px` use content-only layout.
+- Native CSS ambient motion becomes static under reduced-motion preference.
+- Shared root head publishes AnimeX SVG, ICO, Apple touch, and manifest assets derived from the existing logo mark.
+- Phase 6 validation and responsive browser QA are complete.
 - Stop after validation and wait for approval.
 
 ### Phase 7: Profile And Social
