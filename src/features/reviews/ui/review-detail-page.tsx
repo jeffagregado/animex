@@ -1,4 +1,4 @@
-import { Component, useState, type ReactNode } from 'react'
+import { Component, useRef, useState, type ReactNode } from 'react'
 import { useConvexAuth, useMutation, useQuery } from 'convex/react'
 import { useNavigate } from '@tanstack/react-router'
 import { EditIcon, EyeIcon, Trash2Icon, UserRoundIcon } from 'lucide-react'
@@ -63,14 +63,76 @@ function Summary({ review }: { review: ReviewDetail }) { return <div><p classNam
 function OwnerActions({ review }: { review: ReviewDetail }) {
   const [confirm, setConfirm] = useState<'activity' | 'delete' | null>(null)
   const [pending, setPending] = useState(false)
+  const visibilityTriggerRef = useRef<HTMLButtonElement>(null)
   const setVisibility = useMutation(api.reviews.setVisibility)
   const removeActivity = useMutation(api.reviews.removeActivity)
   const remove = useMutation(api.reviews.remove)
   const navigate = useNavigate()
-  const changeVisibility = async (visibility: ActiveVisibility): Promise<void> => { setPending(true); try { await setVisibility({ reviewId: review.id as Id<'reviews'>, visibility }); toast.success('Review visibility updated.') } catch (cause) { toast.error(cause instanceof Error ? cause.message : 'Visibility update failed.') } finally { setPending(false) } }
-  const confirmed = async (): Promise<void> => { if (!confirm) return; setPending(true); try { if (confirm === 'activity') { await removeActivity({ reviewId: review.id as Id<'reviews'> }); toast.success('Review activity removed from feed.'); setConfirm(null) } else { await remove({ reviewId: review.id as Id<'reviews'> }); toast.success('Review deleted.'); await navigate({ to: '/anime/$anilistId/$slug', params: { anilistId: String(review.anime.anilistId), slug: review.anime.slug }, search: { tab: 'reviews' }, replace: true }) } } catch (cause) { toast.error(cause instanceof Error ? cause.message : 'Review action failed.') } finally { setPending(false) } }
+  const changeVisibility = async (visibility: ActiveVisibility): Promise<void> => {
+    setPending(true)
+    try {
+      await setVisibility({ reviewId: review.id as Id<'reviews'>, visibility })
+      toast.success('Review visibility updated.')
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Visibility update failed.')
+    } finally {
+      setPending(false)
+      requestAnimationFrame(() => visibilityTriggerRef.current?.focus())
+    }
+  }
+  const confirmed = async (): Promise<void> => {
+    if (!confirm) return
+    setPending(true)
+    try {
+      if (confirm === 'activity') {
+        await removeActivity({ reviewId: review.id as Id<'reviews'> })
+        toast.success('Review activity removed from feed.')
+        setConfirm(null)
+      } else {
+        await remove({ reviewId: review.id as Id<'reviews'> })
+        toast.success('Review deleted.')
+        await navigate({
+          to: '/anime/$anilistId/$slug',
+          params: { anilistId: String(review.anime.anilistId), slug: review.anime.slug },
+          search: { tab: 'reviews' },
+          replace: true,
+        })
+      }
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Review action failed.')
+    } finally {
+      setPending(false)
+    }
+  }
   const selectedVisibility = review.visibility === 'followers' ? null : review.visibility
-  return <section aria-label="Owner actions" className="border-t border-border pt-5"><p className="text-xs font-bold uppercase tracking-wider text-cyan-300">Owner actions</p><div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><a className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-cyan-400/60 text-cyan-300" href={`/reviews/${review.id}/edit`}><EditIcon className="size-4" />Edit review</a><Select disabled={pending} onValueChange={(value) => { if (value) void changeVisibility(value as ActiveVisibility) }} value={selectedVisibility}><SelectTrigger aria-label="Change visibility" className="min-h-11"><EyeIcon className="size-4" /><SelectValue>{selectedVisibility === null ? 'Change visibility' : getActiveVisibilityLabel(selectedVisibility)}</SelectValue></SelectTrigger><SelectContent>{activeVisibilityOptions.map((value) => <SelectItem key={value} value={value}>{getActiveVisibilityLabel(value)}</SelectItem>)}</SelectContent></Select><button className="min-h-11 rounded-lg border border-border font-bold" disabled={pending} onClick={() => setConfirm('activity')} type="button">Remove feed activity</button><button className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-500 text-red-300" disabled={pending} onClick={() => setConfirm('delete')} type="button"><Trash2Icon className="size-4" />Delete review</button></div><Dialog onOpenChange={(open) => { if (!open) setConfirm(null) }} open={confirm !== null}>{confirm ? <DialogContent title={confirm === 'delete' ? 'Delete Review?' : 'Remove feed activity?'}><p className="mt-4 text-muted-foreground">{confirm === 'delete' ? 'This permanently deletes the Review.' : 'The Review stays on Anime Reviews and Review Detail.'}</p><div className="mt-6 grid grid-cols-2 gap-3"><button className="min-h-11 rounded-lg border border-border" onClick={() => setConfirm(null)} type="button">Cancel</button><button className="min-h-11 rounded-lg bg-red-500 font-black text-white" disabled={pending} onClick={() => void confirmed()} type="button">Confirm</button></div></DialogContent> : null}</Dialog></section>
+  return (
+    <section aria-label="Owner actions" className="border-t border-border pt-5">
+      <p className="text-xs font-bold uppercase tracking-wider text-cyan-300">Owner actions</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <a className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-cyan-400/60 text-cyan-300" href={`/reviews/${review.id}/edit`}><EditIcon className="size-4" />Edit review</a>
+        <Select disabled={pending} onValueChange={(value) => { if (value) void changeVisibility(value as ActiveVisibility) }} value={selectedVisibility}>
+          <SelectTrigger aria-label="Change visibility" className="min-h-11" ref={visibilityTriggerRef}>
+            <EyeIcon className="size-4" />
+            <SelectValue>{selectedVisibility === null ? 'Change visibility' : getActiveVisibilityLabel(selectedVisibility)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>{activeVisibilityOptions.map((value) => <SelectItem key={value} value={value}>{getActiveVisibilityLabel(value)}</SelectItem>)}</SelectContent>
+        </Select>
+        <button className="min-h-11 rounded-lg border border-border font-bold" disabled={pending} onClick={() => setConfirm('activity')} type="button">Remove feed activity</button>
+        <button className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-500 text-red-300" disabled={pending} onClick={() => setConfirm('delete')} type="button"><Trash2Icon className="size-4" />Delete review</button>
+      </div>
+      <Dialog onOpenChange={(open) => { if (!open) setConfirm(null) }} open={confirm !== null}>
+        {confirm ? (
+          <DialogContent title={confirm === 'delete' ? 'Delete Review?' : 'Remove feed activity?'}>
+            <p className="mt-4 text-muted-foreground">{confirm === 'delete' ? 'This permanently deletes the Review.' : 'The Review stays on Anime Reviews and Review Detail.'}</p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button className="min-h-11 rounded-lg border border-border" onClick={() => setConfirm(null)} type="button">Cancel</button>
+              <button className="min-h-11 rounded-lg bg-red-500 font-black text-white" disabled={pending} onClick={() => void confirmed()} type="button">Confirm</button>
+            </div>
+          </DialogContent>
+        ) : null}
+      </Dialog>
+    </section>
+  )
 }
 
 function DetailState({ title, message, loading }: { title: string; message: string; loading: boolean }) { return <main className="mx-auto grid min-h-[55dvh] max-w-3xl place-items-center px-4 text-center"><div aria-busy={loading}><h1 className="text-2xl font-black">{title}</h1><p className="mt-2 text-muted-foreground">{message}</p></div></main> }
