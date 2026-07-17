@@ -143,8 +143,10 @@ const deferred = <T,>() => {
 
 const drain = async <T,>(promise: Promise<T>): Promise<void> => {
   await promise
+  await Promise.resolve()
   await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
   await Promise.resolve()
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
 }
 
 beforeEach(() => {
@@ -267,47 +269,60 @@ describe('ProfileImageCropper', () => {
 
   it('stops after a pending upload URL resolves following unmount', async () => {
     const pending = deferred<string>()
+    const onBusyChange = vi.fn()
     mocks.generate.mockReturnValue(pending.promise)
-    const view = renderCropper()
+    const view = renderCropper({ onBusyChange })
     choose()
     await applyAvatar()
     await waitFor(() => expect(mocks.generate).toHaveBeenCalled())
     view.unmount()
+    const callsAtUnmount = [...onBusyChange.mock.calls]
     pending.resolve('https://upload.test')
     await drain(pending.promise)
+    expect(onBusyChange.mock.calls).toEqual(callsAtUnmount)
     expect(mocks.revoke).toHaveBeenCalledWith('blob:source')
     expect(fetch).not.toHaveBeenCalled()
     expect(mocks.register).not.toHaveBeenCalled()
+    expect(mocks.finalize).not.toHaveBeenCalled()
+    expect(view.container.textContent).toBe('')
   })
 
   it('aborts a pending POST and never registers after unmount', async () => {
     const pending = deferred<Response>()
+    const onBusyChange = vi.fn()
     vi.mocked(fetch).mockReturnValue(pending.promise)
-    const view = renderCropper()
+    const view = renderCropper({ onBusyChange })
     choose()
     await applyAvatar()
     await waitFor(() => expect(fetch).toHaveBeenCalled())
     const signal = vi.mocked(fetch).mock.calls[0]?.[1]?.signal
     view.unmount()
+    const callsAtUnmount = [...onBusyChange.mock.calls]
     expect(signal?.aborted).toBe(true)
     pending.resolve(new Response(JSON.stringify({
       storageId: 'storage-late',
     }), { status: 200 }))
     await drain(pending.promise)
+    expect(onBusyChange.mock.calls).toEqual(callsAtUnmount)
     expect(mocks.register).not.toHaveBeenCalled()
     expect(mocks.finalize).not.toHaveBeenCalled()
+    expect(view.container.textContent).toBe('')
   })
 
   it('never finalizes when pending registration resolves after unmount', async () => {
     const pending = deferred<null>()
+    const onBusyChange = vi.fn()
     mocks.register.mockReturnValue(pending.promise)
-    const view = renderCropper()
+    const view = renderCropper({ onBusyChange })
     choose()
     await applyAvatar()
     await waitFor(() => expect(mocks.register).toHaveBeenCalled())
     view.unmount()
+    const callsAtUnmount = [...onBusyChange.mock.calls]
     pending.resolve(null)
     await drain(pending.promise)
+    expect(onBusyChange.mock.calls).toEqual(callsAtUnmount)
     expect(mocks.finalize).not.toHaveBeenCalled()
+    expect(view.container.textContent).toBe('')
   })
 })
