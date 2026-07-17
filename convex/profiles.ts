@@ -1,9 +1,20 @@
 import { ConvexError, v } from 'convex/values'
 
 import type { Doc, Id } from './_generated/dataModel'
-import { query, type QueryCtx } from './_generated/server'
-import { requireProfile, toUsernameKey } from './users'
+import {
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from './_generated/server'
+import {
+  requireProfile,
+  toUsernameKey,
+  upsertUserSearchDocument,
+} from './users'
 
+const PROFILE_BIO_MAX_LENGTH = 300
+const PROFILE_NAME_MAX_LENGTH = 50
 const profileVisibilityValidator = v.union(v.literal('public'), v.literal('private'))
 const animeValidator = v.object({
   anilistId: v.number(),
@@ -53,9 +64,95 @@ export type ProfileAccessResolution = {
   usernameKey: string
 }
 
+type EditableProfileField = 'name' | 'bio' | 'profileVisibility'
+type ProfileEditFieldErrors = Partial<Record<EditableProfileField, string>>
+
+interface ProfileEditInput {
+  name: string
+  bio: string
+  profileVisibility: string
+}
+
+interface NormalizedProfileEdit {
+  name: string
+  bio: string | undefined
+  profileVisibility: 'public' | 'private'
+}
+
 const fail = (code: string, message: string): never => {
   throw new ConvexError({ code, message })
 }
+
+/** Validates and normalizes owner-editable Profile fields. */
+const normalizeProfileEdit = (input: ProfileEditInput): NormalizedProfileEdit => {
+  const name = input.name.trim()
+  const bio = input.bio.trim()
+  const fieldErrors: ProfileEditFieldErrors = {}
+
+  if (name.length === 0) {
+    fieldErrors.name = 'Display name is required.'
+  } else if (name.length > PROFILE_NAME_MAX_LENGTH) {
+    fieldErrors.name = 'Display name must be 50 characters or fewer.'
+  }
+  if (bio.length > PROFILE_BIO_MAX_LENGTH) {
+    fieldErrors.bio = 'Bio must be 300 characters or fewer.'
+  }
+  if (input.profileVisibility !== 'public' && input.profileVisibility !== 'private') {
+    fieldErrors.profileVisibility = 'Choose Public or Private Profile Visibility.'
+  }
+  if (Object.keys(fieldErrors).length > 0) {
+    throw new ConvexError({
+      code: 'PROFILE_EDIT_INVALID',
+      message: 'Review the highlighted Profile fields.',
+      fieldErrors,
+    })
+  }
+
+  return {
+    name,
+    bio: bio.length === 0 ? undefined : bio,
+    profileVisibility: input.profileVisibility as 'public' | 'private',
+  }
+}
+
+/** Applies editable Profile fields and refreshes its search projection atomically. */
+const updateProfile = async (
+  ctx: MutationCtx,
+  input: ProfileEditInput,
+): Promise<null> => {
+  const { profile } = await requireProfile(ctx)
+  const next = normalizeProfileEdit(input)
+  const patch: Partial<Pick<
+    Doc<'users'>,
+    'bio' | 'name' | 'profileVisibility' | 'updatedAt'
+  >> = {
+    updatedAt: Date.now(),
+  }
+
+  if (profile.name !== next.name) patch.name = next.name
+  if (profile.bio !== next.bio) patch.bio = next.bio
+  if (profile.profileVisibility !== next.profileVisibility) {
+    patch.profileVisibility = next.profileVisibility
+  }
+
+  await ctx.db.patch('users', profile._id, patch)
+  const persisted = await ctx.db.get('users', profile._id)
+  if (!persisted) {
+    return fail('PROFILE_WRITE_FAILED', 'Updated Profile could not be read for search indexing.')
+  }
+  await upsertUserSearchDocument(ctx, persisted)
+  return null
+}
+
+export const update = mutation({
+  args: {
+    name: v.string(),
+    bio: v.string(),
+    profileVisibility: v.string(),
+  },
+  returns: v.null(),
+  handler: updateProfile,
+})
 
 /** Resolves one normalized username and the authenticated viewer's access. */
 export const resolveProfileAccess = async (

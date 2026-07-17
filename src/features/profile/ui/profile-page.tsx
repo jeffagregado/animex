@@ -1,7 +1,9 @@
+import { useRef, useState } from 'react'
 import { useQuery } from 'convex/react'
 import { makeFunctionReference } from 'convex/server'
 
 import type { ProfileTab } from '../shared/profile-contracts'
+import { EditProfileDialog } from './edit-profile-dialog'
 import { ProfileActivity } from './profile-activity'
 import {
   ProfileFavorites,
@@ -59,15 +61,40 @@ export function ProfilePage({
   tab: ProfileTab
 }) {
   const result = useQuery(profileQuery, { username })
+  const editTriggerRef = useRef<HTMLElement | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+
+  const openEditProfile = (): void => {
+    if (!(document.activeElement instanceof HTMLElement)) {
+      throw new Error('Edit Profile trigger is unavailable.')
+    }
+    editTriggerRef.current = document.activeElement
+    setEditOpen(true)
+  }
+  const changeEditOpen = (open: boolean): void => {
+    setEditOpen(open)
+    if (!open) {
+      queueMicrotask(() => editTriggerRef.current?.focus())
+    }
+  }
+
   if (result === undefined) return <ProfileLoading />
   if (result.access === 'header') {
     return (
       <main className="mx-auto min-h-[70dvh] w-full max-w-[1480px] px-4 pt-5 pb-28 sm:px-6 lg:px-10 lg:pb-12">
         <ProfileHeader
-          onEditProfile={() => undefined}
+          onEditProfile={openEditProfile}
           owner={result.owner}
           profile={result.profile}
         />
+        {result.owner && editOpen ? (
+          <EditProfileDialog
+            finalFocus={editTriggerRef.current}
+            onOpenChange={changeEditOpen}
+            open={editOpen}
+            profile={result.profile}
+          />
+        ) : null}
         <section className="mt-6 rounded-xl border border-cyan-300/25 bg-cyan-300/5 p-8 text-center">
           <h2 className="text-xl font-black">This profile is private</h2>
           <p className="mt-2 text-muted-foreground">
@@ -80,10 +107,18 @@ export function ProfilePage({
   return (
     <main className="mx-auto min-h-[70dvh] w-full max-w-[1480px] px-4 pt-5 pb-28 sm:px-6 lg:px-10 lg:pb-12">
       <ProfileHeader
-        onEditProfile={() => undefined}
+        onEditProfile={openEditProfile}
         owner={result.owner}
         profile={result.profile}
       />
+      {result.owner && editOpen ? (
+        <EditProfileDialog
+          finalFocus={editTriggerRef.current}
+          onOpenChange={changeEditOpen}
+          open={editOpen}
+          profile={result.profile}
+        />
+      ) : null}
       <ProfileTabs tab={tab} username={result.profile.username} />
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(20rem,0.8fr)]">
         <ProfileTabContent tab={tab} username={result.profile.username} />
