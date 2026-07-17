@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 
 import { AnimeImage } from '#/features/anime-detail/ui/anime-image'
@@ -30,6 +30,18 @@ export function CatalogPersonWorkGrid({ kind, personId }: CatalogPersonWorkGridP
     },
     getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.currentPage + 1 : undefined,
   })
+  const scope = `${kind}:${personId}`
+  const inFlightRef = useRef<{ scope: string; token: symbol } | null>(null)
+  const loadNextPage = useCallback(async (): Promise<void> => {
+    if (!query.hasNextPage || inFlightRef.current?.scope === scope) return
+    const token = Symbol(scope)
+    inFlightRef.current = { scope, token }
+    try {
+      await query.fetchNextPage({ cancelRefetch: false })
+    } finally {
+      if (inFlightRef.current?.token === token) inFlightRef.current = null
+    }
+  }, [query.fetchNextPage, query.hasNextPage, scope])
   const pages = query.data?.pages ?? []
   const items = uniqueWorks(pages)
   const section = kind === 'character' ? 'anime' : 'works'
@@ -40,22 +52,22 @@ export function CatalogPersonWorkGrid({ kind, personId }: CatalogPersonWorkGridP
 
   useEffect(() => {
     const last = pages.at(-1)
-    if (!last || !query.hasNextPage || query.isFetchingNextPage || query.isFetchNextPageError || countNewLastPage(pages) > 0) return
+    if (!last || !query.hasNextPage || query.isFetchNextPageError || countNewLastPage(pages) > 0) return
     const key = `${kind}:${personId}:${last.currentPage}`
     if (continuedPageRef.current === key) return
     continuedPageRef.current = key
-    void query.fetchNextPage()
-  }, [kind, pages, personId, query.fetchNextPage, query.hasNextPage, query.isFetchNextPageError, query.isFetchingNextPage])
+    void loadNextPage()
+  }, [kind, loadNextPage, pages, personId, query.hasNextPage, query.isFetchNextPageError])
 
   useEffect(() => {
     const target = sentinelRef.current
     if (!target || !query.hasNextPage || query.isFetchNextPageError || typeof IntersectionObserver === 'undefined') return
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting) && !query.isFetchingNextPage) void query.fetchNextPage()
+      if (entries.some((entry) => entry.isIntersecting)) void loadNextPage()
     }, { rootMargin: '240px' })
     observer.observe(target)
     return () => observer.disconnect()
-  }, [query.fetchNextPage, query.hasNextPage, query.isFetchNextPageError, query.isFetchingNextPage])
+  }, [loadNextPage, query.hasNextPage, query.isFetchNextPageError])
 
   if (query.isPending) {
     return <div aria-busy="true" className="rounded-xl border border-border bg-card/60 p-8 text-center text-muted-foreground">Loading {section}…</div>
@@ -66,8 +78,8 @@ export function CatalogPersonWorkGrid({ kind, personId }: CatalogPersonWorkGridP
 
   return <div>
     {items.length > 0 ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{items.map((item) => <WorkCard item={item} key={item.anime.id} />)}</div> : null}
-    {query.isFetchNextPageError ? <WorkError message={query.error.message} onRetry={() => void query.fetchNextPage()} /> : null}
-    {query.hasNextPage && !query.isFetchNextPageError ? <div className="mt-6"><div aria-hidden="true" ref={sentinelRef} /><button className="mx-auto block min-h-11 rounded-lg border border-cyan-300 px-6 font-black text-cyan-300 transition-colors hover:bg-cyan-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-50 motion-reduce:transition-none" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()} type="button">{query.isFetchingNextPage ? 'Loading…' : 'Load more'}</button></div> : null}
+    {query.isFetchNextPageError ? <WorkError message={query.error.message} onRetry={() => void loadNextPage()} /> : null}
+    {query.hasNextPage && !query.isFetchNextPageError ? <div className="mt-6"><div aria-hidden="true" ref={sentinelRef} /><button className="mx-auto block min-h-11 rounded-lg border border-cyan-300 px-6 font-black text-cyan-300 transition-colors hover:bg-cyan-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-50 motion-reduce:transition-none" disabled={query.isFetchingNextPage} onClick={() => void loadNextPage()} type="button">{query.isFetchingNextPage ? 'Loading…' : 'Load more'}</button></div> : null}
     {!query.hasNextPage && items.length === 0 ? <p className="rounded-xl border border-border bg-card/60 p-8 text-center text-muted-foreground">No {section} available.</p> : null}
     {!query.hasNextPage && items.length > 0 ? <p className="mt-6 text-center text-sm text-muted-foreground">End of {section}.</p> : null}
   </div>

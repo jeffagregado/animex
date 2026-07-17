@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { CatalogPersonWork, CatalogPersonWorkPage } from '../shared/catalog-person-contracts'
@@ -108,6 +108,44 @@ describe('CatalogPersonWorkGrid', () => {
     intersect([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver)
     expect(await screen.findByText('Second')).toBeTruthy()
     expect(server.getCatalogPersonWorks).toHaveBeenLastCalledWith({ data: { kind: 'staff', id: 8, page: 2 } })
+  })
+
+  it('serializes observer and manual triggers while the same next page is pending', async () => {
+    let intersect!: IntersectionObserverCallback
+    let resolvePage!: (value: ReturnType<typeof ready>) => void
+    const deferredPage = new Promise<ReturnType<typeof ready>>((resolve) => { resolvePage = resolve })
+    class Observer {
+      constructor(callback: IntersectionObserverCallback) { intersect = callback }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+      takeRecords(): IntersectionObserverEntry[] { return [] }
+      root = null
+      rootMargin = '240px'
+      thresholds = [0]
+    }
+    vi.stubGlobal('IntersectionObserver', Observer)
+    server.getCatalogPersonWorks
+      .mockResolvedValueOnce(ready(page([work(1, 'First')], 1, true)))
+      .mockReturnValueOnce(deferredPage)
+    renderGrid()
+    await screen.findByText('First')
+    act(() => {
+      intersect([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver)
+      intersect([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver)
+      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    })
+    await waitFor(() => {
+      const pageTwoCalls = server.getCatalogPersonWorks.mock.calls.filter(([input]) => input.data.page === 2)
+      expect(pageTwoCalls).toHaveLength(1)
+    })
+    await act(async () => {
+      resolvePage(ready(page([work(2, 'Second')], 2, false)))
+      await deferredPage
+    })
+    expect(await screen.findByText('Second')).toBeTruthy()
+    expect(screen.getAllByRole('article')).toHaveLength(2)
+    expect(server.getCatalogPersonWorks.mock.calls.filter(([input]) => input.data.page === 2)).toHaveLength(1)
   })
 
   it('shows final empty only after provider pagination is exhausted', async () => {
