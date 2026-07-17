@@ -144,4 +144,13 @@ describe('Drawer', () => {
     expect(source).not.toMatch(/\bvaul\b/i)
     expect(source).not.toMatch(/@radix-ui/i)
   })
+
+  it('suppresses transition durations for reduced motion', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'src/components/ui/drawer.tsx'),
+      'utf8',
+    )
+
+    expect(source.match(/motion-reduce:duration-0/g)?.length).toBeGreaterThanOrEqual(3)
+  })
 })
