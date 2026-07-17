@@ -65,8 +65,30 @@ const parseVp8x = (payload: Uint8Array): ProfileMediaDimensions => {
   }
 }
 
-/** Parses one static WebP container and returns its encoded dimensions. */
-export const parseWebpDimensions = (bytes: Uint8Array): ProfileMediaDimensions => {
+type WebpChunk = {
+  name: string
+  nextOffset: number
+  payload: Uint8Array
+}
+
+type WebpState = {
+  canvas: ProfileMediaDimensions | null
+  hasAlphaFlag: boolean
+  image: ProfileMediaDimensions | null
+  imageKind: 'VP8' | 'VP8L' | null
+  sawAlpha: boolean
+}
+
+const createWebpState = (): WebpState => ({
+  canvas: null,
+  hasAlphaFlag: false,
+  image: null,
+  imageKind: null,
+  sawAlpha: false,
+})
+
+/** Confirms bytes declare one complete RIFF/WEBP container. */
+const assertWebpContainer = (bytes: Uint8Array): void => {
   if (
     bytes.length < 20
     || readText(bytes, 0, 4) !== 'RIFF'
@@ -75,48 +97,105 @@ export const parseWebpDimensions = (bytes: Uint8Array): ProfileMediaDimensions =
   ) {
     return invalid('Malformed RIFF/WEBP container.')
   }
+}
 
-  let offset = 12
-  let canvas: ProfileMediaDimensions | null = null
-  let image: ProfileMediaDimensions | null = null
-  let imageKind: 'VP8' | 'VP8L' | null = null
-  let hasAlphaFlag = false
-  let sawAlpha = false
-  while (offset < bytes.length) {
-    if (offset + 8 > bytes.length) return invalid('Malformed WebP chunk header.')
-    const name = readText(bytes, offset, 4)
-    const length = readU32(bytes, offset + 4)
-    const payloadStart = offset + 8
-    const payloadEnd = payloadStart + length
-    if (payloadEnd > bytes.length) return invalid('Malformed WebP chunk length.')
-    if (length % 2 === 1 && (payloadEnd >= bytes.length || bytes[payloadEnd] !== 0)) {
-      return invalid('Malformed WebP chunk padding.')
-    }
-    const payload = bytes.slice(payloadStart, payloadEnd)
-
-    if (name === 'ANIM' || name === 'ANMF') return invalid('Animated WebP is not allowed.')
-    if (name === 'VP8X') {
-      if (canvas || offset !== 12 || image) return invalid('WebP has duplicate or misplaced VP8X.')
-      canvas = parseVp8x(payload)
-      hasAlphaFlag = (payload[0] & 0x10) !== 0
-    } else if (name === 'ALPH') {
-      if (!canvas || image || sawAlpha || !hasAlphaFlag || payload.length === 0) {
-        return invalid('WebP has misplaced or duplicate alpha data.')
-      }
-      sawAlpha = true
-    } else if (name === 'VP8 ' || name === 'VP8L') {
-      if (image) return invalid('WebP has multiple image-data chunks.')
-      image = name === 'VP8 ' ? parseVp8(payload) : parseVp8l(payload)
-      imageKind = name === 'VP8 ' ? 'VP8' : 'VP8L'
-    }
-    offset = payloadEnd + (length % 2)
+/** Reads one bounded WebP chunk including required padding. */
+const readWebpChunk = (bytes: Uint8Array, offset: number): WebpChunk => {
+  if (offset + 8 > bytes.length) return invalid('Malformed WebP chunk header.')
+  const name = readText(bytes, offset, 4)
+  const length = readU32(bytes, offset + 4)
+  const payloadStart = offset + 8
+  const payloadEnd = payloadStart + length
+  if (payloadEnd > bytes.length) return invalid('Malformed WebP chunk length.')
+  if (length % 2 === 1 && (payloadEnd >= bytes.length || bytes[payloadEnd] !== 0)) {
+    return invalid('Malformed WebP chunk padding.')
   }
-  if (offset !== bytes.length || !image) return invalid('WebP image data is missing.')
-  if (sawAlpha && imageKind !== 'VP8') return invalid('ALPH must precede VP8 image data.')
-  if (canvas && (canvas.width !== image.width || canvas.height !== image.height)) {
+  return {
+    name,
+    nextOffset: payloadEnd + (length % 2),
+    payload: bytes.slice(payloadStart, payloadEnd),
+  }
+}
+
+/** Applies one extended-canvas chunk to parser state. */
+const applyCanvasChunk = (
+  state: WebpState,
+  payload: Uint8Array,
+  firstChunk: boolean,
+): WebpState => {
+  if (state.canvas || !firstChunk || state.image) return invalid('WebP has duplicate or misplaced VP8X.')
+  return {
+    ...state,
+    canvas: parseVp8x(payload),
+    hasAlphaFlag: (payload[0] & 0x10) !== 0,
+  }
+}
+
+/** Applies one alpha chunk to parser state. */
+const applyAlphaChunk = (state: WebpState, payload: Uint8Array): WebpState => {
+  if (!state.canvas || state.image || state.sawAlpha || !state.hasAlphaFlag || payload.length === 0) {
+    return invalid('WebP has misplaced or duplicate alpha data.')
+  }
+  return { ...state, sawAlpha: true }
+}
+
+/** Applies one image-data chunk to parser state. */
+const applyImageChunk = (
+  state: WebpState,
+  name: 'VP8 ' | 'VP8L',
+  payload: Uint8Array,
+): WebpState => {
+  if (state.image) return invalid('WebP has multiple image-data chunks.')
+  return {
+    ...state,
+    image: name === 'VP8 ' ? parseVp8(payload) : parseVp8l(payload),
+    imageKind: name === 'VP8 ' ? 'VP8' : 'VP8L',
+  }
+}
+
+/** Applies one recognized WebP chunk and ignores ancillary chunks. */
+const applyWebpChunk = (
+  state: WebpState,
+  chunk: WebpChunk,
+  firstChunk: boolean,
+): WebpState => {
+  if (chunk.name === 'ANIM' || chunk.name === 'ANMF') return invalid('Animated WebP is not allowed.')
+  if (chunk.name === 'VP8X') return applyCanvasChunk(state, chunk.payload, firstChunk)
+  if (chunk.name === 'ALPH') return applyAlphaChunk(state, chunk.payload)
+  if (chunk.name === 'VP8 ' || chunk.name === 'VP8L') {
+    return applyImageChunk(state, chunk.name, chunk.payload)
+  }
+  return state
+}
+
+/** Resolves final dimensions after validating cross-chunk invariants. */
+const resolveWebpDimensions = (
+  state: WebpState,
+  offset: number,
+  byteLength: number,
+): ProfileMediaDimensions => {
+  if (offset !== byteLength || !state.image) return invalid('WebP image data is missing.')
+  if (state.sawAlpha && state.imageKind !== 'VP8') return invalid('ALPH must precede VP8 image data.')
+  if (
+    state.canvas
+    && (state.canvas.width !== state.image.width || state.canvas.height !== state.image.height)
+  ) {
     return invalid('VP8X canvas and image dimensions do not match.')
   }
-  return canvas ?? image
+  return state.canvas ?? state.image
+}
+
+/** Parses one static WebP container and returns its encoded dimensions. */
+export const parseWebpDimensions = (bytes: Uint8Array): ProfileMediaDimensions => {
+  assertWebpContainer(bytes)
+  let offset = 12
+  let state = createWebpState()
+  while (offset < bytes.length) {
+    const chunk = readWebpChunk(bytes, offset)
+    state = applyWebpChunk(state, chunk, offset === 12)
+    offset = chunk.nextOffset
+  }
+  return resolveWebpDimensions(state, offset, bytes.length)
 }
 
 /** Validates one final static crop against Profile media limits. */

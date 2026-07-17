@@ -31,32 +31,54 @@ const createLaneState = (
 
 const encodeCursor = (cursor: ProfileReviewCursor): string => btoa(JSON.stringify(cursor))
 
+const invalidCursor = (message: string): never => {
+  throw new TypeError(`Invalid Profile Review cursor: ${message}`)
+}
+
+/** Decodes one Profile Review cursor envelope. */
+const parseCursor = (cursor: string): Partial<ProfileReviewCursor> => {
+  let value: unknown
+  try {
+    value = JSON.parse(atob(cursor)) as unknown
+  } catch (error) {
+    return invalidCursor(error instanceof Error ? error.message : 'unknown error')
+  }
+  if (!value || typeof value !== 'object') return invalidCursor('Cursor state is invalid.')
+  return value as Partial<ProfileReviewCursor>
+}
+
+/** Confirms cursor remains bound to current lane, profile, and viewer. */
+const assertCursorScope = (
+  value: Partial<ProfileReviewCursor>,
+  access: ProfileAccessResolution,
+): void => {
+  if (value.lane !== 'reviews') throw new TypeError('Profile Review cursor belongs to another lane.')
+  if (value.usernameKey !== access.usernameKey) throw new TypeError('Profile Review cursor belongs to another profile.')
+  if (value.viewerId !== access.viewerId) throw new TypeError('Profile Review cursor belongs to another viewer.')
+}
+
+/** Confirms one cursor lane has valid state and access. */
+const assertLaneState = (
+  state: ProfileReviewLaneState | undefined,
+  inaccessible: boolean,
+): void => {
+  if (!state || (state.anchor !== null && typeof state.anchor !== 'string') || typeof state.done !== 'boolean') {
+    return invalidCursor('Profile Review cursor lanes are invalid.')
+  }
+  if (inaccessible && !state.done) return invalidCursor('Profile Review cursor exposes an inaccessible lane.')
+}
+
 const decodeCursor = (
   cursor: string | null,
   access: ProfileAccessResolution,
 ): Record<ReviewDiscoveryLane, ProfileReviewLaneState> => {
   if (cursor === null) return createLaneState(access.owner)
-  try {
-    const value = JSON.parse(atob(cursor)) as Partial<ProfileReviewCursor>
-    if (value.lane !== 'reviews') throw new TypeError('Profile Review cursor belongs to another lane.')
-    if (value.usernameKey !== access.usernameKey) throw new TypeError('Profile Review cursor belongs to another profile.')
-    if (value.viewerId !== access.viewerId) throw new TypeError('Profile Review cursor belongs to another viewer.')
-    if (!value.lanes || typeof value.lanes !== 'object') throw new TypeError('Profile Review cursor lanes are invalid.')
-    const expected = createLaneState(access.owner)
-    for (const lane of lanes) {
-      const state = value.lanes[lane]
-      if (!state || (state.anchor !== null && typeof state.anchor !== 'string') || typeof state.done !== 'boolean') {
-        throw new TypeError('Profile Review cursor lanes are invalid.')
-      }
-      if (expected[lane].done && !state.done) {
-        throw new TypeError('Profile Review cursor exposes an inaccessible lane.')
-      }
-    }
-    return value.lanes
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes('belongs')) throw error
-    throw new TypeError(`Invalid Profile Review cursor: ${error instanceof Error ? error.message : 'unknown error'}`)
-  }
+  const value = parseCursor(cursor)
+  assertCursorScope(value, access)
+  if (!value.lanes || typeof value.lanes !== 'object') return invalidCursor('Profile Review cursor lanes are invalid.')
+  const expected = createLaneState(access.owner)
+  for (const lane of lanes) assertLaneState(value.lanes[lane], expected[lane].done)
+  return value.lanes
 }
 
 const readLane = async (

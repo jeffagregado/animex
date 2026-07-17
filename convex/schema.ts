@@ -1,18 +1,11 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 
+import { postMediaValidator } from './postValidators'
+
 const storedReviewRatingBandValidator = v.union(
   v.literal('90-100'), v.literal('80-89'), v.literal('70-79'), v.literal('60-69'), v.literal('50-59'),
   v.literal('40-49'), v.literal('30-39'), v.literal('20-29'), v.literal('10-19'), v.literal('0-9'), v.literal('none'),
-)
-
-const postMediaValidator = v.union(
-  v.object({ type: v.literal('image'), url: v.string(), description: v.union(v.string(), v.null()) }),
-  v.object({
-    type: v.literal('video'), url: v.string(),
-    provider: v.union(v.literal('youtube'), v.literal('vimeo'), v.literal('external')),
-    label: v.union(v.string(), v.null()),
-  }),
 )
 
 const profileVisibilityValidator = v.union(

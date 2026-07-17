@@ -72,23 +72,34 @@ const assertAnilistId = (anilistId: number): void => {
 
 const encodeProfileFavoriteCursor = (cursor: ProfileFavoriteCursor): string => btoa(JSON.stringify(cursor))
 
+const invalidProfileFavoriteCursor = (message: string): never => {
+  throw new TypeError(`Invalid Favorite cursor: ${message}`)
+}
+
+/** Decodes one Profile Favorite cursor envelope. */
+const parseProfileFavoriteCursor = (cursor: string): Partial<ProfileFavoriteCursor> => {
+  let value: unknown
+  try {
+    value = JSON.parse(atob(cursor)) as unknown
+  } catch (error) {
+    return invalidProfileFavoriteCursor(error instanceof Error ? error.message : 'unknown error')
+  }
+  if (!value || typeof value !== 'object') return invalidProfileFavoriteCursor('Cursor state is invalid.')
+  return value as Partial<ProfileFavoriteCursor>
+}
+
 const decodeProfileFavoriteCursor = (
   cursor: string | null,
   usernameKey: string,
   viewerId: Id<'users'>,
 ): string | null => {
   if (cursor === null) return null
-  try {
-    const value = JSON.parse(atob(cursor)) as Partial<ProfileFavoriteCursor>
-    if (value.lane !== 'favorites') throw new TypeError('Favorite cursor belongs to another lane.')
-    if (value.usernameKey !== usernameKey) throw new TypeError('Favorite cursor belongs to another profile.')
-    if (value.viewerId !== viewerId) throw new TypeError('Favorite cursor belongs to another viewer.')
-    if (typeof value.cursor !== 'string') throw new TypeError('Favorite cursor state is invalid.')
-    return value.cursor
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes('belongs')) throw error
-    throw new TypeError(`Invalid Favorite cursor: ${error instanceof Error ? error.message : 'unknown error'}`)
-  }
+  const value = parseProfileFavoriteCursor(cursor)
+  if (value.lane !== 'favorites') throw new TypeError('Favorite cursor belongs to another lane.')
+  if (value.usernameKey !== usernameKey) throw new TypeError('Favorite cursor belongs to another profile.')
+  if (value.viewerId !== viewerId) throw new TypeError('Favorite cursor belongs to another viewer.')
+  if (typeof value.cursor !== 'string') return invalidProfileFavoriteCursor('Favorite cursor state is invalid.')
+  return value.cursor
 }
 
 /** Requires the anime to exist in the normalized summary cache. */

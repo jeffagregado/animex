@@ -5,18 +5,11 @@ import type { PostMedia } from '../src/features/social/shared/external-media'
 import type { Doc, Id } from './_generated/dataModel'
 import { mutation, type MutationCtx } from './_generated/server'
 import { makeOrderKey } from './feedPolicy'
+import { postMediaValidator } from './postValidators'
 import { assertRequestId, normalizePostContent } from './socialPolicy'
 import { requireProfile } from './users'
 
 const visibilityValidator = v.union(v.literal('private'), v.literal('followers'), v.literal('public'))
-const postMediaValidator = v.union(
-  v.object({ type: v.literal('image'), url: v.string(), description: v.union(v.string(), v.null()) }),
-  v.object({
-    type: v.literal('video'), url: v.string(),
-    provider: v.union(v.literal('youtube'), v.literal('vimeo'), v.literal('external')),
-    label: v.union(v.string(), v.null()),
-  }),
-)
 const postInput = {
   requestId: v.string(), text: v.string(), media: v.union(postMediaValidator, v.null()),
   hasSpoiler: v.boolean(), visibility: visibilityValidator,

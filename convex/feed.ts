@@ -6,6 +6,7 @@ import { mergeFeedCards } from '../src/features/social/shared/feed-ranking'
 import type { Doc, Id } from './_generated/dataModel'
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { decodeFeedCursor, encodeFeedCursor, makeOrderKey, type FeedView } from './feedPolicy'
+import { postMediaValidator } from './postValidators'
 import { resolveProfileAccess } from './profiles'
 import { canReadSocialRecord } from './socialPolicy'
 import { getOptionalProfile, requireProfile } from './users'
@@ -21,14 +22,6 @@ const activityAnimeValidator = v.object({
   anilistId: v.number(), slug: v.string(), title: v.string(), coverImageUrl: v.union(v.string(), v.null()),
   seasonYear: v.union(v.number(), v.null()), format: animeFormatValidator,
 })
-const postMediaValidator = v.union(
-  v.object({ type: v.literal('image'), url: v.string(), description: v.union(v.string(), v.null()) }),
-  v.object({
-    type: v.literal('video'), url: v.string(),
-    provider: v.union(v.literal('youtube'), v.literal('vimeo'), v.literal('external')),
-    label: v.union(v.string(), v.null()),
-  }),
-)
 const feedCardValidator = v.union(
   v.object({ id: v.string(), postId: v.string(), kind: v.literal('post'), author: authorValidator, text: v.string(), media: v.union(postMediaValidator, v.null()), hasSpoiler: v.boolean(), visibility: visibilityValidator, createdAt: v.number(), updatedAt: v.number() }),
   v.object({ id: v.string(), reviewId: v.string(), kind: v.literal('review'), author: authorValidator, anime: animeValidator, rating: v.number(), summary: v.string(), containsSpoiler: v.boolean(), visibility: visibilityValidator, publishedAt: v.number(), updatedAt: v.number() }),
@@ -164,23 +157,34 @@ const readOwn = async (ctx: QueryCtx, userId: Id<'users'>, anchor: string | null
 
 const encodeProfileFeedCursor = (cursor: ProfileFeedCursor): string => btoa(JSON.stringify(cursor))
 
+const invalidProfileFeedCursor = (message: string): never => {
+  throw new TypeError(`Invalid Profile Activity cursor: ${message}`)
+}
+
+/** Decodes one Profile Activity cursor envelope. */
+const parseProfileFeedCursor = (cursor: string): Partial<ProfileFeedCursor> => {
+  let value: unknown
+  try {
+    value = JSON.parse(atob(cursor)) as unknown
+  } catch (error) {
+    return invalidProfileFeedCursor(error instanceof Error ? error.message : 'unknown error')
+  }
+  if (!value || typeof value !== 'object') return invalidProfileFeedCursor('Cursor state is invalid.')
+  return value as Partial<ProfileFeedCursor>
+}
+
 const decodeProfileFeedCursor = (
   cursor: string | null,
   usernameKey: string,
   viewerId: Id<'users'>,
 ): string | null => {
   if (cursor === null) return null
-  try {
-    const value = JSON.parse(atob(cursor)) as Partial<ProfileFeedCursor>
-    if (value.lane !== 'activity') throw new TypeError('Profile Activity cursor belongs to another lane.')
-    if (value.usernameKey !== usernameKey) throw new TypeError('Profile Activity cursor belongs to another profile.')
-    if (value.viewerId !== viewerId) throw new TypeError('Profile Activity cursor belongs to another viewer.')
-    if (typeof value.anchor !== 'string') throw new TypeError('Profile Activity cursor anchor is invalid.')
-    return value.anchor
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes('belongs')) throw error
-    throw new TypeError(`Invalid Profile Activity cursor: ${error instanceof Error ? error.message : 'unknown error'}`)
-  }
+  const value = parseProfileFeedCursor(cursor)
+  if (value.lane !== 'activity') throw new TypeError('Profile Activity cursor belongs to another lane.')
+  if (value.usernameKey !== usernameKey) throw new TypeError('Profile Activity cursor belongs to another profile.')
+  if (value.viewerId !== viewerId) throw new TypeError('Profile Activity cursor belongs to another viewer.')
+  if (typeof value.anchor !== 'string') return invalidProfileFeedCursor('Profile Activity cursor anchor is invalid.')
+  return value.anchor
 }
 
 type HomeGlobalPage = { cards: Doc<'feedCards'>[]; resumeAnchors: Array<string | null>; scannedAnchor: string | null; terminal: boolean }
