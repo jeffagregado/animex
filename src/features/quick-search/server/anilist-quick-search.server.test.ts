@@ -42,7 +42,7 @@ const media: ProviderMedia = {
     native: '葬送のフリーレン',
   },
   coverImage: { large: 'https://img.example/frieren.webp' },
-  format: 'TV',
+  format: 'TV_SHORT',
   seasonYear: 2023,
 }
 const character: ProviderPerson = {
@@ -123,7 +123,7 @@ describe('AniList Quick Search adapter', () => {
         id: '52991',
         label: "Frieren: Beyond Journey's End",
         imageUrl: 'https://img.example/frieren.webp',
-        metadata: 'TV · 2023',
+        metadata: 'TV SHORT · 2023',
         destination: '/anime/52991/frieren-beyond-journeys-end',
       }],
       characters: [{
@@ -158,7 +158,7 @@ describe('AniList Quick Search adapter', () => {
         ...media,
         id: 2,
         title: { english: null, romaji: ' ', native: '  葬送のフリーレン  ' },
-        format: 'MOVIE',
+        format: 'TV_SHORT',
         seasonYear: null,
       },
       {
@@ -186,7 +186,7 @@ describe('AniList Quick Search adapter', () => {
           metadata: null,
           destination: '/anime/1/caf%C3%A9-%E8%91%AC%E9%80%81s-song',
         },
-        { label: '葬送のフリーレン', metadata: 'MOVIE' },
+        { label: '葬送のフリーレン', metadata: 'TV SHORT' },
         { label: 'Year Only', metadata: '2024' },
       ],
       characters: [{

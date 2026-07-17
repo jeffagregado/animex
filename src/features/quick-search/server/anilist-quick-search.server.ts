@@ -95,10 +95,11 @@ const text = (value: string | null): string | null => {
 }
 
 const animeMetadata = (anime: ParsedAnime): string | null => {
-  if (anime.format !== null && anime.seasonYear !== null) {
-    return `${anime.format} · ${anime.seasonYear}`
+  const format = anime.format?.replaceAll('_', ' ') ?? null
+  if (format !== null && anime.seasonYear !== null) {
+    return `${format} · ${anime.seasonYear}`
   }
-  if (anime.format !== null) return anime.format
+  if (format !== null) return format
   if (anime.seasonYear !== null) return String(anime.seasonYear)
   return null
 }
