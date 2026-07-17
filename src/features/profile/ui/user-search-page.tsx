@@ -78,6 +78,7 @@ function UserSearchState({
   if (state.error) return <div className="mt-6 rounded-xl border border-red-400/40 bg-red-400/10 p-5" role="alert">{state.error}</div>
   if (!state.shouldRequest) return <p className="mt-6 rounded-xl border border-border bg-card/60 p-8 text-center text-muted-foreground">Enter at least 2 characters to search users.</p>
   if (pages.initialLoading) return <p aria-busy="true" className="mt-6 rounded-xl border border-border bg-card/60 p-8 text-center text-muted-foreground">Searching users…</p>
+  if (pages.nextPageError && pages.error && pages.items.length === 0) return <SearchError message={pages.error.message} onRetry={() => void pages.loadMore()} />
   if (pages.error && pages.items.length === 0) return <SearchError message={pages.error.message} onRetry={() => void pages.retryInitial()} />
   if (pages.items.length === 0 && !pages.hasMore) return <p className="mt-6 rounded-xl border border-border bg-card/60 p-8 text-center text-muted-foreground">No users found.</p>
   return <section aria-label="User results" className="mt-6"><div className="grid min-w-0 gap-3 sm:grid-cols-2">{pages.items.map((user) => <UserCard key={user.id} user={user} />)}</div>{pages.nextPageError && pages.error ? <SearchError message={pages.error.message} onRetry={() => void pages.loadMore()} /> : null}{!pages.hasMore && pages.items.length > 0 ? <p className="mt-6 text-center text-sm text-muted-foreground">End of results.</p> : null}</section>

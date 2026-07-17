@@ -134,6 +134,24 @@ describe('CatalogPersonSearchPage', () => {
     expect(await screen.findByText('Second')).toBeTruthy()
   })
 
+  it('retries page two after an empty first page continuation fails', async () => {
+    server.searchCatalogPeople
+      .mockResolvedValueOnce(page([], 1, true))
+      .mockRejectedValueOnce(new Error('Page unavailable.'))
+      .mockResolvedValueOnce(page([row(1, 'First')], 2, false))
+    renderPage('ab')
+    expect((await screen.findByRole('alert')).textContent).toContain('Page unavailable.')
+    expect(screen.queryByText('No characters found.')).toBeNull()
+    expect(screen.queryByText('End of results.')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText('First')).toBeTruthy()
+    expect(server.searchCatalogPeople.mock.calls.map(([input]) => input.data.page)).toEqual([
+      1,
+      2,
+      2,
+    ])
+  })
+
   it('does not mix late results across A to B to A URL restoration', async () => {
     let resolveA!: (value: SearchPage) => void
     const deferredA = new Promise<SearchPage>((resolve) => { resolveA = resolve })

@@ -39,7 +39,15 @@ export function useUserSearchPages(queryText: string, enabled: boolean) {
   const convex = useConvex()
   const continuation = useRef<string | null>(null)
   const guard = useRef<{ scope: string; token: symbol } | null>(null)
+  const cursorHistoryRef = useRef<{
+    cursors: Set<string | null>
+    scope: string
+  }>({ cursors: new Set(), scope: queryText })
   if (guard.current !== null && guard.current.scope !== queryText) guard.current = null
+  if (cursorHistoryRef.current.scope !== queryText) {
+    cursorHistoryRef.current = { cursors: new Set(), scope: queryText }
+  }
+  const successfulCursors = cursorHistoryRef.current.cursors
   const query = useInfiniteQuery({
     queryKey: ['user-search', queryText],
     initialPageParam: null as string | null,
@@ -51,8 +59,13 @@ export function useUserSearchPages(queryText: string, enabled: boolean) {
       const result = resultSchema.parse(raw)
       if (
         !result.isDone
-        && (result.continueCursor.length === 0 || result.continueCursor === pageParam)
+        && (
+          result.continueCursor.length === 0
+          || result.continueCursor === pageParam
+          || successfulCursors.has(result.continueCursor)
+        )
       ) throw new Error('User search returned an invalid pagination cursor.')
+      successfulCursors.add(pageParam)
       return result
     },
     getNextPageParam: (lastPage) => (
@@ -60,6 +73,12 @@ export function useUserSearchPages(queryText: string, enabled: boolean) {
     ),
     enabled,
   })
+  for (const pageParam of query.data?.pageParams ?? []) {
+    if (pageParam !== null && typeof pageParam !== 'string') {
+      throw new TypeError('User search cached an invalid pagination cursor.')
+    }
+    successfulCursors.add(pageParam)
+  }
   const loadMore = useCallback(async (): Promise<void> => {
     if (!query.hasNextPage || guard.current?.scope === queryText) return
     const token = Symbol(queryText)

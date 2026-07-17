@@ -95,6 +95,47 @@ describe('UserSearchPage', () => {
     await waitFor(() => expect(convex.query).toHaveBeenCalledTimes(3))
   })
 
+  it('rejects an A to B to A cursor cycle and retries the failed B page', async () => {
+    convex.query
+      .mockResolvedValueOnce(result([user('1', 'one', 'First')], 'A', false))
+      .mockResolvedValueOnce(result([user('2', 'two', 'Second')], 'B', false))
+      .mockResolvedValueOnce(result([user('3', 'three', 'Third')], 'A', false))
+      .mockResolvedValueOnce(result([user('3', 'three', 'Third')], '', true))
+    renderPage('ab')
+    await screen.findByText('First')
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    await screen.findByText('Second')
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('invalid pagination cursor')
+    expect(screen.queryByText('Third')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText('Third')).toBeTruthy()
+    expect(convex.query.mock.calls.map(([, args]) => args.paginationOpts.cursor)).toEqual([
+      null,
+      'A',
+      'B',
+      'B',
+    ])
+  })
+
+  it('retries the failed continuation after an empty successful first page', async () => {
+    convex.query
+      .mockResolvedValueOnce(result([], 'next', false))
+      .mockRejectedValueOnce(new Error('Cursor unavailable.'))
+      .mockResolvedValueOnce(result([user('1', 'one', 'First')], '', true))
+    renderPage('ab')
+    expect((await screen.findByRole('alert')).textContent).toContain('Cursor unavailable.')
+    expect(screen.queryByText('No users found.')).toBeNull()
+    expect(screen.queryByText('End of results.')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText('First')).toBeTruthy()
+    expect(convex.query.mock.calls.map(([, args]) => args.paginationOpts.cursor)).toEqual([
+      null,
+      'next',
+      'next',
+    ])
+  })
+
   it('fails visibly when runtime payload exposes an unexpected field', async () => {
     convex.query.mockResolvedValueOnce({
       ...result([], '', true),
