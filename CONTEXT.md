@@ -8,7 +8,7 @@ Through Phase 8, active UI omits Follow, Like, Comment, Following-feed, social-c
 
 Backend social contracts, schemas, authorization, and stored Followers visibility remain intact for Phase 9. New Post and Review creation maps a stored Followers account default to Private. Owner edits to legacy Followers Posts and Reviews preserve Followers unless Public or Private is explicitly selected. No migration rewrites stored data.
 
-Phase 7 User Profile, Catalog People, and responsive Quick Search design is approved. Its implementation plan passed independent review and awaits user approval; implementation is unstarted. Desktop uses the locked modal; mobile uses the locked bottom drawer. Phase 9 owns social UI reactivation.
+Phase 7 User Profile, Catalog People, and responsive Quick Search is implemented on `jeff-cx/phase-7-user-profile-quick-search` from the approved locked design. User Profiles are signed-in-only with Public/Private visibility, owner edit/media actions, Activity/Reviews/Favorites, and identity-only User Search. Character/Staff destinations use canonical ID + display slug, strict provider-neutral contracts, paginated work tabs, and separate 24-hour Convex caches/leases. Quick Search is shared across public, landing, and auth headers: desktop modal; mobile Base UI-backed bottom drawer; Anime/Characters/Staff plus Users only for complete authenticated profiles, independent failure lanes, and close-before-navigation. Phase 9 owns social UI reactivation. Validation passed automated gates, browser core flows, and reviewer PASS after `5178706`; no production deploy, push, merge, or unexercised fixture is claimed.
 
 ## Language
 
