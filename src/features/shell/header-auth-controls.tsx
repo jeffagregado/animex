@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { LogIn, LogOut } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
 
 import { AsyncButton } from '../../components/async-button'
 import { authClient } from '../../lib/auth-client'
 import { assertAuthResponse } from '../auth/auth-actions'
 import { isCompleteAuthState } from '../auth/use-auth-state'
-import { headerActionItems } from './navigation'
 import { usePublicAuthState } from './public-auth-context'
 
 type HeaderAuthView = 'loading' | 'signedOut' | 'pending' | 'complete' | 'error'
@@ -24,16 +22,11 @@ const getHeaderAuthView = (state: ReturnType<typeof usePublicAuthState>): Header
   return isCompleteAuthState(state.authState) ? 'complete' : 'pending'
 }
 
-const isHeaderActionVisible = (label: string): boolean => {
-  return label === 'Search'
-}
-
 export function HeaderAuthControls() {
   const authState = usePublicAuthState()
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
   const view = getHeaderAuthView(authState)
-  const visibleActions = headerActionItems.filter((item) => isHeaderActionVisible(item.label))
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
@@ -51,18 +44,6 @@ export function HeaderAuthControls() {
 
   return (
     <>
-      {visibleActions.map((item) => (
-        <Link
-          className="icon-button"
-          to={item.href}
-          hash={item.hash}
-          aria-label={item.label}
-          data-header-action={item.label}
-          key={item.label}
-        >
-          <item.icon aria-hidden="true" className="size-5" />
-        </Link>
-      ))}
       {view === 'loading' ? (
         <span className="header-auth-skeleton" data-testid="header-auth-skeleton" aria-hidden="true" />
       ) : null}

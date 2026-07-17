@@ -8,7 +8,11 @@ export function LandingPage() {
   return (
     <PublicAuthStateProvider>
       <div className="landing-page min-h-dvh text-foreground">
-        <SiteHeader navItems={mainNavigationItems} showAuthAction={true} />
+        <SiteHeader
+          navItems={mainNavigationItems}
+          searchAction={{ kind: 'discover', to: '/discover' }}
+          showAuthAction={true}
+        />
         <main className="landing-hero">
           <div className="landing-signal" aria-hidden="true">
             <span className="landing-signal__ring landing-signal__ring--outer" />

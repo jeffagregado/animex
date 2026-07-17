@@ -1,21 +1,27 @@
 import { Link } from '@tanstack/react-router'
+import { SearchIcon } from 'lucide-react'
 
 import { AnimeXLogo } from './animex-logo'
 import { HeaderAuthControls } from './header-auth-controls'
-import { headerActionItems, type ShellNavigationItem } from './navigation'
+import type { ShellNavigationItem } from './navigation'
+
+export type HeaderSearchAction =
+  | {
+      kind: 'discover'
+      to: '/discover'
+    }
+  | {
+      kind: 'quick-search'
+      open: (trigger: HTMLElement) => void
+    }
 
 export type SiteHeaderProps = {
   navItems: ShellNavigationItem[]
+  searchAction: HeaderSearchAction
   showAuthAction: boolean
 }
 
-export function SiteHeader({ navItems, showAuthAction }: SiteHeaderProps) {
-  const searchAction = headerActionItems.find((item) => item.label === 'Search')
-  if (!searchAction) {
-    throw new Error('Header search action is required.')
-  }
-  const SearchIcon = searchAction.icon
-
+export function SiteHeader({ navItems, searchAction, showAuthAction }: SiteHeaderProps) {
   return (
     <header className="site-header">
       <div className="site-header__inner">
@@ -36,13 +42,27 @@ export function SiteHeader({ navItems, showAuthAction }: SiteHeaderProps) {
           ))}
         </nav>
         <div className="site-header-actions flex items-center gap-2">
-          {showAuthAction ? (
-            <HeaderAuthControls />
+          {searchAction.kind === 'quick-search' ? (
+            <button
+              aria-label="Search"
+              className="icon-button"
+              data-header-action="Search"
+              onClick={(event) => searchAction.open(event.currentTarget)}
+              type="button"
+            >
+              <SearchIcon aria-hidden="true" className="size-5" />
+            </button>
           ) : (
-            <Link className="icon-button" to={searchAction.href} hash={searchAction.hash} aria-label={searchAction.label} data-header-action={searchAction.label}>
+            <Link
+              aria-label="Search"
+              className="icon-button"
+              data-header-action="Search"
+              to={searchAction.to}
+            >
               <SearchIcon aria-hidden="true" className="size-5" />
             </Link>
           )}
+          {showAuthAction ? <HeaderAuthControls /> : null}
         </div>
       </div>
     </header>

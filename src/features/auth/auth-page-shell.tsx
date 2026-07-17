@@ -19,7 +19,11 @@ export function AuthPageShell({
 }) {
   return (
     <main className="auth-page">
-      <SiteHeader navItems={mainNavigationItems} showAuthAction={false} />
+      <SiteHeader
+        navItems={mainNavigationItems}
+        searchAction={{ kind: 'discover', to: '/discover' }}
+        showAuthAction={false}
+      />
       <div className="auth-poster-grid" aria-hidden="true">
         <span />
         <span />
