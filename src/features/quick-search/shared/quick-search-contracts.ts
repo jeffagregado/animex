@@ -37,7 +37,7 @@ export interface QuickSearchGroups {
 
 const positiveSafeIntegerSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
 const querySchema = z.string()
-  .transform((value) => value.trim().replace(/\s+/g, ' '))
+  .transform((value) => value.trim())
   .pipe(z.string().min(QUICK_SEARCH_MIN_LENGTH).max(QUICK_SEARCH_MAX_LENGTH))
 const pathSegmentSchema = z.string().trim().min(1)
 const destinationInputSchema = z.discriminatedUnion('kind', [

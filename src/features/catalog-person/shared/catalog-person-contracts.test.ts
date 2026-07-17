@@ -111,6 +111,10 @@ describe('catalog person contracts', () => {
       ...page,
       items: [{ anime: { ...anime, coverImageUrl: 'http://img.example/anime.webp' }, role: null }],
     })).toThrow()
+    expect(() => catalogPersonWorkPageSchema.parse({
+      ...page,
+      items: [{ anime: { ...anime, format: 'WEB_SERIES' }, role: null }],
+    })).toThrow()
   })
 
   test('validates strict 20-row search pages', () => {

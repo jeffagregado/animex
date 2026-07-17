@@ -1,5 +1,10 @@
 import { z } from 'zod'
 
+import {
+  animeFormatSchema,
+  type AnimeFormat,
+} from '../../discover/shared/discover-contracts'
+
 export const CATALOG_PERSON_PAGE_SIZE = 20 as const
 export const CATALOG_PERSON_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -18,7 +23,7 @@ export interface CatalogAnimeSummary {
   slug: string
   title: string
   coverImageUrl: string | null
-  format: string | null
+  format: AnimeFormat | null
   seasonYear: number | null
 }
 
@@ -81,7 +86,7 @@ const catalogAnimeSummarySchema: z.ZodType<CatalogAnimeSummary> = z.object({
   slug: z.string().trim().min(1),
   title: z.string().trim().min(1),
   coverImageUrl: nullableHttpsUrlSchema,
-  format: nullableTextSchema,
+  format: animeFormatSchema.nullable(),
   seasonYear: z.number().int().positive().nullable(),
 }).strict()
 

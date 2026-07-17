@@ -28,15 +28,16 @@ describe('quick search contracts', () => {
     expect(SEARCH_RESULTS_PAGE_SIZE).toBe(20)
   })
 
-  test('trims and collapses a valid query', () => {
+  test('trims a valid query without rewriting internal whitespace', () => {
     expect(normalizeSearchQuery('  frieren  ')).toBe('frieren')
-    expect(normalizeSearchQuery('Frieren   Himmel')).toBe('Frieren Himmel')
+    expect(normalizeSearchQuery('Frieren   Himmel')).toBe('Frieren   Himmel')
     expect(normalizeSearchQuery('x'.repeat(QUICK_SEARCH_MAX_LENGTH))).toHaveLength(QUICK_SEARCH_MAX_LENGTH)
   })
 
   test('rejects invalid query lengths and non-string input', () => {
     expect(() => normalizeSearchQuery('a')).toThrow('QUICK_SEARCH_INVALID')
     expect(() => normalizeSearchQuery('x'.repeat(QUICK_SEARCH_MAX_LENGTH + 1))).toThrow('QUICK_SEARCH_INVALID')
+    expect(() => normalizeSearchQuery(`a${' '.repeat(99)}b`)).toThrow('QUICK_SEARCH_INVALID')
     expect(() => normalizeSearchQuery(null)).toThrow('QUICK_SEARCH_INVALID')
   })
 
