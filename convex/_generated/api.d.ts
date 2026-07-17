@@ -23,6 +23,8 @@ import type * as authRateLimits from "../authRateLimits.js";
 import type * as authSecurity from "../authSecurity.js";
 import type * as authVerificationCleanup from "../authVerificationCleanup.js";
 import type * as avatarImport from "../avatarImport.js";
+import type * as catalogPersonCache from "../catalogPersonCache.js";
+import type * as catalogPersonCachePolicy from "../catalogPersonCachePolicy.js";
 import type * as crons from "../crons.js";
 import type * as feed from "../feed.js";
 import type * as feedPolicy from "../feedPolicy.js";
@@ -35,6 +37,10 @@ import type * as otpSendLimits from "../otpSendLimits.js";
 import type * as passwordResets from "../passwordResets.js";
 import type * as pendingOauthSignups from "../pendingOauthSignups.js";
 import type * as posts from "../posts.js";
+import type * as profileMedia from "../profileMedia.js";
+import type * as profileMediaPolicy from "../profileMediaPolicy.js";
+import type * as profileReviewPolicy from "../profileReviewPolicy.js";
+import type * as profiles from "../profiles.js";
 import type * as reviewDiscovery from "../reviewDiscovery.js";
 import type * as reviewDiscoveryPolicy from "../reviewDiscoveryPolicy.js";
 import type * as reviews from "../reviews.js";
@@ -42,6 +48,7 @@ import type * as socialPolicy from "../socialPolicy.js";
 import type * as todos from "../todos.js";
 import type * as userAnime from "../userAnime.js";
 import type * as userAnimePolicy from "../userAnimePolicy.js";
+import type * as userSearch from "../userSearch.js";
 import type * as users from "../users.js";
 
 import type {
@@ -66,6 +73,8 @@ declare const fullApi: ApiFromModules<{
   authSecurity: typeof authSecurity;
   authVerificationCleanup: typeof authVerificationCleanup;
   avatarImport: typeof avatarImport;
+  catalogPersonCache: typeof catalogPersonCache;
+  catalogPersonCachePolicy: typeof catalogPersonCachePolicy;
   crons: typeof crons;
   feed: typeof feed;
   feedPolicy: typeof feedPolicy;
@@ -78,6 +87,10 @@ declare const fullApi: ApiFromModules<{
   passwordResets: typeof passwordResets;
   pendingOauthSignups: typeof pendingOauthSignups;
   posts: typeof posts;
+  profileMedia: typeof profileMedia;
+  profileMediaPolicy: typeof profileMediaPolicy;
+  profileReviewPolicy: typeof profileReviewPolicy;
+  profiles: typeof profiles;
   reviewDiscovery: typeof reviewDiscovery;
   reviewDiscoveryPolicy: typeof reviewDiscoveryPolicy;
   reviews: typeof reviews;
@@ -85,6 +98,7 @@ declare const fullApi: ApiFromModules<{
   todos: typeof todos;
   userAnime: typeof userAnime;
   userAnimePolicy: typeof userAnimePolicy;
+  userSearch: typeof userSearch;
   users: typeof users;
 }>;
 
