@@ -36,6 +36,7 @@ import type * as otpCooldown from "../otpCooldown.js";
 import type * as otpSendLimits from "../otpSendLimits.js";
 import type * as passwordResets from "../passwordResets.js";
 import type * as pendingOauthSignups from "../pendingOauthSignups.js";
+import type * as postValidators from "../postValidators.js";
 import type * as posts from "../posts.js";
 import type * as profileMedia from "../profileMedia.js";
 import type * as profileMediaPolicy from "../profileMediaPolicy.js";
@@ -86,6 +87,7 @@ declare const fullApi: ApiFromModules<{
   otpSendLimits: typeof otpSendLimits;
   passwordResets: typeof passwordResets;
   pendingOauthSignups: typeof pendingOauthSignups;
+  postValidators: typeof postValidators;
   posts: typeof posts;
   profileMedia: typeof profileMedia;
   profileMediaPolicy: typeof profileMediaPolicy;
