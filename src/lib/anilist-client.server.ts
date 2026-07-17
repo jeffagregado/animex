@@ -4,10 +4,7 @@ const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
 const ANILIST_TIMEOUT_MS = 8_000
 const ANILIST_MAX_ATTEMPTS = 3
 const graphQlErrorSchema = z.object({ errors: z.array(z.object({ message: z.string() })).min(1) })
-const notFoundGraphQlBodySchema = z.object({
-  errors: z.array(z.object({ message: z.string(), status: z.literal(404) }).passthrough()).min(1),
-  data: z.object({ Media: z.null() }).strict(),
-}).strict()
+export type AniListNotFoundRoot = 'Media' | 'Character' | 'Staff'
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 
@@ -90,11 +87,20 @@ const parseResponseBody = async (response: Response): Promise<unknown> => {
 }
 
 /** Validates status and GraphQL error policy for one response. */
-const readResponseBody = async (response: Response, allowNotFoundBody: boolean): Promise<unknown> => {
-  if (!response.ok && !(allowNotFoundBody && response.status === 404)) throw upstreamError()
+const notFoundBodySchema = (root: AniListNotFoundRoot) => z.object({
+  errors: z.array(z.object({ message: z.string(), status: z.literal(404) }).passthrough()).min(1),
+  data: z.object({ [root]: z.null() }).strict(),
+}).strict()
+
+/** Validates status and one explicit GraphQL not-found root. */
+const readResponseBody = async (
+  response: Response,
+  notFoundRoot: AniListNotFoundRoot | null,
+): Promise<unknown> => {
+  if (!response.ok && !(notFoundRoot !== null && response.status === 404)) throw upstreamError()
   const body = await parseResponseBody(response)
-  if (allowNotFoundBody && response.status === 404) {
-    if (notFoundGraphQlBodySchema.safeParse(body).success) return body
+  if (notFoundRoot !== null && response.status === 404) {
+    if (notFoundBodySchema(notFoundRoot).safeParse(body).success) return body
     throw upstreamError()
   }
   if (graphQlErrorSchema.safeParse(body).success) throw upstreamError()
@@ -105,7 +111,7 @@ const requestAniListWithNotFoundPolicy = async (
   document: string,
   variables: Record<string, unknown>,
   dependencies: AniListDependencies,
-  allowNotFoundBody: boolean,
+  notFoundRoot: AniListNotFoundRoot | null,
 ): Promise<unknown> => {
   for (let attempt = 1; attempt <= ANILIST_MAX_ATTEMPTS; attempt += 1) {
     const response = await fetchResponse(document, variables, dependencies)
@@ -117,17 +123,22 @@ const requestAniListWithNotFoundPolicy = async (
       await retryRateLimited(response, attempt, dependencies)
       continue
     }
-    return await readResponseBody(response, allowNotFoundBody)
+    return await readResponseBody(response, notFoundRoot)
   }
   throw upstreamError()
 }
 
 /** Sends one sanitized, bounded-retry AniList GraphQL POST request. */
 export const requestAniList = async (document: string, variables: Record<string, unknown>, dependencies: AniListDependencies): Promise<unknown> => {
-  return await requestAniListWithNotFoundPolicy(document, variables, dependencies, false)
+  return await requestAniListWithNotFoundPolicy(document, variables, dependencies, null)
 }
 
 /** Allows a valid 404 body so detail normalizers can own not-found semantics. */
-export const requestAniListAllowingNotFound = async (document: string, variables: Record<string, unknown>, dependencies: AniListDependencies): Promise<unknown> => {
-  return await requestAniListWithNotFoundPolicy(document, variables, dependencies, true)
+export const requestAniListAllowingNotFound = async (
+  document: string,
+  variables: Record<string, unknown>,
+  dependencies: AniListDependencies,
+  expectedRoot: AniListNotFoundRoot,
+): Promise<unknown> => {
+  return await requestAniListWithNotFoundPolicy(document, variables, dependencies, expectedRoot)
 }

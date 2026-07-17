@@ -57,7 +57,7 @@ const listItem = (media: z.infer<typeof listMediaSchema>): AnimeDetailListItem |
 
 /** Fetches and strictly normalizes public anime metadata. */
 export const fetchAnimeDetailCachePayload = async (anilistId: number, dependencies: AniListDependencies): Promise<{ detail: AnimeDetail; summary: AnimeSummary } | null> => {
-  const body = await requestAniListAllowingNotFound(detailDocument, { id: parseAnilistId(anilistId) }, dependencies)
+  const body = await requestAniListAllowingNotFound(detailDocument, { id: parseAnilistId(anilistId) }, dependencies, 'Media')
   const parsed = detailResponseSchema.safeParse(body)
   if (!parsed.success) throw new AniListRequestError('UPSTREAM', 'AniList is temporarily unavailable.', null)
   const media = parsed.data.data.Media
@@ -116,7 +116,7 @@ const pageSchema = z.object({ pageInfo: z.object({ currentPage: z.number().int()
 export const fetchAnimePeoplePageFromAniList = async (anilistId: number, kind: AnimePeopleKind, page: number, dependencies: AniListDependencies): Promise<AnimePeoplePage<AnimeCharacter> | AnimePeoplePage<AnimeStaff> | null> => {
   const validId = parseAnilistId(anilistId)
   const validPage = parseAnimePage(page)
-  const body = await requestAniListAllowingNotFound(kind === 'characters' ? characterDocument : staffDocument, { id: validId, page: validPage, perPage: ANIME_PEOPLE_PER_PAGE }, dependencies)
+  const body = await requestAniListAllowingNotFound(kind === 'characters' ? characterDocument : staffDocument, { id: validId, page: validPage, perPage: ANIME_PEOPLE_PER_PAGE }, dependencies, 'Media')
   const response = peopleResponseSchema.safeParse(body)
   if (!response.success) throw new AniListRequestError('UPSTREAM', 'AniList is temporarily unavailable.', null)
   if (response.data.data.Media === null) return null

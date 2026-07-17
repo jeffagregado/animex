@@ -34,14 +34,16 @@ const mediaSelection = `id type isAdult title { english romaji native } coverIma
 const documents = {
   characterDetail: `query CharacterDetail($id: Int!) { Character(id: $id) { id name { full native } image { large } description age gender dateOfBirth { year month day } bloodType } }`,
   staffDetail: `query StaffDetail($id: Int!) { Staff(id: $id) { id name { full native } image { large } description primaryOccupations languageV2 homeTown yearsActive } }`,
-  characterWorks: `query CharacterWorks($id: Int!, $page: Int!, $perPage: Int!) { Character(id: $id) { id media(page: $page, perPage: $perPage, sort: [POPULARITY_DESC, ID]) { pageInfo { currentPage hasNextPage } edges { characterRole node { ${mediaSelection} } } } } }`,
-  staffWorks: `query StaffWorks($id: Int!, $page: Int!, $perPage: Int!) { Staff(id: $id) { id staffMedia(page: $page, perPage: $perPage, sort: [POPULARITY_DESC, ID]) { pageInfo { currentPage hasNextPage } edges { staffRole node { ${mediaSelection} } } } } }`,
+  characterWorks: `query CharacterWorks($id: Int!, $page: Int!, $perPage: Int!) { Character(id: $id) { id media(type: ANIME, page: $page, perPage: $perPage, sort: [POPULARITY_DESC, ID]) { pageInfo { currentPage hasNextPage } edges { characterRole node { ${mediaSelection} } } } } }`,
+  staffWorks: `query StaffWorks($id: Int!, $page: Int!, $perPage: Int!) { Staff(id: $id) { id staffMedia(type: ANIME, page: $page, perPage: $perPage, sort: [POPULARITY_DESC, ID]) { pageInfo { currentPage hasNextPage } edges { staffRole node { ${mediaSelection} } } } } }`,
   characterSearch: `query CharacterSearch($query: String!, $page: Int!, $perPage: Int!) { Page(page: $page, perPage: $perPage) { pageInfo { currentPage hasNextPage } characters(search: $query, sort: SEARCH_MATCH) { id name { full native } image { large } } } }`,
   staffSearch: `query StaffSearch($query: String!, $page: Int!, $perPage: Int!) { Page(page: $page, perPage: $perPage) { pageInfo { currentPage hasNextPage } staff(search: $query, sort: SEARCH_MATCH) { id name { full native } image { large } } } }`,
 } as const
 
 const upstreamError = (): AniListRequestError => new AniListRequestError('UPSTREAM', 'AniList is temporarily unavailable.', null)
 const text = (value: string | null): string | null => value?.trim() || null
+const isValidatedNotFound = (body: unknown): boolean =>
+  typeof body === 'object' && body !== null && 'errors' in body
 const personInputSchema = z.object({
   kind: z.enum(['character', 'staff']),
   id: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
@@ -68,8 +70,8 @@ const formatBirthday = (value: { year: number | null; month: number | null; day:
 
 const formatActiveYears = (years: number[] | null): string | null => {
   if (years === null || years.length === 0) return null
-  if (years.length === 1) return String(years[0])
-  if (years.length === 2) return `${years[0]}–${years[1]}`
+  if (years.length === 1) return `${years[0]}–Present`
+  if (years.length === 2 && years[0]! <= years[1]!) return `${years[0]}–${years[1]}`
   throw upstreamError()
 }
 
@@ -93,7 +95,9 @@ export const fetchCatalogPersonFromAniList = async (
     input.kind === 'character' ? documents.characterDetail : documents.staffDetail,
     { id: input.id },
     dependencies,
+    input.kind === 'character' ? 'Character' : 'Staff',
   )
+  if (isValidatedNotFound(body)) return null
   try {
     if (input.kind === 'character') {
       const parsed = characterDetailResponseSchema.parse(body).data.Character
@@ -135,7 +139,9 @@ export const fetchCatalogPersonWorksFromAniList = async (
     kind === 'character' ? documents.characterWorks : documents.staffWorks,
     { id: input.id, page: validPage, perPage: CATALOG_PERSON_PAGE_SIZE },
     dependencies,
+    kind === 'character' ? 'Character' : 'Staff',
   )
+  if (isValidatedNotFound(body)) return null
   try {
     const person = kind === 'character'
       ? characterWorksResponseSchema.parse(body).data.Character
@@ -144,7 +150,7 @@ export const fetchCatalogPersonWorksFromAniList = async (
     if (person.id !== input.id) throw upstreamError()
     const parsed = 'media' in person ? person.media : person.staffMedia
     if (parsed.pageInfo.currentPage !== validPage) throw upstreamError()
-    const edges = parsed.edges.map((edge) => ({
+    const edges = parsed.edges.filter((edge) => !edge.node.isAdult).map((edge) => ({
       summary: normalizeAnimeSummary(edge.node),
       role: 'characterRole' in edge ? text(edge.characterRole) : text(edge.staffRole),
     }))
@@ -182,6 +188,7 @@ export const searchCatalogPeopleFromAniList = async (
     const parsed = kind === 'character'
       ? characterSearchResponseSchema.parse(body).data.Page
       : staffSearchResponseSchema.parse(body).data.Page
+    if (parsed.pageInfo.currentPage !== input.page) throw upstreamError()
     const people = 'characters' in parsed ? parsed.characters : parsed.staff
     return catalogPersonSearchPageSchema.parse({
       items: people.map((person) => {

@@ -91,16 +91,29 @@ describe('AniList client', () => {
     expect(attempts).toBe(3)
   })
 
-  test('allows only the validated AniList not-found response shape', async () => {
-    const body = { errors: [{ message: 'Not Found.', status: 404 }], data: { Media: null } }
+  test.each(['Media', 'Character', 'Staff'] as const)(
+    'allows only strict validated %s not-found response shapes',
+    async (root) => {
+      const body = { errors: [{ message: 'Not Found.', status: 404 }], data: { [root]: null } }
 
-    await expect(requestAniListAllowingNotFound('query Test { Media { id } }', {}, dependencies([
-      Response.json(body, { status: 404 }),
-    ]))).resolves.toEqual(body)
+      await expect(requestAniListAllowingNotFound('query Test { Root { id } }', {}, dependencies([
+        Response.json(body, { status: 404 }),
+      ]), root)).resolves.toEqual(body)
 
+      await expect(requestAniListAllowingNotFound('query Test { Root { id } }', {}, dependencies([
+        Response.json({ ...body, data: { Wrong: null } }, { status: 404 }),
+      ]), root)).rejects.toMatchObject({ code: 'UPSTREAM' })
+
+      await expect(requestAniListAllowingNotFound('query Test { Root { id } }', {}, dependencies([
+        Response.json({ ...body, data: { [root]: null, Extra: null } }, { status: 404 }),
+      ]), root)).rejects.toMatchObject({ code: 'UPSTREAM' })
+    },
+  )
+
+  test('rejects incomplete not-found bodies', async () => {
     await expect(requestAniListAllowingNotFound('query Test { Media { id } }', {}, dependencies([
       Response.json({ data: { Media: null } }, { status: 404 }),
-    ]))).rejects.toMatchObject({ code: 'UPSTREAM' })
+    ]), 'Media')).rejects.toMatchObject({ code: 'UPSTREAM' })
   })
 
   test('sanitizes GraphQL error response details', async () => {

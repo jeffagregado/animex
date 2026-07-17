@@ -36,7 +36,7 @@ export const staffDetailResponseSchema = z.object({
       primaryOccupations: z.array(z.string()),
       languageV2: z.string().nullable(),
       homeTown: z.string().nullable(),
-      yearsActive: z.array(z.number().int().positive().max(Number.MAX_SAFE_INTEGER)).min(1).max(2).nullable(),
+      yearsActive: z.array(z.number().int().positive().max(Number.MAX_SAFE_INTEGER)).max(2).nullable(),
     }).strict().nullable(),
   }).strict(),
 }).strict()
