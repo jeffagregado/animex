@@ -13,6 +13,7 @@ import {
   searchPreview,
   verifyProfiles,
 } from './userSearch'
+import { createUserSearchText } from './users'
 
 const modules = import.meta.glob(['./_generated/**/*.*', './{userSearch,users}.ts'])
 // Generated API is controller-owned and intentionally not regenerated in this worker commit.
@@ -81,6 +82,13 @@ const insertProfile = async (
 })
 
 describe('profile search Convex integration', () => {
+  test('builds one canonical normalized identity search text', () => {
+    expect(createUserSearchText({
+      name: '  Anime   Fan ',
+      username: 'Anime_Fan',
+    })).toBe('anime fan anime_fan')
+  })
+
   test('completes a profile with Public visibility and its normalized search projection', async () => {
     const t = createHarness()
     const owner = await createAuthUser(t, 'completion-owner')
@@ -129,6 +137,9 @@ describe('profile search Convex integration', () => {
       .rejects.toThrow('Unauthenticated')
     await expect(viewer.client.query(profileApi.userSearch.searchPreview, { query: 'a' }))
       .rejects.toThrow('2-100')
+    await expect(viewer.client.query(profileApi.userSearch.searchPreview, {
+      query: `a${' '.repeat(99)}b`,
+    })).rejects.toThrow('2-100')
 
     const preview = await viewer.client.query(
       profileApi.userSearch.searchPreview,
@@ -153,6 +164,81 @@ describe('profile search Convex integration', () => {
       'username',
     ])
     expect(JSON.stringify(preview)).not.toContain('private-auth-id')
+  })
+
+  test('caps preview at 5 and pages full search at exactly 20 results', async () => {
+    const t = createHarness()
+    const viewer = await createAuthUser(t, 'paging-viewer')
+    await insertProfile(t, viewer.authId, 'PagingViewer', 'Search Viewer', 'public')
+    const expectedIds = await t.run(async (ctx) => {
+      const now = Date.now()
+      return await Promise.all(Array.from({ length: 22 }, async (_, index) => (
+        await ctx.db.insert('users', {
+          authId: `paging-auth-${index}`,
+          username: `PagingFan${index}`,
+          usernameKey: `pagingfan${index}`,
+          name: `PagingMatch ${index}`,
+          profileVisibility: 'public',
+          visibility: 'public',
+          createdAt: now,
+          updatedAt: now,
+        })
+      )))
+    })
+    await t.mutation(profileInternal.userSearch.backfillProfiles, {
+      paginationOpts: { numItems: 100, cursor: null },
+    })
+
+    await expect(viewer.client.query(profileApi.userSearch.search, {
+      query: 'pagingmatch',
+      paginationOpts: { numItems: 19, cursor: null },
+    })).rejects.toThrow('20 results per page')
+
+    const preview = await viewer.client.query(
+      profileApi.userSearch.searchPreview,
+      { query: 'pagingmatch' },
+    )
+    const first = await viewer.client.query(profileApi.userSearch.search, {
+      query: 'pagingmatch',
+      paginationOpts: { numItems: 20, cursor: null },
+    })
+    const second = await viewer.client.query(profileApi.userSearch.search, {
+      query: 'pagingmatch',
+      paginationOpts: { numItems: 20, cursor: first.continueCursor },
+    })
+
+    expect(preview).toHaveLength(5)
+    expect(first.page).toHaveLength(20)
+    expect(first.isDone).toBe(false)
+    expect(second.page).toHaveLength(2)
+    expect(second.isDone).toBe(true)
+    expect(new Set([...first.page, ...second.page].map((item) => item.id)))
+      .toEqual(new Set(expectedIds))
+  })
+
+  test('omits stale projections whose profile no longer exists', async () => {
+    const t = createHarness()
+    const viewer = await createAuthUser(t, 'stale-viewer')
+    await insertProfile(t, viewer.authId, 'StaleViewer', 'Search Viewer', 'public')
+    const deletedId = await insertProfile(
+      t,
+      'stale-auth',
+      'DeletedSearchFan',
+      'DeletedSearch Identity',
+      'public',
+    )
+    await t.mutation(profileInternal.userSearch.backfillProfiles, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    await t.run(async (ctx) => await ctx.db.delete('users', deletedId))
+
+    expect(await viewer.client.query(profileApi.userSearch.searchPreview, {
+      query: 'deletedsearch',
+    })).toEqual([])
+    expect(await viewer.client.query(profileApi.userSearch.search, {
+      query: 'deletedsearch',
+      paginationOpts: { numItems: 20, cursor: null },
+    })).toMatchObject({ page: [] })
   })
 
   test('keeps one projection per profile and rejects duplicate corruption', async () => {

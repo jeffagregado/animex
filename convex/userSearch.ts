@@ -8,7 +8,11 @@ import {
   query,
   type QueryCtx,
 } from './_generated/server'
-import { requireProfile, upsertUserSearchDocument } from './users'
+import {
+  createUserSearchText,
+  requireProfile,
+  upsertUserSearchDocument,
+} from './users'
 
 const SEARCH_PAGE_SIZE = 20
 const SEARCH_PREVIEW_SIZE = 5
@@ -39,7 +43,7 @@ const verificationResultValidator = v.object({
 })
 
 const normalizeQuery = (query: string): string => {
-  const normalized = query.trim().replace(/\s+/g, ' ').toLowerCase()
+  const normalized = query.trim().toLowerCase()
   if (normalized.length < 2 || normalized.length > 100) {
     throw new ConvexError({
       code: 'INVALID_SEARCH_QUERY',
@@ -48,10 +52,6 @@ const normalizeQuery = (query: string): string => {
   }
   return normalized
 }
-
-const expectedSearchText = (user: Doc<'users'>): string => (
-  `${user.name} ${user.username}`.trim().replace(/\s+/g, ' ').toLowerCase()
-)
 
 const hydrateIdentity = async (
   ctx: QueryCtx,
@@ -179,7 +179,7 @@ const verifyProfile = async (
     result.duplicateSearchUserIds.push(user._id)
     return
   }
-  if (rows[0]!.searchText !== expectedSearchText(user)) {
+  if (rows[0]!.searchText !== createUserSearchText(user)) {
     result.mismatchedSearchUserIds.push(user._id)
   }
 }

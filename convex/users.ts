@@ -142,6 +142,14 @@ export const requireProfile = async (ctx: UserCtx) => {
   return { authUser, profile }
 }
 
+/** Builds normalized name and username text for User Search. */
+export const createUserSearchText = (
+  user: Pick<Doc<'users'>, 'name' | 'username'>,
+): string => `${user.name} ${user.username}`
+  .trim()
+  .replace(/\s+/g, ' ')
+  .toLowerCase()
+
 /** Writes the canonical identity-only search projection for one profile. */
 export const upsertUserSearchDocument = async (
   ctx: MutationCtx,
@@ -158,10 +166,7 @@ export const upsertUserSearchDocument = async (
     })
   }
 
-  const searchText = `${user.name} ${user.username}`
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLowerCase()
+  const searchText = createUserSearchText(user)
   const updatedAt = Date.now()
   if (rows[0]) {
     await ctx.db.patch('userSearchDocuments', rows[0]._id, {
