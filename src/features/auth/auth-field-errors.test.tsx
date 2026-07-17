@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render as renderWithTestingLibrary,
+  screen,
+  waitFor,
+} from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
@@ -16,6 +23,7 @@ const authClientMock = vi.hoisted(() => ({
 }))
 
 const navigateToAuthPathMock = vi.hoisted(() => vi.fn())
+const routerNavigateMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../lib/auth-client', () => ({
   authClient: authClientMock,
@@ -29,12 +37,30 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ activeOptions: _activeOptions, activeProps: _activeProps, children, hash, to, ...props }: { activeOptions?: unknown, activeProps?: unknown, children: ReactNode, hash?: string, to: string }) => (
     <a href={`${to}${hash === undefined ? '' : `#${hash}`}`} {...props}>{children}</a>
   ),
+  useNavigate: () => routerNavigateMock,
+}))
+
+vi.mock('convex/react', () => ({
+  useConvex: () => ({ query: vi.fn() }),
 }))
 
 import { SignInPage } from './sign-in-page'
 import { SignUpPage } from './sign-up-page'
 import { ForgotPasswordPage } from './forgot-password-page'
 import { VerifyEmailPage } from './verify-email-page'
+
+/** Renders an auth page with the app-level query boundary. */
+const render = (children: ReactNode) => renderWithTestingLibrary(
+  <QueryClientProvider
+    client={new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    })}
+  >
+    {children}
+  </QueryClientProvider>,
+)
 
 const mockSignedOutState = (): void => {
   vi.stubGlobal(
