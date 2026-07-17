@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -115,6 +115,32 @@ describe('UserSearchPage', () => {
       'A',
       'B',
       'B',
+    ])
+  })
+
+  it('resets cursor history when a full infinite query refetch restarts at null', async () => {
+    convex.query
+      .mockResolvedValueOnce(result([user('1', 'one', 'First')], 'A', false))
+      .mockResolvedValueOnce(result([user('2', 'two', 'Second')], '', true))
+      .mockResolvedValueOnce(result([user('1', 'one', 'First')], 'A', false))
+      .mockResolvedValueOnce(result([user('2', 'two', 'Second')], '', true))
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(<QueryClientProvider client={client}><UserSearchPage onQuerySubmit={vi.fn()} query="ab" /></QueryClientProvider>)
+    await screen.findByText('First')
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    await screen.findByText('Second')
+
+    await act(async () => {
+      await client.refetchQueries({ exact: true, queryKey: ['user-search', 'ab'] })
+    })
+
+    expect(client.getQueryState(['user-search', 'ab'])?.error).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(convex.query.mock.calls.map(([, args]) => args.paginationOpts.cursor)).toEqual([
+      null,
+      'A',
+      null,
+      'A',
     ])
   })
 

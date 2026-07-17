@@ -52,6 +52,7 @@ export function useUserSearchPages(queryText: string, enabled: boolean) {
     queryKey: ['user-search', queryText],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }): Promise<UserSearchResult> => {
+      if (pageParam === null) successfulCursors.clear()
       const raw = await convex.query(searchUsersRef, {
         query: queryText,
         paginationOpts: { cursor: pageParam, numItems: 20 },
