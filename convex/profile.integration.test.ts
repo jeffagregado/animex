@@ -1,7 +1,9 @@
 /// <reference types="vite/client" />
 
 import betterAuthTest from '@convex-dev/better-auth/test'
+import { defineSchema, defineTable } from 'convex/server'
 import { convexTest } from 'convex-test'
+import { v } from 'convex/values'
 import { describe, expect, test } from 'vitest'
 
 import { api, components, internal } from './_generated/api'
@@ -20,11 +22,40 @@ const modules = import.meta.glob(['./_generated/**/*.*', './{userSearch,users}.t
 const profileApi = api as any
 const profileInternal = internal as any
 
+const legacyProfileSchema = defineSchema({
+  users: defineTable({
+    authId: v.string(),
+    username: v.string(),
+    usernameKey: v.string(),
+    name: v.string(),
+    avatarStorageId: v.optional(v.id('_storage')),
+    bannerStorageId: v.optional(v.id('_storage')),
+    bio: v.optional(v.string()),
+    profileVisibility: v.optional(v.union(v.literal('public'), v.literal('private'))),
+    visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_auth_id', ['authId'])
+    .index('by_username_key', ['usernameKey'])
+    .index('by_avatar_storage_id', ['avatarStorageId'])
+    .index('by_banner_storage_id', ['bannerStorageId']),
+  userSearchDocuments: defineTable({
+    userId: v.id('users'),
+    searchText: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .searchIndex('search_users', { searchField: 'searchText' }),
+})
+
 const createHarness = () => {
   const t = convexTest(schema, modules)
   betterAuthTest.register(t)
   return t
 }
+
+const createMigrationHarness = () => convexTest(legacyProfileSchema, modules)
 
 const createAuthUser = async (
   t: ReturnType<typeof createHarness>,
@@ -63,6 +94,26 @@ const createAuthUser = async (
 
 const insertProfile = async (
   t: ReturnType<typeof createHarness>,
+  authId: string,
+  username: string,
+  name: string,
+  profileVisibility: 'private' | 'public',
+): Promise<Id<'users'>> => await t.run(async (ctx) => {
+  const now = Date.now()
+  return await ctx.db.insert('users', {
+    authId,
+    username,
+    usernameKey: username.toLowerCase(),
+    name,
+    profileVisibility,
+    visibility: 'public',
+    createdAt: now,
+    updatedAt: now,
+  })
+})
+
+const insertLegacyProfile = async (
+  t: ReturnType<typeof createMigrationHarness>,
   authId: string,
   username: string,
   name: string,
@@ -273,10 +324,10 @@ describe('profile search Convex integration', () => {
   })
 
   test('backfills missing defaults idempotently and reports every verification mismatch', async () => {
-    const t = createHarness()
-    const missingId = await insertProfile(t, 'missing-auth', 'MissingFan', 'Missing Fan', undefined)
-    const mismatchId = await insertProfile(t, 'mismatch-auth', 'MismatchFan', 'Mismatch Fan', 'public')
-    const duplicateId = await insertProfile(t, 'duplicate-auth', 'DuplicateFan', 'Duplicate Fan', 'public')
+    const t = createMigrationHarness()
+    const missingId = await insertLegacyProfile(t, 'missing-auth', 'MissingFan', 'Missing Fan', undefined)
+    const mismatchId = await insertLegacyProfile(t, 'mismatch-auth', 'MismatchFan', 'Mismatch Fan', 'public')
+    const duplicateId = await insertLegacyProfile(t, 'duplicate-auth', 'DuplicateFan', 'Duplicate Fan', 'public')
 
     await t.run(async (ctx) => {
       await ctx.db.insert('userSearchDocuments', {

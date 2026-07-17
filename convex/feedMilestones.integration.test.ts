@@ -34,7 +34,7 @@ describe('feed milestone source integrity', () => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
         authId: 'milestone-owner', username: 'MilestoneOwner', usernameKey: 'milestoneowner', name: 'Milestone Owner',
-        visibility: 'public', createdAt: now, updatedAt: now,
+        profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
       await ctx.db.insert('animeMilestones', {
         userId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: 200, updatedAt: 200,
@@ -64,7 +64,7 @@ describe('feed milestone source integrity', () => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
         authId: 'deleted-owner', username: 'DeletedOwner', usernameKey: 'deletedowner', name: 'Deleted Owner',
-        visibility: 'public', createdAt: now, updatedAt: now,
+        profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
       const milestoneId = await ctx.db.insert('animeMilestones', {
         userId, anilistId: 1, kind: 'rewatched', visibility: 'public', occurredAt: now, updatedAt: now,
@@ -89,7 +89,7 @@ describe('feed milestone source integrity', () => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
         authId: 'private-owner', username: 'PrivateOwner', usernameKey: 'privateowner', name: 'Private Owner',
-        visibility: 'public', createdAt: now, updatedAt: now,
+        profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
       await ctx.db.insert('animeMilestones', {
         userId, anilistId: 1, kind: 'completed', visibility: 'private', occurredAt: now, updatedAt: now,
@@ -112,7 +112,7 @@ describe('feed milestone source integrity', () => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
         authId: 'public-source-owner', username: 'PublicSourceOwner', usernameKey: 'publicsourceowner', name: 'Public Source Owner',
-        visibility: 'public', createdAt: now, updatedAt: now,
+        profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
       await ctx.db.insert('animeMilestones', {
         userId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now,
@@ -135,7 +135,7 @@ describe('feed milestone source integrity', () => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
         authId: 'wrong-key-owner', username: 'WrongKeyOwner', usernameKey: 'wrongkeyowner', name: 'Wrong Key Owner',
-        visibility: 'public', createdAt: now, updatedAt: now,
+        profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
       await ctx.db.insert('animeMilestones', {
         userId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now,
@@ -156,7 +156,7 @@ describe('feed milestone source integrity', () => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
         authId: 'backfill-owner', username: 'BackfillOwner', usernameKey: 'backfillowner', name: 'Backfill Owner',
-        visibility: 'public', createdAt: now, updatedAt: now,
+        profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
       await ctx.db.insert('animeMilestones', { userId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now })
       await ctx.db.insert('animeMilestones', { userId, anilistId: 1, kind: 'rewatched', visibility: 'public', occurredAt: now + 1, updatedAt: now + 1 })

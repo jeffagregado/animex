@@ -50,7 +50,7 @@ const insertProfile = async (
   const now = Date.now()
   return await ctx.db.insert('users', {
     authId, username, usernameKey: username.toLowerCase(), name: username,
-    visibility, createdAt: now, updatedAt: now,
+    profileVisibility: 'public', visibility, createdAt: now, updatedAt: now,
   })
 })
 

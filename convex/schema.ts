@@ -75,7 +75,7 @@ export default defineSchema({
     avatarStorageId: v.optional(v.id('_storage')),
     bannerStorageId: v.optional(v.id('_storage')),
     bio: v.optional(v.string()),
-    profileVisibility: v.optional(profileVisibilityValidator),
+    profileVisibility: profileVisibilityValidator,
     visibility: v.union(
       v.literal('private'),
       v.literal('followers'),

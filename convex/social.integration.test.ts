@@ -28,7 +28,7 @@ const createOwner = async (t: ReturnType<typeof createHarness>, label: string) =
   })
   const profileId = await t.run(async (ctx) => await ctx.db.insert('users', {
     authId: user._id, username: label, usernameKey: label.toLowerCase(), name: label,
-    visibility: 'public', createdAt: now, updatedAt: now,
+    profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
   }))
   return { profileId, client: t.withIdentity({ subject: user._id, sessionId: session._id } as never) }
 }
@@ -748,7 +748,7 @@ describe('social Convex integration', () => {
         const now = index
         const userId = await ctx.db.insert('users', {
           authId: `review-author-${index}`, username: `Author${index}`, usernameKey: `author${index}`,
-          name: `Author ${index}`, visibility: 'public', createdAt: now, updatedAt: now,
+          name: `Author ${index}`, profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
         })
         const key = String(index * 2).padStart(4, '0')
         await ctx.db.insert('reviews', {
