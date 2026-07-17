@@ -156,7 +156,7 @@ export const parseCatalogPersonId = (value: unknown): number => {
     : value
   const result = positiveSafeIntegerSchema.safeParse(candidate)
   if (!result.success) {
-    throw new RangeError('CATALOG_PERSON_ID_INVALID', { cause: result.error })
+    throw new RangeError(`CATALOG_PERSON_ID_INVALID: ${result.error.message}`)
   }
 
   return result.data
