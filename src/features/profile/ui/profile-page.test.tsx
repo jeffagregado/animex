@@ -298,6 +298,41 @@ describe('Profile tab states', () => {
     })
     expect(loadMore).toHaveBeenCalledOnce()
   })
+
+  it('keeps legal empty continuation pages non-terminal across every tab', () => {
+    const loadMore = vi.fn(async () => undefined)
+    let intersect!: IntersectionObserverCallback
+    class Observer {
+      constructor(callback: IntersectionObserverCallback) {
+        intersect = callback
+      }
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+      takeRecords(): IntersectionObserverEntry[] { return [] }
+    }
+    vi.stubGlobal('IntersectionObserver', Observer)
+    const continuing = { ...page([], { hasMore: true }), loadMore }
+    const view = render(<ProfileActivity state={continuing} />)
+
+    expect(screen.queryByText('No activity yet')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    act(() => {
+      intersect(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      )
+    })
+    expect(loadMore).toHaveBeenCalledTimes(2)
+
+    view.rerender(<ProfileReviews state={continuing} />)
+    expect(screen.queryByText('No reviews yet')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Load more' })).toBeTruthy()
+
+    view.rerender(<ProfileFavorites state={continuing} />)
+    expect(screen.queryByText('No favorites yet')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Load more' })).toBeTruthy()
+  })
 })
 
 describe('Profile cursor pages', () => {

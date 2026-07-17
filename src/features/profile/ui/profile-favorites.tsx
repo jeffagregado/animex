@@ -26,7 +26,7 @@ export function ProfileFavorites({
   }
   return (
     <section aria-label="Profile favorites">
-      {state.items.length === 0 && state.error === null ? (
+      {state.items.length === 0 && !state.hasMore && state.error === null ? (
         <ProfileFavoriteState
           message="No favorites are visible on this profile."
           title="No favorites yet"

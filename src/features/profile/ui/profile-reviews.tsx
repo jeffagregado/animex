@@ -28,7 +28,7 @@ export function ProfileReviews({
       {state.items.map((review) => (
         <PublishedReviewCard key={review.id} review={review} />
       ))}
-      {state.items.length === 0 && state.error === null ? (
+      {state.items.length === 0 && !state.hasMore && state.error === null ? (
         <ReviewState
           message="No Reviews are visible on this profile."
           title="No reviews yet"

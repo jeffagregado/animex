@@ -33,7 +33,7 @@ export function ProfileActivity({
           owner={false}
         />
       ))}
-      {state.items.length === 0 && state.error === null ? (
+      {state.items.length === 0 && !state.hasMore && state.error === null ? (
         <ActivityState
           message="Nothing visible on this profile yet."
           title="No activity yet"
