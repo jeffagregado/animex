@@ -34,7 +34,7 @@ const detailResponseSchema = z.object({ data: z.object({ Media: z.object({
   trailer: z.object({ id: z.string(), site: z.string(), thumbnail: z.url().nullable() }).nullable(), externalLinks: z.array(z.object({ site: z.string(), url: z.url() })),
 }).nullable() }) })
 
-const plainText = (html: string | null): string | null => {
+export const normalizeDescriptionText = (html: string | null): string | null => {
   if (html === null) return null
   const text = html.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/\s+/g, ' ').replace(/\s+([.,!?;:])/g, '$1').trim()
   return text || null
@@ -71,7 +71,7 @@ export const fetchAnimeDetailCachePayload = async (anilistId: number, dependenci
     if (!charactersPage || !staffPage) throw new TypeError('AniList people pages were missing.')
     const detail = animeDetailSchema.parse({
       anilistId: media.id, slug: slugifyAnimeTitle(titles.display), titles,
-      coverImageUrl: media.coverImage?.extraLarge ?? null, bannerImageUrl: media.bannerImage, synopsis: plainText(media.description),
+      coverImageUrl: media.coverImage?.extraLarge ?? null, bannerImageUrl: media.bannerImage, synopsis: normalizeDescriptionText(media.description),
       format: media.format, status: media.status, source: media.source, season: media.season, seasonYear: media.seasonYear,
       episodes: media.episodes, durationMinutes: media.duration, startDate: media.startDate, endDate: media.endDate,
       genres: [...new Set(media.genres.map((genre) => genre.trim()).filter(Boolean))],
