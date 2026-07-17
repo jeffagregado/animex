@@ -4,10 +4,10 @@ import {
   QuickSearchProvider,
   useQuickSearchControls,
 } from '../quick-search/ui/quick-search-provider'
+import { QuickSearchHeader } from '../quick-search/ui/quick-search-header'
 import { mainNavigationItems } from './navigation'
 import { MobileBottomNavigation } from './mobile-bottom-navigation'
 import { PublicAuthStateProvider } from './public-auth-context'
-import { SiteHeader } from './site-header'
 
 type PublicShellProps = {
   children: ReactNode
@@ -18,9 +18,8 @@ function PublicShellContent({ children }: PublicShellProps) {
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
-      <SiteHeader
+      <QuickSearchHeader
         navItems={mainNavigationItems}
-        searchAction={{ kind: 'quick-search', open: openSearch }}
         showAuthAction={true}
       />
       {children}

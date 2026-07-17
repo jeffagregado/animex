@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render as renderWithTestingLibrary,
+  screen,
+  waitFor,
+} from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { renderToString } from 'react-dom/server'
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -18,6 +25,7 @@ const authClientMock = vi.hoisted(() => ({
 }))
 
 const navigateToAuthPathMock = vi.hoisted(() => vi.fn())
+const routerNavigateMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../lib/auth-client', () => ({
   authClient: authClientMock,
@@ -31,6 +39,11 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ activeOptions: _activeOptions, activeProps: _activeProps, children, hash, to, ...props }: { activeOptions?: unknown, activeProps?: unknown, children: ReactNode, hash?: string, to: string }) => (
     <a href={`${to}${hash === undefined ? '' : `#${hash}`}`} {...props}>{children}</a>
   ),
+  useNavigate: () => routerNavigateMock,
+}))
+
+vi.mock('convex/react', () => ({
+  useConvex: () => ({ query: vi.fn() }),
 }))
 
 import { ForgotPasswordPage } from './forgot-password-page'
@@ -40,6 +53,20 @@ import { SignInPage } from './sign-in-page'
 import { SignUpPage } from './sign-up-page'
 import { UsernamePage } from './username-page'
 import { VerifyEmailPage } from './verify-email-page'
+
+/** Creates an isolated query client for one auth-page render. */
+const createTestQueryClient = () => new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+  },
+})
+
+/** Renders an auth page with the app-level query boundary. */
+const render = (children: ReactNode) => renderWithTestingLibrary(
+  <QueryClientProvider client={createTestQueryClient()}>
+    {children}
+  </QueryClientProvider>,
+)
 
 const mockSignedOutState = (): void => {
   vi.stubGlobal(
@@ -106,6 +133,8 @@ describe('auth pages', () => {
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Community' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Stats' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Search' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Search' })).toBeNull()
     expect(screen.getByRole('heading', { name: 'Sign in' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeTruthy()
     expect(screen.getByLabelText('Account Email')).toBeTruthy()
@@ -253,7 +282,11 @@ describe('auth pages', () => {
   test('renders reset password page without browser globals during SSR', () => {
     vi.stubGlobal('window', undefined)
 
-    expect(() => renderToString(<ResetPasswordPage token={null} />)).not.toThrow()
+    expect(() => renderToString(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <ResetPasswordPage token={null} />
+      </QueryClientProvider>,
+    )).not.toThrow()
   })
 
   test('uses authoritative verification email and ignores malformed query override', async () => {

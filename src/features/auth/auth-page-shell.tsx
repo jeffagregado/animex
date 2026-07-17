@@ -2,9 +2,10 @@ import { useState, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 
 import { AsyncButton } from '../../components/async-button'
+import { QuickSearchHeader } from '../quick-search/ui/quick-search-header'
+import { GuestQuickSearchProvider } from '../quick-search/ui/quick-search-provider'
 import { AnimeXLogo } from '../shell/animex-logo'
 import { mainNavigationItems } from '../shell/navigation'
-import { SiteHeader } from '../shell/site-header'
 
 export function AuthPageShell({
   children,
@@ -18,27 +19,28 @@ export function AuthPageShell({
   title: string
 }) {
   return (
-    <main className="auth-page">
-      <SiteHeader
-        navItems={mainNavigationItems}
-        searchAction={{ kind: 'discover', to: '/discover' }}
-        showAuthAction={false}
-      />
-      <div className="auth-poster-grid" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-        <span />
-      </div>
-      <div className="auth-x-mark" aria-hidden="true" />
-      <section className="auth-panel" aria-labelledby="auth-title">
-        <AnimeXLogo ariaLabel="AnimeX home" href="/home" size="panel" />
-        <p className="sr-only">{eyebrow}</p>
-        <h1 id="auth-title">{title}</h1>
-        {subtitle ? <p className="auth-subtitle">{subtitle}</p> : null}
-        {children}
-      </section>
-    </main>
+    <GuestQuickSearchProvider>
+      <main className="auth-page">
+        <QuickSearchHeader
+          navItems={mainNavigationItems}
+          showAuthAction={false}
+        />
+        <div className="auth-poster-grid" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="auth-x-mark" aria-hidden="true" />
+        <section className="auth-panel" aria-labelledby="auth-title">
+          <AnimeXLogo ariaLabel="AnimeX home" href="/home" size="panel" />
+          <p className="sr-only">{eyebrow}</p>
+          <h1 id="auth-title">{title}</h1>
+          {subtitle ? <p className="auth-subtitle">{subtitle}</p> : null}
+          {children}
+        </section>
+      </main>
+    </GuestQuickSearchProvider>
   )
 }
 

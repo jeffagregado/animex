@@ -35,6 +35,12 @@ interface SearchSurfaceState {
   triggerRef: RefObject<HTMLElement | null>
 }
 
+interface QuickSearchRootProps {
+  authScope: string | null
+  children: ReactNode
+  usersEnabled: boolean
+}
+
 /** Owns responsive surface selection and close-completion reset state. */
 function useSearchSurface(): SearchSurfaceState {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -101,24 +107,19 @@ function useCloseNavigation(
 }
 
 /** Owns one responsive Quick Search surface and its close-before-navigation flow. */
-export function QuickSearchProvider({ children }: { children: ReactNode }) {
-  const auth = usePublicAuthState()
-  const convexAuth = useConvexAuth()
+function QuickSearchRoot({
+  authScope,
+  children,
+  usersEnabled,
+}: QuickSearchRootProps) {
   const state = useSearchSurface()
   const navigation = useCloseNavigation(
     state.closeSearch,
     state.finishClose,
     state.openSearch,
   )
-  const completeProfile = auth.status === 'ready'
-    && auth.authState.status === 'complete'
-    ? auth.authState.profile
-    : null
-  const usersEnabled = completeProfile !== null
-    && convexAuth.isAuthenticated
-    && !convexAuth.isLoading
   const model = useQuickSearch({
-    authScope: completeProfile?.id ?? null,
+    authScope,
     onSelect: navigation.select,
     open: state.open,
     resetVersion: state.resetVersion,
@@ -146,6 +147,37 @@ export function QuickSearchProvider({ children }: { children: ReactNode }) {
       {state.surface === 'dialog' ? <QuickSearchDialog {...surfaceProps} /> : null}
       {state.surface === 'drawer' ? <QuickSearchDrawer {...surfaceProps} /> : null}
     </QuickSearchContext.Provider>
+  )
+}
+
+/** Enables Quick Search with authenticated User results on public pages. */
+export function QuickSearchProvider({ children }: { children: ReactNode }) {
+  const auth = usePublicAuthState()
+  const convexAuth = useConvexAuth()
+  const completeProfile = auth.status === 'ready'
+    && auth.authState.status === 'complete'
+    ? auth.authState.profile
+    : null
+  const usersEnabled = completeProfile !== null
+    && convexAuth.isAuthenticated
+    && !convexAuth.isLoading
+
+  return (
+    <QuickSearchRoot
+      authScope={completeProfile?.id ?? null}
+      usersEnabled={usersEnabled}
+    >
+      {children}
+    </QuickSearchRoot>
+  )
+}
+
+/** Enables guest-scoped Quick Search without loading auth state. */
+export function GuestQuickSearchProvider({ children }: { children: ReactNode }) {
+  return (
+    <QuickSearchRoot authScope={null} usersEnabled={false}>
+      {children}
+    </QuickSearchRoot>
   )
 }
 

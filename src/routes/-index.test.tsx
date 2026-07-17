@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   RouterProvider,
   createMemoryHistory,
@@ -14,6 +15,28 @@ import type { AuthState } from '#/features/auth/auth-contracts'
 import { LandingPage } from '#/features/landing/landing-page'
 import { getLandingHead } from './-index-head'
 import { Route } from './index'
+
+vi.mock('convex/react', () => ({
+  useConvex: () => ({ query: vi.fn() }),
+  useConvexAuth: () => ({
+    isAuthenticated: false,
+    isLoading: false,
+  }),
+}))
+
+/** Renders landing routes with the app-level query boundary. */
+const renderLandingRouter = (router: ReturnType<typeof createLandingTestRouter>['router']) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
+}
 
 /** Stubs one successful public auth-state response. */
 const stubAuthState = (authState: AuthState) => {
@@ -72,12 +95,14 @@ describe('Root landing route', () => {
     vi.stubGlobal('scrollTo', vi.fn())
     const { history, router } = createLandingTestRouter()
 
-    render(<RouterProvider router={router} />)
+    renderLandingRouter(router)
 
     expect(await screen.findByRole('link', { name: 'Sign in' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Find anime worth remembering.' })).toBeTruthy()
     expect(screen.getByText('Build your list. Share what stays with you.')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'AnimeX home' }).getAttribute('href')).toBe('/home')
+    expect(screen.getByRole('button', { name: 'Search' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Search' })).toBeNull()
     expect(screen.queryByRole('navigation', { name: 'Mobile' })).toBeNull()
 
     const primary = within(screen.getByRole('navigation', { name: 'Primary' }))
@@ -103,7 +128,7 @@ describe('Root landing route', () => {
     vi.stubGlobal('scrollTo', vi.fn())
     const { history, router } = createLandingTestRouter()
 
-    render(<RouterProvider router={router} />)
+    renderLandingRouter(router)
 
     expect(await screen.findByRole('button', { name: 'Sign out' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Find anime worth remembering.' })).toBeTruthy()
