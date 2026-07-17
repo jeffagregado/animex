@@ -219,31 +219,23 @@ const listProfilePage = async (
   viewerId: Id<'users'>,
   anchor: string | null,
 ) => {
-  const candidates: Array<{ item: FeedCard; resumeAnchor: string | null }> = []
-  let scanAnchor = anchor
-  while (candidates.length <= FEED_PAGE_SIZE) {
-    const raw = await readOwn(ctx, userId, scanAnchor)
-    const page = await resolveFeedPage(
-      ctx,
-      createRawPage(raw, scanAnchor),
-      { mode: 'direct', viewerId },
-    )
-    for (let index = 0; index < page.items.length; index += 1) {
-      candidates.push({
-        item: page.items[index],
-        resumeAnchor: page.resumeAnchors[index] ?? scanAnchor,
-      })
-      if (candidates.length > FEED_PAGE_SIZE) break
+  const raw = await readOwn(ctx, userId, anchor)
+  const page = await resolveFeedPage(
+    ctx,
+    createRawPage(raw, anchor),
+    { mode: 'direct', viewerId },
+  )
+  const items = page.items.slice(0, FEED_PAGE_SIZE)
+  if (page.terminal) return { items, anchor: null }
+  if (page.items.length > FEED_PAGE_SIZE) {
+    return {
+      items,
+      anchor: page.resumeAnchors[FEED_PAGE_SIZE] ?? page.scannedAnchor,
     }
-    if (candidates.length > FEED_PAGE_SIZE) break
-    if (page.terminal) {
-      return { items: candidates.map((candidate) => candidate.item), anchor: null }
-    }
-    scanAnchor = page.scannedAnchor
   }
   return {
-    items: candidates.slice(0, FEED_PAGE_SIZE).map((candidate) => candidate.item),
-    anchor: candidates[FEED_PAGE_SIZE]?.resumeAnchor ?? scanAnchor,
+    items,
+    anchor: page.scannedAnchor,
   }
 }
 
