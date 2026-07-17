@@ -9,6 +9,7 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { getFunctionName } from 'convex/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -95,10 +96,17 @@ describe('Home route', () => {
       throw new TypeError('Home route requires a pending component.')
     }
     const rootRoute = createRootRoute()
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { gcTime: Infinity, retry: false } },
+    })
     const publicRoute = createRoute({
       getParentRoute: () => rootRoute,
       id: '_public',
-      component: () => <PublicShell><Outlet /></PublicShell>,
+      component: () => (
+        <QueryClientProvider client={queryClient}>
+          <PublicShell><Outlet /></PublicShell>
+        </QueryClientProvider>
+      ),
     })
     const homeRoute = createRoute({
       getParentRoute: () => publicRoute,
