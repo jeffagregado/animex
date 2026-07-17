@@ -5,7 +5,7 @@ Status: ACTIVE. Pre-Phase 7 embargo is implemented and validated. Phase 7 is nex
 ## Phase Map
 
 - Pre-Phase 7: Social UI Embargo Cleanup.
-- Phase 7: User Profile and Quick Search.
+- Phase 7: User Profile, Catalog People, and Quick Search.
 - Phase 8: Notifications, Privacy, Moderation.
 - Phase 9: Social Interactions. Final MVP phase.
 
@@ -36,15 +36,18 @@ No CSS hiding or disabled controls remain. Home exposes Home and Global. Direct 
 - Do not expose a new Followers-only selection until Phase 9.
 - No migration rewrites stored Followers data.
 
-## Phase 7: User Profile And Quick Search
+## Phase 7: User Profile, Catalog People, And Quick Search
 
 Phase 7 profile shows:
 
+- Signed-in `/users/:username` profile access.
 - Profile cover, avatar, display name, username, and bio.
-- Review tab.
-- Latest 10 favorited anime plus full-list route.
-- Anime stats.
+- Activity default plus Reviews and Favorites `tab` query states.
+- Latest 10 favorited anime plus full Favorites tab.
+- Completed, watching, planned, and dropped stats only.
 - Viewer-allowed profile activity.
+- Separate Public/Private Profile Visibility. Private shows header identity/bio and a privacy notice to non-owners while hiding stats, favorites, Reviews, and Activity.
+- Guided 1:1 avatar and 4:1 banner media editing backed by Convex Storage.
 
 Phase 7 omits:
 
@@ -52,20 +55,32 @@ Phase 7 omits:
 - Follower and following counts.
 - Like and Comment actions or counts.
 - Social activity footers.
+- Favorite Genres and Anime List.
+- Followers Profile Visibility.
 
 Locked profile visual reference remains final-state direction. Phase 7 implements only non-social elements.
 
-Phase 7 desktop Quick Search includes:
+Phase 7 Catalog People includes:
+
+- Public `/characters/:id/:slug` destinations with Overview and Anime.
+- Public `/staff/:id/:slug` destinations with Overview and Works.
+- Canonical numeric identity with display-only slugs and redirect correction.
+- Provider-neutral normalized detail/work contracts and 24-hour caches.
+- Character/Staff destinations completed before Quick Search entry points ship.
+
+Phase 7 Quick Search includes:
 
 - Focused dimmed-page overlay using the locked Quick Search visual reference.
 - Large live-search input.
 - Desktop header Search entry for signed-out and signed-in visitors.
-- Desktop category controls, optionally using a left rail.
-- One unified ranked result list grouped by Anime, Characters, and Users.
-- Explicit loading, empty, error, keyboard, focus, and desktop responsive states.
+- Mobile drawer entry from the bottom Search tab using `docs/visual/quick-search/quick-search-mobile-drawer.png`; its search field stays pinned at the bottom while results scroll.
+- Compact ranked groups capped at five results for Anime, Characters, Staff, and signed-in Users; signed-out search omits Users.
+- No category-selection controls.
+- View all Anime routes to `/discover?q=...`, Characters to `/search/characters?q=...`, Staff to `/search/staff?q=...`, and Users to signed-in `/search/users?q=...`.
+- Explicit loading, empty, error, keyboard, focus, scroll, dismissal, and responsive states.
 - Existing canonical destination behavior where supported by the selected result.
 
-Mobile does not render Quick Search. Mobile Search navigation routes to `/discover` and uses the existing Discover search. Discover remains separate from desktop Quick Search and serves as the mobile search destination. Manga remains a future-only Quick Search group.
+Desktop uses the locked dimmed modal shell. Mobile uses the locked Base UI-backed bottom drawer rather than the desktop modal. Discover remains separate from Quick Search and receives only the View all Anime destination. Manga remains a future-only Quick Search group.
 
 ## Phase 8: Notifications, Privacy, Moderation
 
@@ -106,6 +121,6 @@ Phase 9 acceptance requires every approved social control to be visible and func
 
 - This document locks scheduling and visibility only.
 - Pre-Phase 7 cleanup is complete under its approved design and implementation plan.
-- Phase 7 receives one approved design/spec and implementation plan covering User Profile and Quick Search.
+- Phase 7 receives one approved design/spec and implementation plan covering User Profile, Catalog People, and Quick Search.
 - Phase 8 and Phase 9 each receive separate approved design/spec and implementation plans.
-- Phase 7 implementation has not started. Phase 9 retains social UI reactivation ownership.
+- Phase 7 design decisions are approved under `2026-07-17-phase-7-user-profile-quick-search-design.md`; spec review, implementation planning, and implementation remain pending. Phase 9 retains social UI reactivation ownership.

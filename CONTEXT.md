@@ -8,7 +8,7 @@ Through Phase 8, active UI omits Follow, Like, Comment, Following-feed, social-c
 
 Backend social contracts, schemas, authorization, and stored Followers visibility remain intact for Phase 9. New Post and Review creation maps a stored Followers account default to Private. Owner edits to legacy Followers Posts and Reviews preserve Followers unless Public or Private is explicitly selected. No migration rewrites stored data.
 
-Phase 7 User Profile and desktop Quick Search are next and unstarted. Mobile Search routes to `/discover`; Phase 9 owns social UI reactivation.
+Phase 7 User Profile, Catalog People, and responsive Quick Search design is approved and awaiting spec review. Implementation planning and implementation are unstarted. Desktop uses the locked modal; mobile uses the locked bottom drawer. Phase 9 owns social UI reactivation.
 
 ## Language
 
@@ -37,7 +37,7 @@ A required separate user-written field, capped at 280 characters, shown on Revie
 _Avoid_: Full review preview, feed review body, auto-generated excerpt
 
 **Review Card**:
-A source-backed card for a visible Review on the User Profile Review Tab or anime-page review surfaces. It shows an anime image, anime name, current Review Rating, Review Summary, Review Visible Like Count when nonzero, and a Review Like action for signed-in viewers; it is separate from the Review Activity feed card.
+A source-backed card for a visible Review on the User Profile Reviews tab or anime-page review surfaces. It shows an anime image, anime name, current Review Rating, Review Summary, and open affordance; it is separate from the Review Activity feed card. Phase 9 may add the Review Visible Like Count and Review Like action.
 _Avoid_: Review Activity card, full review body
 
 **Review Button**:
@@ -81,11 +81,11 @@ A minimal notice shown when a direct link or notification target points to conte
 _Avoid_: Non-public redirect, hidden-content sign-in page
 
 **Signed-Out Browsing**:
-A read-only visitor state for users who are not signed in. Signed-out users can browse public content, the public read-only Home Feed, Discover, desktop Quick Search, anime detail pages, public User Profiles, public Reviews, Visible Like Counts, Visible Comment Counts, and visible Comments on public feed cards, but cannot create Posts, Reviews, Comments, Comment Replies, Likes, Follows, Blocks, or Content Reports; direct access to Account-Only Surfaces and Non-Public Direct Links sends them to the public Home Feed.
+A read-only visitor state for users who are not signed in. Signed-out users can browse public content, the public read-only Home Feed, Discover, Quick Search without User results, anime detail pages, public Reviews, Visible Like Counts, Visible Comment Counts, and visible Comments on public feed cards, but cannot open User Profiles or User search, create Posts, Reviews, Comments, Comment Replies, Likes, Follows, Blocks, or Content Reports. Signed-out User Profile and User search routes send the visitor to sign-in with a validated `returnTo`; direct access to other Account-Only Surfaces and Non-Public Direct Links sends them to the public Home Feed.
 _Avoid_: Guest interaction, anonymous action
 
 **Post-Sign-In Return**:
-A navigation behavior after a signed-out visitor uses `Sign in` from a public AnimeX page. Successful sign-in returns the user to that same public page, such as an anime detail page, public Review Detail Page, or public User Profile; when sign-in starts from the public Home Feed, it opens the signed-in Home Feed; if the return target becomes unavailable during sign-in, the user sees an Unavailable Content Notice.
+A navigation behavior after a signed-out visitor uses `Sign in` from an AnimeX page or is redirected there from a signed-in-only User Profile/User search route. Successful sign-in returns the user to the validated relative target, such as an anime detail page, public Review Detail Page, or User Profile; when sign-in starts from the public Home Feed, it opens the signed-in Home Feed; if the return target becomes unavailable during sign-in, the user sees an Unavailable Content Notice.
 _Avoid_: Forced generic landing, lost browsing context
 
 **Signed-In Auth Redirect**:
@@ -649,23 +649,27 @@ A one-way relationship where one user chooses to receive another user's visible 
 _Avoid_: Friend, subscribe
 
 **Private Account Mode**:
-A non-MVP account setting that would require follower approval or hide broader profile visibility. AnimeX MVP does not include private account mode.
+A non-MVP account setting that would require follower approval or make all account content relationship-gated. AnimeX MVP does not include private account mode. Phase 7 Profile Visibility may hide profile modules from non-owners, but it does not require follower approval, change Account-Level Default Visibility, or change per-record access.
 _Avoid_: Locked account
 
+**Profile Visibility**:
+A User Profile setting separate from Account-Level Default Visibility. Phase 7 supports Public and Private. Existing and new profiles default to Public. A Private profile shows its banner, avatar, display name, username, bio, and a privacy notice to another signed-in user while hiding stats, favorites, Reviews, and Activity; the owner always sees the full profile. Followers Profile Visibility is deferred to Phase 9.
+_Avoid_: Content default visibility, private account mode, Followers profile before Phase 9
+
 **User Profile**:
-A user's viewer-filtered profile surface. It shows the profile header, bio, latest favorited anime preview, follower and following counts, anime stats, Profile Counts where used, active feed cards the viewer is allowed to see, and a Review Tab; deleted feed cards and deleted Activity cards do not appear in profile activity, and deleted Review Activity is not backfilled there by a Review source entry.
+A signed-in, viewer-filtered profile surface at `/users/:username`. It shows the profile header, bio, list-progress stats, latest 10 favorited anime, and Activity, Reviews, and Favorites tabs controlled by the `tab` query; Activity is default. Profile Visibility may reduce the surface to its header and privacy notice. Deleted feed cards and deleted Activity cards do not appear in profile Activity, and deleted Review Activity is not backfilled there by a Review source entry. Phase 7 omits all social controls and counts.
 _Avoid_: Public Profile, User page
 
 **User Profile Visual Direction**:
-The locked visual direction for AnimeX User Profile pages. Desktop and mobile follow `docs/visual/user-profile/user-profile-desktop-mobile.png`. User Profile uses the same poster-forward dark theme, AnimeX logo/header direction, fixed poster-frame image system, teal/coral accents, and navigation rules as Home, Discover, and anime detail pages. The profile header uses a wide anime cover image, circular User Avatar, display name, username, bio, follower and following counts, Follow action for other users, and a small profile menu. The Review Tab can be selected and shows source-backed Review Cards with anime image, anime name, current Review Rating, Review Summary, nonzero visible like count, Review Like action, and open affordance. Supporting profile modules include Anime Stats, Latest Favorites, and viewer-allowed Profile Activity.
+The locked final-state visual direction for AnimeX User Profile pages. Desktop and mobile follow `docs/visual/user-profile/user-profile-desktop-mobile.png`. Phase 7 keeps the poster-forward dark theme, wide cover, circular User Avatar, display name, username, bio, Edit Profile for the owner, Activity/Reviews/Favorites tabs, list-progress stats, Latest Favorites, and viewer-allowed Activity. It removes Follow, follower/following counts, Review Likes/counts, Favorite Genres, Anime List tab, and social footers until their owning phases.
 _Avoid_: Public Profile wording, top-level Stats page, Community nav, like-total profile stats, liked-user preview, average rating, episodes watched
 
-**Review Tab**:
-A User Profile section that lists visible Reviews as Review Cards. Review Tab is source-backed rather than activity-backed, so it may show a Review when Review Visibility allows even if the related Review Activity feed card was deleted.
+**Reviews Tab**:
+A User Profile section that lists visible Reviews as Review Cards. The Reviews tab is source-backed rather than activity-backed, so it may show a Review when Review Visibility allows even if the related Review Activity feed card was deleted.
 _Avoid_: Profile activity backfill, Review Activity tab
 
 **Profile Counts**:
-User-visible social totals shown on a User Profile, such as visible Posts, Reviews, Comments, and Likes if AnimeX chooses to show them. Profile Counts exclude content and interactions hidden by an active Moderation Case or Moderation Removal; private moderation records do not contribute to normal user-visible totals.
+Phase 9 user-visible social totals shown on a User Profile, such as visible Posts, Reviews, Comments, and Likes if AnimeX chooses to show them. Profile Counts are absent through Phase 8. When active, they exclude content and interactions hidden by an active Moderation Case or Moderation Removal; private moderation records do not contribute to normal user-visible totals.
 _Avoid_: Moderation stats, audit counts
 
 **User Avatar**:
@@ -693,7 +697,7 @@ The AnimeX brand mark used for navigation, favicon, and app identity. The primar
 _Avoid_: Unrelated logo, mascot portrait only, badge as primary nav logo
 
 **Site Navigation**:
-The primary way users move between AnimeX areas such as Home, Discover, search, creation, notifications, profile, and settings. Desktop Site Navigation uses a top navigation layout with Home, Discover, a search icon, notification icon, and profile/settings entry for signed-in users; the desktop search icon opens Quick Search, and desktop navigation does not show `Community` or `Stats` in MVP. Desktop Post Create stays near the Home Feed composer entry rather than as a global header label. Signed-out desktop navigation hides account-only controls, including the notification icon and Post Create entry, and shows `Sign in`; signed-in mobile Site Navigation uses bottom tabs for Home, Discover, Search, Create, and Profile, where Search routes to `/discover`, Create opens the Post Composer, and Notifications stay in the mobile header; signed-out mobile navigation hides Create and Profile tabs, hides the notification icon, and shows `Sign in` in the header.
+The primary way users move between AnimeX areas such as Home, Discover, search, creation, notifications, profile, and settings. Desktop Site Navigation uses a top navigation layout with Home, Discover, a search icon, notification icon, and profile/settings entry for signed-in users; the desktop search icon opens Quick Search, and desktop navigation does not show `Community` or `Stats` in MVP. Desktop Post Create stays near the Home Feed composer entry rather than as a global header label. Signed-out desktop navigation hides account-only controls, including the notification icon and Post Create entry, and shows `Sign in`; signed-in mobile Site Navigation uses bottom tabs for Home, Discover, Search, Create, and Profile, where Search opens the mobile Quick Search drawer, Create opens the Post Composer, and Notifications stay in the mobile header; signed-out mobile navigation keeps Search but omits User results, hides Create and Profile tabs, hides the notification icon, and shows `Sign in` in the header.
 _Avoid_: Desktop sidebar, Community nav before community features exist, top-level Stats page in MVP
 
 **Discover**:
@@ -713,11 +717,11 @@ The locked visual direction for AnimeX anime detail pages. Desktop follows `docs
 _Avoid_: Overview review cards, top characters, right-column character list, duplicate My Anime card, Community nav
 
 **Quick Search**:
-A desktop-only search-triggered overlay for direct lookup across Anime, Characters, and Users, with Manga reserved for future Manga lists. Quick Search opens from desktop Site Navigation and uses a distinct AnimeX layout with category controls and one unified ranked result list rather than copied AniList columns. Mobile Search routes to `/discover` and uses the existing Discover search.
+A responsive search-triggered overlay for direct lookup across Anime, Characters, Staff, and signed-in Users, with Manga reserved for future Manga lists. Desktop Quick Search opens from Site Navigation as a modal; mobile Quick Search opens from the bottom Search tab as a drawer. Both use compact live groups capped at five results, omit category-selection controls, and use chevrons instead of inline add or Follow actions. Signed-out search omits Users. View all Anime routes to `/discover` with the query; View all Characters, Staff, and Users use matching dedicated result pages.
 _Avoid_: Discover, full browse page, AniList clone
 
 **Quick Search Visual Direction**:
-The locked visual direction for the desktop-only AnimeX search modal follows `docs/visual/quick-search/quick-search-modal.png`. Quick Search opens as a focused overlay above the current desktop page with the background dimmed, a large search input at the top, category controls, and one unified ranked result list grouped by Anime, Characters, and Users. Desktop may use a left category rail. Mobile does not render this modal; its Search navigation routes to `/discover`. Anime results can include compact metadata and direct add/open affordances, while Manga stays a future-only note until Manga lists are first-class.
+The locked Quick Search visual direction follows `docs/visual/quick-search/quick-search-modal.png` for the desktop dimmed modal shell and `docs/visual/quick-search/quick-search-mobile-drawer.png` for mobile. Desktop keeps its large top search input but removes category-selection controls. Mobile customizes the shadcn Base UI Drawer at `https://ui.shadcn.com/docs/components/base/drawer` with a swipe handle, dimmed page, independently scrollable results, and a large search field pinned above the safe area in the drawer footer. Both show compact Anime, Character, Staff, and eligible User groups with View all links and right chevrons. Manga stays future-only until Manga lists are first-class.
 _Avoid_: Discover page clone, AniList column clone, active Manga results in MVP, full search page as default interaction
 
 **AniList Metadata Flow**:
@@ -733,7 +737,7 @@ Anime a user marks as a favorite. The User Profile previews up to 10 latest favo
 _Avoid_: Top anime, ranked favorites
 
 **Anime Stats**:
-Personal anime-list summary shown on a user's profile. Anime stats include completed, watching, planned, and dropped counts plus favorite genres; they exclude On Hold, average rating, and episodes watched.
+Personal anime-list summary shown on a user's profile. Phase 7 Anime Stats include completed, watching, planned, and dropped counts. They exclude On Hold, Favorite Genres, average rating, and episodes watched.
 _Avoid_: Global anime stats, rating summary, watch time
 
 **Image Attachment**:
@@ -1203,7 +1207,7 @@ Domain Expert: No. The notification stays in history, no unlike notification is 
 Developer: Does a user get notified when another user likes their Review?
 Domain Expert: Yes. A Review Like Notification tells the Review author that another user liked their Review, using short copy such as `Mika liked your review`.
 
-Developer: If the Review Activity card was deleted, does a new Review Like from the Review Detail Page or Review Tab still notify the Review author?
+Developer: If the Review Activity card was deleted, does a new Review Like from the Review Detail Page or Reviews tab still notify the Review author?
 Domain Expert: Yes. It is still a source-level Review Like, so it can create a Review Like Notification unless self-like, Blocked Notification Delivery, or Notification Preferences prevent it.
 
 Developer: If someone likes a Review and later removes that Review Like, does the old Review Like Notification disappear?
@@ -1303,10 +1307,10 @@ Developer: Should profile activity show the Review source after its Review Activ
 Domain Expert: No. Profile activity shows active feed cards only; deleted Review Activity is not replaced by a Review source entry.
 
 Developer: Does the User Profile still have a Review list?
-Domain Expert: Yes. The Review Tab lists visible Review sources as Review Cards, separate from profile activity.
+Domain Expert: Yes. The Reviews tab lists visible Review sources as Review Cards, separate from profile activity.
 
 Developer: What does a Review Card show on the User Profile?
-Domain Expert: It shows an anime image, anime name, current Review Rating, Review Summary, Review Visible Like Count when nonzero, and a Review Like action for signed-in viewers.
+Domain Expert: In Phase 7 it shows an anime image, anime name, current Review Rating, Review Summary, and open affordance. Phase 9 adds the Review Visible Like Count when nonzero and Review Like action.
 
 Developer: If a user edits a Review after deleting its Review Activity card, is the feed card recreated?
 Domain Expert: No. Review Edits update the Review source, Review Detail Page, and Anime Review Metrics when the Review Rating changes, but Activity Deletion keeps that Review Activity card suppressed.
@@ -1317,7 +1321,7 @@ Domain Expert: No. In MVP, Comments belong to feed cards and Comments, not to th
 Developer: Does the Review Detail Page show the same Like action as the Review Card?
 Domain Expert: Yes for signed-in viewers. Review Cards and Review Detail Pages share one source-level Review Like; it is not tied to the deleted Review Activity feed-card Like.
 
-Developer: If the Review Activity card was deleted, can users still like the Review from the Review Detail Page or Review Tab?
+Developer: If the Review Activity card was deleted, can users still like the Review from the Review Detail Page or Reviews tab?
 Domain Expert: Yes. Activity Deletion removes only the feed-card Like surface; source-level Review Likes remain available anywhere the Review source is visible.
 
 Developer: Do Review Cards and Review Detail Pages show a like count?
@@ -1552,7 +1556,7 @@ Developer: Does MVP include private account mode?
 Domain Expert: No. MVP uses account-level default visibility and per-card visibility, without follower approval or private account mode.
 
 Developer: What should a User Profile show?
-Domain Expert: User Profiles show the profile header, bio, favorite anime, follower and following counts, anime stats, viewer-allowed feed cards, and a Review Tab with visible Review Cards. Followers only and Private feed cards are hidden from viewers who are not allowed to see them.
+Domain Expert: Phase 7 User Profiles are signed-in-only and show the profile header, bio, list-progress stats, latest 10 favorites, and Activity, Reviews, and Favorites tabs. A separate Private Profile Visibility shows only the header, bio, and privacy notice to non-owners. Public profiles still filter each Review and Activity record by its own visibility. Social controls and counts stay absent until Phase 9.
 
 Developer: What should users see when someone has no uploaded avatar?
 Domain Expert: Show a circular Default Avatar using initials from the display name, falling back to the username initial. For new users, the username is the initial display name, so the Default Avatar uses username initials. The chibi mascot is a Mascot Avatar, not the ordinary user fallback.
@@ -1996,10 +2000,10 @@ Developer: Do creation surfaces show visibility before publishing?
 Domain Expert: Posts and Reviews show a Creation Visibility Selector defaulted to Account-Level Default Visibility, which is Private for new accounts. Generated Activity cards inherit Account-Level Default Visibility silently and can be changed after creation.
 
 Developer: Where does AnimeX mobile navigation live?
-Domain Expert: Signed-in mobile Site Navigation uses a bottom tab bar for Home, Discover, Search, Create, and Profile. The mobile Search tab routes to `/discover`, the Create tab opens the Post Composer, Notifications stay in the top mobile header, and mobile does not show a separate top-header Search icon. Signed-out users keep the Search tab routing to `/discover`, do not see the Create tab, Profile tab, or notification icon, and see `Sign in` in the mobile header instead.
+Domain Expert: Signed-in mobile Site Navigation uses a bottom tab bar for Home, Discover, Search, Create, and Profile. The mobile Search tab opens the locked Quick Search drawer, the Create tab opens the Post Composer, Notifications stay in the top mobile header, and mobile does not show a separate top-header Search icon. Signed-out users keep the Search tab and drawer without User results, do not see the Create tab, Profile tab, or notification icon, and see `Sign in` in the mobile header instead.
 
 Developer: What is the difference between Discover and Quick Search?
-Domain Expert: Discover is a browse destination for trending anime, seasonal anime, genres, recommendations, and mobile search, with room for future Manga lists. Quick Search opens only from desktop search and shows a distinct AnimeX overlay with live grouped results for Anime, Characters, and Users; the mobile Search tab routes to `/discover`, and Manga is a future Quick Search group.
+Domain Expert: Discover is a browse destination for trending anime, seasonal anime, genres, recommendations, and full Anime search, with room for future Manga lists. Quick Search uses a desktop modal or mobile drawer with compact live groups for Anime, Characters, Staff, and signed-in Users. View all Anime routes to Discover with the query; other View all links use dedicated result pages. Manga is a future Quick Search group.
 
 Developer: Which Home Feed visual direction is locked?
 Domain Expert: Home Feed uses the locked poster-forward design at `docs/visual/home/home-desktop-feed.png` and `docs/visual/home/home-mobile-feed.png`. Desktop has only the main feed column and right utility column; Seasonal Anime sits above the feed; the right utility column includes anime-list modules and Trending, but excludes profile picture, follower/following/likes stats, average rating, and episodes watched. Mobile uses the same theme stacked with bottom navigation.
@@ -2011,13 +2015,13 @@ Developer: Is Manga available in Quick Search at MVP?
 Domain Expert: No. Manga is a future Quick Search group that becomes available when Manga lists become first-class in AnimeX.
 
 Developer: What is the AnimeX Quick Search layout?
-Domain Expert: Quick Search uses desktop category controls and one unified ranked result list. It may use a left category rail. Mobile does not render Quick Search; mobile Search routes to `/discover`.
+Domain Expert: Quick Search has no category selector. Desktop uses a dimmed modal; mobile uses a Base UI-backed bottom drawer with scrollable results and a bottom-pinned search field. Each eligible category shows at most five compact results, with View all links for deeper results.
 
 Developer: Which User Profile visual direction is locked?
-Domain Expert: User Profile uses the locked design at `docs/visual/user-profile/user-profile-desktop-mobile.png`, with the same poster-forward dark theme, profile cover header, Review Tab cards, Anime Stats, Latest Favorites, and viewer-allowed Profile Activity.
+Domain Expert: User Profile uses the final-state design at `docs/visual/user-profile/user-profile-desktop-mobile.png`. Phase 7 keeps the poster-forward cover/avatar composition, Activity/Reviews/Favorites tabs, list-progress stats, Latest Favorites, and viewer-allowed Activity while removing social controls/counts, Favorite Genres, and Anime List.
 
 Developer: Which Quick Search visual direction is locked?
-Domain Expert: Desktop Quick Search uses the locked modal design at `docs/visual/quick-search/quick-search-modal.png`, with a dimmed-page overlay, large search input, category controls, and grouped unified results for Anime, Characters, and Users while Manga remains future-only. Mobile Search routes to `/discover`.
+Domain Expert: Desktop Quick Search uses the locked modal shell at `docs/visual/quick-search/quick-search-modal.png`; Phase 7 removes its category selector and uses capped Anime, Character, Staff, and eligible User groups. Mobile uses `docs/visual/quick-search/quick-search-mobile-drawer.png`, with a dimmed-page Base UI-backed drawer, scrollable groups, and a bottom-pinned search field. Manga remains future-only.
 
 Developer: How does AnimeX get anime metadata?
 Domain Expert: AnimeX uses the AniList GraphQL API. Search returns candidates, then AnimeX stores the selected AniList `id` and fetches metadata by that ID so specials or related entries from search ranking do not become the canonical anime by accident.
@@ -2029,4 +2033,4 @@ Developer: How should favorite anime appear on profiles?
 Domain Expert: Profiles preview up to 10 latest favorited anime and include a see more option for the full favorite anime list. This is not a curated top 10.
 
 Developer: Which anime stats should appear on profiles?
-Domain Expert: Profiles show completed, watching, planned, and dropped counts plus favorite genres. They do not show On Hold, average rating, or episodes watched.
+Domain Expert: Profiles show completed, watching, planned, and dropped counts. They do not show On Hold, Favorite Genres, average rating, or episodes watched.

@@ -311,7 +311,7 @@ Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified 
 - [x] Decide that deleted Activity cards disappear from profile activity surfaces too.
 - [x] Decide that profile activity does not backfill deleted Review Activity with Review source entries.
 - [x] Rename Public Profile to User Profile.
-- [x] Decide that User Profile has a Review Tab sourced from visible Review sources.
+- [x] Decide that User Profile has a Reviews tab sourced from visible Review sources.
 - [x] Decide that Review Cards show an anime image, anime name, Review Rating, Review Summary, and Review Like action.
 - [x] Decide that Review Likes belong to Review sources, not feed cards.
 - [x] Decide that Review Detail Pages share the same Review Like as Review Cards.
@@ -399,8 +399,8 @@ Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified 
 - [x] Lock Home Feed Visual Direction to `docs/visual/home/home-desktop-feed.png` and `docs/visual/home/home-mobile-feed.png`, with Seasonal Anime above feed, two desktop columns, right-column Trending, and no profile picture/follower/following/likes/average-rating/episodes-watched utility stats.
 - [x] Lock Discover Visual Direction to `docs/visual/discover/discover-desktop.png` and `docs/visual/discover/discover-mobile.png`, using the same poster-forward dark theme with Trending, Seasonal, Genres, Recommendations, and only muted future Manga placeholders.
 - [x] Lock Anime Detail Visual Direction to `docs/visual/anime-details/anime-details-desktop-frieren.png` and `docs/visual/anime-details/anime-details-mobile-frieren.png`, with Overview metadata only, Reviews/Characters/Staff in their own tabs, no duplicate My Anime card, and no top/right-column character lists.
-- [x] Lock User Profile Visual Direction to `docs/visual/user-profile/user-profile-desktop-mobile.png`, with profile cover header, Review Tab cards, Anime Stats, Latest Favorites, and viewer-allowed Profile Activity.
-- [x] Lock Quick Search Visual Direction to `docs/visual/quick-search/quick-search-modal.png`, with dimmed-page modal, large search input, category controls, grouped unified results, and future-only Manga note.
+- [x] Lock User Profile final-state Visual Direction to `docs/visual/user-profile/user-profile-desktop-mobile.png`; Phase 7 keeps its non-social cover/avatar, tabs, stats, favorites, and viewer-allowed Activity.
+- [x] Lock Quick Search Visual Direction to `docs/visual/quick-search/quick-search-modal.png` for desktop and `docs/visual/quick-search/quick-search-mobile-drawer.png` for mobile, with dimmed overlays, compact grouped results, no category selector, and a bottom-pinned mobile search field.
 - [x] Lock AniList Metadata Flow: search returns candidates, selected AniList `id` is stored as canonical external anime ID, and metadata is fetched by AniList `id`.
 - [x] Lock Discover Anime Population MVP: Discover uses AnimeX-managed AniList list caches, stores lightweight anime summaries by AniList `id`, and hydrates full anime metadata only when an anime detail page opens.
 - [x] Decide desktop header navigation does not show `Community` in MVP.
@@ -408,7 +408,7 @@ Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified 
 - [x] Note future Manga lists for Discover design.
 - [x] Decide Manga is a future Quick Search group.
 - [x] Decide Quick Search result layout.
-- [x] Decide mobile Search routes to `/discover`; Quick Search remains desktop-only and Notifications remain in the mobile header.
+- [x] Decide mobile Search opens the locked drawer; View all Anime routes to `/discover` with the query, while Notifications remain in the mobile header.
 - [x] Elaborate Create behavior after Discover/Search decisions.
 - [x] Decide desktop Create placement.
 - [x] Decide that signed-out desktop navigation shows `Sign in` and hides account-only controls.
@@ -606,9 +606,11 @@ Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified 
 - [x] Decide whether Feed Card Menu actions differ for authors and other viewers.
 - [x] Decide whether users need a private account mode in MVP.
 - [x] Decide what User Profile surfaces show.
+- [x] Keep User Profile signed-in-only and add separate Public/Private Profile Visibility without changing content-default visibility.
+- [x] Use Activity default plus Reviews and Favorites `tab` query states.
 - [x] Reject 10 favorite anime as the profile favorite-anime limit.
 - [x] Decide whether profiles use favorite anime, and if yes, what limit they use.
-- [x] Decide anime stats shown on profiles.
+- [x] Decide anime stats show completed, watching, planned, and dropped only; exclude Favorite Genres.
 - [x] Decide whether profile anime stats include On Hold.
 # Discover Feedback Fixes
 
@@ -865,19 +867,26 @@ Status: COMPLETE. Active social interaction UI and Followers-only choices are ab
 - [x] Complete automated gates, review, Convex dev redeploy, and signed-out/signed-in browser QA at 390 and 1280.
 - [x] Keep `Remove feed activity` available only from Home feed owner actions, not Review Detail.
 
-# Phase 7 User Profile And Quick Search
+# Phase 7 User Profile, Catalog People, And Quick Search
 
-Status: NEXT. Implementation has not started.
+Status: DESIGN APPROVED. Spec review is pending. Implementation plan and implementation have not started.
 
-- [x] Keep profile header, Review tab, latest favorites, anime stats, and viewer-allowed profile activity in Phase 7.
-- [x] Assign locked desktop-only Quick Search implementation to Phase 7.
+- [x] Keep signed-in profile header, Activity/Reviews/Favorites tabs, latest 10 favorites, four list-progress stats, and viewer-allowed profile activity in Phase 7.
+- [x] Add separate Public/Private Profile Visibility; Private shows header identity/bio and a privacy notice to non-owners.
+- [x] Exclude Favorite Genres, Anime List, and every social control/count from Phase 7.
+- [x] Plan guided 1:1 avatar and 4:1 banner crop with `react-easy-crop`, Convex Storage validation, replacement, removal, and cleanup.
+- [x] Add Character `/characters/:id/:slug` and Staff `/staff/:id/:slug` destinations before Quick Search.
+- [x] Assign locked desktop modal and mobile drawer Quick Search implementation to Phase 7.
 - [x] Open Quick Search from desktop header Search for signed-out and signed-in visitors.
-- [x] Route mobile Search navigation to `/discover` and reuse the existing Discover search.
-- [x] Use the locked dimmed-page modal, large input, category controls, and one unified ranked result list grouped by Anime, Characters, and Users.
-- [x] Use desktop category controls with explicit loading, empty, error, keyboard, focus, and desktop responsive states.
+- [x] Open the locked Base UI-backed mobile Search drawer from the bottom Search tab, with scrollable results and the search field pinned at the bottom.
+- [x] Show compact live groups capped at five results for Anime, Characters, Staff, and signed-in Users; omit Users for signed-out search and use chevron links instead of inline actions.
+- [x] Route View all Anime to `/discover?q=...`, Characters to `/search/characters?q=...`, Staff to `/search/staff?q=...`, and Users to `/search/users?q=...`.
+- [x] Cover loading, empty, error, keyboard, focus, scroll, dismissal, and responsive states without category-selection controls.
 - [x] Keep Discover separate and Manga future-only.
 - [x] Defer Follow actions, follower/following counts, Likes, Comments, Comment counts, Like counts, and social activity footers to Phase 9.
-- [ ] Write and approve the combined Phase 7 User Profile and Quick Search design/spec and implementation plan after embargo cleanup passes.
+- [x] Write the combined Phase 7 design spec at `docs/superpowers/specs/2026-07-17-phase-7-user-profile-quick-search-design.md`.
+- [ ] Review and approve the committed Phase 7 design spec.
+- [ ] Write and approve the Phase 7 implementation plan.
 
 # Phase 8 Notifications, Privacy, Moderation
 

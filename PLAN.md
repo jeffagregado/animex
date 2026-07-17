@@ -154,20 +154,26 @@ Status: COMPLETE. Implementation, review, responsive browser QA, cleanup, and Co
 - Backend schemas, stored Followers data, authorization, and Phase 9 social contracts remain intact. No migration ran.
 - Stop after validation and wait for approval before Phase 7.
 
-### Phase 7: User Profile And Quick Search
+### Phase 7: User Profile, Catalog People, And Quick Search
 
-Status: NEXT. Design/spec, implementation plan, and implementation are unstarted.
+Status: DESIGN APPROVED. Spec review is pending. Implementation plan and implementation are unstarted.
 
 - Build User Profile from locked design.
-- Add Review tab, latest favorites, anime stats, and viewer-allowed profile activity.
-- Build desktop-only Quick Search from the locked modal design.
+- Use signed-in routes at `/users/:username` with Activity default plus Reviews and Favorites `tab` query states.
+- Add Public/Private Profile Visibility separate from content-default visibility; Private shows header identity/bio only to non-owners.
+- Add latest 10 favorites, full Favorites tab, completed/watching/planned/dropped stats, and viewer-allowed profile activity.
+- Add profile editing with `react-easy-crop`, Convex Storage-backed 1:1 avatar and 4:1 banner media, explicit validation, replacement, removal, and cleanup.
+- Build canonical Character and Staff detail destinations with Overview plus Anime/Works pagination.
+- Build desktop Quick Search and mobile Search drawer from the locked visual references.
 - Open Quick Search from the desktop header Search control for signed-out and signed-in visitors.
-- Route the mobile Search tab to `/discover`, where users use the existing Discover search.
-- Add live grouped results for Anime, Characters, and Users in one unified ranked list.
-- Use desktop category controls; include loading, empty, error, keyboard, focus, and desktop responsive states.
+- Open the mobile Search drawer from the bottom Search tab, using the locked Base UI-backed drawer design with its search field pinned at the bottom.
+- Add live grouped results capped at five per group for Anime, Characters, Staff, and signed-in Users; signed-out search omits Users.
+- Route View all Anime to `/discover?q=...`, Characters to `/search/characters?q=...`, Staff to `/search/staff?q=...`, and signed-in Users to `/search/users?q=...`.
+- Include loading, empty, error, keyboard, focus, scroll, dismissal, and responsive states without category-selection controls.
 - Keep Discover separate from Quick Search and keep Manga as a future-only group.
-- Omit Follow actions, follower/following counts, Like actions/counts, Comment actions/counts, and social activity footers.
+- Omit Favorite Genres, Anime List, Follow actions, follower/following counts, Like actions/counts, Comment actions/counts, and social activity footers.
 - Treat social elements in the locked profile reference as Phase 9 final-state elements.
+- Use `docs/superpowers/specs/2026-07-17-phase-7-user-profile-quick-search-design.md` as the approved design source after spec review.
 - Stop after validation and wait for approval.
 
 ### Phase 8: Notifications, Privacy, Moderation
