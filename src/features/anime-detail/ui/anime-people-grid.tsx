@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { getAnimePeoplePage } from '../server/anime-detail.functions'
 import type { AnimeCharacter, AnimePeopleKind, AnimePeoplePage, AnimeStaff } from '../shared/anime-detail-contracts'
+import { createCatalogPersonPath } from '#/features/catalog-person/shared/catalog-person-contracts'
 import { AnimeImage } from './anime-image'
 
 type Person = AnimeCharacter | AnimeStaff
@@ -44,10 +45,23 @@ function uniquePeople(items: Person[]): Person[] {
 function PersonCard({ item, kind }: { item: Person; kind: AnimePeopleKind }) {
   if (kind === 'characters') {
     const character = item as AnimeCharacter
-    return <article className="flex min-h-36 overflow-hidden rounded-xl border border-border bg-card/70"><AnimeImage alt={`${character.name} portrait`} src={character.imageUrl} className="aspect-[4/5] w-2/5 shrink-0 object-cover" /><div className="flex min-w-0 flex-col justify-center p-3"><h3 className="font-black">{character.name}</h3><p className="text-sm text-cyan-300">{titleRole(character.role)}</p>{character.japaneseVoiceActor ? <div className="mt-3 flex items-center gap-2"><AnimeImage alt={`${character.japaneseVoiceActor.name} portrait`} src={character.japaneseVoiceActor.imageUrl} className="size-9 shrink-0 rounded-full object-cover" /><p className="text-xs">{character.japaneseVoiceActor.name}<br /><span className="text-muted-foreground">Japanese</span></p></div> : <p className="mt-3 text-xs text-muted-foreground">Voice actor unavailable</p>}</div></article>
+    const path = createCatalogPersonPath('character', character.anilistId, character.name)
+    return <article className="flex min-h-36 overflow-hidden rounded-xl border border-border bg-card/70">
+      <a className="w-2/5 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300" href={path}><AnimeImage alt={`${character.name} portrait`} src={character.imageUrl} className="aspect-[4/5] size-full object-cover" /></a>
+      <div className="flex min-w-0 flex-1 flex-col justify-center p-3"><a className="flex min-h-11 items-center rounded-sm font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={path}><h3>{character.name}</h3></a><p className="text-sm text-cyan-300">{titleRole(character.role)}</p>{character.japaneseVoiceActor ? <VoiceActorIdentity voiceActor={character.japaneseVoiceActor} /> : <p className="mt-3 text-xs text-muted-foreground">Voice actor unavailable</p>}</div>
+    </article>
   }
   const staff = item as AnimeStaff
-  return <article className="flex min-h-28 overflow-hidden rounded-xl border border-border bg-card/70"><AnimeImage alt={`${staff.name} portrait`} src={staff.imageUrl} className="aspect-square w-1/3 shrink-0 object-cover" /><div className="flex min-w-0 flex-col justify-center p-3"><h3 className="font-black">{staff.name}</h3><p className="text-sm text-cyan-300">{staff.role}</p></div></article>
+  const path = createCatalogPersonPath('staff', staff.anilistId, staff.name)
+  return <article className="flex min-h-28 overflow-hidden rounded-xl border border-border bg-card/70">
+    <a className="w-1/3 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300" href={path}><AnimeImage alt={`${staff.name} portrait`} src={staff.imageUrl} className="aspect-square size-full object-cover" /></a>
+    <div className="flex min-w-0 flex-1 flex-col justify-center p-3"><a className="flex min-h-11 items-center rounded-sm font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={path}><h3>{staff.name}</h3></a><p className="text-sm text-cyan-300">{staff.role}</p></div>
+  </article>
+}
+
+function VoiceActorIdentity({ voiceActor }: { voiceActor: NonNullable<AnimeCharacter['japaneseVoiceActor']> }) {
+  const path = createCatalogPersonPath('staff', voiceActor.anilistId, voiceActor.name)
+  return <div className="mt-3"><a className="flex min-h-11 items-center gap-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={path}><AnimeImage alt={`${voiceActor.name} portrait`} src={voiceActor.imageUrl} className="size-9 shrink-0 rounded-full object-cover" /><span className="text-xs">{voiceActor.name}</span></a><span className="block text-xs text-muted-foreground">Japanese</span></div>
 }
 
 const titleRole = (role: AnimeCharacter['role']) => role.charAt(0) + role.slice(1).toLowerCase()

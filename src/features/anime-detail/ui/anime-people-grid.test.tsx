@@ -3,12 +3,13 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { AnimeCharacter } from '../shared/anime-detail-contracts'
+import type { AnimeCharacter, AnimeStaff } from '../shared/anime-detail-contracts'
 import { AnimePeopleGrid } from './anime-people-grid'
 
 const server = vi.hoisted(() => ({ getAnimePeoplePage: vi.fn() }))
 vi.mock('../server/anime-detail.functions', () => ({ getAnimePeoplePage: server.getAnimePeoplePage }))
 const character = (anilistId: number, name: string): AnimeCharacter => ({ anilistId, name, role: 'MAIN', imageUrl: null, japaneseVoiceActor: null })
+const staff = (anilistId: number, name: string): AnimeStaff => ({ anilistId, name, role: 'Director', imageUrl: null })
 
 afterEach(() => { cleanup(); server.getAnimePeoplePage.mockReset() })
 
@@ -41,5 +42,21 @@ describe('AnimePeopleGrid', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy())
     expect(screen.getByText('Frieren')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull()
+  })
+
+  it('links Character, Staff, and Japanese voice-actor identities without nested anchors', () => {
+    const voiced: AnimeCharacter = {
+      ...character(7, 'Frieren'),
+      japaneseVoiceActor: { anilistId: 8, name: 'Atsumi Tanezaki', imageUrl: null, language: 'Japanese' },
+    }
+    const view = render(<AnimePeopleGrid anilistId={1} initialPage={{ items: [voiced], currentPage: 1, hasNextPage: false, perPage: 24 }} kind="characters" />)
+    expect(screen.getAllByRole('link', { name: /Frieren/ }).every((link) => link.getAttribute('href') === '/characters/7/frieren')).toBe(true)
+    expect(screen.getByRole('link', { name: /Atsumi Tanezaki/ }).getAttribute('href')).toBe('/staff/8/atsumi-tanezaki')
+    expect(screen.getByText('Japanese').closest('a')).toBeNull()
+    expect(view.container.querySelector('a a')).toBeNull()
+    cleanup()
+    const staffView = render(<AnimePeopleGrid anilistId={1} initialPage={{ items: [staff(9, 'Keiichiro Saito')], currentPage: 1, hasNextPage: false, perPage: 24 }} kind="staff" />)
+    expect(screen.getAllByRole('link', { name: /Keiichiro Saito/ }).every((link) => link.getAttribute('href') === '/staff/9/keiichiro-saito')).toBe(true)
+    expect(staffView.container.querySelector('a a')).toBeNull()
   })
 })
