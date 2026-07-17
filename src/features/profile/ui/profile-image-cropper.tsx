@@ -43,7 +43,10 @@ const explicitMessage = (error: unknown): string => (
   error instanceof Error ? error.message : 'PROFILE_MEDIA_INVALID'
 )
 
-const readStorageId = async (response: Response): Promise<string> => {
+const readStorageId = async (
+  response: Response,
+  current: () => boolean,
+): Promise<string | null> => {
   if (!response.ok) {
     throw new Error(`Profile media upload failed with HTTP ${response.status}.`)
   }
@@ -51,8 +54,10 @@ const readStorageId = async (response: Response): Promise<string> => {
   try {
     value = await response.json()
   } catch (error) {
+    if (!current()) return null
     throw new Error('Profile media upload returned invalid JSON.', { cause: error })
   }
+  if (!current()) return null
   if (
     typeof value !== 'object'
     || value === null
@@ -80,6 +85,7 @@ export function ProfileImageCropper({
   const mountedRef = useRef(true)
   const tokenRef = useRef(0)
   const urlRef = useRef<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const [sourceUrl, setSourceUrl] = useState<string | null>(null)
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
@@ -89,8 +95,14 @@ export function ProfileImageCropper({
   const [message, setMessage] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
 
-  const revokeSelection = useCallback((): void => {
+  const stopOperation = useCallback((): void => {
     tokenRef.current += 1
+    abortRef.current?.abort()
+    abortRef.current = null
+  }, [])
+
+  const revokeSelection = useCallback((): void => {
+    stopOperation()
     if (urlRef.current) URL.revokeObjectURL(urlRef.current)
     urlRef.current = null
     setSourceUrl(null)
@@ -98,16 +110,16 @@ export function ProfileImageCropper({
     setCrop({ x: 0, y: 0 })
     setZoom(1)
     setMediaReady(false)
-  }, [])
+  }, [stopOperation])
 
   useEffect(() => {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
-      tokenRef.current += 1
+      stopOperation()
       if (urlRef.current) URL.revokeObjectURL(urlRef.current)
     }
-  }, [])
+  }, [stopOperation])
 
   useEffect(() => {
     if (!active && !busy) revokeSelection()
@@ -150,23 +162,37 @@ export function ProfileImageCropper({
 
   const applyCrop = async (): Promise<void> => {
     if (!sourceUrl || !cropPixels || busy) return
+    abortRef.current?.abort()
+    abortRef.current = null
     const token = ++tokenRef.current
+    const current = (): boolean => (
+      mountedRef.current && tokenRef.current === token
+    )
     setBusy(true)
     setMessage(null)
     setStatus(`Preparing ${label[kind]}…`)
     try {
       const blob = await cropProfileMedia(sourceUrl, cropPixels, kind)
-      if (!mountedRef.current || tokenRef.current !== token) return
+      if (!current()) return
       setStatus(`Uploading ${label[kind]}…`)
       const uploadUrl = await generateUploadUrl({ kind })
+      if (!current()) return
+      const controller = new AbortController()
+      abortRef.current = controller
       const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'image/webp' },
         body: blob,
+        signal: controller.signal,
       })
-      const storageId = await readStorageId(response)
+      if (!current()) return
+      const storageId = await readStorageId(response, current)
+      if (!current() || storageId === null) return
       await registerPending({ kind, storageId })
+      if (!current()) return
       await convex.action(finalizeRef, { kind, storageId })
+      if (!current()) return
+      if (abortRef.current === controller) abortRef.current = null
       finish(token, `${kind === 'avatar' ? 'Avatar' : 'Banner'} updated.`)
     } catch (error) {
       fail(token, error)
@@ -230,8 +256,15 @@ export function ProfileImageCropper({
           }`}>
             <Cropper
               aspect={kind === 'avatar' ? 1 : 4}
+              classes={{
+                cropAreaClassName: 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-black',
+              }}
               crop={crop}
               cropShape={kind === 'avatar' ? 'round' : 'rect'}
+              cropperProps={{
+                'aria-describedby': `${kind}-crop-instructions`,
+                'aria-label': `Pan ${label[kind]} crop`,
+              }}
               image={sourceUrl}
               keyboardStep={2}
               mediaProps={{
@@ -248,6 +281,12 @@ export function ProfileImageCropper({
               onZoomChange={setZoom}
             />
           </div>
+          <p
+            className="mt-2 text-xs text-muted-foreground"
+            id={`${kind}-crop-instructions`}
+          >
+            Use arrow keys to pan the crop area, or drag with pointer or touch.
+          </p>
           <label className="mt-3 flex flex-col gap-1 text-sm font-bold">
             Zoom {title.toLowerCase()}
             <input

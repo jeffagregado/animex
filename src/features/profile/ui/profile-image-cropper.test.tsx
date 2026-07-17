@@ -57,9 +57,13 @@ vi.mock('react-easy-crop', async () => {
   return {
     default: (props: {
       aspect: number
+      classes?: { cropAreaClassName?: string }
+      crop: { x: number; y: number }
       cropShape: string
+      cropperProps?: React.HTMLAttributes<HTMLDivElement>
       image: string
       mediaProps: { alt?: string }
+      onCropChange: (point: { x: number; y: number }) => void
       restrictPosition: boolean
       roundCropAreaPixels: boolean
       onCropComplete: (area: object, pixels: object) => void
@@ -78,14 +82,23 @@ vi.mock('react-easy-crop', async () => {
         )
       }, [])
       return (
-        <div
-          aria-label={props.mediaProps.alt}
-          data-aspect={props.aspect}
-          data-crop-shape={props.cropShape}
-          data-image={props.image}
-          data-restrict={String(props.restrictPosition)}
-          data-rounded={String(props.roundCropAreaPixels)}
-        />
+        <>
+          <img alt={props.mediaProps.alt} src={props.image} />
+          <div
+            {...props.cropperProps}
+            className={props.classes?.cropAreaClassName}
+            data-aspect={props.aspect}
+            data-crop-shape={props.cropShape}
+            data-crop-x={props.crop.x}
+            data-image={props.image}
+            data-restrict={String(props.restrictPosition)}
+            data-rounded={String(props.roundCropAreaPixels)}
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowRight') props.onCropChange({ x: 2, y: 0 })
+            }}
+          />
+        </>
       )
     },
   }
@@ -118,6 +131,20 @@ const applyAvatar = async (): Promise<void> => {
   })
   await waitFor(() => expect(button.disabled).toBe(false))
   fireEvent.click(button)
+}
+
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((pass) => {
+    resolve = pass
+  })
+  return { promise, resolve }
+}
+
+const drain = async <T,>(promise: Promise<T>): Promise<void> => {
+  await promise
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
+  await Promise.resolve()
 }
 
 beforeEach(() => {
@@ -157,11 +184,18 @@ describe('ProfileImageCropper', () => {
   it('configures an accessible controlled round avatar crop and keyboard zoom', async () => {
     renderCropper()
     choose()
-    const cropper = await screen.findByLabelText('Avatar crop source')
+    const cropper = await screen.findByLabelText('Pan avatar crop')
     expect(cropper.dataset.aspect).toBe('1')
     expect(cropper.dataset.cropShape).toBe('round')
     expect(cropper.dataset.restrict).toBe('true')
     expect(cropper.dataset.rounded).toBe('true')
+    expect(cropper.getAttribute('aria-describedby')).toBe('avatar-crop-instructions')
+    expect(cropper.className).toContain('focus-visible:ring-2')
+    expect(screen.getByText(/arrow keys to pan/i)).toBeTruthy()
+    expect(screen.getByAltText('Avatar crop source')).toBeTruthy()
+    fireEvent.keyDown(cropper, { key: 'ArrowRight' })
+    expect(cropper.tabIndex).toBe(0)
+    await waitFor(() => expect(cropper.dataset.cropX).toBe('2'))
     expect(screen.getByRole('slider', { name: 'Zoom avatar' })).toBeTruthy()
   })
 
@@ -184,7 +218,7 @@ describe('ProfileImageCropper', () => {
   it('cancel and replacement revoke URLs without network or Convex calls', async () => {
     renderCropper()
     choose()
-    await screen.findByLabelText('Avatar crop source')
+    await screen.findByAltText('Avatar crop source')
     fireEvent.click(screen.getByRole('button', { name: 'Cancel crop' }))
     expect(mocks.revoke).toHaveBeenCalledWith('blob:source')
     expect(fetch).not.toHaveBeenCalled()
@@ -231,19 +265,49 @@ describe('ProfileImageCropper', () => {
     expect(mocks.finalize).not.toHaveBeenCalled()
   })
 
-  it('revokes selection on unmount and ignores late completion UI writes', async () => {
-    let resolve!: (value: string) => void
-    mocks.generate.mockReturnValue(new Promise<string>((pass) => {
-      resolve = pass
-    }))
+  it('stops after a pending upload URL resolves following unmount', async () => {
+    const pending = deferred<string>()
+    mocks.generate.mockReturnValue(pending.promise)
     const view = renderCropper()
     choose()
     await applyAvatar()
     await waitFor(() => expect(mocks.generate).toHaveBeenCalled())
     view.unmount()
-    resolve('https://upload.test')
-    await Promise.resolve()
+    pending.resolve('https://upload.test')
+    await drain(pending.promise)
     expect(mocks.revoke).toHaveBeenCalledWith('blob:source')
+    expect(fetch).not.toHaveBeenCalled()
     expect(mocks.register).not.toHaveBeenCalled()
+  })
+
+  it('aborts a pending POST and never registers after unmount', async () => {
+    const pending = deferred<Response>()
+    vi.mocked(fetch).mockReturnValue(pending.promise)
+    const view = renderCropper()
+    choose()
+    await applyAvatar()
+    await waitFor(() => expect(fetch).toHaveBeenCalled())
+    const signal = vi.mocked(fetch).mock.calls[0]?.[1]?.signal
+    view.unmount()
+    expect(signal?.aborted).toBe(true)
+    pending.resolve(new Response(JSON.stringify({
+      storageId: 'storage-late',
+    }), { status: 200 }))
+    await drain(pending.promise)
+    expect(mocks.register).not.toHaveBeenCalled()
+    expect(mocks.finalize).not.toHaveBeenCalled()
+  })
+
+  it('never finalizes when pending registration resolves after unmount', async () => {
+    const pending = deferred<null>()
+    mocks.register.mockReturnValue(pending.promise)
+    const view = renderCropper()
+    choose()
+    await applyAvatar()
+    await waitFor(() => expect(mocks.register).toHaveBeenCalled())
+    view.unmount()
+    pending.resolve(null)
+    await drain(pending.promise)
+    expect(mocks.finalize).not.toHaveBeenCalled()
   })
 })
