@@ -182,7 +182,12 @@ describe('QuickSearchProvider', () => {
     const popup = document.querySelector('[data-slot="drawer-popup"]')
     const results = document.querySelector('#quick-search-results')?.parentElement?.parentElement
     const footer = document.querySelector('[data-slot="drawer-footer"]')
-    if (!results || !footer) throw new Error('Mobile Quick Search structure is incomplete.')
+    const close = screen.getByRole('button', { name: 'Close Quick Search' })
+    const closeZone = document.querySelector('[data-slot="quick-search-close-zone"]')
+    const handle = document.querySelector('[data-slot="drawer-swipe-handle"]')
+    if (!results || !footer || !closeZone || !handle) {
+      throw new Error('Mobile Quick Search structure is incomplete.')
+    }
     expect(screen.getAllByRole('searchbox')).toHaveLength(1)
     expect(popup?.querySelector('[data-slot="drawer-swipe-handle"]')).not.toBeNull()
     expect(results?.className).toContain('flex min-h-0 flex-1 overflow-y-auto overscroll-contain')
@@ -192,6 +197,14 @@ describe('QuickSearchProvider', () => {
     expect(screen.getByRole('heading', { name: 'Quick Search' }).className).toContain('sr-only')
     expect(screen.getByText(/Search Anime, Characters/).className).toContain('sr-only')
     expect(document.querySelector('[data-slot="drawer-header"]')).toBeNull()
+    expect(close.className).toContain('top-3')
+    expect(close.className).toContain('size-11')
+    expect(handle.className).toContain('group-data-[swipe-axis=y]/drawer-popup:h-3')
+    expect(closeZone.className).toContain('h-12')
+    expect(closeZone.compareDocumentPosition(results) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const closeBottomPixels = 12 + 44
+    const resultsTopPixels = 12 + 48
+    expect(resultsTopPixels).toBeGreaterThan(closeBottomPixels)
   })
 
   it('requests Users only for complete matching auth and keys cache by profile', async () => {

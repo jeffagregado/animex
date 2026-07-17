@@ -46,6 +46,7 @@ export function QuickSearchDrawer(props: QuickSearchDrawerProps) {
         >
           <XIcon aria-hidden="true" className="size-5" />
         </DrawerClose>
+        <div aria-hidden="true" className="h-12 shrink-0" data-slot="quick-search-close-zone" />
         <div className="scrollbar-themed flex min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <QuickSearchResults model={props.model} />
         </div>
