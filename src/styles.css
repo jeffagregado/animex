@@ -67,6 +67,7 @@ body,
 }
 
 body {
+  position: relative;
   margin: 0;
   background:
     radial-gradient(circle at 18% -10%, oklch(0.45 0.13 196 / 0.35), transparent 32rem),
