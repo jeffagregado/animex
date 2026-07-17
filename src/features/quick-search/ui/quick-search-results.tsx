@@ -1,4 +1,4 @@
-import { useState, type RefObject } from 'react'
+import { useEffect, useState, type MouseEvent, type RefObject } from 'react'
 import { ChevronRightIcon, ImageOffIcon, SearchIcon } from 'lucide-react'
 
 import {
@@ -41,6 +41,13 @@ export function QuickSearchResults({ model }: { model: QuickSearchModel }) {
     || model.normalizedQuery.length > 100
   const visibleGroups = (Object.entries(model.groups) as [QuickSearchGroup, QuickSearchRow[]][])
     .filter(([, rows]) => rows.length > 0)
+  const activeOptionId = model.activeIndex < 0
+    ? null
+    : model.items[model.activeIndex]?.optionId ?? null
+  useEffect(() => {
+    if (activeOptionId === null) return
+    document.getElementById(activeOptionId)?.scrollIntoView?.({ block: 'nearest' })
+  }, [activeOptionId])
   return (
     <div className="min-h-0">
       <p aria-atomic="true" aria-live="polite" className="sr-only">{model.status}</p>
@@ -68,13 +75,23 @@ export function QuickSearchResults({ model }: { model: QuickSearchModel }) {
 
 function ErrorLane({ label, onRetry }: { label: string; onRetry: () => void }) {
   return (
-    <div className="m-4 flex items-center justify-between gap-3 rounded-lg border border-destructive/50 p-3 text-sm">
+    <div aria-atomic="true" className="m-4 flex items-center justify-between gap-3 rounded-lg border border-destructive/50 p-3 text-sm" role="alert">
       <p>{label}</p>
       <button className="min-h-11 rounded-lg px-4 font-bold focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={onRetry} type="button">
         Retry
       </button>
     </div>
   )
+}
+
+const shouldCloseForLink = (event: MouseEvent<HTMLAnchorElement>): boolean => {
+  return event.button === 0
+    && !event.defaultPrevented
+    && !event.altKey
+    && !event.ctrlKey
+    && !event.metaKey
+    && !event.shiftKey
+    && event.currentTarget.target !== '_blank'
 }
 
 function ResultGroup({
@@ -96,9 +113,18 @@ function ResultGroup({
     <section aria-labelledby={titleId} className="border-t border-border p-4 first:border-t-0">
       <div className="mb-2 flex min-h-11 items-center justify-between gap-3">
         <h2 className="font-black" id={titleId}>{labels[group]}</h2>
-        <button className="min-h-11 rounded-lg px-3 text-sm font-bold text-cyan-300 focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={() => model.select(destination)} type="button">
-          View all
-        </button>
+        <a
+          className="flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-bold text-cyan-300 focus-visible:ring-2 focus-visible:ring-cyan-300"
+          href={destination}
+          onClick={(event) => {
+            if (!shouldCloseForLink(event)) return
+            event.preventDefault()
+            model.select(destination)
+          }}
+        >
+          View all <span className="sr-only">{labels[group]}</span>
+          <ChevronRightIcon aria-hidden="true" className="size-4" />
+        </a>
       </div>
       <ul aria-labelledby={titleId} className="space-y-1" role="listbox">
         {rows.map((row) => {

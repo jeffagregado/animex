@@ -7,7 +7,6 @@ import {
   DrawerContent,
   DrawerDescription,
   DrawerFooter,
-  DrawerHeader,
   DrawerTitle,
 } from '../../../components/ui/drawer'
 import { QuickSearchInput, QuickSearchResults } from './quick-search-results'
@@ -37,16 +36,16 @@ export function QuickSearchDrawer(props: QuickSearchDrawerProps) {
         finalFocus={() => props.finalFocus}
         initialFocus={() => props.inputRef.current}
       >
-        <DrawerHeader className="relative border-b border-border px-4 pb-3 text-left">
-          <DrawerTitle className="pr-12 text-xl font-black">Quick Search</DrawerTitle>
-          <DrawerDescription>Search Anime, Characters, Staff, and eligible Users.</DrawerDescription>
-          <DrawerClose
-            aria-label="Close Quick Search"
-            className="absolute top-1 right-3 grid size-11 place-items-center rounded-lg text-muted-foreground hover:bg-cyan-300/10 hover:text-cyan-200 focus-visible:ring-2 focus-visible:ring-cyan-300"
-          >
-            <XIcon aria-hidden="true" className="size-5" />
-          </DrawerClose>
-        </DrawerHeader>
+        <DrawerTitle className="sr-only">Quick Search</DrawerTitle>
+        <DrawerDescription className="sr-only">
+          Search Anime, Characters, Staff, and eligible Users.
+        </DrawerDescription>
+        <DrawerClose
+          aria-label="Close Quick Search"
+          className="absolute top-3 right-3 z-20 grid size-11 place-items-center rounded-lg text-muted-foreground hover:bg-cyan-300/10 hover:text-cyan-200 focus-visible:ring-2 focus-visible:ring-cyan-300"
+        >
+          <XIcon aria-hidden="true" className="size-5" />
+        </DrawerClose>
         <div className="scrollbar-themed flex min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <QuickSearchResults model={props.model} />
         </div>

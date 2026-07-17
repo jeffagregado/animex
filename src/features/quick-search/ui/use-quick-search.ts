@@ -155,10 +155,10 @@ export function useQuickSearch(input: UseQuickSearchInput): QuickSearchModel {
     enabled: input.open && requestQuery.length > 0 && input.usersEnabled,
     retry: false,
   })
-  const providerValue = input.open && provider.data?.query === normalizedQuery
+  const providerValue = provider.data?.query === normalizedQuery
     ? provider.data.value
     : null
-  const userValue = input.open && input.usersEnabled
+  const userValue = input.usersEnabled
     && users.data?.query === normalizedQuery
     ? users.data.value
     : null

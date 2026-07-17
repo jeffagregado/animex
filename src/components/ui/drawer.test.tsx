@@ -145,12 +145,30 @@ describe('Drawer', () => {
     expect(source).not.toMatch(/@radix-ui/i)
   })
 
-  it('suppresses transition durations for reduced motion', () => {
-    const source = readFileSync(
-      join(process.cwd(), 'src/components/ui/drawer.tsx'),
-      'utf8',
+  it('suppresses every base and ending transition duration for reduced motion', () => {
+    const { container } = render(
+      <Drawer open showSwipeHandle>
+        <DrawerContent>
+          <DrawerTitle>Profile</DrawerTitle>
+          <DrawerDescription>Edit your profile.</DrawerDescription>
+        </DrawerContent>
+      </Drawer>,
     )
+    const document = container.ownerDocument
+    const overlay = document.querySelector('[data-slot="drawer-overlay"]')
+    const popup = document.querySelector('[data-slot="drawer-popup"]')
+    const handle = document.querySelector('[data-slot="drawer-swipe-handle"]')
+    const content = document.querySelector('[data-slot="drawer-content"]')
 
-    expect(source.match(/motion-reduce:duration-0/g)?.length).toBeGreaterThanOrEqual(3)
+    expect(overlay?.className).toContain('motion-reduce:data-ending-style:duration-0')
+    expect(popup?.className).toContain('motion-reduce:data-ending-style:duration-0')
+    expect(popup?.className).toContain(
+      'motion-reduce:data-ending-style:data-nested-drawer-swiping:duration-0',
+    )
+    expect(popup?.className).toContain(
+      'motion-reduce:data-ending-style:data-swiping:duration-0',
+    )
+    expect(handle?.className).toContain('motion-reduce:duration-0')
+    expect(content?.className).toContain('motion-reduce:duration-0')
   })
 })

@@ -189,8 +189,9 @@ describe('QuickSearchProvider', () => {
     expect(results?.className).not.toContain('h-full')
     expect(footer?.className).toContain('pb-[max(1rem,env(safe-area-inset-bottom))]')
     expect(results.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Quick Search' })).toBeTruthy()
-    expect(screen.getByText(/Search Anime, Characters/)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Quick Search' }).className).toContain('sr-only')
+    expect(screen.getByText(/Search Anime, Characters/).className).toContain('sr-only')
+    expect(document.querySelector('[data-slot="drawer-header"]')).toBeNull()
   })
 
   it('requests Users only for complete matching auth and keys cache by profile', async () => {
@@ -418,6 +419,6 @@ describe('QuickSearchProvider', () => {
     fireEvent.keyDown(input, { key: 'ArrowDown' })
     expect(input.getAttribute('aria-activedescendant')).toContain('anime-1')
     expect(screen.getAllByRole('option')).toHaveLength(2)
-    expect(screen.getAllByRole('button', { name: 'View all' })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: /View all/ })).toHaveLength(2)
   })
 })
