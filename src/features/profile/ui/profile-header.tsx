@@ -14,7 +14,7 @@ export interface ProfileHeaderData {
 interface ProfileHeaderProps {
   profile: ProfileHeaderData
   owner: boolean
-  onEditProfile: () => void
+  onEditProfile: (trigger: HTMLButtonElement) => void
 }
 
 /** Renders profile cover identity and owner edit entry point. */
@@ -57,7 +57,7 @@ export function ProfileHeader({
         {owner ? (
           <Button
             className="min-h-11 bg-coral-500 px-5 font-black text-white hover:bg-coral-400"
-            onClick={onEditProfile}
+            onClick={(event) => onEditProfile(event.currentTarget)}
             type="button"
           >
             Edit Profile

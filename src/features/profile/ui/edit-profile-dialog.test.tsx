@@ -14,6 +14,7 @@ vi.mock('convex/react', () => ({
 }))
 
 const profile = {
+  id: 'user-rinko',
   name: 'Rinko',
   bio: 'Seasonal reviews',
   profileVisibility: 'public' as const,

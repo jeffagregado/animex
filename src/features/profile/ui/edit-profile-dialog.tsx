@@ -23,11 +23,15 @@ type ProfileEditFormValues = {
   profileVisibility: ProfileVisibility
 }
 
+type EditableProfile = ProfileEditFormValues & {
+  id: string
+}
+
 interface EditProfileDialogProps {
   finalFocus: HTMLElement | null
   onOpenChange: (open: boolean) => void
   open: boolean
-  profile: ProfileEditFormValues
+  profile: EditableProfile
 }
 
 type ProfileEditField = keyof ProfileEditFormValues
@@ -55,6 +59,15 @@ const profileFields: readonly ProfileEditField[] = [
   'bio',
   'profileVisibility',
 ]
+
+/** Selects fields managed by Profile edit form. */
+const toProfileEditValues = (
+  profile: EditableProfile,
+): ProfileEditFormValues => ({
+  name: profile.name,
+  bio: profile.bio,
+  profileVisibility: profile.profileVisibility,
+})
 
 /** Reads the stable Profile validation payload from a mutation error. */
 const getProfileEditError = (error: unknown): ProfileEditErrorData | null => {
@@ -95,6 +108,8 @@ export function EditProfileDialog({
   const updateProfile = useMutation(profileUpdate)
   const formRef = useRef<HTMLFormElement>(null)
   const nameRef = useRef<HTMLInputElement>(null)
+  const activeProfileIdRef = useRef(profile.id)
+  const wasOpenRef = useRef(false)
   const [submitted, setSubmitted] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -102,7 +117,7 @@ export function EditProfileDialog({
   const [serverErrors, setServerErrors] = useState<ProfileEditFieldErrors>({})
 
   const form = useForm({
-    defaultValues: profile,
+    defaultValues: toProfileEditValues(profile),
     validationLogic: revalidateLogic({
       mode: 'blur',
       modeAfterSubmission: 'change',
@@ -145,13 +160,18 @@ export function EditProfileDialog({
   })
 
   useEffect(() => {
-    if (!open) return
-    form.reset(profile)
-    setSubmitted(false)
-    setSubmitErrors({})
-    setServerErrors({})
-    setMessage(null)
-  }, [form, open, profile])
+    const opened = open && !wasOpenRef.current
+    const profileChanged = open && activeProfileIdRef.current !== profile.id
+    if (opened || profileChanged) {
+      form.reset(toProfileEditValues(profile))
+      setSubmitted(false)
+      setSubmitErrors({})
+      setServerErrors({})
+      setMessage(null)
+    }
+    activeProfileIdRef.current = profile.id
+    wasOpenRef.current = open
+  }, [form, open, profile.id])
 
   const changeOpen = (nextOpen: boolean): void => {
     if (!nextOpen && saving) return

@@ -61,21 +61,12 @@ export function ProfilePage({
   tab: ProfileTab
 }) {
   const result = useQuery(profileQuery, { username })
-  const editTriggerRef = useRef<HTMLElement | null>(null)
+  const editTriggerRef = useRef<HTMLButtonElement | null>(null)
   const [editOpen, setEditOpen] = useState(false)
 
-  const openEditProfile = (): void => {
-    if (!(document.activeElement instanceof HTMLElement)) {
-      throw new Error('Edit Profile trigger is unavailable.')
-    }
-    editTriggerRef.current = document.activeElement
+  const openEditProfile = (trigger: HTMLButtonElement): void => {
+    editTriggerRef.current = trigger
     setEditOpen(true)
-  }
-  const changeEditOpen = (open: boolean): void => {
-    setEditOpen(open)
-    if (!open) {
-      queueMicrotask(() => editTriggerRef.current?.focus())
-    }
   }
 
   if (result === undefined) return <ProfileLoading />
@@ -87,10 +78,10 @@ export function ProfilePage({
           owner={result.owner}
           profile={result.profile}
         />
-        {result.owner && editOpen ? (
+        {result.owner ? (
           <EditProfileDialog
             finalFocus={editTriggerRef.current}
-            onOpenChange={changeEditOpen}
+            onOpenChange={setEditOpen}
             open={editOpen}
             profile={result.profile}
           />
@@ -111,10 +102,10 @@ export function ProfilePage({
         owner={result.owner}
         profile={result.profile}
       />
-      {result.owner && editOpen ? (
+      {result.owner ? (
         <EditProfileDialog
           finalFocus={editTriggerRef.current}
-          onOpenChange={changeEditOpen}
+          onOpenChange={setEditOpen}
           open={editOpen}
           profile={result.profile}
         />

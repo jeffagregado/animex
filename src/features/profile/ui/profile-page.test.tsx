@@ -22,20 +22,29 @@ import {
 const mocks = vi.hoisted(() => ({
   profile: undefined as ProfileResult | undefined,
   query: vi.fn(),
+  update: vi.fn(),
   client: { query: vi.fn() },
 }))
 
 vi.mock('convex/react', () => ({
   useConvex: () => mocks.client,
+  useMutation: () => mocks.update,
   useQuery: () => mocks.profile,
   useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
 }))
 
-vi.mock('@tanstack/react-router', async (load) => {
-  const actual = await load<typeof import('@tanstack/react-router')>()
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual<typeof import('@tanstack/react-router')>(
+    '@tanstack/react-router',
+  )
   return {
     ...actual,
-    createFileRoute: () => (options: unknown) => ({ ...options }),
+    createFileRoute: () => (options: unknown) => {
+      if (typeof options !== 'object' || options === null) {
+        throw new TypeError('Route options must be an object.')
+      }
+      return { ...options }
+    },
     Outlet: () => <div>Profile child</div>,
   }
 })
@@ -132,6 +141,8 @@ const deferred = <T,>() => {
 beforeEach(() => {
   mocks.profile = fullProfile
   mocks.query.mockReset()
+  mocks.update.mockReset()
+  mocks.update.mockResolvedValue(null)
   mocks.query.mockResolvedValue({ items: [], cursor: null, hasMore: false })
   mocks.client.query = mocks.query
   vi.stubGlobal('IntersectionObserver', undefined)
@@ -202,8 +213,9 @@ describe('Profile responsive content contract', () => {
   it('renders owner identity, edit callback, four stats, and ten latest favorites', async () => {
     const onEditProfile = vi.fn()
     render(<ProfileHeader owner profile={header} onEditProfile={onEditProfile} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Profile' }))
-    expect(onEditProfile).toHaveBeenCalledOnce()
+    const editTrigger = screen.getByRole('button', { name: 'Edit Profile' })
+    fireEvent.click(editTrigger)
+    expect(onEditProfile).toHaveBeenCalledWith(editTrigger)
     cleanup()
 
     render(<ProfilePage tab="activity" username="rinko" />)
@@ -215,6 +227,83 @@ describe('Profile responsive content contract', () => {
     expect(screen.getByText('6')).toBeTruthy()
     expect(screen.getAllByRole('link', { name: /Favorite \d+/ })).toHaveLength(10)
     await waitFor(() => expect(mocks.query).toHaveBeenCalled())
+  })
+
+  it('keeps the controlled dialog mounted while closing and restores its real trigger', async () => {
+    let finishClose!: () => void
+    const closeFinished = new Promise<void>((resolve) => {
+      finishClose = resolve
+    })
+    const animationDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'getAnimations',
+    )
+    Object.defineProperty(HTMLElement.prototype, 'getAnimations', {
+      configurable: true,
+      value(this: HTMLElement): Animation[] {
+        if (!this.hasAttribute('data-closed')) return []
+        return [{
+          finished: closeFinished,
+          pending: true,
+          playState: 'running',
+        } as unknown as Animation]
+      },
+    })
+    const distractor = document.createElement('button')
+    distractor.textContent = 'Distractor'
+    document.body.append(distractor)
+    distractor.focus()
+    try {
+      render(<ProfilePage tab="activity" username="rinko" />)
+      const editTrigger = screen.getByRole('button', { name: 'Edit Profile' })
+
+      fireEvent.click(editTrigger)
+      expect(await screen.findByRole('dialog', { name: 'Edit Profile' })).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      const closingDialog = document.querySelector<HTMLElement>('[role="dialog"]')
+      expect(closingDialog?.hasAttribute('data-closed')).toBe(true)
+      await act(async () => finishClose())
+      await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+      expect(document.activeElement).toBe(editTrigger)
+    } finally {
+      distractor.remove()
+      if (animationDescriptor) {
+        Object.defineProperty(
+          HTMLElement.prototype,
+          'getAnimations',
+          animationDescriptor,
+        )
+      } else {
+        delete (HTMLElement.prototype as { getAnimations?: () => Animation[] })
+          .getAnimations
+      }
+    }
+  })
+
+  it('saves an owner Profile Visibility change from Private to Public', async () => {
+    mocks.profile = {
+      ...fullProfile,
+      profile: {
+        ...fullProfile.profile,
+        profileVisibility: 'private',
+      },
+    }
+    render(<ProfilePage tab="activity" username="rinko" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Profile' }))
+    const visibility = await screen.findByRole('combobox', {
+      name: /Profile Visibility/,
+    })
+    expect((visibility as HTMLSelectElement).value).toBe('private')
+    fireEvent.change(visibility, { target: { value: 'public' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({
+      name: 'Rinko',
+      bio: 'Reviews, seasonals, and quiet fantasy picks.',
+      profileVisibility: 'public',
+    }))
   })
 
   it('shows only header and privacy notice for a Private profile viewer', () => {
