@@ -1,7 +1,7 @@
 import { ImageOffIcon } from 'lucide-react'
 
-import { Button } from '#/components/ui/button'
 import { Skeleton } from '#/components/ui/skeleton'
+import { ProfilePagination, ProfileState } from './profile-page-state'
 import {
   useProfileAutoLoad,
   type ProfileFavorite,
@@ -27,8 +27,10 @@ export function ProfileFavorites({
   return (
     <section aria-label="Profile favorites">
       {state.items.length === 0 && !state.hasMore && state.error === null ? (
-        <ProfileFavoriteState
+        <ProfileState
+          action={null}
           message="No favorites are visible on this profile."
+          onAction={null}
           title="No favorites yet"
         />
       ) : (
@@ -122,54 +124,11 @@ function ProfileFavoritePagination({
 }) {
   return (
     <div className="mt-5" ref={sentinelRef}>
-      {state.error === null ? null : (
-        <ProfileFavoriteState
-          action="Retry"
-          message={state.error}
-          onAction={() => void state.retry()}
-          title="Favorites unavailable"
-        />
-      )}
-      {state.hasMore && state.error === null ? (
-        <Button
-          className="min-h-11 w-full"
-          disabled={state.loadingMore}
-          onClick={() => void state.loadMore()}
-          type="button"
-          variant="outline"
-        >
-          {state.loadingMore ? 'Loading more…' : 'Load more'}
-        </Button>
-      ) : null}
-      {!state.hasMore && state.items.length > 0 && state.error === null ? (
-        <p className="py-5 text-center text-sm text-muted-foreground">
-          End of favorites.
-        </p>
-      ) : null}
-    </div>
-  )
-}
-
-function ProfileFavoriteState({
-  title,
-  message,
-  action,
-  onAction,
-}: {
-  title: string
-  message: string
-  action?: string
-  onAction?: () => void
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-card/50 p-8 text-center" role={action ? 'alert' : undefined}>
-      <h2 className="font-black">{title}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{message}</p>
-      {action && onAction ? (
-        <Button className="mt-4 min-h-11" onClick={onAction} type="button" variant="outline">
-          {action}
-        </Button>
-      ) : null}
+      <ProfilePagination
+        endLabel="favorites"
+        errorTitle="Favorites unavailable"
+        state={state}
+      />
     </div>
   )
 }

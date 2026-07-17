@@ -54,18 +54,36 @@ const searchInputSchema = z.object({
   page: pageSchema,
 }).strict()
 
-const formatBirthday = (value: { year: number | null; month: number | null; day: number | null } | null): string | null => {
+type PersonBirthday = { year: number | null; month: number | null; day: number | null }
+type CompleteMonthDay = PersonBirthday & { month: number; day: number }
+
+const hasMonthDay = (value: PersonBirthday): value is CompleteMonthDay => (
+  [value.month, value.day].every((part) => part !== null)
+)
+
+const formatPartialBirthday = (value: PersonBirthday): string | null => (
+  value.year !== null && value.month === null && value.day === null
+    ? String(value.year)
+    : null
+)
+
+const formatMonthDay = (value: CompleteMonthDay): string => {
+  const calendarYear = value.year ?? 2000
+  const date = new Date(Date.UTC(calendarYear, value.month - 1, value.day))
+  const dateMatches = date.getUTCMonth() === value.month - 1
+    && date.getUTCDate() === value.day
+  if (!dateMatches) throw upstreamError()
+  return new Intl.DateTimeFormat(
+    'en',
+    { month: 'long', day: 'numeric', timeZone: 'UTC' },
+  ).format(date)
+}
+
+const formatBirthday = (value: PersonBirthday | null): string | null => {
   if (!value) return null
-  const { year, month, day } = value
-  if (month !== null && day !== null) {
-    const calendarYear = year ?? 2000
-    const date = new Date(Date.UTC(calendarYear, month - 1, day))
-    if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) throw upstreamError()
-    const monthDay = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(date)
-    return year === null ? monthDay : `${monthDay}, ${year}`
-  }
-  if (year !== null && month === null && day === null) return String(year)
-  return null
+  if (!hasMonthDay(value)) return formatPartialBirthday(value)
+  const monthDay = formatMonthDay(value)
+  return value.year === null ? monthDay : `${monthDay}, ${value.year}`
 }
 
 const formatActiveYears = (years: number[] | null): string | null => {

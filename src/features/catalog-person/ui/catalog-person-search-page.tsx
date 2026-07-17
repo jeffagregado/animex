@@ -153,18 +153,44 @@ function SearchState({
   if (state.error) return <div className="mt-6 rounded-xl border border-red-400/40 bg-red-400/10 p-5" role="alert">{state.error}</div>
   if (!state.shouldRequest) return <p className="mt-6 rounded-xl border border-border bg-card/60 p-8 text-center text-muted-foreground">Enter at least 2 characters to search {noun}.</p>
   if (pages.initialLoading) return <p aria-busy="true" className="mt-6 rounded-xl border border-border bg-card/60 p-8 text-center text-muted-foreground">Searching {noun}…</p>
-  if (pages.nextPageError && pages.error && pages.items.length === 0) return <SearchError message={pages.error.message} onRetry={() => void pages.loadMore()} />
-  if (pages.error && pages.items.length === 0) return <SearchError message={pages.error.message} onRetry={() => void pages.retryInitial()} />
+  return <PersonSearchResults kind={kind} pages={pages} />
+}
+
+function PersonSearchResults({
+  kind,
+  pages,
+}: {
+  kind: CatalogPersonKind
+  pages: ReturnType<typeof useCatalogPersonSearchPages>
+}) {
+  const noun = kind === 'character' ? 'characters' : 'staff'
+  if (pages.error && pages.items.length === 0) {
+    const retry = pages.nextPageError ? pages.loadMore : pages.retryInitial
+    return <SearchError message={pages.error.message} onRetry={() => void retry()} />
+  }
   if (pages.items.length === 0 && !pages.hasMore) return <p className="mt-6 rounded-xl border border-border bg-card/60 p-8 text-center text-muted-foreground">No {noun} found.</p>
   return (
     <section aria-label={`${noun} results`} className="mt-6">
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         {pages.items.map((row) => <PersonCard key={row.id} row={row} />)}
       </div>
-      {pages.nextPageError && pages.error ? <SearchError message={pages.error.message} onRetry={() => void pages.loadMore()} /> : null}
-      {!pages.hasMore && pages.items.length > 0 ? <p className="mt-6 text-center text-sm text-muted-foreground">End of results.</p> : null}
+      <PersonSearchFooter pages={pages} />
     </section>
   )
+}
+
+function PersonSearchFooter({
+  pages,
+}: {
+  pages: ReturnType<typeof useCatalogPersonSearchPages>
+}) {
+  if (pages.nextPageError && pages.error) {
+    return <SearchError message={pages.error.message} onRetry={() => void pages.loadMore()} />
+  }
+  if (!pages.hasMore && pages.items.length > 0) {
+    return <p className="mt-6 text-center text-sm text-muted-foreground">End of results.</p>
+  }
+  return null
 }
 
 function PersonCard({ row }: { row: CatalogPersonSearchRow }) {

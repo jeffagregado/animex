@@ -4,6 +4,7 @@ import { revalidateLogic, useForm } from '@tanstack/react-form'
 import { useMutation } from 'convex/react'
 import { makeFunctionReference } from 'convex/server'
 import { XIcon } from 'lucide-react'
+import { z } from 'zod'
 
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -50,6 +51,15 @@ interface ProfileEditErrorData {
   message: string
   fieldErrors: ProfileEditFieldErrors
 }
+const profileEditErrorSchema = z.object({
+  code: z.literal('PROFILE_EDIT_INVALID'),
+  message: z.string(),
+  fieldErrors: z.object({
+    name: z.string().optional(),
+    bio: z.string().optional(),
+    profileVisibility: z.string().optional(),
+  }),
+})
 
 const profileUpdate = makeFunctionReference<
   'mutation',
@@ -75,18 +85,8 @@ const toProfileEditValues = (
 /** Reads the stable Profile validation payload from a mutation error. */
 const getProfileEditError = (error: unknown): ProfileEditErrorData | null => {
   if (typeof error !== 'object' || error === null || !('data' in error)) return null
-  const data = error.data
-  if (typeof data !== 'object' || data === null) return null
-  if (
-    !('code' in data)
-    || data.code !== 'PROFILE_EDIT_INVALID'
-    || !('message' in data)
-    || typeof data.message !== 'string'
-    || !('fieldErrors' in data)
-    || typeof data.fieldErrors !== 'object'
-    || data.fieldErrors === null
-  ) return null
-  return data as ProfileEditErrorData
+  const result = profileEditErrorSchema.safeParse(error.data)
+  return result.success ? result.data : null
 }
 
 /** Focuses the first editable invalid Profile control. */
@@ -98,6 +98,29 @@ const focusFirstInvalidProfileField = (form: HTMLFormElement | null): void => {
     if (control.getAttribute('aria-invalid') !== 'true') continue
     control.focus()
     return
+  }
+}
+
+const useProfileEditState = () => {
+  const [submitted, setSubmitted] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [mediaBusy, setMediaBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [submitErrors, setSubmitErrors] = useState<ProfileEditFieldErrors>({})
+  const [serverErrors, setServerErrors] = useState<ProfileEditFieldErrors>({})
+  return {
+    mediaBusy,
+    message,
+    saving,
+    serverErrors,
+    setMediaBusy,
+    setMessage,
+    setSaving,
+    setServerErrors,
+    setSubmitErrors,
+    setSubmitted,
+    submitErrors,
+    submitted,
   }
 }
 
@@ -113,12 +136,20 @@ export function EditProfileDialog({
   const nameRef = useRef<HTMLInputElement>(null)
   const activeProfileIdRef = useRef(profile.id)
   const wasOpenRef = useRef(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [mediaBusy, setMediaBusy] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const [submitErrors, setSubmitErrors] = useState<ProfileEditFieldErrors>({})
-  const [serverErrors, setServerErrors] = useState<ProfileEditFieldErrors>({})
+  const {
+    mediaBusy,
+    message,
+    saving,
+    serverErrors,
+    setMediaBusy,
+    setMessage,
+    setSaving,
+    setServerErrors,
+    setSubmitErrors,
+    setSubmitted,
+    submitErrors,
+    submitted,
+  } = useProfileEditState()
 
   const form = useForm({
     defaultValues: toProfileEditValues(profile),

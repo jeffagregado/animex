@@ -53,21 +53,16 @@ const normalizeCrop = (
   naturalWidth: number,
   naturalHeight: number,
 ): Area => {
-  if (
-    !Number.isFinite(crop.x)
-    || !Number.isFinite(crop.y)
-    || !Number.isFinite(crop.width)
-    || !Number.isFinite(crop.height)
-    || crop.width <= 0
-    || crop.height <= 0
-    || naturalWidth <= 0
-    || naturalHeight <= 0
-  ) throw invalid()
+  const finiteValues = [crop.x, crop.y, crop.width, crop.height]
+  const dimensions = [crop.width, crop.height, naturalWidth, naturalHeight]
+  if (!finiteValues.every(Number.isFinite) || !dimensions.every((value) => value > 0)) {
+    throw invalid()
+  }
   const x = Math.max(0, Math.min(naturalWidth - 1, Math.round(crop.x)))
   const y = Math.max(0, Math.min(naturalHeight - 1, Math.round(crop.y)))
   const width = Math.min(naturalWidth - x, Math.round(crop.width))
   const height = Math.min(naturalHeight - y, Math.round(crop.height))
-  if (width <= 0 || height <= 0) throw invalid()
+  if (![width, height].every((value) => value > 0)) throw invalid()
   return { x, y, width, height }
 }
 

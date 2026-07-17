@@ -1,6 +1,6 @@
-import { Button } from '#/components/ui/button'
 import type { FeedCard as FeedCardData } from '#/features/social/shared/social-contracts'
 import { FeedCard } from '#/features/feed/feed-card'
+import { ProfilePagination, ProfileState } from './profile-page-state'
 import {
   useProfileAutoLoad,
   type ProfilePageState,
@@ -34,61 +34,20 @@ export function ProfileActivity({
         />
       ))}
       {state.items.length === 0 && !state.hasMore && state.error === null ? (
-        <ActivityState
+        <ProfileState
+          action={null}
           message="Nothing visible on this profile yet."
+          onAction={null}
           title="No activity yet"
         />
       ) : null}
       <div className="min-h-16" ref={sentinelRef}>
-        {state.error === null ? null : (
-          <ActivityState
-            action="Retry"
-            message={state.error}
-            onAction={() => void state.retry()}
-            title="Activity unavailable"
-          />
-        )}
-        {state.hasMore && state.error === null ? (
-          <Button
-            className="min-h-11 w-full"
-            disabled={state.loadingMore}
-            onClick={() => void state.loadMore()}
-            type="button"
-            variant="outline"
-          >
-            {state.loadingMore ? 'Loading more…' : 'Load more'}
-          </Button>
-        ) : null}
-        {!state.hasMore && state.items.length > 0 && state.error === null ? (
-          <p className="py-5 text-center text-sm text-muted-foreground">
-            End of activity.
-          </p>
-        ) : null}
+        <ProfilePagination
+          endLabel="activity"
+          errorTitle="Activity unavailable"
+          state={state}
+        />
       </div>
     </section>
-  )
-}
-
-function ActivityState({
-  title,
-  message,
-  action,
-  onAction,
-}: {
-  title: string
-  message: string
-  action?: string
-  onAction?: () => void
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-card/50 p-8 text-center" role={action ? 'alert' : undefined}>
-      <h2 className="font-black">{title}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{message}</p>
-      {action && onAction ? (
-        <Button className="mt-4 min-h-11" onClick={onAction} type="button" variant="outline">
-          {action}
-        </Button>
-      ) : null}
-    </div>
   )
 }
