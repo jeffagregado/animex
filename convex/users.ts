@@ -142,6 +142,42 @@ export const requireProfile = async (ctx: UserCtx) => {
   return { authUser, profile }
 }
 
+/** Writes the canonical identity-only search projection for one profile. */
+export const upsertUserSearchDocument = async (
+  ctx: MutationCtx,
+  user: Doc<'users'>,
+): Promise<void> => {
+  const rows = await ctx.db
+    .query('userSearchDocuments')
+    .withIndex('by_user', (q) => q.eq('userId', user._id))
+    .take(2)
+  if (rows.length > 1) {
+    throw new ConvexError({
+      code: 'USER_SEARCH_CORRUPT',
+      message: 'Multiple search documents exist for one profile.',
+    })
+  }
+
+  const searchText = `${user.name} ${user.username}`
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+  const updatedAt = Date.now()
+  if (rows[0]) {
+    await ctx.db.patch('userSearchDocuments', rows[0]._id, {
+      searchText,
+      updatedAt,
+    })
+    return
+  }
+
+  await ctx.db.insert('userSearchDocuments', {
+    userId: user._id,
+    searchText,
+    updatedAt,
+  })
+}
+
 /** Resolves optional viewer profile without requiring authentication. */
 export const getOptionalProfile = async (ctx: UserCtx) => {
   const authUser = await authComponent.safeGetAuthUser(ctx)
@@ -371,7 +407,7 @@ export const completeProfileInternal = internalMutation({
     const pending = await readPendingOauthSignup(ctx, authUser._id)
     assertPendingProfileState(pending, authUser.email, now)
 
-    return await completePendingProfile({
+    const profileId = await completePendingProfile({
       insert: async () => {
         await assertUsernameAvailable(ctx, username, authUser._id)
         const profileId = await ctx.db.insert('users', {
@@ -379,6 +415,7 @@ export const completeProfileInternal = internalMutation({
           avatarStorageId: args.avatarStorageId,
           createdAt: now,
           name: username,
+          profileVisibility: 'public',
           updatedAt: now,
           username,
           usernameKey: toUsernameKey(username),
@@ -390,6 +427,15 @@ export const completeProfileInternal = internalMutation({
         if (pending) await ctx.db.delete(pending._id)
       },
     })
+    const profile = await ctx.db.get('users', profileId)
+    if (!profile) {
+      throw new ConvexError({
+        code: 'PROFILE_WRITE_FAILED',
+        message: 'Completed profile could not be read for search indexing.',
+      })
+    }
+    await upsertUserSearchDocument(ctx, profile)
+    return profileId
   },
 })
 
