@@ -49,8 +49,16 @@ const parseVp8l = (payload: Uint8Array): ProfileMediaDimensions => {
 }
 
 const parseVp8x = (payload: Uint8Array): ProfileMediaDimensions => {
-  if (payload.length < 10) return invalid('Malformed VP8X dimensions.')
+  if (payload.length !== 10) return invalid('Malformed VP8X dimensions.')
   if ((payload[0] & 0x02) !== 0) return invalid('Animated WebP is not allowed.')
+  if (
+    (payload[0] & 0xc1) !== 0
+    || payload[1] !== 0
+    || payload[2] !== 0
+    || payload[3] !== 0
+  ) {
+    return invalid('VP8X reserved fields must be zero.')
+  }
   return {
     width: readU24(payload, 4) + 1,
     height: readU24(payload, 7) + 1,
@@ -69,7 +77,11 @@ export const parseWebpDimensions = (bytes: Uint8Array): ProfileMediaDimensions =
   }
 
   let offset = 12
-  let dimensions: ProfileMediaDimensions | null = null
+  let canvas: ProfileMediaDimensions | null = null
+  let image: ProfileMediaDimensions | null = null
+  let imageKind: 'VP8' | 'VP8L' | null = null
+  let hasAlphaFlag = false
+  let sawAlpha = false
   while (offset < bytes.length) {
     if (offset + 8 > bytes.length) return invalid('Malformed WebP chunk header.')
     const name = readText(bytes, offset, 4)
@@ -77,21 +89,34 @@ export const parseWebpDimensions = (bytes: Uint8Array): ProfileMediaDimensions =
     const payloadStart = offset + 8
     const payloadEnd = payloadStart + length
     if (payloadEnd > bytes.length) return invalid('Malformed WebP chunk length.')
+    if (length % 2 === 1 && (payloadEnd >= bytes.length || bytes[payloadEnd] !== 0)) {
+      return invalid('Malformed WebP chunk padding.')
+    }
     const payload = bytes.slice(payloadStart, payloadEnd)
 
-    if (name === 'ANIM') return invalid('Animated WebP is not allowed.')
-    if (name === 'VP8 ' || name === 'VP8L' || name === 'VP8X') {
-      if (dimensions) return invalid('WebP has multiple image headers.')
-      dimensions = name === 'VP8 '
-        ? parseVp8(payload)
-        : name === 'VP8L'
-          ? parseVp8l(payload)
-          : parseVp8x(payload)
+    if (name === 'ANIM' || name === 'ANMF') return invalid('Animated WebP is not allowed.')
+    if (name === 'VP8X') {
+      if (canvas || offset !== 12 || image) return invalid('WebP has duplicate or misplaced VP8X.')
+      canvas = parseVp8x(payload)
+      hasAlphaFlag = (payload[0] & 0x10) !== 0
+    } else if (name === 'ALPH') {
+      if (!canvas || image || sawAlpha || !hasAlphaFlag || payload.length === 0) {
+        return invalid('WebP has misplaced or duplicate alpha data.')
+      }
+      sawAlpha = true
+    } else if (name === 'VP8 ' || name === 'VP8L') {
+      if (image) return invalid('WebP has multiple image-data chunks.')
+      image = name === 'VP8 ' ? parseVp8(payload) : parseVp8l(payload)
+      imageKind = name === 'VP8 ' ? 'VP8' : 'VP8L'
     }
     offset = payloadEnd + (length % 2)
   }
-  if (offset !== bytes.length || !dimensions) return invalid('WebP image header is missing.')
-  return dimensions
+  if (offset !== bytes.length || !image) return invalid('WebP image data is missing.')
+  if (sawAlpha && imageKind !== 'VP8') return invalid('ALPH must precede VP8 image data.')
+  if (canvas && (canvas.width !== image.width || canvas.height !== image.height)) {
+    return invalid('VP8X canvas and image dimensions do not match.')
+  }
+  return canvas ?? image
 }
 
 /** Validates one final static crop against Profile media limits. */

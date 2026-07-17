@@ -37,14 +37,17 @@ const cleanupExpiredCandidate = makeFunctionReference<
 >('profileMedia:cleanupExpiredCandidate')
 
 const text = (value: string): number[] => [...new TextEncoder().encode(value)]
-const u24 = (value: number): number[] => [value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff]
 const u32 = (value: number): number[] => [
   value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff,
 ]
 const validWebp = (kind: Kind): Uint8Array => {
   const [width, height] = kind === 'avatar' ? [512, 512] : [1600, 400]
-  const payload = [0, 0, 0, 0, ...u24(width - 1), ...u24(height - 1)]
-  const chunk = [...text('VP8X'), ...u32(payload.length), ...payload]
+  const payload = [
+    0, 0, 0, 0x9d, 0x01, 0x2a,
+    width & 0xff, (width >>> 8) & 0x3f,
+    height & 0xff, (height >>> 8) & 0x3f,
+  ]
+  const chunk = [...text('VP8 '), ...u32(payload.length), ...payload]
   return Uint8Array.from([...text('RIFF'), ...u32(chunk.length + 4), ...text('WEBP'), ...chunk])
 }
 const createHarness = () => {
@@ -112,16 +115,21 @@ const setReference = async (
 ) => await t.run(async (ctx) => await ctx.db.patch('users', profileId, {
   [kind === 'avatar' ? 'avatarStorageId' : 'bannerStorageId']: storageId,
 }))
-const errorCode = async (promise: Promise<unknown>): Promise<string> => {
+const errorData = async (
+  promise: Promise<unknown>,
+): Promise<{ code?: string; originalCode?: string }> => {
   try {
     await promise
   } catch (error) {
-    return (error as { data?: { code?: string } }).data?.code ?? ''
+    return (error as { data?: { code?: string; originalCode?: string } }).data ?? {}
   }
   throw new Error('Expected function to reject.')
 }
+const errorCode = async (promise: Promise<unknown>): Promise<string> =>
+  (await errorData(promise)).code ?? ''
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
@@ -200,6 +208,32 @@ describe('Profile media finalization', () => {
     expect(await exists(t, storageId)).toBe(false)
   })
 
+  test('cleanup failure preserves original invalid-media category', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'cleanup-failure-owner')
+    const storageId = await store(t, Uint8Array.from([1, 2, 3]))
+    await owner.client.mutation(registerPending, { kind: 'avatar', storageId })
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      const now = Date.now()
+      await t.run(async (ctx) => await ctx.db.insert('profileMediaUploads', {
+        userId: owner.profileId,
+        kind: 'avatar',
+        storageId,
+        expiresAt: now + 60 * 60 * 1000,
+        createdAt: now,
+      }))
+      return new Response(new Blob([Uint8Array.from([1, 2, 3])]))
+    }))
+
+    expect(await errorData(owner.client.action(finalize, { kind: 'avatar', storageId })))
+      .toEqual({
+        code: 'PROFILE_MEDIA_CLEANUP_FAILED',
+        originalCode: 'PROFILE_MEDIA_INVALID',
+        message: 'Profile media cleanup failed after finalization failed.',
+      })
+    expect(await exists(t, storageId)).toBe(true)
+  })
+
   test('successful swap commits new reference before deleting old storage', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'swap-owner')
@@ -274,6 +308,39 @@ describe('Profile media removal and expiry cleanup', () => {
     expect(await exists(t, expired)).toBe(false)
     expect(await exists(t, active)).toBe(true)
     expect(await exists(t, unrelated)).toBe(true)
+  })
+
+  test('cleanup continues beyond the 50-row expiry page', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-17T03:15:00.000Z'))
+    const t = createHarness()
+    const owner = await createOwner(t, 'cleanup-page-owner')
+    const storageIds: Id<'_storage'>[] = []
+    for (let index = 0; index < 51; index += 1) {
+      const storageId = await store(t, validWebp('avatar'))
+      storageIds.push(storageId)
+      await owner.client.mutation(registerPending, { kind: 'avatar', storageId })
+    }
+    const now = Date.now()
+    await t.run(async (ctx) => {
+      const rows = await ctx.db.query('profileMediaUploads')
+        .withIndex('by_user', (q) => q.eq('userId', owner.profileId))
+        .collect()
+      await Promise.all(rows.map(async (row) => await ctx.db.patch(
+        'profileMediaUploads',
+        row._id,
+        { expiresAt: now - 1 },
+      )))
+    })
+
+    await t.action(cleanupExpired, { cursor: null, now })
+    await t.finishAllScheduledFunctions(vi.runAllTimers)
+
+    expect(await t.run(async (ctx) => await ctx.db.query('profileMediaUploads')
+      .withIndex('by_user', (q) => q.eq('userId', owner.profileId))
+      .collect())).toEqual([])
+    await expect(Promise.all(storageIds.map(async (storageId) => await exists(t, storageId))))
+      .resolves.toEqual(Array.from({ length: 51 }, () => false))
   })
 
   test('cleanup race recheck preserves storage finalized after stale selection', async () => {

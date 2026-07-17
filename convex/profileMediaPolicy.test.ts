@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+
 import { describe, expect, test, vi } from 'vitest'
 
 import {
@@ -47,23 +49,70 @@ const vp8l = (width: number, height: number): Uint8Array => {
 const vp8x = (width: number, height: number, flags: number): Uint8Array => webp(chunk('VP8X', [
   flags, 0, 0, 0, ...u24(width - 1), ...u24(height - 1),
 ]))
+const vp8xChunk = (width: number, height: number, flags: number): number[] => chunk('VP8X', [
+  flags, 0, 0, 0, ...u24(width - 1), ...u24(height - 1),
+])
+const malformedRiffFixture = Uint8Array.from(Buffer.from(
+    'UklGRloCAABXRUJQVlA4WAoAAAAQAAAA/wEA/wEAQUxQSBwAAAABB9C/iAgIBJL9vWcoov8Z//nPf/7zn//85/8AVlA4IBgCAADQOgCdASoAAgACPm02mUmkIyKhIAgAgA2JaW7hd2Ee3AfgAAAT2Ae+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ9YAAD+/7ge///8guWF1yNf//yA/5Af8gP/4+KarTgZtUCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==',
+  'base64',
+))
+const staticAlphaAvatar = Uint8Array.from(Buffer.from([
+  'UklGRlACAABXRUJQVlA4WAoAAAAQAAAA/wEA/wEAQUxQSBwAAAABB9C/iAgIBJL9vWcoov8Z//nPf/7zn//85/8AVlA4IA4CAABw',
+  'OQCdASoAAgACAAAAJaW7hd2Ee3AfgB+gH8AAhYmNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomN',
+  'NomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomN',
+  'NomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomN',
+  'NomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomN',
+  'NomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomN',
+  'NomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomNNomN',
+  'NomNNomNNomNNomNNomNNWAA/v/8jIb///LD8f1J5/8sQ////E9ObxFTyv/4mQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+].join(''), 'base64'))
 
 describe('Profile media byte policy', () => {
-  test('parses VP8, VP8L, and VP8X exact dimensions', () => {
+  test('parses simple images and a real static alpha VP8X image', () => {
     expect(parseWebpDimensions(vp8(512, 512))).toEqual({ width: 512, height: 512 })
     expect(parseWebpDimensions(vp8l(1600, 400))).toEqual({ width: 1600, height: 400 })
-    expect(parseWebpDimensions(vp8x(512, 512, 0))).toEqual({ width: 512, height: 512 })
+    expect(parseWebpDimensions(staticAlphaAvatar)).toEqual({ width: 512, height: 512 })
+    expect(validateProfileMedia(staticAlphaAvatar, 'avatar')).toBeUndefined()
   })
 
   test('accepts only exact static avatar and banner output', () => {
     expect(validateProfileMedia(vp8(512, 512), 'avatar')).toBeUndefined()
     expect(validateProfileMedia(vp8l(1600, 400), 'banner')).toBeUndefined()
     expect(() => validateProfileMedia(vp8(511, 512), 'avatar')).toThrow('PROFILE_MEDIA_INVALID')
-    expect(() => validateProfileMedia(vp8x(512, 512, 0x02), 'avatar')).toThrow('PROFILE_MEDIA_INVALID')
     expect(() => validateProfileMedia(webp(
-      chunk('VP8X', [0, 0, 0, 0, ...u24(511), ...u24(511)]),
-      chunk('ANIM', [0, 0, 0, 0, 0, 0]),
+      vp8xChunk(512, 512, 0x02),
+      chunk('VP8 ', [...vp8(512, 512).slice(20)]),
     ), 'avatar')).toThrow('PROFILE_MEDIA_INVALID')
+    expect(() => validateProfileMedia(webp(
+      vp8xChunk(512, 512, 0),
+      chunk('ANIM', [0, 0, 0, 0, 0, 0]),
+      chunk('VP8 ', [...vp8(512, 512).slice(20)]),
+    ), 'avatar')).toThrow('PROFILE_MEDIA_INVALID')
+  })
+
+  test('enforces extended WebP canvas and image-data structure', () => {
+    const vp8Payload = [...vp8(512, 512).slice(20)]
+    const vp8lPayload = [...vp8l(512, 512).slice(20)]
+    expect(() => parseWebpDimensions(vp8x(512, 512, 0))).toThrow('PROFILE_MEDIA_INVALID')
+    expect(() => parseWebpDimensions(webp(
+      vp8xChunk(512, 512, 0),
+      vp8xChunk(512, 512, 0),
+      chunk('VP8 ', vp8Payload),
+    ))).toThrow('PROFILE_MEDIA_INVALID')
+    expect(() => parseWebpDimensions(webp(
+      vp8xChunk(512, 512, 0),
+      chunk('VP8 ', vp8Payload),
+      chunk('VP8L', vp8lPayload),
+    ))).toThrow('PROFILE_MEDIA_INVALID')
+    expect(() => parseWebpDimensions(webp(
+      vp8xChunk(512, 512, 0),
+      chunk('VP8 ', [...vp8(511, 512).slice(20)]),
+    ))).toThrow('PROFILE_MEDIA_INVALID')
+    expect(() => parseWebpDimensions(webp(
+      vp8xChunk(512, 512, 0),
+      chunk('ANMF', [0, 0, 0, 0]),
+      chunk('VP8 ', vp8Payload),
+    ))).toThrow('PROFILE_MEDIA_INVALID')
   })
 
   test('rejects empty, malformed, non-WebP, and oversized bytes', () => {
@@ -73,6 +122,16 @@ describe('Profile media byte policy', () => {
     expect(() => parseWebpDimensions(Uint8Array.from([
       ...text('RIFF'), ...u32(100), ...text('WEBP'), ...chunk('VP8 ', [0]),
     ]))).toThrow('PROFILE_MEDIA_INVALID')
+    expect(() => parseWebpDimensions(malformedRiffFixture)).toThrow('PROFILE_MEDIA_INVALID')
+    const malformedSize = webp(chunk('JUNK', [1, 2]))
+    malformedSize.set(u32(100), 16)
+    expect(() => parseWebpDimensions(malformedSize)).toThrow('PROFILE_MEDIA_INVALID')
+    const malformedPad = webp(
+      chunk('JUNK', [1]),
+      chunk('VP8 ', [...vp8(512, 512).slice(20)]),
+    )
+    malformedPad[21] = 1
+    expect(() => parseWebpDimensions(malformedPad)).toThrow('PROFILE_MEDIA_INVALID')
     expect(() => validateProfileMedia(new Uint8Array(2 * 1024 * 1024 + 1), 'avatar'))
       .toThrow('PROFILE_MEDIA_INVALID')
   })
