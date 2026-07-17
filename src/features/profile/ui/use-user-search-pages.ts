@@ -43,15 +43,14 @@ export function useUserSearchPages(queryText: string, enabled: boolean) {
     cursors: Set<string | null>
     scope: string
   }>({ cursors: new Set(), scope: queryText })
-  if (guard.current !== null && guard.current.scope !== queryText) guard.current = null
-  if (cursorHistoryRef.current.scope !== queryText) {
-    cursorHistoryRef.current = { cursors: new Set(), scope: queryText }
-  }
-  const successfulCursors = cursorHistoryRef.current.cursors
   const query = useInfiniteQuery({
     queryKey: ['user-search', queryText],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }): Promise<UserSearchResult> => {
+      if (cursorHistoryRef.current.scope !== queryText) {
+        cursorHistoryRef.current = { cursors: new Set(), scope: queryText }
+      }
+      const successfulCursors = cursorHistoryRef.current.cursors
       if (pageParam === null) successfulCursors.clear()
       const raw = await convex.query(searchUsersRef, {
         query: queryText,
@@ -74,11 +73,11 @@ export function useUserSearchPages(queryText: string, enabled: boolean) {
     ),
     enabled,
   })
-  for (const pageParam of query.data?.pageParams ?? []) {
+  const pageParams = query.data?.pageParams
+  for (const pageParam of pageParams ?? []) {
     if (pageParam !== null && typeof pageParam !== 'string') {
       throw new TypeError('User search cached an invalid pagination cursor.')
     }
-    successfulCursors.add(pageParam)
   }
   const loadMore = useCallback(async (): Promise<void> => {
     if (!query.hasNextPage || guard.current?.scope === queryText) return
@@ -90,19 +89,31 @@ export function useUserSearchPages(queryText: string, enabled: boolean) {
       if (guard.current?.token === token) guard.current = null
     }
   }, [query.fetchNextPage, query.hasNextPage, queryText])
-  const pages = query.data?.pages ?? []
-  const items = dedupeUsers(pages)
+  const pages = query.data?.pages
+  const items = dedupeUsers(pages ?? [])
 
   useEffect(() => {
+    const cursors = new Set<string | null>()
+    for (const pageParam of pageParams ?? []) {
+      if (pageParam !== null && typeof pageParam !== 'string') {
+        throw new TypeError('User search cached an invalid pagination cursor.')
+      }
+      cursors.add(pageParam)
+    }
+    guard.current = null
     continuation.current = null
-  }, [queryText])
+    cursorHistoryRef.current = {
+      cursors,
+      scope: queryText,
+    }
+  }, [pageParams, queryText])
   useEffect(() => {
-    const lastPage = pages.at(-1)
+    const lastPage = pages?.at(-1)
     if (
       !lastPage
       || !query.hasNextPage
       || query.isFetchNextPageError
-      || countNewUsers(pages) > 0
+      || countNewUsers(pages ?? []) > 0
     ) return
     const key = `${queryText}:${lastPage.continueCursor}`
     if (continuation.current === key) return

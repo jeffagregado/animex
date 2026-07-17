@@ -28,7 +28,6 @@ export function useCatalogPersonSearchPages(
   const sentinelContinuation = useRef<string | null>(null)
   const guard = useRef<{ scope: string; token: symbol } | null>(null)
   const scope = `${kind}:${queryText}`
-  if (guard.current !== null && guard.current.scope !== scope) guard.current = null
 
   const query = useInfiniteQuery({
     queryKey: ['catalog-person-search', kind, queryText],
@@ -53,20 +52,21 @@ export function useCatalogPersonSearchPages(
     }
   }, [query.fetchNextPage, query.hasNextPage, scope])
 
-  const pages = query.data?.pages ?? []
-  const items = dedupePeople(pages)
+  const pages = query.data?.pages
+  const items = dedupePeople(pages ?? [])
 
   useEffect(() => {
+    guard.current = null
     sentinelContinuation.current = null
   }, [scope])
 
   useEffect(() => {
-    const lastPage = pages.at(-1)
+    const lastPage = pages?.at(-1)
     if (
       !lastPage
       || !query.hasNextPage
       || query.isFetchNextPageError
-      || countNewPeople(pages) > 0
+      || countNewPeople(pages ?? []) > 0
     ) return
     const key = `${scope}:${lastPage.currentPage}`
     if (sentinelContinuation.current === key) return
