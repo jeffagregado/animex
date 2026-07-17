@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('convex/react', () => ({
+  useConvex: () => ({ action: mocks.update }),
   useMutation: () => mocks.update,
 }))
 
@@ -17,6 +18,8 @@ const profile = {
   id: 'user-rinko',
   name: 'Rinko',
   bio: 'Seasonal reviews',
+  avatarUrl: null,
+  bannerUrl: null,
   profileVisibility: 'public' as const,
 }
 
@@ -42,13 +45,13 @@ afterEach(() => {
 })
 
 describe('EditProfileDialog', () => {
-  it('shows disabled media slots and cancel performs no mutation', () => {
+  it('shows media controls and cancel performs no mutation', () => {
     const onOpenChange = vi.fn()
     renderDialog(onOpenChange)
 
     expect(screen.getByRole('dialog', { name: 'Edit Profile' })).toBeTruthy()
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Change avatar' }).disabled).toBe(true)
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Change banner' }).disabled).toBe(true)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Change avatar' }).disabled).toBe(false)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Change banner' }).disabled).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(mocks.update).not.toHaveBeenCalled()

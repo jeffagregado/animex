@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
 import { revalidateLogic, useForm } from '@tanstack/react-form'
 import { useMutation } from 'convex/react'
@@ -16,6 +16,7 @@ import {
   profileEditInputSchema as profileEditSchema,
   type ProfileVisibility,
 } from '../shared/profile-contracts'
+import { ProfileImageCropper } from './profile-image-cropper'
 
 type ProfileEditFormValues = {
   name: string
@@ -24,6 +25,8 @@ type ProfileEditFormValues = {
 }
 
 type EditableProfile = ProfileEditFormValues & {
+  avatarUrl: string | null
+  bannerUrl: string | null
   id: string
 }
 
@@ -112,6 +115,7 @@ export function EditProfileDialog({
   const wasOpenRef = useRef(false)
   const [submitted, setSubmitted] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [mediaBusy, setMediaBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [submitErrors, setSubmitErrors] = useState<ProfileEditFieldErrors>({})
   const [serverErrors, setServerErrors] = useState<ProfileEditFieldErrors>({})
@@ -174,9 +178,13 @@ export function EditProfileDialog({
   }, [form, open, profile.id])
 
   const changeOpen = (nextOpen: boolean): void => {
-    if (!nextOpen && saving) return
+    if (!nextOpen && (saving || mediaBusy)) return
     onOpenChange(nextOpen)
   }
+  const changeMediaBusy = useCallback((nextBusy: boolean): void => {
+    setMediaBusy(nextBusy)
+  }, [])
+  const busy = saving || mediaBusy
 
   return (
     <DialogPrimitive.Root onOpenChange={changeOpen} open={open}>
@@ -186,7 +194,7 @@ export function EditProfileDialog({
           data-testid="edit-profile-backdrop"
         />
         <DialogPrimitive.Popup
-          aria-busy={saving}
+          aria-busy={busy}
           className="scrollbar-themed fixed top-1/2 left-1/2 z-50 max-h-[90dvh] w-[min(94vw,42rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-white/10 bg-card p-5 shadow-2xl duration-150 outline-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 motion-reduce:duration-0 sm:p-7"
           finalFocus={() => finalFocus}
           initialFocus={nameRef}
@@ -200,7 +208,7 @@ export function EditProfileDialog({
           <DialogPrimitive.Close
             aria-label="Close Edit Profile"
             className="absolute top-3 right-3 grid size-11 place-items-center rounded-lg text-muted-foreground hover:bg-cyan-300/10 hover:text-cyan-200 focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-wait disabled:opacity-50"
-            disabled={saving}
+            disabled={busy}
           >
             <XIcon aria-hidden="true" />
           </DialogPrimitive.Close>
@@ -243,7 +251,7 @@ export function EditProfileDialog({
                       aria-describedby={error ? 'profile-name-error' : undefined}
                       aria-invalid={error ? true : undefined}
                       autoComplete="name"
-                      disabled={saving}
+                      disabled={busy}
                       maxLength={50}
                       name={field.name}
                       value={field.state.value}
@@ -290,7 +298,7 @@ export function EditProfileDialog({
                       aria-describedby={error ? 'profile-bio-error' : undefined}
                       aria-invalid={error ? true : undefined}
                       className="min-h-28 w-full resize-y rounded-lg border border-input bg-card px-3 py-2 text-sm font-normal outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/40 disabled:cursor-wait disabled:opacity-50"
-                      disabled={saving}
+                      disabled={busy}
                       maxLength={300}
                       name={field.name}
                       value={field.state.value ?? ''}
@@ -337,7 +345,7 @@ export function EditProfileDialog({
                       aria-describedby={error ? 'profile-visibility-error' : undefined}
                       aria-invalid={error ? true : undefined}
                       className="h-10 w-full rounded-lg border border-input bg-card px-3 text-sm font-normal outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/40 disabled:cursor-wait disabled:opacity-50"
-                      disabled={saving}
+                      disabled={busy}
                       name={field.name}
                       value={field.state.value}
                       onBlur={field.handleBlur}
@@ -371,15 +379,20 @@ export function EditProfileDialog({
 
             <fieldset className="grid gap-3 sm:grid-cols-2">
               <legend className="mb-2 font-bold">Profile media</legend>
-              <Button disabled type="button" variant="outline">
-                Change avatar
-              </Button>
-              <Button disabled type="button" variant="outline">
-                Change banner
-              </Button>
-              <p className="text-sm text-muted-foreground sm:col-span-2">
-                Avatar and banner editing arrive in the next Profile step.
-              </p>
+              <ProfileImageCropper
+                active={open}
+                currentUrl={profile.avatarUrl}
+                disabled={busy}
+                kind="avatar"
+                onBusyChange={changeMediaBusy}
+              />
+              <ProfileImageCropper
+                active={open}
+                currentUrl={profile.bannerUrl}
+                disabled={busy}
+                kind="banner"
+                onBusyChange={changeMediaBusy}
+              />
             </fieldset>
 
             {message ? (
@@ -394,14 +407,14 @@ export function EditProfileDialog({
 
             <div className="grid grid-cols-2 gap-3">
               <Button
-                disabled={saving}
+                disabled={busy}
                 onClick={() => changeOpen(false)}
                 type="button"
                 variant="outline"
               >
                 Cancel
               </Button>
-              <Button disabled={saving} type="submit">
+              <Button disabled={busy} type="submit">
                 {saving ? 'Saving changes…' : 'Save changes'}
               </Button>
             </div>
