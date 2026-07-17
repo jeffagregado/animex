@@ -15,6 +15,48 @@ const postMediaValidator = v.union(
   }),
 )
 
+const profileVisibilityValidator = v.union(
+  v.literal('public'),
+  v.literal('private'),
+)
+
+const profileMediaKindValidator = v.union(
+  v.literal('avatar'),
+  v.literal('banner'),
+)
+
+const catalogPersonKindValidator = v.union(
+  v.literal('character'),
+  v.literal('staff'),
+)
+
+const catalogPersonDetailValidator = v.union(
+  v.object({
+    kind: v.literal('character'),
+    id: v.number(),
+    name: v.string(),
+    nativeName: v.union(v.string(), v.null()),
+    imageUrl: v.union(v.string(), v.null()),
+    description: v.union(v.string(), v.null()),
+    age: v.union(v.string(), v.null()),
+    gender: v.union(v.string(), v.null()),
+    birthday: v.union(v.string(), v.null()),
+    bloodType: v.union(v.string(), v.null()),
+  }),
+  v.object({
+    kind: v.literal('staff'),
+    id: v.number(),
+    name: v.string(),
+    nativeName: v.union(v.string(), v.null()),
+    imageUrl: v.union(v.string(), v.null()),
+    description: v.union(v.string(), v.null()),
+    occupations: v.array(v.string()),
+    language: v.union(v.string(), v.null()),
+    hometown: v.union(v.string(), v.null()),
+    activeYears: v.union(v.string(), v.null()),
+  }),
+)
+
 export default defineSchema({
   products: defineTable({
     title: v.string(),
@@ -31,6 +73,9 @@ export default defineSchema({
     usernameKey: v.string(),
     name: v.string(),
     avatarStorageId: v.optional(v.id('_storage')),
+    bannerStorageId: v.optional(v.id('_storage')),
+    bio: v.optional(v.string()),
+    profileVisibility: v.optional(profileVisibilityValidator),
     visibility: v.union(
       v.literal('private'),
       v.literal('followers'),
@@ -40,7 +85,28 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index('by_auth_id', ['authId'])
-    .index('by_username_key', ['usernameKey']),
+    .index('by_username_key', ['usernameKey'])
+    .index('by_avatar_storage_id', ['avatarStorageId'])
+    .index('by_banner_storage_id', ['bannerStorageId']),
+  userSearchDocuments: defineTable({
+    userId: v.id('users'),
+    searchText: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .searchIndex('search_users', {
+      searchField: 'searchText',
+    }),
+  profileMediaUploads: defineTable({
+    userId: v.id('users'),
+    kind: profileMediaKindValidator,
+    storageId: v.id('_storage'),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index('by_storage', ['storageId'])
+    .index('by_user', ['userId'])
+    .index('by_expiry', ['expiresAt']),
   passwordResets: defineTable({
     authId: v.string(),
     tokenKey: v.string(),
@@ -142,6 +208,31 @@ export default defineSchema({
   }).index('by_anime_kind_page', ['anilistId', 'kind', 'page']),
   animeDetailCacheLeases: defineTable({
     key: v.string(), leaseId: v.string(), leaseUntil: v.number(), updatedAt: v.number(),
+  }).index('by_key', ['key']),
+  catalogPersonDetails: defineTable({
+    kind: catalogPersonKindValidator,
+    personId: v.number(),
+    detail: catalogPersonDetailValidator,
+    refreshedAt: v.number(),
+    expiresAt: v.number(),
+  }).index('by_kind_person', ['kind', 'personId']),
+  catalogPersonWorkPages: defineTable({
+    kind: catalogPersonKindValidator,
+    personId: v.number(),
+    page: v.number(),
+    items: v.array(v.object({
+      animeId: v.number(),
+      role: v.union(v.string(), v.null()),
+    })),
+    hasNextPage: v.boolean(),
+    refreshedAt: v.number(),
+    expiresAt: v.number(),
+  }).index('by_kind_person_page', ['kind', 'personId', 'page']),
+  catalogPersonCacheLeases: defineTable({
+    key: v.string(),
+    leaseId: v.string(),
+    leaseUntil: v.number(),
+    updatedAt: v.number(),
   }).index('by_key', ['key']),
   userAnimeEntries: defineTable({
     userId: v.id('users'), anilistId: v.number(),
