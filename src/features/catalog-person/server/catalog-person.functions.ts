@@ -14,7 +14,7 @@ export const catalogPersonSearchInputSchema = z.object({
 }).strict()
 
 export type CatalogPersonGetInput = z.infer<typeof catalogPersonGetInputSchema>
-export type CatalogPersonWorksInput = z.infer<typeof catalogPersonWorksInputSchema>
+type CatalogPersonWorksInput = z.infer<typeof catalogPersonWorksInputSchema>
 export type CatalogPersonSearchInput = z.infer<typeof catalogPersonSearchInputSchema>
 
 /** Runs validated person detail through injected server behavior. */
@@ -23,7 +23,7 @@ export const runCatalogPersonGet = async (input: CatalogPersonGetInput, runner: 
 }
 
 /** Runs validated person work through injected server behavior. */
-export const runCatalogPersonWorks = async (input: CatalogPersonWorksInput, runner: (input: CatalogPersonWorksInput) => Promise<CatalogPersonWorksState>): Promise<CatalogPersonWorksState> => {
+const runCatalogPersonWorks = async (input: CatalogPersonWorksInput, runner: (input: CatalogPersonWorksInput) => Promise<CatalogPersonWorksState>): Promise<CatalogPersonWorksState> => {
   return await runner(catalogPersonWorksInputSchema.parse(input))
 }
 

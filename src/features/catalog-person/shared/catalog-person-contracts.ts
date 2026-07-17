@@ -9,7 +9,7 @@ export const CATALOG_PERSON_PAGE_SIZE = 20 as const
 export const CATALOG_PERSON_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 export const catalogPersonKindSchema = z.enum(['character', 'staff'])
-export const catalogPersonTabSchema = z.enum(['overview', 'anime', 'works'])
+const catalogPersonTabSchema = z.enum(['overview', 'anime', 'works'])
 
 export type CatalogPersonKind = z.infer<typeof catalogPersonKindSchema>
 export type CatalogPersonTab = z.infer<typeof catalogPersonTabSchema>

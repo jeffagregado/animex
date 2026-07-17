@@ -8,9 +8,9 @@ export const PROFILE_MEDIA_SOURCE_MAX_BYTES = 10 * 1024 * 1024
 export const PROFILE_MEDIA_OUTPUT_MAX_BYTES = 2 * 1024 * 1024
 export const PROFILE_MEDIA_PENDING_TTL_MS = 60 * 60 * 1000
 
-export const profileVisibilitySchema = z.enum(['public', 'private'])
+const profileVisibilitySchema = z.enum(['public', 'private'])
 export const profileTabSchema = z.enum(['activity', 'reviews', 'favorites'])
-export const profileMediaKindSchema = z.enum(['avatar', 'banner'])
+const profileMediaKindSchema = z.enum(['avatar', 'banner'])
 
 export type ProfileVisibility = z.infer<typeof profileVisibilitySchema>
 export type ProfileTab = z.infer<typeof profileTabSchema>
@@ -22,15 +22,13 @@ export const profileEditInputSchema = z.object({
   profileVisibility: profileVisibilitySchema,
 }).strict()
 
-export type ProfileEditInput = z.input<typeof profileEditInputSchema>
-
 export interface NormalizedProfileEdit {
   name: string
   bio: string | null
   profileVisibility: ProfileVisibility
 }
 
-export const profileMediaSourceSchema = z.object({
+const profileMediaSourceSchema = z.object({
   name: z.string().trim().min(1),
   type: z.enum(['image/jpeg', 'image/png', 'image/webp']),
   size: z.number().int().positive().max(PROFILE_MEDIA_SOURCE_MAX_BYTES),

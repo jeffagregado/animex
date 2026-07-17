@@ -47,7 +47,7 @@ const mediaDateSchema = z.object({
   day: z.number().int().min(1).max(31).nullable(),
 }).strict().nullable()
 
-export const mediaSchema = z.object({
+const mediaSchema = z.object({
   id: z.number().int().positive(),
   type: z.literal('ANIME'),
   isAdult: z.boolean(),
