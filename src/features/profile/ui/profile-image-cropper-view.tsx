@@ -9,7 +9,7 @@ const label: Record<ProfileMediaKind, string> = {
   banner: 'banner',
 }
 
-export interface ProfileImageCropperModel {
+interface ProfileImageCropperModel {
   applyCrop: () => Promise<void>
   busy: boolean
   crop: Point
