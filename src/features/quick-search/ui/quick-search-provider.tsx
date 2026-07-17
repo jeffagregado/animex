@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useConvexAuth } from 'convex/react'
@@ -23,24 +24,24 @@ export interface QuickSearchControls {
 
 const QuickSearchContext = createContext<QuickSearchControls | null>(null)
 
-/** Owns one responsive Quick Search surface and its close-before-navigation flow. */
-export function QuickSearchProvider({ children }: { children: ReactNode }) {
-  const auth = usePublicAuthState()
-  const convexAuth = useConvexAuth()
-  const navigate = useNavigate()
+interface SearchSurfaceState {
+  closeSearch: () => void
+  finishClose: () => void
+  inputRef: RefObject<HTMLInputElement | null>
+  open: boolean
+  openSearch: (trigger: HTMLElement) => void
+  resetVersion: number
+  surface: QuickSearchSurface | null
+  triggerRef: RefObject<HTMLElement | null>
+}
+
+/** Owns responsive surface selection and close-completion reset state. */
+function useSearchSurface(): SearchSurfaceState {
   const inputRef = useRef<HTMLInputElement>(null)
   const triggerRef = useRef<HTMLElement | null>(null)
-  const pendingDestination = useRef<string | null>(null)
   const [surface, setSurface] = useState<QuickSearchSurface | null>(null)
   const [open, setOpen] = useState(false)
   const [resetVersion, setResetVersion] = useState(0)
-  const completeProfile = auth.status === 'ready'
-    && auth.authState.status === 'complete'
-    ? auth.authState.profile
-    : null
-  const usersEnabled = completeProfile !== null
-    && convexAuth.isAuthenticated
-    && !convexAuth.isLoading
 
   const closeSearch = useCallback((): void => {
     setOpen(false)
@@ -48,52 +49,102 @@ export function QuickSearchProvider({ children }: { children: ReactNode }) {
   const openSearch = useCallback((trigger: HTMLElement): void => {
     if (open) return
     triggerRef.current = trigger
-    pendingDestination.current = null
     setSurface(window.matchMedia('(min-width: 48rem)').matches ? 'dialog' : 'drawer')
     setOpen(true)
   }, [open])
+  const finishClose = useCallback((): void => {
+    setSurface(null)
+    setResetVersion((current) => current + 1)
+    triggerRef.current = null
+  }, [])
+
+  return {
+    closeSearch,
+    finishClose,
+    inputRef,
+    open,
+    openSearch,
+    resetVersion,
+    surface,
+    triggerRef,
+  }
+}
+
+/** Defers navigation until the selected surface finishes closing. */
+function useCloseNavigation(
+  closeSearch: () => void,
+  finishClose: () => void,
+  openSurface: (trigger: HTMLElement) => void,
+) {
+  const navigate = useNavigate()
+  const pendingDestination = useRef<string | null>(null)
+  const openSearch = useCallback((trigger: HTMLElement): void => {
+    pendingDestination.current = null
+    openSurface(trigger)
+  }, [openSurface])
   const select = useCallback((destination: string): void => {
     pendingDestination.current = destination
-    setOpen(false)
-  }, [])
-  const model = useQuickSearch({
-    authScope: completeProfile?.id ?? null,
-    onSelect: select,
-    open,
-    resetVersion,
-    usersEnabled,
-  })
-  const changeOpen = useCallback((nextOpen: boolean): void => {
-    if (!nextOpen) closeSearch()
+    closeSearch()
   }, [closeSearch])
   const changeComplete = useCallback((nextOpen: boolean): void => {
     if (nextOpen) return
     const destination = pendingDestination.current
     pendingDestination.current = null
-    setSurface(null)
-    setResetVersion((current) => current + 1)
-    triggerRef.current = null
-    if (destination !== null) {
-      window.setTimeout(() => {
-        void navigate({ to: destination })
-      }, 0)
-    }
-  }, [navigate])
-  const controls: QuickSearchControls = { closeSearch, openSearch }
+    finishClose()
+    if (destination === null) return
+    window.setTimeout(() => {
+      void navigate({ to: destination })
+    }, 0)
+  }, [finishClose, navigate])
+
+  return { changeComplete, openSearch, select }
+}
+
+/** Owns one responsive Quick Search surface and its close-before-navigation flow. */
+export function QuickSearchProvider({ children }: { children: ReactNode }) {
+  const auth = usePublicAuthState()
+  const convexAuth = useConvexAuth()
+  const state = useSearchSurface()
+  const navigation = useCloseNavigation(
+    state.closeSearch,
+    state.finishClose,
+    state.openSearch,
+  )
+  const completeProfile = auth.status === 'ready'
+    && auth.authState.status === 'complete'
+    ? auth.authState.profile
+    : null
+  const usersEnabled = completeProfile !== null
+    && convexAuth.isAuthenticated
+    && !convexAuth.isLoading
+  const model = useQuickSearch({
+    authScope: completeProfile?.id ?? null,
+    onSelect: navigation.select,
+    open: state.open,
+    resetVersion: state.resetVersion,
+    usersEnabled,
+  })
+  const changeOpen = useCallback((nextOpen: boolean): void => {
+    if (!nextOpen) state.closeSearch()
+  }, [state.closeSearch])
+  const controls: QuickSearchControls = {
+    closeSearch: state.closeSearch,
+    openSearch: navigation.openSearch,
+  }
   const surfaceProps = {
-    finalFocus: triggerRef.current,
-    inputRef,
+    finalFocus: state.triggerRef.current,
+    inputRef: state.inputRef,
     model,
     onOpenChange: changeOpen,
-    onOpenChangeComplete: changeComplete,
-    open,
+    onOpenChangeComplete: navigation.changeComplete,
+    open: state.open,
   }
 
   return (
     <QuickSearchContext.Provider value={controls}>
       {children}
-      {surface === 'dialog' ? <QuickSearchDialog {...surfaceProps} /> : null}
-      {surface === 'drawer' ? <QuickSearchDrawer {...surfaceProps} /> : null}
+      {state.surface === 'dialog' ? <QuickSearchDialog {...surfaceProps} /> : null}
+      {state.surface === 'drawer' ? <QuickSearchDrawer {...surfaceProps} /> : null}
     </QuickSearchContext.Provider>
   )
 }
