@@ -8,7 +8,7 @@ Through Phase 8, active UI omits Follow, Like, Comment, Following-feed, social-c
 
 Backend social contracts, schemas, authorization, and stored Followers visibility remain intact for Phase 9. New Post and Review creation maps a stored Followers account default to Private. Owner edits to legacy Followers Posts and Reviews preserve Followers unless Public or Private is explicitly selected. No migration rewrites stored data.
 
-Phase 7 User Profile, Catalog People, and responsive Quick Search design is approved and awaiting spec review. Implementation planning and implementation are unstarted. Desktop uses the locked modal; mobile uses the locked bottom drawer. Phase 9 owns social UI reactivation.
+Phase 7 User Profile, Catalog People, and responsive Quick Search design is approved. Its implementation plan passed independent review and awaits user approval; implementation is unstarted. Desktop uses the locked modal; mobile uses the locked bottom drawer. Phase 9 owns social UI reactivation.
 
 ## Language
 

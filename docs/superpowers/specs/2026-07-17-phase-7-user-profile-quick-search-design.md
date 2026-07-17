@@ -1,6 +1,6 @@
 # Phase 7 User Profile, Catalog People, And Quick Search Design
 
-Status: DESIGN APPROVED. SPEC REVIEW PENDING. Implementation plan and implementation are unstarted.
+Status: APPROVED. Implementation plan passed independent review and awaits user approval. Implementation is unstarted.
 
 ## Approved References
 
@@ -404,7 +404,7 @@ Full gates:
 - `pnpm exec tsc --noEmit`
 - `pnpm test`
 - `pnpm build`
-- `pnpm exec fallow --format compact`
+- `pnpm exec fallow audit --base <resolved-base> --format json --quiet`
 - React Doctor on changed React files
 - `pnpm exec convex dev --once` after Convex changes
 
@@ -443,4 +443,4 @@ Remove stale Phase 7 references to public profiles, singular Review Tab, profile
 - Convex pagination: <https://docs.convex.dev/database/pagination>
 - `react-easy-crop`: <https://github.com/ValentinH/react-easy-crop>
 
-No implementation plan is written until this spec is reviewed and approved.
+The implementation plan is `docs/superpowers/plans/2026-07-17-phase-7-user-profile-catalog-people-quick-search.md`. Implementation remains blocked until plan approval.

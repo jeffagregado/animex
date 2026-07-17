@@ -1,6 +1,6 @@
 # Phase 7-9 Feature Sequencing
 
-Status: ACTIVE. Pre-Phase 7 embargo is implemented and validated. Phase 7 is next and unstarted.
+Status: ACTIVE. Pre-Phase 7 embargo is complete. Phase 7 design is approved; its independently reviewed implementation plan awaits user approval.
 
 ## Phase Map
 
@@ -123,4 +123,4 @@ Phase 9 acceptance requires every approved social control to be visible and func
 - Pre-Phase 7 cleanup is complete under its approved design and implementation plan.
 - Phase 7 receives one approved design/spec and implementation plan covering User Profile, Catalog People, and Quick Search.
 - Phase 8 and Phase 9 each receive separate approved design/spec and implementation plans.
-- Phase 7 design decisions are approved under `2026-07-17-phase-7-user-profile-quick-search-design.md`; spec review, implementation planning, and implementation remain pending. Phase 9 retains social UI reactivation ownership.
+- Phase 7 design is approved under `2026-07-17-phase-7-user-profile-quick-search-design.md`; its implementation plan is written under `../plans/2026-07-17-phase-7-user-profile-catalog-people-quick-search.md`, passed independent review, and awaits user approval. Implementation remains unstarted. Phase 9 retains social UI reactivation ownership.

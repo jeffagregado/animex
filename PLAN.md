@@ -156,7 +156,7 @@ Status: COMPLETE. Implementation, review, responsive browser QA, cleanup, and Co
 
 ### Phase 7: User Profile, Catalog People, And Quick Search
 
-Status: DESIGN APPROVED. Spec review is pending. Implementation plan and implementation are unstarted.
+Status: DESIGN APPROVED. Implementation plan passed independent review and awaits user approval. Implementation is unstarted.
 
 - Build User Profile from locked design.
 - Use signed-in routes at `/users/:username` with Activity default plus Reviews and Favorites `tab` query states.
@@ -173,7 +173,8 @@ Status: DESIGN APPROVED. Spec review is pending. Implementation plan and impleme
 - Keep Discover separate from Quick Search and keep Manga as a future-only group.
 - Omit Favorite Genres, Anime List, Follow actions, follower/following counts, Like actions/counts, Comment actions/counts, and social activity footers.
 - Treat social elements in the locked profile reference as Phase 9 final-state elements.
-- Use `docs/superpowers/specs/2026-07-17-phase-7-user-profile-quick-search-design.md` as the approved design source after spec review.
+- Use `docs/superpowers/specs/2026-07-17-phase-7-user-profile-quick-search-design.md` as the approved design source.
+- Review `docs/superpowers/plans/2026-07-17-phase-7-user-profile-catalog-people-quick-search.md` before implementation.
 - Stop after validation and wait for approval.
 
 ### Phase 8: Notifications, Privacy, Moderation
@@ -222,7 +223,7 @@ Each phase must run only relevant checks, then stop:
 - `pnpm exec tsc --noEmit`
 - `pnpm test`
 - `pnpm build`
-- `pnpm exec fallow --format compact`
+- `pnpm exec fallow audit --base <resolved-base> --format json --quiet`
 - Browser QA for changed UI paths, desktop and mobile.
 - Console check for UI phases.
 - Convex validation for schema/function phases.

@@ -869,7 +869,7 @@ Status: COMPLETE. Active social interaction UI and Followers-only choices are ab
 
 # Phase 7 User Profile, Catalog People, And Quick Search
 
-Status: DESIGN APPROVED. Spec review is pending. Implementation plan and implementation have not started.
+Status: DESIGN APPROVED. Implementation plan passed independent review and awaits user approval. Implementation has not started.
 
 - [x] Keep signed-in profile header, Activity/Reviews/Favorites tabs, latest 10 favorites, four list-progress stats, and viewer-allowed profile activity in Phase 7.
 - [x] Add separate Public/Private Profile Visibility; Private shows header identity/bio and a privacy notice to non-owners.
@@ -885,8 +885,9 @@ Status: DESIGN APPROVED. Spec review is pending. Implementation plan and impleme
 - [x] Keep Discover separate and Manga future-only.
 - [x] Defer Follow actions, follower/following counts, Likes, Comments, Comment counts, Like counts, and social activity footers to Phase 9.
 - [x] Write the combined Phase 7 design spec at `docs/superpowers/specs/2026-07-17-phase-7-user-profile-quick-search-design.md`.
-- [ ] Review and approve the committed Phase 7 design spec.
-- [ ] Write and approve the Phase 7 implementation plan.
+- [x] Review and approve the committed Phase 7 design spec.
+- [x] Write and self-review the Phase 7 implementation plan.
+- [ ] Review and approve the Phase 7 implementation plan.
 
 # Phase 8 Notifications, Privacy, Moderation
 
