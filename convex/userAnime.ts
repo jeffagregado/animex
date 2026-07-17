@@ -4,6 +4,7 @@ import { ConvexError, v } from 'convex/values'
 import { type Doc, type Id } from './_generated/dataModel'
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { removeMilestoneCard, upsertMilestoneCard } from './feed'
+import { resolveProfileAccess } from './profiles'
 import { requireProfile } from './users'
 import {
   applyFavorite,
@@ -31,8 +32,28 @@ const progressValidator = v.object({ watching: v.number(), completed: v.number()
 const rewatchPageValidator = v.object({
   items: v.array(rewatchValidator), continueCursor: v.string(), isDone: v.boolean(), perPage: v.literal(20),
 })
+const profileFavoriteValidator = v.object({
+  favoriteAt: v.number(),
+  anime: v.object({
+    anilistId: v.number(),
+    slug: v.string(),
+    title: v.string(),
+    coverImageUrl: v.union(v.string(), v.null()),
+  }),
+})
+const profileFavoritePageValidator = v.object({
+  items: v.array(profileFavoriteValidator),
+  cursor: v.union(v.string(), v.null()),
+  hasMore: v.boolean(),
+})
 type UserCtx = QueryCtx | MutationCtx
 type Profile = Doc<'users'>
+type ProfileFavoriteCursor = {
+  lane: 'favorites'
+  usernameKey: string
+  viewerId: string
+  cursor: string
+}
 
 export const toPublicEntry = (entry: Doc<'userAnimeEntries'>) => ({
   anilistId: entry.anilistId,
@@ -47,6 +68,27 @@ export const toPublicEntry = (entry: Doc<'userAnimeEntries'>) => ({
 
 const assertAnilistId = (anilistId: number): void => {
   if (!Number.isSafeInteger(anilistId) || anilistId <= 0) throw new ConvexError({ code: 'INVALID_ANILIST_ID', message: 'AniList ID must be a positive safe integer.' })
+}
+
+const encodeProfileFavoriteCursor = (cursor: ProfileFavoriteCursor): string => btoa(JSON.stringify(cursor))
+
+const decodeProfileFavoriteCursor = (
+  cursor: string | null,
+  usernameKey: string,
+  viewerId: Id<'users'>,
+): string | null => {
+  if (cursor === null) return null
+  try {
+    const value = JSON.parse(atob(cursor)) as Partial<ProfileFavoriteCursor>
+    if (value.lane !== 'favorites') throw new TypeError('Favorite cursor belongs to another lane.')
+    if (value.usernameKey !== usernameKey) throw new TypeError('Favorite cursor belongs to another profile.')
+    if (value.viewerId !== viewerId) throw new TypeError('Favorite cursor belongs to another viewer.')
+    if (typeof value.cursor !== 'string') throw new TypeError('Favorite cursor state is invalid.')
+    return value.cursor
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('belongs')) throw error
+    throw new TypeError(`Invalid Favorite cursor: ${error instanceof Error ? error.message : 'unknown error'}`)
+  }
 }
 
 /** Requires the anime to exist in the normalized summary cache. */
@@ -197,6 +239,69 @@ export const getMyProgress = query({
         watching: progress.watching, completed: progress.completed, planned: progress.planned, dropped: progress.dropped,
       })
       : { watching: 0, completed: 0, planned: 0, dropped: 0 }
+  },
+})
+
+/** Lists one accessible profile's favorites, newest first. */
+export const listProfileFavorites = query({
+  args: { username: v.string(), cursor: v.union(v.string(), v.null()) },
+  returns: profileFavoritePageValidator,
+  handler: async (ctx, args) => {
+    const access = await resolveProfileAccess(ctx, args.username)
+    if (access.access === 'header') {
+      throw new ConvexError({ code: 'PROFILE_PRIVATE', message: 'Profile content is private.' })
+    }
+    const cursor = decodeProfileFavoriteCursor(
+      args.cursor,
+      access.usernameKey,
+      access.viewerId,
+    )
+    const page = await ctx.db
+      .query('userAnimeEntries')
+      .withIndex('by_user_favorite_at', (q) => q
+        .eq('userId', access.targetId)
+        .gt('favoriteAt', null))
+      .order('desc')
+      .paginate({ numItems: 20, cursor })
+    const items = await Promise.all(page.page.map(async (entry) => {
+      if (entry.favoriteAt === null) {
+        throw new ConvexError({
+          code: 'PROFILE_FAVORITE_CORRUPT',
+          message: 'Favorite entry is missing its timestamp.',
+        })
+      }
+      const anime = await ctx.db
+        .query('animeSummaries')
+        .withIndex('by_anilist_id', (q) => q.eq('anilistId', entry.anilistId))
+        .unique()
+      if (!anime) {
+        throw new ConvexError({
+          code: 'PROFILE_ANIME_MISSING',
+          message: 'Favorite Anime summary is missing.',
+        })
+      }
+      return {
+        favoriteAt: entry.favoriteAt,
+        anime: {
+          anilistId: anime.anilistId,
+          slug: anime.slug,
+          title: anime.titles.display,
+          coverImageUrl: anime.coverImageUrl,
+        },
+      }
+    }))
+    return {
+      items,
+      cursor: page.isDone
+        ? null
+        : encodeProfileFavoriteCursor({
+            lane: 'favorites',
+            usernameKey: access.usernameKey,
+            viewerId: access.viewerId,
+            cursor: page.continueCursor,
+          }),
+      hasMore: !page.isDone,
+    }
   },
 })
 

@@ -6,6 +6,7 @@ import { mergeFeedCards } from '../src/features/social/shared/feed-ranking'
 import type { Doc, Id } from './_generated/dataModel'
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { decodeFeedCursor, encodeFeedCursor, makeOrderKey, type FeedView } from './feedPolicy'
+import { resolveProfileAccess } from './profiles'
 import { canReadSocialRecord } from './socialPolicy'
 import { getOptionalProfile, requireProfile } from './users'
 
@@ -55,6 +56,12 @@ const requireCachedAnime = async (ctx: QueryCtx | MutationCtx, anilistId: number
 }
 
 type FeedRead = { mode: 'direct' | 'owner'; viewerId: Id<'users'> | null } | { mode: 'public' }
+type ProfileFeedCursor = {
+  lane: 'activity'
+  usernameKey: string
+  viewerId: string
+  anchor: string
+}
 
 /** Identifies milestone projections. */
 const isMilestoneCard = (card: Doc<'feedCards'>): boolean => card.kind === 'completed' || card.kind === 'rewatched'
@@ -155,6 +162,27 @@ const readOwn = async (ctx: QueryCtx, userId: Id<'users'>, anchor: string | null
     return anchor === null ? base : base.gt('orderKey', anchor)
   }).take(FEED_PAGE_SIZE + 1)
 
+const encodeProfileFeedCursor = (cursor: ProfileFeedCursor): string => btoa(JSON.stringify(cursor))
+
+const decodeProfileFeedCursor = (
+  cursor: string | null,
+  usernameKey: string,
+  viewerId: Id<'users'>,
+): string | null => {
+  if (cursor === null) return null
+  try {
+    const value = JSON.parse(atob(cursor)) as Partial<ProfileFeedCursor>
+    if (value.lane !== 'activity') throw new TypeError('Profile Activity cursor belongs to another lane.')
+    if (value.usernameKey !== usernameKey) throw new TypeError('Profile Activity cursor belongs to another profile.')
+    if (value.viewerId !== viewerId) throw new TypeError('Profile Activity cursor belongs to another viewer.')
+    if (typeof value.anchor !== 'string') throw new TypeError('Profile Activity cursor anchor is invalid.')
+    return value.anchor
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('belongs')) throw error
+    throw new TypeError(`Invalid Profile Activity cursor: ${error instanceof Error ? error.message : 'unknown error'}`)
+  }
+}
+
 type HomeGlobalPage = { cards: Doc<'feedCards'>[]; resumeAnchors: Array<string | null>; scannedAnchor: string | null; terminal: boolean }
 type ResolvedFeedPage = { items: FeedCard[]; resumeAnchors: Array<string | null>; scannedAnchor: string | null; terminal: boolean }
 
@@ -182,6 +210,41 @@ const resolveFeedPage = async (ctx: QueryCtx, page: HomeGlobalPage, read: FeedRe
     }
   }
   return { items, resumeAnchors, scannedAnchor: page.scannedAnchor, terminal: page.terminal }
+}
+
+/** Reads enough indexed source-backed cards to fill one Profile Activity page. */
+const listProfilePage = async (
+  ctx: QueryCtx,
+  userId: Id<'users'>,
+  viewerId: Id<'users'>,
+  anchor: string | null,
+) => {
+  const candidates: Array<{ item: FeedCard; resumeAnchor: string | null }> = []
+  let scanAnchor = anchor
+  while (candidates.length <= FEED_PAGE_SIZE) {
+    const raw = await readOwn(ctx, userId, scanAnchor)
+    const page = await resolveFeedPage(
+      ctx,
+      createRawPage(raw, scanAnchor),
+      { mode: 'direct', viewerId },
+    )
+    for (let index = 0; index < page.items.length; index += 1) {
+      candidates.push({
+        item: page.items[index],
+        resumeAnchor: page.resumeAnchors[index] ?? scanAnchor,
+      })
+      if (candidates.length > FEED_PAGE_SIZE) break
+    }
+    if (candidates.length > FEED_PAGE_SIZE) break
+    if (page.terminal) {
+      return { items: candidates.map((candidate) => candidate.item), anchor: null }
+    }
+    scanAnchor = page.scannedAnchor
+  }
+  return {
+    items: candidates.slice(0, FEED_PAGE_SIZE).map((candidate) => candidate.item),
+    anchor: candidates[FEED_PAGE_SIZE]?.resumeAnchor ?? scanAnchor,
+  }
 }
 
 const readHomeGlobal = async (ctx: QueryCtx, viewerId: Id<'users'>, anchor: string | null): Promise<HomeGlobalPage> => {
@@ -261,6 +324,39 @@ export const listFollowing = query({
   handler: async (_ctx, args) => {
     if (args.cursor !== null) return fail('INVALID_CURSOR', 'Following feed has no Phase 5 cursor.')
     return { items: [], cursor: null, hasMore: false }
+  },
+})
+
+/** Lists newest accessible source-backed Activity for one profile. */
+export const listForProfile = query({
+  args: { username: v.string(), cursor: v.union(v.string(), v.null()) },
+  returns: feedPageValidator,
+  handler: async (ctx, args) => {
+    const access = await resolveProfileAccess(ctx, args.username)
+    if (access.access === 'header') return fail('PROFILE_PRIVATE', 'Profile content is private.')
+    const anchor = decodeProfileFeedCursor(
+      args.cursor,
+      access.usernameKey,
+      access.viewerId,
+    )
+    const page = await listProfilePage(
+      ctx,
+      access.targetId,
+      access.viewerId,
+      anchor,
+    )
+    return {
+      items: page.items,
+      cursor: page.anchor === null
+        ? null
+        : encodeProfileFeedCursor({
+            lane: 'activity',
+            usernameKey: access.usernameKey,
+            viewerId: access.viewerId,
+            anchor: page.anchor,
+          }),
+      hasMore: page.anchor !== null,
+    }
   },
 })
 

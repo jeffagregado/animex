@@ -18,11 +18,13 @@ import {
 } from './reviewDiscovery'
 import {
   decodeReviewDiscoveryCursor,
+  mergeOrderedReviewLanes,
   normalizeReviewDiscoveryQuery,
   type ReviewDiscoveryCursorState,
   type ReviewDiscoveryLane,
   type ReviewDiscoveryCursorScope,
 } from './reviewDiscoveryPolicy'
+import { resolveProfileAccess } from './profiles'
 import { assertRequestId, canReadSocialRecord, decodeReviewCursor, encodeReviewCursor, mergeReviewPage, transitionReviewAggregate } from './socialPolicy'
 import { getOptionalProfile, requireProfile } from './users'
 
@@ -162,6 +164,13 @@ const toReviewDetail = async (ctx: QueryCtx, review: Doc<'reviews'>) => {
 }
 
 type DiscoveryPage = { reviews: Doc<'reviews'>[]; cursor: string | null; hasMore: boolean }
+type ProfileReviewLaneState = { anchor: string | null; done: boolean }
+type ProfileReviewCursor = {
+  lane: 'reviews'
+  usernameKey: string
+  viewerId: string
+  lanes: Record<ReviewDiscoveryLane, ProfileReviewLaneState>
+}
 
 /** Restricts anonymous discovery reads to Public Reviews. */
 const resolveDiscoveryAccess = (
@@ -206,6 +215,133 @@ const hydrateDiscoveryPage = async (ctx: QueryCtx, page: DiscoveryPage) => ({
   items: await Promise.all(page.reviews.map((review) => toReviewList(ctx, review))),
   cursor: page.cursor,
   hasMore: page.hasMore,
+})
+
+const createProfileReviewLanes = (
+  owner: boolean,
+): Record<ReviewDiscoveryLane, ProfileReviewLaneState> => ({
+  followers: { anchor: null, done: !owner },
+  private: { anchor: null, done: !owner },
+  public: { anchor: null, done: false },
+})
+
+const encodeProfileReviewCursor = (cursor: ProfileReviewCursor): string => btoa(JSON.stringify(cursor))
+
+const decodeProfileReviewCursor = (
+  cursor: string | null,
+  usernameKey: string,
+  viewerId: Id<'users'>,
+  owner: boolean,
+): Record<ReviewDiscoveryLane, ProfileReviewLaneState> => {
+  if (cursor === null) return createProfileReviewLanes(owner)
+  try {
+    const value = JSON.parse(atob(cursor)) as Partial<ProfileReviewCursor>
+    if (value.lane !== 'reviews') throw new TypeError('Profile Review cursor belongs to another lane.')
+    if (value.usernameKey !== usernameKey) throw new TypeError('Profile Review cursor belongs to another profile.')
+    if (value.viewerId !== viewerId) throw new TypeError('Profile Review cursor belongs to another viewer.')
+    if (!value.lanes || typeof value.lanes !== 'object') throw new TypeError('Profile Review cursor lanes are invalid.')
+    const expected = createProfileReviewLanes(owner)
+    for (const lane of ['followers', 'private', 'public'] as const) {
+      const state = value.lanes[lane]
+      if (!state || (state.anchor !== null && typeof state.anchor !== 'string') || typeof state.done !== 'boolean') {
+        throw new TypeError('Profile Review cursor lanes are invalid.')
+      }
+      if (expected[lane].done && !state.done) throw new TypeError('Profile Review cursor exposes an inaccessible lane.')
+    }
+    return value.lanes
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('belongs')) throw error
+    throw new TypeError(`Invalid Profile Review cursor: ${error instanceof Error ? error.message : 'unknown error'}`)
+  }
+}
+
+const readProfileReviewLane = async (
+  ctx: QueryCtx,
+  userId: Id<'users'>,
+  viewerId: Id<'users'>,
+  lane: ReviewDiscoveryLane,
+  anchor: string | null,
+) => {
+  const reviews = await ctx.db.query('reviews').withIndex('by_discovery_owner_newest', (q) => {
+    const base = q.eq('userId', userId).eq('state', 'published').eq('visibility', lane)
+    return anchor === null ? base : base.gt('newestOrderKey', anchor)
+  })
+  .take(21)
+  return reviews.filter((review) => canReadSocialRecord(
+    review.visibility,
+    viewerId,
+    review.userId,
+  ))
+}
+
+/** Lists newest accessible Reviews for one profile. */
+export const listForProfile = query({
+  args: { username: v.string(), cursor: v.union(v.string(), v.null()) },
+  returns: reviewPageValidator,
+  handler: async (ctx, args) => {
+    const access = await resolveProfileAccess(ctx, args.username)
+    if (access.access === 'header') return fail('PROFILE_PRIVATE', 'Profile content is private.')
+    const lanes = decodeProfileReviewCursor(
+      args.cursor,
+      access.usernameKey,
+      access.viewerId,
+      access.owner,
+    )
+    const active = (['followers', 'private', 'public'] as const)
+      .filter((lane) => !lanes[lane].done)
+    const rows: Record<ReviewDiscoveryLane, Doc<'reviews'>[]> = {
+      followers: [],
+      private: [],
+      public: [],
+    }
+    await Promise.all(active.map(async (lane) => {
+      rows[lane] = await readProfileReviewLane(
+        ctx,
+        access.targetId,
+        access.viewerId,
+        lane,
+        lanes[lane].anchor,
+      )
+    }))
+    const merged = mergeOrderedReviewLanes({
+      followers: rows.followers.map((review) => ({
+        id: review._id,
+        key: review.newestOrderKey,
+        review,
+      })),
+      private: rows.private.map((review) => ({
+        id: review._id,
+        key: review.newestOrderKey,
+        review,
+      })),
+      public: rows.public.map((review) => ({
+        id: review._id,
+        key: review.newestOrderKey,
+        review,
+      })),
+    }, 20)
+    for (const lane of active) {
+      const consumed = merged.consumed[lane]
+      if (consumed > 0) {
+        lanes[lane].anchor = rows[lane][consumed - 1]?.newestOrderKey ?? lanes[lane].anchor
+      }
+      lanes[lane].done = rows[lane].length <= consumed
+    }
+    const hasMore = (['followers', 'private', 'public'] as const)
+      .some((lane) => !lanes[lane].done)
+    return {
+      items: await Promise.all(merged.items.map((item) => toReviewList(ctx, item.review))),
+      cursor: hasMore
+        ? encodeProfileReviewCursor({
+            lane: 'reviews',
+            usernameKey: access.usernameKey,
+            viewerId: access.viewerId,
+            lanes,
+          })
+        : null,
+      hasMore,
+    }
+  },
 })
 
 export const getMineForAnime = query({
