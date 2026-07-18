@@ -189,6 +189,22 @@ Status: COMPLETE. Final reviewer PASS after the keyboard Profile fix. Shared hea
 - Browser QA passed with both named QA accounts at 390×844, 768×1024, and 1280×800: no horizontal overflow; avatar geometry; owner menu pointer/keyboard behavior including Profile Enter, Escape focus return, and outside close; Quick Search/User Search avatars; Profile tabs/back/forward/reload; Character/Staff Overview/Anime and Staff migration; private-profile cross-account visibility; signed-out server redirect; root not-found; clean final console/server logs. QA server stopped, port 3000 freed, viewport reset, and account signed out.
 - No Phase 7 browser fixture remains open. Deep pagination closed by user confirmation without Codex-run evidence.
 
+### Post-Phase 7: Public Catalog Identity
+
+Status: PLANNED. Must complete and close before Phase 8 starts. Detailed implementation plan: `docs/superpowers/plans/2026-07-18-post-phase-7-public-catalog-identity.md`.
+
+- Add AnimeX-owned catalog entities for Anime, Character, and Staff. Expose serialized catalog entity IDs as opaque `publicId` values.
+- Store AniList numeric IDs as server-only provider references keyed by provider + entity kind + provider ID.
+- Replace canonical routes with `/anime/$publicId/$slug`, `/characters/$publicId/$slug`, and `/staff/$publicId/$slug`; redirect legacy numeric URLs once.
+- Remove AniList IDs from browser contracts, hydrated data, UI props, query keys, rendered URLs, and client logs.
+- Preserve existing AniList-keyed metadata cache rows, ordered sections, TTLs, lease keys, image URLs, and refresh behavior.
+- Materialize public identities for live Anime/Character/Staff search results before returning them to browser.
+- Migrate durable user Anime state, favorites, rewatches, milestones, Reviews, feed cards, and Review aggregates to AnimeX entity references through additive schema, bounded backfill, verification, cutover, and schema tightening.
+- Keep AniList GraphQL and provider IDs server-only; missing/conflicting mappings fail clearly without provider-ID fallback.
+- Keep Metadata Image Proxy optional, unscheduled, and outside this phase.
+- Run Convex dev sync, migration verification, full tests, TypeScript, build, client boundary scans, Fallow, React Doctor, integrated review, and responsive browser QA.
+- Stop after validation and wait for approval before Phase 8.
+
 ### Phase 8: Notifications, Privacy, Moderation
 
 - Add notification preview/page foundations and required moderation notifications.

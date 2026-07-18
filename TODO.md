@@ -965,6 +965,27 @@ Status: COMPLETE. Character has an all-language Voice Actors tab; Character and 
 
 Validation: initial red run failed 14/52 focused tests; final focused run passes 52/52. Convex sync, TypeScript, client + SSR build, Fallow, diff check, and the full suite pass: 131 files + 2 skipped / 929 tests + 3 skipped. React Doctor reports only the inherited Discover ref-mutation error outside this patch. Live Albedo and Staff QA passes at 390, 768, and 1280 px with all seven returned languages, working Staff links, keyboard navigation, canonical Staff tab handling, Facts-before-About order, no right column, no overflow, and clean browser/application logs. Browser tabs and worktree server are closed; port 3000 is free.
 
+# Post-Phase 7 Public Catalog Identity
+
+Status: PLANNED. Detailed plan saved at `docs/superpowers/plans/2026-07-18-post-phase-7-public-catalog-identity.md`. Phase 8 stays blocked until this phase closes.
+
+- [x] Lock `catalogEntities._id` as client-facing `publicId`; keep provider mappings separate and server-only.
+- [x] Lock cache-preserving architecture: existing cache rows, AniList keys, TTLs, leases, and image URLs remain unchanged.
+- [x] Write and self-review detailed implementation, migration, rollback, validation, and browser QA plan.
+- [ ] Add catalog identity schema, indexed registry, strict contracts, and integration tests.
+- [ ] Register identities during bounded cache commits without changing cache storage contracts.
+- [ ] Add resumable internal identity backfill and independent verification for every existing provider-ID source.
+- [ ] Add additive Anime entity references to user Anime, rewatch, milestone, Review, feed, and Review-stat records.
+- [ ] Backfill and verify durable references and milestone source keys before schema tightening.
+- [ ] Split provider/cache models from strict public browser contracts.
+- [ ] Materialize public identities for Discover, Quick Search, Character search, and Staff search.
+- [ ] Replace Anime, Character, Staff, Review, feed, Profile, and user Anime client surfaces with `publicId`.
+- [ ] Rename canonical route params to `$publicId`; preserve one-way redirects from legacy numeric URLs.
+- [ ] Push additive Convex dev schema, run bounded backfills to completion, require zero mismatches, then push final schema.
+- [ ] Update current-state data-flow docs after implementation; keep Metadata Image Proxy untouched and unscheduled.
+- [ ] Run full tests, TypeScript, build, client AniList-ID/endpoint scans, Fallow, React Doctor, integrated review, and browser QA at 390/768/1280.
+- [ ] Close phase and request approval before Phase 8.
+
 # Phase 8 Notifications, Privacy, Moderation
 
 Status: SCOPE ADJUSTED. Detailed planning has not started.
