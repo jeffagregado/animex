@@ -156,14 +156,14 @@ Status: COMPLETE. Implementation, review, responsive browser QA, cleanup, and Co
 
 ### Phase 7: User Profile, Catalog People, And Quick Search
 
-Status: COMPLETE. Implemented and validated on `jeff-cx/phase-7-user-profile-quick-search`; approved visual contract shipped, reviewer PASS after `5178706`, and current-state docs synced. No production deploy, push, merge, or unexercised fixture claimed.
+Status: COMPLETE. Implemented and validated on `jeff-cx/phase-7-user-profile-quick-search`; approved visual contract shipped, final feedback reviewer PASS, and current-state docs synced. Second-account private-profile verification is closed. Three browser fixtures remain explicitly unexercised: real media upload/crop/remove, injected provider or Storage failure, and deep pagination. No production deploy, push, merge, or unexercised fixture is claimed.
 
 - Build User Profile from locked design.
 - Use signed-in routes at `/users/:username` with Activity default plus Reviews and Favorites `tab` query states.
 - Add Public/Private Profile Visibility separate from content-default visibility; Private shows header identity/bio only to non-owners.
 - Add latest 10 favorites, full Favorites tab, completed/watching/planned/dropped stats, and viewer-allowed profile activity.
 - Add profile editing with `react-easy-crop`, Convex Storage-backed 1:1 avatar and 4:1 banner media, explicit validation, replacement, removal, and cleanup.
-- Build canonical Character and Staff detail destinations with Overview plus Anime/Works pagination.
+- Build canonical Character and Staff detail destinations with Overview plus Anime pagination; legacy Staff `?tab=works` canonicalizes to `?tab=anime` without changing provider/cache identities.
 - Build desktop Quick Search and mobile Search drawer from the locked visual references.
 - Open Quick Search from the desktop header Search control for signed-out and signed-in visitors.
 - Open the mobile Search drawer from the bottom Search tab, using the locked Base UI-backed drawer design with its search field pinned at the bottom.
@@ -175,7 +175,19 @@ Status: COMPLETE. Implemented and validated on `jeff-cx/phase-7-user-profile-qui
 - Treat social elements in the locked profile reference as Phase 9 final-state elements.
 - Use `docs/superpowers/specs/2026-07-17-phase-7-user-profile-quick-search-design.md` as the approved design source.
 - Review `docs/superpowers/plans/2026-07-17-phase-7-user-profile-catalog-people-quick-search.md` before implementation.
-- Keep verification gaps explicit: second-account private-profile fixture, real media upload/crop/remove, failure injection, and deep pagination Load more were not exercised in browser QA.
+- Keep verification gaps explicit: real media upload/crop/remove, injected provider/Storage failure, and deep pagination Load more remain unexercised; second-account private-profile viewing is verified.
+
+### Phase 7 Feedback Fixes
+
+Status: COMPLETE. Final reviewer PASS after the keyboard Profile fix. Shared header auth state and avatar owner menu, server-first Profile auth/read facades, Profile SPA tabs, shared UserAvatar geometry, neutral Anime/Character/Staff layout, legacy Staff tab migration, and AnimeX root not-found UI are implemented and browser-verified.
+
+- Complete accounts use one 44 px circular UserAvatar trigger with exactly Profile and Sign out; pending sign-out is guarded and success-only navigation reaches `/home`.
+- Profile `beforeLoad` resolves auth before child DOM/query mount. Authenticated server facades own Profile/User Search reads; client Convex synchronization gates only identity-dependent mutations. There is no `Checking authentication` DOM.
+- UserAvatar is shared across Quick Search, `/search/users`, Feed, and Profile. Quick Search/header use 44 px, User Search uses 64 px, and Profile uses 96 px mobile or 128 px tablet/desktop with scaled fallback glyphs.
+- Character and Staff use shared neutral detail geometry and Overview/Anime only. Staff `?tab=works` replaces to `?tab=anime`; work provider/cache semantics are unchanged. Anime behavior remains Anime-specific inside shared geometry.
+- Final QA: 131 test files passed / 2 skipped; 925 tests passed / 3 skipped (928 total); TypeScript and client + SSR build passed with the existing >500 kB warning; Fallow against `3fdda5c` passed with one pre-existing non-error finding, 0 complexity, and 0 duplication; React Doctor score 53, equal to baseline. Route-tree protected SHA-256 remained `14A6932D22316BF69AF6EA6C1E343EE0C4704DE66039C8A674888D11ABA92DDD`. No Convex source changed, so no `convex dev --once` was required.
+- Browser QA passed with both named QA accounts at 390×844, 768×1024, and 1280×800: no horizontal overflow; avatar geometry; owner menu pointer/keyboard behavior including Profile Enter, Escape focus return, and outside close; Quick Search/User Search avatars; Profile tabs/back/forward/reload; Character/Staff Overview/Anime and Staff migration; private-profile cross-account visibility; signed-out server redirect; root not-found; clean final console/server logs. QA server stopped, port 3000 freed, viewport reset, and account signed out.
+- Remaining browser gaps: real media upload/crop/remove, injected provider/Storage failure, and deep pagination. These are not marked complete.
 
 ### Phase 8: Notifications, Privacy, Moderation
 

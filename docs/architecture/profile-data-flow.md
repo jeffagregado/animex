@@ -2,47 +2,45 @@
 
 ## Entry and access
 
-`/_public/_profile` gates `/users/:username` and `/search/users` until public auth is ready, the user is email-verified, the AnimeX profile is complete, and Convex auth is synchronized. Signed-out, unverified, and profile-pending viewers redirect to the matching auth route with a validated relative `returnTo`. `convex/users.ts` is the final auth/profile authority; no raw Better Auth identity or email reaches profile output.
+`/_public/_profile` resolves the application auth state in `beforeLoad` through the shared TanStack Query auth cache before a protected child route renders. Signed-out, email-unverified, and profile-incomplete requests redirect to the existing auth route with a validated relative `returnTo`. Auth transport or schema failures render `Authentication unavailable` with an explicit refresh action; they are not treated as signed out. No Profile route renders a `Checking authentication` state.
+
+The shared public header consumes the same auth-state query. Complete accounts render a circular `UserAvatar` trigger and an owner menu containing only `Profile` and `Sign out`; pending or incomplete accounts keep the direct Sign out action, and signed-out visitors keep Sign in. Profile selection uses TanStack Router navigation. Sign-out has one guarded request, re-enables on failure, and navigates to `/home` only after success.
 
 ## Profile read
 
 | Field | Current contract |
 | --- | --- |
 | Entry | `src/routes/_public/_profile/users/$username.tsx`; Activity is default, `tab` accepts `activity`, `reviews`, or `favorites`. |
-| Input | Normalized username, validated tab, authenticated viewer, optional lane cursor. |
-| Validation | `ProfileLayout` requires complete auth; `profiles:resolveProfileAccess` lowercases username and uses `users.by_username_key`; missing/invalid visibility fails explicitly. |
-| Transform | `profiles:getByUsername` returns header projection for a non-owner private viewer, otherwise full projection. Full output adds four progress counts and ten newest favorites. URLs resolve through Convex Storage. |
-| Storage | `users`, `userAnimeProgress`, `userAnimeEntries` + `by_user_favorite_at`, `animeSummaries`, `reviews`, and active `feedCards`. Profile content queries reuse `reviews:listForProfile`, `feed:listForProfile`, and `userAnime:listProfileFavorites`. |
-| External calls | None for profile records; Storage URL reads are Convex-owned. |
-| Retry | Convex query retry/reactivity. Profile page lanes own cursor retry and load-more; no stale or synthetic content fallback. |
-| Error | `PROFILE_NOT_FOUND`, `PROFILE_VISIBILITY_CORRUPT`, `PROFILE_PRIVATE`, missing Anime summary, or lane-specific query errors render explicit states. Private non-owners see header, bio, and privacy notice only. |
-| Output | Typed header/full profile, or independently paginated Activity, Reviews, and Favorites UI. |
-| Owner | `convex/profiles.ts`, `convex/feed.ts`, `convex/reviews.ts`, `convex/userAnime.ts`; route/UI under `src/features/profile` and `src/routes/_public/_profile`. |
+| Input | Normalized username, validated tab, server request session, optional lane cursor. |
+| Validation | `_profile.beforeLoad` ensures `authStateQueryOptions()`; `getProfileByUsername` and `getProfileContentPage` use strict Zod input/output contracts; Convex remains the final access authority. |
+| Transform | Authenticated server facades call `api.profiles.getByUsername`, `api.feed.listForProfile`, `api.reviews.listForProfile`, or `api.userAnime.listProfileFavorites`. Private non-owners receive header identity/bio plus a privacy notice; full output includes four progress counts and ten newest favorites. |
+| Storage | `users`, `userAnimeProgress`, `userAnimeEntries` + favorite index, `animeSummaries`, `reviews`, and active `feedCards`; profile content reuses the existing Convex list queries. |
+| External calls | TanStack Start server functions use `getAuthProxy`; browser does not call Convex for Profile reads and no raw Better Auth identity/email reaches output. |
+| Retry | Route/auth failures expose explicit refresh or retry. Activity, Reviews, and Favorites lanes own cursor retry and load-more; no stale or synthetic fallback. |
+| Error | `PROFILE_NOT_FOUND`, invalid/corrupt visibility, private access, unauthenticated server transport, missing Anime summary, and lane failures remain explicit and scoped to the affected surface. |
+| Output | Typed Profile header/full result, or independently paginated Activity, Reviews, and Favorites UI. |
+| Owner | Auth facade and route under `src/features/auth`, `src/features/profile/server`, `src/routes/_public/_profile`; data authority in `convex/users.ts`, `convex/profiles.ts`, `convex/feed.ts`, `convex/reviews.ts`, and `convex/userAnime.ts`. |
 
-`useProfilePages` isolates state by `username:tab`, binds cursors to username/viewer/lane in Convex, deduplicates merged rows, and keeps Activity, Reviews, and Favorites failures independent. It exposes Retry and Load more/end states; IntersectionObserver only requests a next page when no error exists.
+`useProfilePages` scopes state by `username:tab`, binds cursors to username/viewer/lane, deduplicates merged rows, and keeps lane failures independent. Router tab links preserve the public shell and browser history; they do not reload the document or remount the auth/header boundary. `refreshProfileQuery` invalidates and refetches the server-owned Profile query only after a successful owner mutation; cancel and failed mutations do not refresh.
 
 ## User Search
 
-Username completion and profile name edits call `upsertUserSearchDocument` in the same Convex mutation boundary as the user write. The projection stores only normalized display-name + username text in `userSearchDocuments`; `search_users` is the full-text index and `by_user` detects duplicates. `userSearch:searchPreview` (five rows) powers eligible Quick Search Users. `userSearch:search` requires a complete profile and returns identity-only pages of 20 rows. `userSearch:backfillProfiles` and `verifyProfiles` are internal bounded maintenance functions; current schema requires `users.profileVisibility`.
+Username completion and profile edits refresh `userSearchDocuments` in the same Convex mutation boundary as the user write. `searchUsersPreview` and `searchUsers` are authenticated TanStack Start server facades over `userSearch:searchPreview` and `userSearch:search`; they return identity-only rows and never expose auth IDs or email. The full `/search/users` route uses an infinite TanStack Query cache keyed by normalized query and explicit retry/error/end states.
 
-The dedicated `/search/users` route canonicalizes query whitespace, prompts below two characters, preserves overlong input as an explicit error, and uses a TanStack Query infinite cache keyed by query. Rows are deduplicated by user ID. Auth failure, malformed cursor, provider/Convex failure, Retry, empty, and end states stay visible; no email/auth ID is exposed.
+## Owner mutations and media
 
-## Owner profile edit
+Edit Profile validates display name, bio, and `public|private` visibility with Zod, then calls the owner mutation through client Convex synchronization. Client Convex identity gates edit/media mutations only; it is not required for server Profile reads. A successful edit or media finalize/remove refreshes the Profile server query; cancellation or failure leaves current data unchanged and reports the error.
 
-`EditProfileDialog` validates display name (1–50), bio (0–300), and `public|private` Profile Visibility with Zod. `profiles:update` requires the owner profile, normalizes fields, patches `users`, rereads the row, and refreshes its search projection atomically. `PROFILE_EDIT_INVALID` includes field errors; write/index failures raise explicit errors. Cancel performs no mutation.
+Profile media keeps the existing crop/upload contract: JPEG/PNG/WebP input up to 10 MiB, `react-easy-crop`, avatar 512×512 or banner 1600×400 WebP capped at 2 MiB, owner upload URL, pending registration, bounded Storage validation, finalize, replacement cleanup, and remove. Browser QA did not exercise the real upload/crop/remove flow.
 
-## Avatar/banner media
+## Avatar and containment
 
-1. `profile-image-cropper.tsx` accepts JPEG/PNG/WebP up to 10 MiB, uses `react-easy-crop`, and renders a cropped WebP: avatar 512×512 or banner 1600×400, capped at 2 MiB.
-2. `profileMedia:generateUploadUrl` requires the owner. The browser POSTs the cropped bytes to Convex Storage, then immediately calls `registerPending`; registration checks Storage existence, purpose, ownership, and unclaimed state, with a one-hour expiry.
-3. `profileMedia:finalize` runs `prepareFinalize` → bounded Storage fetch (three attempts, 50/100 ms delays with warnings) → static WebP signature/chunk/dimension/size validation → `commitFinalize`. Commit swaps the owned `users` reference and removes the pending row; the replaced asset is deleted only after no current or pending claim remains.
-4. Failed finalization cleans the pending candidate and reports `PROFILE_MEDIA_*`; cleanup failure is explicit. `profileMedia:remove` clears only the owner’s reference and deletes the asset when unclaimed. Scheduled cleanup scans expired registered uploads only and rechecks claims.
+`UserAvatar` is the shared user-identity renderer used by the header account trigger, Quick Search Users, `/search/users`, feed, and Profile. User sizes are 44×44 for header/Quick Search (`md`), 64×64 for `/search/users` (`search`), 96×96 on Profile phone, and 128×128 on Profile tablet/desktop (`profile`); Profile fallback glyphs scale to 36 px and 48 px respectively. Every box is square, circular, non-shrinking, clipped, and `object-cover`; broken URLs switch to one uppercase initial without layout shift. Profile identity text wraps safely, grid children use `min-width: 0`, support content follows the main column below desktop, and only the tab rail may scroll horizontally on narrow screens.
 
-The direct-upload → pending-registration interruption window is real; cleanup never deletes an unregistered or unrelated Storage object. Crop output, upload, finalize, remove, progress, cancellation, and retry errors remain visible in the dialog.
+## Remaining browser-fixture gaps
 
-## Verification gaps
+- Real media upload, crop, replacement, and remove flow.
+- Injected provider or Storage failure flow.
+- Deep pagination beyond the exercised page.
 
-- [ ] Browser fixture for a second account viewing a private profile.
-- [ ] Real media upload/crop/replace/remove browser flow.
-- [ ] Injected provider/storage failure browser flow.
-- [ ] Deep pagination beyond the exercised page.
+The second-account private-profile scenario is closed and verified.

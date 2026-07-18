@@ -1,6 +1,6 @@
 # Phase 7 Feedback Fixes Implementation Plan
 
-Status: APPROVED FOR IMPLEMENTATION. Additional header account-menu feedback is locked, independent revision review passed, and production implementation starts from the planning checkpoint commit.
+Status: IMPLEMENTED AND VERIFIED. Final reviewer PASS after the keyboard Profile fix; controller owns the final docs commit. Additional browser fixtures remain explicitly unexercised as listed below.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: use `orchestrating-coding-work` with the existing repo `.codex/agents/orchestration_*.toml` files. Never replace configured agents with skill templates. Use `superpowers:test-driven-development` for changed behavior and `superpowers:verification-before-completion` before closure.
 
@@ -9,6 +9,15 @@ Status: APPROVED FOR IMPLEMENTATION. Additional header account-menu feedback is 
 **Architecture:** Keep Convex authorization authoritative. Resolve the `_profile` session on the TanStack Start server before route content renders. Read Profile header/content and User Search through authenticated TanStack Start server functions that call Convex with the request session; retain client Convex synchronization only around edit/media mutations. Navigate Profile tabs and the header owner link through TanStack Router without document reload. Reuse `UserAvatar` for User identity and as the complete-account trigger for the installed Base UI-backed shadcn dropdown. Extract Anime Detail page geometry into a neutral required-slot layout consumed by Anime and Catalog Person. Reproduce every supplied runtime error before changing its source; never infer one cause from unrelated log lines.
 
 **Tech stack:** TanStack Start/Router/Query, React 19, Convex + Better Auth proxy, Zod, Base UI-backed shadcn, Tailwind v4, Vitest, React Doctor, Fallow. No new production dependency or asset.
+
+## Execution outcome
+
+Implementation tasks 1–7 are complete. The current result includes shared UserAvatar geometry and header owner menu, server-first Profile auth/read facades, SPA Profile tabs with success-only refresh, AnimeX root not-found UI, and neutral Anime/Character/Staff detail geometry with Staff `works` → `anime` migration. Final validation is recorded in `docs/superpowers/checkpoints/2026-07-18-phase-7-feedback-qa.md`.
+
+- Full suite: 131 test files passed / 2 skipped; 925 tests passed / 3 skipped (928 total). Two initial 10-second timeouts cleared after the QA server stopped; the final full run is green.
+- TypeScript, client + SSR build, Fallow, reviewer, and browser gates pass. React Doctor score is 53, equal to baseline; existing >500 kB chunk warning remains.
+- Protected route-tree SHA-256 remains `14A6932D22316BF69AF6EA6C1E343EE0C4704DE66039C8A674888D11ABA92DDD`. No Convex source changed, so no Convex deploy was required.
+- Exactly three browser fixtures remain: real media upload/crop/remove, injected provider or Storage failure, and deep pagination. Second-account private-profile verification is closed.
 
 ## Worktree And Scope
 
@@ -650,7 +659,7 @@ Close test-created browser sessions and stop only test-created Node/Convex proce
 - Modify: `docs/superpowers/specs/2026-07-18-phase-7-feedback-fixes-design.md`
 - Modify: `docs/superpowers/plans/2026-07-18-phase-7-feedback-fixes.md`
 
-- [ ] **Step 1: Update current truth**
+- [x] **Step 1: Update current truth**
 
 - Profile doc: shared header AuthState, avatar owner-menu path, server `beforeLoad`, validated redirects, authenticated server read facades, mutation-only client Convex synchronization, SPA tabs, refetch/invalidation, and actionable auth errors.
 - Quick Search doc: authenticated server User preview plus shared circular User avatar; catalog media unchanged.
@@ -658,7 +667,7 @@ Close test-created browser sessions and stop only test-created Node/Convex proce
 - Anime Detail doc: shared neutral page geometry with unchanged Anime-specific hero, tabs, controls, and sidebar.
 - Trackers: mark only executed/tested items complete. Keep the four pre-existing browser fixture gaps separate unless this work actually verifies them.
 
-- [ ] **Step 2: Final docs/diff check**
+- [x] **Step 2: Final docs/diff check**
 
 ```powershell
 rg -n "Checking authentication|overview\\|works|Staff.*Works|tab=works" docs CONTEXT.md PLAN.md TODO.md
@@ -668,7 +677,7 @@ git status --short
 
 Expected: legacy `works` appears only where its migration is documented/tested; no doc claims unrun validation; unrelated dirty files remain untouched.
 
-- [ ] **Step 3: Final docs commit**
+- [x] **Step 3: Final docs commit**
 
 ```powershell
 git add docs/architecture/profile-data-flow.md docs/architecture/quick-search-data-flow.md docs/architecture/catalog-person-data-flow.md docs/architecture/anime-detail-data-flow.md CONTEXT.md PLAN.md TODO.md docs/superpowers/specs/2026-07-18-phase-7-feedback-fixes-design.md docs/superpowers/plans/2026-07-18-phase-7-feedback-fixes.md
@@ -687,18 +696,18 @@ git commit -m "docs: close phase 7 feedback fixes"
 
 ## Completion Checklist
 
-- [ ] Accepted design requirements map to implementation and browser evidence.
-- [ ] UserAvatar is the only AnimeX User identity renderer on changed surfaces.
-- [ ] Complete accounts have an accessible two-item avatar menu with a typed owner-Profile link and preserved Sign out behavior.
-- [ ] Profile auth resolves server-side before child render.
-- [ ] Profile tabs navigate without document reload or auth-loader flash.
-- [ ] Profile/User Search reads use authenticated server facades; client Convex identity gates mutations only.
-- [ ] All supplied log signatures are individually resolved by exact evidence.
-- [ ] Character/Staff use shared detail geometry and Overview/Anime only.
-- [ ] Staff work provider/cache identities are unchanged.
-- [ ] 390, 768, and 1280 checks pass with both QA accounts.
-- [ ] TypeScript, tests, build, React Doctor, Fallow, review, browser, and diff gates pass.
-- [ ] Unrelated dirty files and secrets remain untouched.
+- [x] Accepted design requirements map to implementation and browser evidence.
+- [x] UserAvatar is the only AnimeX User identity renderer on changed surfaces.
+- [x] Complete accounts have an accessible two-item avatar menu with a typed owner-Profile link and preserved Sign out behavior.
+- [x] Profile auth resolves server-side before child render.
+- [x] Profile tabs navigate without document reload or auth-loader flash.
+- [x] Profile/User Search reads use authenticated server facades; client Convex identity gates mutations only.
+- [x] All supplied log signatures are individually resolved by exact evidence.
+- [x] Character/Staff use shared detail geometry and Overview/Anime only.
+- [x] Staff work provider/cache identities are unchanged.
+- [x] 390, 768, and 1280 checks pass with both QA accounts.
+- [x] TypeScript, tests, build, React Doctor, Fallow, review, browser, and diff gates pass.
+- [x] Unrelated dirty files and secrets remain untouched.
 
 ## References
 

@@ -1,6 +1,6 @@
 # Phase 7 Feedback Fixes Design Contract
 
-Status: APPROVED DIRECTION. Implementation must preserve Phase 7 visual language.
+Status: IMPLEMENTED AND VERIFIED. Final reviewer PASS and responsive browser QA confirm this contract; three explicitly unexercised browser fixtures remain tracked in the Phase 7 checkpoint.
 
 ## Goal, Users, Surfaces
 
@@ -37,19 +37,15 @@ Secondary locked references:
 - `docs/superpowers/specs/2026-07-17-phase-7-user-profile-quick-search-design.md`;
 - `docs/superpowers/specs/2026-07-13-phase-4-anime-detail-layout-consistency-design.md`.
 
-Current source evidence:
+Current implementation evidence:
 
-- `src/components/user-avatar.tsx:11-26` owns image failure and initial fallback.
-- `src/features/profile/ui/profile-header.tsx:27-53` enlarges the avatar box to 96/128 px without enlarging fallback type.
-- `src/features/quick-search/ui/quick-search-results.tsx:143-165` sends every result through one rounded-rectangle media renderer.
-- `src/features/profile/ui/user-search-page.tsx:111-112` renders a separate empty avatar circle instead of `UserAvatar`.
-- `src/features/shell/header-auth-controls.tsx:56-74` gives complete accounts only a direct Sign out button, so desktop/tablet owners have no header path to their Profile.
-- `src/components/ui/dropdown-menu.tsx` already provides the installed Base UI-backed shadcn dropdown foundation; current upstream usage composes grouped items and Base UI `render`.
-- `src/routes/_public/_profile/route.tsx:13-57` decides auth only after client mount and exposes `Checking authentication…`.
-- `src/features/profile/ui/profile-page.tsx:63-72` mounts the profile query after that client gate.
-- `src/features/anime-detail/ui/anime-detail-page.tsx:19-24` and `anime-detail-tabs.tsx:8-26` provide the stable catalog shell and tab behavior to reuse.
-- `src/features/catalog-person/ui/catalog-person-page.tsx:23-94` currently uses a separate shell and labels Staff work as `Works`.
-- `src/styles.css:9-60` owns background, card, border, cyan, coral, and radius tokens.
+- `src/components/user-avatar.tsx` owns shared image failure, circular geometry, and size-specific fallback typography.
+- Quick Search and `/search/users` route User rows through `UserAvatar`; catalog rows retain rectangular media.
+- `src/features/shell/header-auth-controls.tsx` renders the complete-account `UserAvatar` trigger and exactly two menu items: Profile and Sign out.
+- `src/routes/_public/_profile/route.tsx` resolves auth in `beforeLoad`; `src/features/profile/server/profile-read.functions.ts` and `user-search.functions.ts` own authenticated server reads.
+- Profile tabs use TanStack Router navigation; successful mutations refresh server Profile data, while failed/cancelled mutations do not.
+- `src/components/detail-page-layout.tsx` supplies neutral geometry to Anime Detail and Catalog Person; Character/Staff use Overview/Anime and migrate legacy Staff `works` to `anime`.
+- `src/routes/__root.tsx` owns the AnimeX root not-found UI.
 
 ## Locked Visual Direction
 

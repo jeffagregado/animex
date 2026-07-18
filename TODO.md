@@ -869,7 +869,7 @@ Status: COMPLETE. Active social interaction UI and Followers-only choices are ab
 
 # Phase 7 User Profile, Catalog People, And Quick Search
 
-Status: COMPLETE. Implemented on `jeff-cx/phase-7-user-profile-quick-search`; approved visual contract shipped, automated/TypeScript/build/Fallow/Convex gates pass, React Doctor is 62 with one inherited Discover error, desktop/tablet/mobile core browser flows pass, and reviewer PASS after `5178706`. No production deploy, push, merge, or unexercised fixture claimed.
+Status: COMPLETE. Implemented on `jeff-cx/phase-7-user-profile-quick-search`; feedback fixes, final reviewer PASS, automated gates, and responsive browser QA are complete. The second-account private-profile scenario is verified. Three browser fixtures remain unexercised: real media upload/crop/remove, injected provider or Storage failure, and deep pagination. No production deploy, push, merge, or unexercised fixture is claimed.
 
 - [x] Keep signed-in profile header, Activity/Reviews/Favorites tabs, latest 10 favorites, four list-progress stats, and viewer-allowed profile activity in Phase 7.
 - [x] Add separate Public/Private Profile Visibility; Private shows header identity/bio and a privacy notice to non-owners.
@@ -892,28 +892,30 @@ Status: COMPLETE. Implemented on `jeff-cx/phase-7-user-profile-quick-search`; ap
 - [x] Run automated gates: final full suite 122 passed + 2 skipped files / 889 passed + 3 skipped tests; focused header/Quick Search suite 5 files / 40 tests; TypeScript/build/Fallow/Convex dev deploy pass; React Doctor is 62 with one inherited Discover error.
 - [x] Run desktop/tablet/mobile core browser QA; recheck landing and signed-out auth Search with one dialog/searchbox and zero console errors.
 - [x] Complete code review (PASS after `5178706`) and sync current-state docs/data-flow maps.
-- [ ] Verify second-account private-profile browser fixture.
+- [x] Verify second-account private-profile browser fixture with both named QA accounts; restore visibility to Public after verification.
 - [ ] Verify real media upload/crop/remove browser flow.
 - [ ] Verify injected provider/storage failure lanes.
 - [ ] Verify deep pagination Load more browser flow.
 
 # Phase 7 Feedback Fixes
 
-Status: IMPLEMENTATION APPROVED. User feedback is locked in `docs/superpowers/specs/2026-07-18-phase-7-feedback-fixes-design.md`.
+Status: COMPLETE. User feedback is implemented and locked in `docs/superpowers/specs/2026-07-18-phase-7-feedback-fixes-design.md`; final reviewer PASS and browser QA pass after the keyboard Profile fix.
 
 - [x] Lock avatar reuse, Profile containment, server-auth-first routing, and Character/Staff layout direction.
-- [ ] Reuse `UserAvatar` in Quick Search and `/search/users`; scale Profile fallback geometry.
-- [ ] Replace complete-account header Sign out button with a shared-avatar shadcn dropdown containing Profile and Sign out.
-- [ ] Repair Profile phone/tablet/desktop overflow, wrapping, and non-deforming media.
-- [ ] Replace full-document Profile tab changes with router navigation that preserves the shell.
-- [ ] Resolve Profile auth on the server before DOM/query mount; remove `Checking authentication…`.
-- [ ] Reproduce and fix invalid-hook, QueryClientProvider, root not-found, hydration, and unauthenticated-query logs by exact source.
-- [ ] Reuse Anime Detail shell geometry for Character/Staff with only Overview and Anime tabs.
-- [ ] Canonicalize legacy Staff `?tab=works` to `?tab=anime` without changing provider/cache identities.
-- [ ] Use both repo QA accounts for private-viewer, avatar, auth, tab, and responsive browser checks.
-- [ ] Run focused/full tests, TypeScript, build, React Doctor, Fallow, Convex deploy when applicable, review, and browser QA.
+- [x] Reuse `UserAvatar` in Quick Search and `/search/users`; scale Profile fallback geometry.
+- [x] Replace complete-account header Sign out button with a shared-avatar shadcn dropdown containing Profile and Sign out.
+- [x] Repair Profile phone/tablet/desktop overflow, wrapping, and non-deforming media.
+- [x] Replace full-document Profile tab changes with router navigation that preserves the shell.
+- [x] Resolve Profile auth on the server before DOM/query mount; remove `Checking authentication…`.
+- [x] Reproduce and fix invalid-hook, QueryClientProvider, root not-found, hydration, and unauthenticated-query logs by exact source; final console/server logs are clean.
+- [x] Reuse Anime Detail shell geometry for Character/Staff with only Overview and Anime tabs.
+- [x] Canonicalize legacy Staff `?tab=works` to `?tab=anime` without changing provider/cache identities.
+- [x] Use both repo QA accounts for private-viewer, avatar, auth, tab, and responsive browser checks.
+- [x] Run focused/full tests, TypeScript, build, React Doctor, Fallow, review, and browser QA. No Convex source changed, so no Convex deploy was required.
 - [x] Write and independently review the implementation plan.
 - [x] Approve the implementation plan for execution.
+
+Final validation: 131 test files passed / 2 skipped; 925 tests passed / 3 skipped (928 total); TypeScript and client + SSR build passed with the existing >500 kB warning; Fallow against `3fdda5c` passed with one pre-existing non-error finding, zero complexity, and zero duplication; React Doctor score 53, equal to baseline. Protected `src/routeTree.gen.ts` SHA-256 remained `14A6932D22316BF69AF6EA6C1E343EE0C4704DE66039C8A674888D11ABA92DDD`. No Convex source change or deploy. Browser QA passed at 390×844, 768×1024, and 1280×800 with both accounts, including keyboard/pointer menu behavior, Profile SPA navigation, Quick Search/User Search avatars, Character/Staff tab migration, private-profile visibility, redirects, root not-found, no overflow, and clean console/server logs. QA server stopped and port 3000 freed.
 
 # Phase 8 Notifications, Privacy, Moderation
 

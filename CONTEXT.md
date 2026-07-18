@@ -2034,3 +2034,23 @@ Domain Expert: Profiles preview up to 10 latest favorited anime and include a se
 
 Developer: Which anime stats should appear on profiles?
 Domain Expert: Profiles show completed, watching, planned, and dropped counts. They do not show On Hold, Favorite Genres, average rating, or episodes watched.
+
+## Phase 7 feedback fixes current state
+
+Developer: How does Profile authentication work now?
+Domain Expert: `_public/_profile` resolves shared application auth in TanStack Start `beforeLoad` before protected Profile children render. Signed-out, email-unverified, and profile-incomplete requests redirect with validated `returnTo`; auth transport failure shows an actionable Authentication unavailable state. Profile reads and User Search reads use authenticated server facades. Client Convex state is required only for owner edit/media mutations and is never used as a silent read fallback.
+
+Developer: How does the complete-account header identify its owner?
+Domain Expert: The shared header uses one circular `UserAvatar` account trigger. Its owner menu contains exactly `Profile` and `Sign out`; Profile uses SPA navigation to the active username, and Sign out navigates to `/home` only after one successful request. Escape, outside click, Enter, and focus restoration stay owned by the Base UI menu.
+
+Developer: Which UserAvatar sizes are canonical?
+Domain Expert: Quick Search and the header use 44 px circles. `/search/users` uses a 64 px circle. Profile uses 96 px on phones and 128 px from tablet upward, with fallback glyphs scaled to 36 px and 48 px. UserAvatar is shared by Quick Search, User Search, Feed, and Profile; every box is square, clipped, non-shrinking, and `object-cover`.
+
+Developer: Do Profile tab changes reload the document?
+Domain Expert: No. Activity, Reviews, and Favorites use TanStack Router links, preserve the shell and browser history, and load only the selected panel. Successful owner mutations invalidate/refetch Profile data; cancel and failure do not refresh.
+
+Developer: What is the current Character/Staff detail contract?
+Domain Expert: Character and Staff use the neutral Anime Detail geometry and expose only Overview and Anime. Staff `?tab=works` is a legacy URL that replaces to `?tab=anime`; detail/work provider and cache identities remain unchanged. Anime keeps its own hero, controls, tabs, and sidebar behavior inside the shared geometry.
+
+Developer: Which Phase 7 browser fixtures remain?
+Domain Expert: The second-account private-profile scenario is closed and verified. Three browser fixtures remain: real media upload/crop/remove, injected provider or Storage failure, and deep pagination beyond the exercised page. No production deploy, push, merge, or unexercised fixture is claimed.
