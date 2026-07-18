@@ -1,6 +1,26 @@
 # AnimeX
 
-AnimeX is a TanStack Start community app for tracking anime, publishing Reviews, and sharing Posts in a visibility-aware feed. Phase 5 includes Home, Following, and Global feed views, Review creation/detail/discovery, structured rich text, and one optional external Post media item.
+AnimeX is an anime discovery, tracking, and community app. Users can explore anime, manage their watch activity, rate and review titles, create short posts, and discover characters, staff, and voice actors.
+
+Built as a personal project for practicing full-stack development and API integration.
+
+## Highlights
+
+- Discover trending, seasonal, recommended, and genre-based anime.
+- Search Anime, Characters, Staff, and AnimeX users.
+- View detailed Anime, Character, Staff, and Voice Actor information.
+- Track watch status, progress, scores, and favorite anime.
+- Publish ratings and Reviews with summaries, rich text, and spoiler controls.
+- Share short Posts through a visibility-aware activity feed.
+- Create user profiles with Activity, Reviews, Favorites, and list statistics.
+- Use responsive desktop, tablet, and mobile interfaces.
+- Sign in through password or Google OAuth with email verification and account recovery.
+
+## Unofficial project notice
+
+AnimeX is an unofficial, independent client project powered by the AniList GraphQL API. It is not affiliated with, endorsed by, or operated by AniList.
+
+This site is intended only for personal and educational use, including practicing API integration and full-stack application development. Anime information, artwork, and related intellectual property belong to their respective owners.
 
 ## Development
 
@@ -23,20 +43,3 @@ pnpm exec tsc --noEmit
 pnpm build
 pnpm generate-routes
 ```
-
-## Current architecture
-
-- TanStack Start, TanStack Router, React, Tailwind CSS, and Base UI primitives.
-- Convex owns application data, feed projections, Review discovery, and auth integration.
-- Better Auth handles password and OAuth flows; Resend delivers auth email.
-- Posts accept zero or one safe external HTTPS image/video URL. AnimeX does not upload, process, or server-fetch Post media.
-- Review bodies use validated Lexical JSON. Review-level `containsSpoiler` is warning metadata; Summary stays visible while rich-text spoiler blocks reveal independently.
-
-## Repository guides
-
-- [Project plan](PLAN.md)
-- [Product context](CONTEXT.md)
-- [Task tracker](TODO.md)
-- [Review/Post data flow](docs/architecture/review-discovery-data-flow.md)
-- [Discover data flow](docs/architecture/discover-data-flow.md)
-- [Phase 5 design QA](design-qa.md)
