@@ -1,6 +1,7 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, it, test } from 'vitest'
 
 import {
+  profileResultSchema,
   PROFILE_BIO_MAX_LENGTH,
   PROFILE_CONTENT_PAGE_SIZE,
   PROFILE_FAVORITES_PREVIEW_SIZE,
@@ -13,6 +14,23 @@ import {
   parseProfileTab,
   profileEditInputSchema,
 } from './profile-contracts'
+
+it('rejects raw user fields from Profile server output', () => {
+  expect(profileResultSchema.safeParse({
+    access: 'header',
+    owner: false,
+    profile: {
+      avatarUrl: null,
+      bannerUrl: null,
+      bio: '',
+      email: 'secret@example.com',
+      id: 'user-1',
+      name: 'Mika',
+      profileVisibility: 'private',
+      username: 'mika',
+    },
+  }).success).toBe(false)
+})
 
 describe('profile contracts', () => {
   test('locks profile limits', () => {

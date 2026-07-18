@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { feedPageSchema, reviewListItemSchema } from '../../social/shared/social-contracts'
+
 export const PROFILE_BIO_MAX_LENGTH = 300 as const
 export const PROFILE_NAME_MAX_LENGTH = 50 as const
 export const PROFILE_CONTENT_PAGE_SIZE = 20 as const
@@ -15,6 +17,67 @@ const profileMediaKindSchema = z.enum(['avatar', 'banner'])
 export type ProfileVisibility = z.infer<typeof profileVisibilitySchema>
 export type ProfileTab = z.infer<typeof profileTabSchema>
 export type ProfileMediaKind = z.infer<typeof profileMediaKindSchema>
+
+const nullableHttpsUrlSchema = z.url({ protocol: /^https$/ }).nullable()
+export const profileHeaderSchema = z.object({
+  avatarUrl: nullableHttpsUrlSchema,
+  bannerUrl: nullableHttpsUrlSchema,
+  bio: z.string().max(PROFILE_BIO_MAX_LENGTH),
+  id: z.string().trim().min(1),
+  name: z.string().trim().min(1).max(PROFILE_NAME_MAX_LENGTH),
+  profileVisibility: profileVisibilitySchema,
+  username: z.string().trim().min(1),
+}).strict()
+const profileFavoriteAnimeSchema = z.object({
+  anilistId: z.number().int().positive(),
+  coverImageUrl: nullableHttpsUrlSchema,
+  slug: z.string().trim().min(1),
+  title: z.string().trim().min(1),
+}).strict()
+const fullProfileSchema = profileHeaderSchema.extend({
+  favorites: z.array(profileFavoriteAnimeSchema).max(PROFILE_FAVORITES_PREVIEW_SIZE),
+  progress: z.object({
+    completed: z.number().int().nonnegative(),
+    dropped: z.number().int().nonnegative(),
+    planned: z.number().int().nonnegative(),
+    watching: z.number().int().nonnegative(),
+  }).strict(),
+}).strict()
+export const profileResultSchema = z.discriminatedUnion('access', [
+  z.object({
+    access: z.literal('header'),
+    owner: z.boolean(),
+    profile: profileHeaderSchema,
+  }).strict(),
+  z.object({
+    access: z.literal('full'),
+    owner: z.boolean(),
+    profile: fullProfileSchema,
+  }).strict(),
+])
+const cursorPageFields = {
+  cursor: z.string().nullable(),
+  hasMore: z.boolean(),
+}
+export const profileFavoriteSchema = z.object({
+  anime: profileFavoriteAnimeSchema,
+  favoriteAt: z.number().finite().nonnegative(),
+}).strict()
+export const profileContentPageSchema = z.union([
+  feedPageSchema,
+  z.object({
+    ...cursorPageFields,
+    items: z.array(reviewListItemSchema).max(PROFILE_CONTENT_PAGE_SIZE),
+  }).strict(),
+  z.object({
+    ...cursorPageFields,
+    items: z.array(profileFavoriteSchema).max(PROFILE_CONTENT_PAGE_SIZE),
+  }).strict(),
+])
+
+export type ProfileHeaderData = z.infer<typeof profileHeaderSchema>
+export type ProfileResult = z.infer<typeof profileResultSchema>
+export type ProfileContentPage = z.infer<typeof profileContentPageSchema>
 
 export const profileEditInputSchema = z.object({
   name: z.string().trim().min(1).max(PROFILE_NAME_MAX_LENGTH),
