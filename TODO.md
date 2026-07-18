@@ -967,7 +967,7 @@ Validation: initial red run failed 14/52 focused tests; final focused run passes
 
 # Post-Phase 7 Public Catalog Identity
 
-Status: PLANNED. Detailed plan saved at `docs/superpowers/plans/2026-07-18-post-phase-7-public-catalog-identity.md`. Phase 8 stays blocked until this phase closes.
+Status: IN PROGRESS. Detailed plan saved at `docs/superpowers/plans/2026-07-18-post-phase-7-public-catalog-identity.md`. Safe staged rollout approved: additive Tasks 1-4, dev backfill/verification, then public cutover. Phase 8 stays blocked until this phase closes.
 
 - [x] Lock `catalogEntities._id` as client-facing `publicId`; keep provider mappings separate and server-only.
 - [x] Lock cache-preserving architecture: existing cache rows, AniList keys, TTLs, leases, and image URLs remain unchanged.
@@ -981,7 +981,8 @@ Status: PLANNED. Detailed plan saved at `docs/superpowers/plans/2026-07-18-post-
 - [ ] Materialize public identities for Discover, Quick Search, Character search, and Staff search.
 - [ ] Replace Anime, Character, Staff, Review, feed, Profile, and user Anime client surfaces with `publicId`.
 - [ ] Rename canonical route params to `$publicId`; preserve one-way redirects from legacy numeric URLs.
-- [ ] Push additive Convex dev schema, run bounded backfills to completion, require zero mismatches, then push final schema.
+- [ ] Push additive Convex dev schema, run bounded backfills to completion, and require zero mismatches before public cutover.
+- [ ] Retain migration tooling and legacy durable fields until separately approved production migration and final schema tightening.
 - [ ] Update current-state data-flow docs after implementation; keep Metadata Image Proxy untouched and unscheduled.
 - [ ] Run full tests, TypeScript, build, client AniList-ID/endpoint scans, Fallow, React Doctor, integrated review, and browser QA at 390/768/1280.
 - [ ] Close phase and request approval before Phase 8.

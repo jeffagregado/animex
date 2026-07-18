@@ -4,7 +4,7 @@
 
 **Goal:** Replace client-visible AniList Anime, Character, and Staff IDs with stable AnimeX-owned `publicId` values while preserving existing metadata caches and stored user data.
 
-**Architecture:** Add `catalogEntities` plus provider-reference rows. Serialized `catalogEntities._id` becomes public `publicId`; AniList numeric IDs remain server-only provider/cache keys. Public server functions resolve or materialize identities before returning strict client contracts. Durable user Anime, Review, feed, milestone, rewatch, and aggregate records migrate to AnimeX entity references through additive schema, bounded internal backfills, verification, cutover, and final schema tightening.
+**Architecture:** Add `catalogEntities` plus provider-reference rows. Serialized `catalogEntities._id` becomes public `publicId`; AniList numeric IDs remain server-only provider/cache keys. Public server functions resolve or materialize identities before returning strict client contracts. Durable user Anime, Review, feed, milestone, rewatch, and aggregate records migrate to AnimeX entity references through additive schema, bounded internal backfills, verification, and cutover. Final schema tightening follows only after separately approved production migration.
 
 **Tech Stack:** TanStack Start server functions and file routes, React 19, TanStack Router/Query, Convex schema/indexes/internal migrations, Zod 4, Vitest, React Testing Library, Fallow, React Doctor.
 
@@ -24,7 +24,8 @@
 - Legacy numeric Anime/Character/Staff URLs must issue one canonical redirect to `publicId` URLs.
 - Missing or conflicting identity mappings fail with clear typed errors. No silent provider-ID fallback.
 - Use existing packages only. Ask before adding any production dependency.
-- Use additive schema, deploy, bounded backfill, verification, cutover, then schema tightening.
+- Use additive schema, dev deploy, bounded backfill, verification, then public cutover.
+- Retain migration functions and legacy durable fields until every target deployment, including production, is separately approved, backfilled, and verified. Required-field schema tightening is outside this execution.
 - Do not deploy production or run `npx convex deploy` without explicit approval.
 - Preserve unrelated dirty `README.md` work.
 
@@ -87,6 +88,21 @@ Existing AniList-keyed cache row
 | Controller-only integration | `convex/schema.ts`, `convex/_generated/*`, `src/routeTree.gen.ts`, migrations, `PLAN.md`, `TODO.md`, current-state docs |
 
 Shared schema, generated files, route tree, and migration execution stay serialized. No parallel writer may edit these surfaces.
+
+---
+
+## Safe Staged Execution Order
+
+Execute tasks in this order:
+
+```text
+Tasks 1-4 additive code
+  -> Task 7 additive Convex dev sync, backfill, and verification
+  -> Tasks 5-6 public contract and route cutover
+  -> Task 8 validation and documentation
+```
+
+Do not delete migration tooling or make migrated durable fields required during this execution. Production deployment, production backfill, and final schema tightening require separate explicit approval.
 
 ---
 
@@ -257,6 +273,8 @@ git commit -m "feat(catalog): add public identity registry"
 - Modify: `convex/catalogPersonCachePolicy.ts`
 - Modify: `convex/catalogPersonCachePolicy.test.ts`
 - Modify: `convex/catalogPersonCache.integration.test.ts`
+- Create: `convex/animeCache.integration.test.ts`
+- Create: `convex/animeDetailCache.integration.test.ts`
 
 **Interfaces:**
 
@@ -276,10 +294,12 @@ Prove:
 - duplicate provider IDs within one bounded payload create one mapping.
 - cache record fields, `refreshedAt`, `expiresAt`, ordered IDs, and lease deletion remain unchanged.
 
+Use real Convex integration harnesses for `commitSection`, `commitDetail`, and `commitPeoplePage`. Pure policy tests do not satisfy transaction, identity-row, or cache-preservation assertions.
+
 - [ ] **Step 2: Run focused cache tests and confirm RED**
 
 ```powershell
-pnpm test -- convex/animeCachePolicy.test.ts convex/animeDetailCachePolicy.test.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
+pnpm test -- convex/animeCachePolicy.test.ts convex/animeCache.integration.test.ts convex/animeDetailCachePolicy.test.ts convex/animeDetailCache.integration.test.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
 ```
 
 Expected: new identity assertions fail.
@@ -318,7 +338,7 @@ Reject payloads beyond current section/detail/person caps before identity writes
 - [ ] **Step 5: Run focused cache suite**
 
 ```powershell
-pnpm test -- convex/animeCachePolicy.test.ts convex/animeDetailCachePolicy.test.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
+pnpm test -- convex/animeCachePolicy.test.ts convex/animeCache.integration.test.ts convex/animeDetailCachePolicy.test.ts convex/animeDetailCache.integration.test.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
 ```
 
 Expected: identity assertions and existing cache invariants pass.
@@ -326,7 +346,7 @@ Expected: identity assertions and existing cache invariants pass.
 - [ ] **Step 6: Commit cache bridge**
 
 ```powershell
-git add convex/animeCache.ts convex/animeCachePolicy.ts convex/animeCachePolicy.test.ts convex/animeDetailCache.ts convex/animeDetailCachePolicy.ts convex/animeDetailCachePolicy.test.ts convex/catalogPersonCache.ts convex/catalogPersonCachePolicy.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
+git add convex/animeCache.ts convex/animeCachePolicy.ts convex/animeCachePolicy.test.ts convex/animeCache.integration.test.ts convex/animeDetailCache.ts convex/animeDetailCachePolicy.ts convex/animeDetailCachePolicy.test.ts convex/animeDetailCache.integration.test.ts convex/catalogPersonCache.ts convex/catalogPersonCachePolicy.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
 git commit -m "feat(catalog): register identities during cache writes"
 ```
 
@@ -758,7 +778,7 @@ git commit -m "feat(catalog): route client surfaces by public id"
 
 ---
 
-### Task 7: Execute Dev Migration and Tighten Final Schema
+### Task 7: Execute Additive Dev Migration and Retain Migration Tooling
 
 **Files:**
 
@@ -768,18 +788,19 @@ git commit -m "feat(catalog): route client surfaces by public id"
 - Modify: `convex/reviewDiscovery.ts`
 - Modify: `convex/feed.ts`
 - Modify: affected tests
-- Delete after verified backfill: `convex/catalogIdentityMigration.ts`
-- Delete after verified backfill: `convex/catalogIdentityMigration.integration.test.ts`
-- Delete after verified backfill: `convex/catalogAnimeDataMigration.ts`
-- Delete after verified backfill: `convex/catalogAnimeDataMigration.integration.test.ts`
+- Retain: `convex/catalogIdentityMigration.ts`
+- Retain: `convex/catalogIdentityMigration.integration.test.ts`
+- Retain: `convex/catalogAnimeDataMigration.ts`
+- Retain: `convex/catalogAnimeDataMigration.integration.test.ts`
 - Modify: `docs/runbooks/catalog-identity-backfill.md`
 - Regenerate: `convex/_generated/*`
 
 **Interfaces:**
 
-- Final durable tables require AnimeX entity references.
+- Dev durable rows have verified AnimeX entity references.
 - Cache/provider tables retain server-only AniList IDs.
 - Final public functions contain no provider-ID args or returns.
+- Transitional durable fields remain additive until separately approved production backfill and tightening.
 
 - [ ] **Step 1: Push additive schema and functions to Convex dev**
 
@@ -821,47 +842,26 @@ Require zero values for every Task 4 verification counter. Record only counts/cu
 pnpm test -- convex/catalogIdentity.integration.test.ts convex/catalogIdentityMigration.integration.test.ts convex/catalogAnimeDataMigration.integration.test.ts convex/userAnime.integration.test.ts
 ```
 
-Expected: registry, migration reruns, and the additive durable model pass against the verified dev data shape.
+Expected: registry, migration reruns, and additive durable model pass against verified dev data shape.
 
-- [ ] **Step 7: Remove temporary migration code and tighten the schema**
-
-Delete the four exact migration files named in this task. Retain the completed procedure, lane inventory, counts, cursors, verification results, and rollback boundary in `docs/runbooks/catalog-identity-backfill.md`.
-
-Final durable shape:
-
-```text
-userAnimeEntries.animeId required
-animeRewatchEntries.animeId required
-animeMilestones.animeId required
-reviews.animeId required
-feedCards.animeId optional only because Post cards have no Anime
-animeReviewStats.animeId required
-```
-
-Remove old durable `anilistId` fields/indexes and dual-read/dual-write code. Keep cache/provider `anilistId` fields.
-
-- [ ] **Step 8: Push final schema**
+- [ ] **Step 7: Run post-backfill identity and domain regression**
 
 ```powershell
-pnpm exec convex dev --once
+pnpm test -- convex/catalogIdentity.integration.test.ts convex/catalogIdentityMigration.integration.test.ts convex/catalogAnimeDataMigration.integration.test.ts convex/userAnime.integration.test.ts convex/feedMilestones.integration.test.ts convex/reviewDiscoveryPolicy.test.ts convex/feedPolicy.test.ts
 ```
 
-Expected: final schema/codegen sync passes after verified backfill.
+Expected: registry, retained migration tooling, and additive durable model pass.
 
-- [ ] **Step 9: Run final identity and domain regression**
+- [ ] **Step 8: Record dev migration evidence and commit generated state**
 
-```powershell
-pnpm test -- convex/catalogIdentity.integration.test.ts convex/userAnime.integration.test.ts convex/feedMilestones.integration.test.ts convex/reviewDiscoveryPolicy.test.ts convex/feedPolicy.test.ts
-```
-
-Expected: registry and final durable model pass with no deleted migration module imports.
-
-- [ ] **Step 10: Commit final schema**
+Update runbook with exact dev lane counts, terminal cursors, rerun results, and zero-mismatch verification. Do not record credentials or private Review/profile content.
 
 ```powershell
 git add convex docs/runbooks/catalog-identity-backfill.md
-git commit -m "chore(catalog): finalize public identity migration"
+git commit -m "chore(catalog): verify additive identity migration"
 ```
+
+After this task passes, release public-contract and route cutover work in Tasks 5 and 6. Production deployment, production backfill, migration deletion, legacy-field removal, and required-field tightening remain blocked pending separate approval.
 
 ---
 
@@ -976,7 +976,7 @@ Check 390×844, 768×1024, and 1280×800:
 
 - [ ] **Step 8: Close trackers**
 
-Mark Post-Phase 7 complete only after migration verification, final schema sync, review PASS, automated gates, and browser QA pass. Keep Phase 8 unstarted.
+Mark this implementation complete only after dev migration verification, additive schema sync, review PASS, automated gates, and browser QA pass. Keep production migration/final tightening and Phase 8 unstarted.
 
 - [ ] **Step 9: Commit docs**
 
@@ -1012,8 +1012,10 @@ After public URLs ship:
 - [ ] AniList IDs remain available server-side for provider fetch/cache.
 - [ ] Existing metadata cache rows and TTLs remain intact.
 - [ ] Durable AnimeX data uses entity references.
-- [ ] Every migration lane completes and verifies with zero mismatch.
+- [ ] Every dev migration lane completes and verifies with zero mismatch.
+- [ ] Migration tooling and legacy durable fields remain available for separately approved production rollout.
 - [ ] Legacy numeric links redirect once to stable canonical URLs.
 - [ ] Image proxy remains untouched.
 - [ ] Full tests, TypeScript, build, Fallow, React Doctor, review, and browser QA pass.
+- [ ] Production migration and final schema tightening remain unstarted until explicit approval.
 - [ ] Phase 8 remains unstarted until explicit approval.
