@@ -225,7 +225,7 @@ describe('PublicShell', () => {
     expect(signOutItem.className).toContain('min-h-11')
   })
 
-  it('opens and navigates the account menu by keyboard, then restores trigger focus on Escape', async () => {
+  it('supports keyboard focus and Escape before typed Profile navigation', async () => {
     setViewport(true)
     vi.stubGlobal('scrollTo', vi.fn())
     stubCompleteAuth()
@@ -255,11 +255,35 @@ describe('PublicShell', () => {
       name: 'Profile',
     })
     await waitFor(() => expect(document.activeElement).toBe(profileAgain))
-    fireEvent.keyDown(profileAgain, { key: 'Enter' })
-    fireEvent.keyUp(profileAgain, { key: 'Enter' })
-    // jsdom does not synthesize the browser's keyboard link activation.
-    profileAgain.click()
+    fireEvent.click(profileAgain)
     await waitFor(() => expect(history.location.pathname).toBe('/users/mika'))
+  })
+
+  it('activates Sign out from the keyboard exactly once', async () => {
+    setViewport(true)
+    vi.stubGlobal('scrollTo', vi.fn())
+    stubCompleteAuth()
+    account.signOut.mockReturnValue(new Promise(() => undefined))
+    const { router } = createPublicTestRouter('/home')
+    render(<RouterProvider router={router} />)
+
+    const trigger = await screen.findByRole('button', {
+      name: 'Mika account menu',
+    })
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    const profileItem = await screen.findByRole('menuitem', {
+      name: 'Profile',
+    })
+    await waitFor(() => expect(document.activeElement).toBe(profileItem))
+    fireEvent.keyDown(profileItem, { key: 'ArrowDown' })
+    const signOutItem = screen.getByRole('menuitem', { name: 'Sign out' })
+    await waitFor(() => expect(document.activeElement).toBe(signOutItem))
+
+    fireEvent.keyDown(signOutItem, { key: 'Enter' })
+    fireEvent.keyUp(signOutItem, { key: 'Enter' })
+
+    await waitFor(() => expect(account.signOut).toHaveBeenCalledOnce())
   })
 
   it('closes the account menu on outside interaction', async () => {

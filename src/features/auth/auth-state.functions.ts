@@ -4,7 +4,7 @@ import { api } from '../../../convex/_generated/api'
 import { getAuthProxy } from '../../lib/server-auth-proxy'
 import { authStateSchema, type AuthState } from './auth-contracts'
 
-export const PROFILE_ROUTE_AUTH_SCOPE = 'Profile route authentication'
+const PROFILE_ROUTE_AUTH_SCOPE = 'Profile route authentication'
 
 /** Runs the authenticated application-state query through server transport. */
 export const runAuthStateQuery = async (

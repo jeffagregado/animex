@@ -1,9 +1,9 @@
 import { z } from 'zod'
 
-export const USER_SEARCH_PAGE_SIZE = 20 as const
-export const USER_SEARCH_PREVIEW_SIZE = 5 as const
+const USER_SEARCH_PAGE_SIZE = 20 as const
+const USER_SEARCH_PREVIEW_SIZE = 5 as const
 
-export const userSearchRowSchema = z.object({
+const userSearchRowSchema = z.object({
   avatarUrl: z.url({ protocol: /^https$/ }).nullable(),
   id: z.string().trim().min(1),
   name: z.string().trim().min(1),

@@ -14,11 +14,11 @@ import {
 
 const USER_SEARCH_SCOPE = 'User search server read'
 
-export const userSearchInputSchema = z.object({
+const userSearchInputSchema = z.object({
   cursor: z.string().nullable(),
   query: z.string().trim().min(2).max(100),
 }).strict()
-export const userSearchPreviewInputSchema = z.object({
+const userSearchPreviewInputSchema = z.object({
   query: z.string().trim().min(2).max(100),
 }).strict()
 

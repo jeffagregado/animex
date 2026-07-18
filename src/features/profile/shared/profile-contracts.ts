@@ -19,7 +19,7 @@ export type ProfileTab = z.infer<typeof profileTabSchema>
 export type ProfileMediaKind = z.infer<typeof profileMediaKindSchema>
 
 const nullableHttpsUrlSchema = z.url({ protocol: /^https$/ }).nullable()
-export const profileHeaderSchema = z.object({
+const profileHeaderSchema = z.object({
   avatarUrl: nullableHttpsUrlSchema,
   bannerUrl: nullableHttpsUrlSchema,
   bio: z.string().max(PROFILE_BIO_MAX_LENGTH),
@@ -59,25 +59,19 @@ const cursorPageFields = {
   cursor: z.string().nullable(),
   hasMore: z.boolean(),
 }
-export const profileFavoriteSchema = z.object({
+const profileFavoriteSchema = z.object({
   anime: profileFavoriteAnimeSchema,
   favoriteAt: z.number().finite().nonnegative(),
 }).strict()
-export const profileActivityPageSchema = feedPageSchema
-export const profileReviewPageSchema = z.object({
+const profileActivityPageSchema = feedPageSchema
+const profileReviewPageSchema = z.object({
   ...cursorPageFields,
   items: z.array(reviewListItemSchema).max(PROFILE_CONTENT_PAGE_SIZE),
 }).strict()
-export const profileFavoritePageSchema = z.object({
+const profileFavoritePageSchema = z.object({
   ...cursorPageFields,
   items: z.array(profileFavoriteSchema).max(PROFILE_CONTENT_PAGE_SIZE),
 }).strict()
-export const profileContentPageSchema = z.union([
-  profileActivityPageSchema,
-  profileReviewPageSchema,
-  profileFavoritePageSchema,
-])
-
 export type ProfileHeaderData = z.infer<typeof profileHeaderSchema>
 export type ProfileResult = z.infer<typeof profileResultSchema>
 export type ProfileActivityPage = z.infer<typeof profileActivityPageSchema>

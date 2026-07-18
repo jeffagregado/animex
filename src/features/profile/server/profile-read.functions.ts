@@ -13,10 +13,10 @@ import {
 
 const PROFILE_READ_SCOPE = 'Profile server read'
 
-export const profileUsernameInputSchema = z.object({
+const profileUsernameInputSchema = z.object({
   username: z.string().trim().min(1),
 }).strict()
-export const profileContentInputSchema = profileUsernameInputSchema.extend({
+const profileContentInputSchema = profileUsernameInputSchema.extend({
   cursor: z.string().nullable(),
   tab: z.enum(['activity', 'reviews', 'favorites']),
 }).strict()

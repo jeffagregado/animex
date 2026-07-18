@@ -36,6 +36,11 @@ interface ProfileImageCropperProps {
   onProfileChanged: () => Promise<void>
 }
 
+interface CropRequest {
+  pixels: Area
+  sourceUrl: string
+}
+
 const label: Record<ProfileMediaKind, string> = {
   avatar: 'avatar',
   banner: 'banner',
@@ -47,6 +52,18 @@ const storageResponseSchema = z.object({
 const explicitMessage = (error: unknown): string => (
   error instanceof Error ? error.message : 'PROFILE_MEDIA_INVALID'
 )
+
+/** Returns complete crop input only while the editor is ready. */
+const getCropRequest = (
+  busy: boolean,
+  sourceUrl: string | null,
+  pixels: Area | null,
+): CropRequest | null => {
+  if (busy) return null
+  if (sourceUrl === null) return null
+  if (pixels === null) return null
+  return { pixels, sourceUrl }
+}
 
 const readStorageId = async (
   response: Response,
@@ -236,9 +253,8 @@ function useProfileImageCropper({
   }
 
   const applyCrop = async (): Promise<void> => {
-    if (busy) return
-    if (!sourceUrl) return
-    if (!cropPixels) return
+    const request = getCropRequest(busy, sourceUrl, cropPixels)
+    if (request === null) return
     abortRef.current?.abort()
     abortRef.current = null
     const token = ++tokenRef.current
@@ -249,7 +265,11 @@ function useProfileImageCropper({
     setMessage(null)
     setStatus(`Preparing ${label[kind]}…`)
     try {
-      const prepared = await prepareCrop(current, sourceUrl, cropPixels)
+      const prepared = await prepareCrop(
+        current,
+        request.sourceUrl,
+        request.pixels,
+      )
       if (!prepared) return
       const saved = await saveCrop(current, prepared.storageId)
       if (!saved) return

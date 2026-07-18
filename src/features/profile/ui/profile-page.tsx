@@ -3,7 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useConvexAuth } from 'convex/react'
 
-import type { ProfileTab } from '../shared/profile-contracts'
+import type {
+  ProfileHeaderData,
+  ProfileTab,
+} from '../shared/profile-contracts'
 import { EditProfileDialog } from './edit-profile-dialog'
 import { ProfileActivity } from './profile-activity'
 import {
@@ -59,21 +62,16 @@ export function ProfilePage({
   if (result.access === 'header') {
     return (
       <main className="mx-auto min-h-[70dvh] min-w-0 w-full max-w-[1480px] px-4 pt-5 pb-28 sm:px-6 lg:px-10 lg:pb-12">
-        <ProfileHeader
+        <ProfileIdentity
+          canMutate={canMutate}
+          editOpen={editOpen}
+          finalFocus={editTriggerRef.current}
+          mutationUnavailable={mutationUnavailable}
           onEditProfile={openEditProfile}
-          owner={canMutate}
+          onOpenChange={setEditOpen}
+          onProfileChanged={onProfileChanged}
           profile={result.profile}
         />
-        {canMutate ? (
-          <EditProfileDialog
-            finalFocus={editTriggerRef.current}
-            onProfileChanged={onProfileChanged}
-            onOpenChange={setEditOpen}
-            open={editOpen}
-            profile={result.profile}
-          />
-        ) : null}
-        {mutationUnavailable ? <ProfileMutationUnavailable /> : null}
         <section className="mt-6 min-w-0 rounded-xl border border-cyan-300/25 bg-cyan-300/5 p-8 text-center">
           <h2 className="text-xl font-black">This profile is private</h2>
           <p className="mt-2 text-muted-foreground">
@@ -85,21 +83,16 @@ export function ProfilePage({
   }
   return (
     <main className="mx-auto min-h-[70dvh] min-w-0 w-full max-w-[1480px] px-4 pt-5 pb-28 sm:px-6 lg:px-10 lg:pb-12">
-      <ProfileHeader
+      <ProfileIdentity
+        canMutate={canMutate}
+        editOpen={editOpen}
+        finalFocus={editTriggerRef.current}
+        mutationUnavailable={mutationUnavailable}
         onEditProfile={openEditProfile}
-        owner={canMutate}
+        onOpenChange={setEditOpen}
+        onProfileChanged={onProfileChanged}
         profile={result.profile}
       />
-      {canMutate ? (
-        <EditProfileDialog
-          finalFocus={editTriggerRef.current}
-          onProfileChanged={onProfileChanged}
-          onOpenChange={setEditOpen}
-          open={editOpen}
-          profile={result.profile}
-        />
-      ) : null}
-      {mutationUnavailable ? <ProfileMutationUnavailable /> : null}
       <ProfileTabs tab={tab} username={result.profile.username} />
       <div className="mt-6 grid min-w-0 grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(20rem,0.8fr)]">
         <div className="min-w-0">
@@ -114,6 +107,46 @@ export function ProfilePage({
         </aside>
       </div>
     </main>
+  )
+}
+
+function ProfileIdentity({
+  canMutate,
+  editOpen,
+  finalFocus,
+  mutationUnavailable,
+  onEditProfile,
+  onOpenChange,
+  onProfileChanged,
+  profile,
+}: {
+  canMutate: boolean
+  editOpen: boolean
+  finalFocus: HTMLButtonElement | null
+  mutationUnavailable: boolean
+  onEditProfile: (trigger: HTMLButtonElement) => void
+  onOpenChange: (open: boolean) => void
+  onProfileChanged: () => Promise<void>
+  profile: ProfileHeaderData
+}) {
+  return (
+    <>
+      <ProfileHeader
+        onEditProfile={onEditProfile}
+        owner={canMutate}
+        profile={profile}
+      />
+      {canMutate ? (
+        <EditProfileDialog
+          finalFocus={finalFocus}
+          onProfileChanged={onProfileChanged}
+          onOpenChange={onOpenChange}
+          open={editOpen}
+          profile={profile}
+        />
+      ) : null}
+      {mutationUnavailable ? <ProfileMutationUnavailable /> : null}
+    </>
   )
 }
 
