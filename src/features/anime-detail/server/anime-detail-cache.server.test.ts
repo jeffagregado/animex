@@ -15,6 +15,25 @@ const createDeps = (read: AnimeDetailCacheDependencies['client']['readDetail']):
 })
 
 describe('anime detail cache orchestration', () => {
+  test('passes the configured server token to raw detail and people reads', async () => {
+    const detailTokens: Array<string | undefined> = []
+    const peopleTokens: Array<string | undefined> = []
+    const deps = createDeps(async (_anilistId, token) => {
+      detailTokens.push(token)
+      return { status: 'fresh', entry: { payload: detail, refreshedAt: 1, expiresAt: 86_400_001 } }
+    })
+    deps.client.readPeoplePage = async (_anilistId, _kind, _page, token) => {
+      peopleTokens.push(token)
+      return { status: 'fresh', entry: { payload: emptyPage, refreshedAt: 1, expiresAt: 86_400_001 } }
+    }
+
+    await getAnimeDetailServer(1, deps)
+    await getAnimePeoplePageServer(1, 'characters', 1, deps)
+
+    expect(detailTokens).toEqual(['token'])
+    expect(peopleTokens).toEqual(['token'])
+  })
+
   test('returns fresh entries without upstream work', async () => {
     const deps = createDeps(async () => ({ status: 'fresh', entry: { payload: detail, refreshedAt: 1, expiresAt: 86_400_001 } }))
     deps.fetchDetail = async () => { throw new Error('must not fetch') }

@@ -19,7 +19,7 @@ const CONTENTION_READS = 6
 const CONTENTION_DELAY_MS = 500
 
 export interface DiscoverCacheClient {
-  readSections: (keys: DiscoverSectionKeyProvider[]) => Promise<DiscoverCacheReadProvider[]>
+  readSections: (keys: DiscoverSectionKeyProvider[], token: string) => Promise<DiscoverCacheReadProvider[]>
   acquireSectionLease: (key: DiscoverSectionKeyProvider, leaseId: string, token: string) => Promise<{ acquired: boolean; leaseUntil: number | null }>
   commitSection: (key: DiscoverSectionKeyProvider, leaseId: string, summaries: AnimeSummaryProvider[], token: string) => Promise<void>
   releaseSectionLease: (key: DiscoverSectionKeyProvider, leaseId: string, token: string) => Promise<boolean>
@@ -45,9 +45,9 @@ const requireServerEnv = (name: 'VITE_CONVEX_URL' | 'DISCOVER_CACHE_WRITE_TOKEN'
 const createConvexCacheClient = (url: string): DiscoverCacheClient => {
   const client = new ConvexHttpClient(url)
   return {
-    readSections: async (keys) => await client.query(
+    readSections: async (keys, token) => await client.query(
       api.animeCache.readSections,
-      { keys },
+      { keys, token },
     ) as DiscoverCacheReadProvider[],
     acquireSectionLease: async (key, leaseId, token) => await client.mutation(api.animeCache.acquireSectionLease, { key, leaseId, token }),
     commitSection: async (key, leaseId, summaries, token) => {
@@ -98,8 +98,9 @@ const releaseOwnedLease = async (
 const readKey = async (
   client: DiscoverCacheClient,
   key: DiscoverSectionKeyProvider,
+  writeToken: string,
 ): Promise<DiscoverCacheReadProvider> => {
-  const results = await client.readSections([key])
+  const results = await client.readSections([key], writeToken)
   const result = results[0]
   if (!result || result.key !== key) throw new TypeError(`Discover cache did not return section ${key}.`)
   return result
@@ -119,7 +120,7 @@ export const refreshDiscoverSectionServer = async (
   const client = dependencies.createClient(dependencies.convexUrl)
   let current: DiscoverCacheReadProvider
   try {
-    current = await readKey(client, key)
+    current = await readKey(client, key, dependencies.writeToken)
   } catch {
     return cacheError(key)
   }
@@ -137,7 +138,7 @@ export const refreshDiscoverSectionServer = async (
     for (let attempt = 0; attempt < CONTENTION_READS; attempt += 1) {
       await dependencies.delay(CONTENTION_DELAY_MS)
       try {
-        const reread = toState(await readKey(client, key))
+        const reread = toState(await readKey(client, key, dependencies.writeToken))
         if (reread) return reread
       } catch {
         return cacheError(key)
@@ -155,7 +156,7 @@ export const refreshDiscoverSectionServer = async (
   }
   try {
     await client.commitSection(key, leaseId, summaries, dependencies.writeToken)
-    const reread = toState(await readKey(client, key))
+    const reread = toState(await readKey(client, key, dependencies.writeToken))
     return reread ?? cacheError(key)
   } catch {
     await releaseOwnedLease(client, key, leaseId, dependencies.writeToken)
@@ -170,7 +171,7 @@ export const getDiscoverPageServer = async (
   const client = dependencies.createClient(dependencies.convexUrl)
   let reads: DiscoverCacheReadProvider[]
   try {
-    reads = await client.readSections([...DISCOVER_PROVIDER_SECTION_KEYS])
+    reads = await client.readSections([...DISCOVER_PROVIDER_SECTION_KEYS], dependencies.writeToken)
   } catch {
     return {
       sections: Object.fromEntries(

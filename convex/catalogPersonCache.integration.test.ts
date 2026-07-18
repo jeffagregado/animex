@@ -30,8 +30,8 @@ const modules = import.meta.glob([
   './_generated/**/*.*',
   './{animeCache,catalogIdentityModel,catalogPersonCache}.ts',
 ])
-const readDetail = makeFunctionReference<'query', { kind: Kind; personId: number }, unknown>('catalogPersonCache:readDetail')
-const readWorkPage = makeFunctionReference<'query', { kind: Kind; personId: number; page: number }, unknown>('catalogPersonCache:readWorkPage')
+const readDetail = makeFunctionReference<'query', { kind: Kind; personId: number; token?: string }, unknown>('catalogPersonCache:readDetail')
+const readWorkPage = makeFunctionReference<'query', { kind: Kind; personId: number; page: number; token?: string }, unknown>('catalogPersonCache:readWorkPage')
 const acquireLease = makeFunctionReference<'mutation', { key: string; leaseId: string; token: string }, { acquired: boolean; leaseUntil: number | null }>('catalogPersonCache:acquireLease')
 const commitDetail = makeFunctionReference<'mutation', { kind: Kind; personId: number; detail: Detail; leaseId: string; token: string }, null>('catalogPersonCache:commitDetail')
 const commitWorkPage = makeFunctionReference<'mutation', {
@@ -78,9 +78,87 @@ afterEach(() => {
 })
 
 describe('catalog person Convex cache', () => {
+  test('requires the configured token for raw person reads without changing payloads', async () => {
+    const t = createHarness()
+    await t.mutation(acquireLease, {
+      key: 'person:character:12', leaseId: 'detail-owner', token,
+    })
+    await t.mutation(commitDetail, {
+      kind: 'character', personId: 12, detail, leaseId: 'detail-owner', token,
+    })
+    await t.mutation(acquireLease, {
+      key: 'person-work:character:12:1', leaseId: 'work-owner', token,
+    })
+    await t.mutation(commitWorkPage, {
+      kind: 'character',
+      personId: 12,
+      page: 1,
+      items: [{ animeId: 1, role: 'MAIN' }],
+      hasNextPage: false,
+      summaries: [summary],
+      leaseId: 'work-owner',
+      token,
+    })
+
+    await expect(t.query(readDetail, { kind: 'character', personId: 12 })).rejects.toThrow()
+    await expect(t.query(readDetail, {
+      kind: 'character',
+      personId: 12,
+      token: 'wrong-token',
+    })).rejects.toThrow('CACHE_WRITE_UNAUTHORIZED')
+    await expect(t.query(readDetail, {
+      kind: 'character',
+      personId: 12,
+      token,
+    })).resolves.toEqual({
+      status: 'fresh',
+      entry: { payload: detail, refreshedAt: now, expiresAt: now + 24 * 60 * 60 * 1000 },
+    })
+
+    await expect(t.query(readWorkPage, {
+      kind: 'character',
+      personId: 12,
+      page: 1,
+    })).rejects.toThrow()
+    await expect(t.query(readWorkPage, {
+      kind: 'character',
+      personId: 12,
+      page: 1,
+      token: 'wrong-token',
+    })).rejects.toThrow('CACHE_WRITE_UNAUTHORIZED')
+    await expect(t.query(readWorkPage, {
+      kind: 'character',
+      personId: 12,
+      page: 1,
+      token,
+    })).resolves.toEqual({
+      status: 'fresh',
+      entry: {
+        payload: {
+          items: [{
+            anime: {
+              id: 1,
+              slug: 'one',
+              title: 'One',
+              coverImageUrl: 'https://example.com/one.jpg',
+              format: 'TV',
+              seasonYear: 2024,
+            },
+            role: 'MAIN',
+          }],
+          currentPage: 1,
+          hasNextPage: false,
+          perPage: 20,
+        },
+        refreshedAt: now,
+        expiresAt: now + 24 * 60 * 60 * 1000,
+      },
+    })
+  })
+
   test('guards tokens, validators, indexes, owner commit, and lease deletion', async () => {
     const t = createHarness()
-    await expect(t.query(readDetail, { kind: 'character', personId: 0 })).rejects.toThrow()
+    await expect(t.query(readDetail, { kind: 'character', personId: 0, token })).rejects.toThrow()
     await expect(t.mutation(acquireLease, {
       key: 'person:character:12', leaseId: 'owner', token: 'wrong',
     })).rejects.toThrow()
@@ -95,7 +173,7 @@ describe('catalog person Convex cache', () => {
       kind: 'character', personId: 12, detail, leaseId: 'owner', token,
     })
 
-    await expect(t.query(readDetail, { kind: 'character', personId: 12 }))
+    await expect(t.query(readDetail, { kind: 'character', personId: 12, token }))
       .resolves.toMatchObject({ status: 'fresh', entry: { payload: detail } })
     expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonDetails')
       .withIndex('by_kind_person', (q) => q.eq('kind', 'character').eq('personId', 12))
@@ -167,7 +245,7 @@ describe('catalog person Convex cache', () => {
       hasNextPage: true, summaries: [summary, second], leaseId: 'work-owner', token,
     })
 
-    await expect(t.query(readWorkPage, { kind: 'staff', personId: 21, page: 1 }))
+    await expect(t.query(readWorkPage, { kind: 'staff', personId: 21, page: 1, token }))
       .resolves.toMatchObject({
         status: 'fresh',
         entry: { payload: {
@@ -232,7 +310,7 @@ describe('catalog person Convex cache', () => {
       .toHaveLength(3)
     expect(await t.run(async (ctx) => await ctx.db.query('catalogEntities').collect()))
       .toHaveLength(3)
-    expect(await t.query(readWorkPage, { kind: 'staff', personId: 21, page: 1 }))
+    expect(await t.query(readWorkPage, { kind: 'staff', personId: 21, page: 1, token }))
       .toMatchObject({
         status: 'fresh',
         entry: {
@@ -284,7 +362,7 @@ describe('catalog person Convex cache', () => {
       kind: 'character', personId: 12, detail, leaseId: 'owner', token,
     })
     vi.setSystemTime(new Date('2026-07-18T00:00:00.000Z'))
-    await expect(t.query(readDetail, { kind: 'character', personId: 12 }))
+    await expect(t.query(readDetail, { kind: 'character', personId: 12, token }))
       .resolves.toEqual({ status: 'expired', entry: null })
   })
 
@@ -300,7 +378,7 @@ describe('catalog person Convex cache', () => {
       expiresAt: now + 86_400_000,
     }))
 
-    await expect(t.query(readDetail, { kind: 'character', personId: 12 }))
+    await expect(t.query(readDetail, { kind: 'character', personId: 12, token }))
       .resolves.toEqual({ status: 'expired', entry: null })
   })
 
@@ -312,7 +390,7 @@ describe('catalog person Convex cache', () => {
       items: [{ animeId: 404, role: 'MAIN' }], hasNextPage: false,
       refreshedAt: now, expiresAt: now + 86_400_000,
     }))
-    await expect(t.query(readWorkPage, { kind: 'character', personId: 12, page: 1 }))
+    await expect(t.query(readWorkPage, { kind: 'character', personId: 12, page: 1, token }))
       .rejects.toThrow('missing anime 404')
 
     await t.mutation(acquireLease, {

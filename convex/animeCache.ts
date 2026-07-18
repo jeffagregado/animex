@@ -318,9 +318,10 @@ const deleteReleasedSectionLease = async (
 
 /** Reads cache sections in caller order without returning stale items. */
 export const readSections = query({
-  args: { keys: v.array(sectionKeyValidator) },
+  args: { keys: v.array(sectionKeyValidator), token: v.string() },
   returns: v.array(v.union(freshSectionValidator, unavailableSectionValidator)),
   handler: async (ctx, args) => {
+    requireCacheWriteToken(args.token)
     const now = Date.now()
     return await Promise.all(args.keys.map((key) => readSection(ctx, key, now)))
   },

@@ -34,6 +34,16 @@ const commitPeoplePage = makeFunctionReference<
   },
   null
 >('animeDetailCache:commitPeoplePage')
+const readDetail = makeFunctionReference<
+  'query',
+  { anilistId: number; token?: string },
+  unknown
+>('animeDetailCache:readDetail')
+const readPeoplePage = makeFunctionReference<
+  'query',
+  { anilistId: number; kind: PeopleKind; page: number; token?: string },
+  unknown
+>('animeDetailCache:readPeoplePage')
 
 const token = 'detail-test-token'
 const characters = [
@@ -129,6 +139,60 @@ afterEach(() => {
 })
 
 describe('anime detail Convex cache identity bridge', () => {
+  test('requires the configured token for raw detail and people reads without changing payloads', async () => {
+    const t = createHarness()
+    await t.mutation(acquireLease, { key: 'detail:1', leaseId: 'detail-owner', token })
+    await t.mutation(commitDetail, { leaseId: 'detail-owner', token, summary, detail })
+    await t.mutation(acquireLease, { key: 'people:1:characters:1', leaseId: 'people-owner', token })
+    await t.mutation(commitPeoplePage, {
+      anilistId: 1,
+      kind: 'characters',
+      page: 1,
+      items: characters,
+      hasNextPage: false,
+      leaseId: 'people-owner',
+      token,
+    })
+
+    await expect(t.query(readDetail, { anilistId: 1 })).rejects.toThrow()
+    await expect(t.query(readDetail, { anilistId: 1, token: 'wrong-token' }))
+      .rejects.toThrow('CACHE_WRITE_UNAUTHORIZED')
+    await expect(t.query(readDetail, { anilistId: 1, token })).resolves.toEqual({
+      status: 'fresh',
+      entry: { payload: detail, refreshedAt: now, expiresAt: now + 24 * 60 * 60 * 1000 },
+    })
+
+    await expect(t.query(readPeoplePage, {
+      anilistId: 1,
+      kind: 'characters',
+      page: 1,
+    })).rejects.toThrow()
+    await expect(t.query(readPeoplePage, {
+      anilistId: 1,
+      kind: 'characters',
+      page: 1,
+      token: 'wrong-token',
+    })).rejects.toThrow('CACHE_WRITE_UNAUTHORIZED')
+    await expect(t.query(readPeoplePage, {
+      anilistId: 1,
+      kind: 'characters',
+      page: 1,
+      token,
+    })).resolves.toEqual({
+      status: 'fresh',
+      entry: {
+        payload: {
+          items: characters,
+          currentPage: 1,
+          hasNextPage: false,
+          perPage: 24,
+        },
+        refreshedAt: now,
+        expiresAt: now + 24 * 60 * 60 * 1000,
+      },
+    })
+  })
+
   test('registers bounded deduped detail identities while preserving detail cache and lease invariants', async () => {
     const t = createHarness()
     await t.mutation(acquireLease, { key: 'detail:1', leaseId: 'owner', token })

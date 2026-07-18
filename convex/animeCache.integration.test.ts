@@ -17,6 +17,11 @@ const commitSection = makeFunctionReference<
   { key: 'trending'; leaseId: string; summaries: typeof summary[]; token: string },
   null
 >('animeCache:commitSection')
+const readSections = makeFunctionReference<
+  'query',
+  { keys: ['trending']; token?: string },
+  unknown
+>('animeCache:readSections')
 
 const token = 'discover-test-token'
 const summary = {
@@ -51,6 +56,31 @@ afterEach(() => {
 })
 
 describe('discover Convex cache identity bridge', () => {
+  test('requires the configured token for raw section reads without changing the payload', async () => {
+    const t = createHarness()
+    await t.mutation(acquireSectionLease, { key: 'trending', leaseId: 'owner', token })
+    await t.mutation(commitSection, {
+      key: 'trending',
+      leaseId: 'owner',
+      summaries: [summary],
+      token,
+    })
+
+    await expect(t.query(readSections, { keys: ['trending'] })).rejects.toThrow()
+    await expect(t.query(readSections, { keys: ['trending'], token: 'wrong-token' }))
+      .rejects.toThrow('CACHE_WRITE_UNAUTHORIZED')
+    await expect(t.query(readSections, { keys: ['trending'], token })).resolves.toEqual([{
+      key: 'trending',
+      status: 'fresh',
+      section: {
+        key: 'trending',
+        items: [summary],
+        refreshedAt: now,
+        expiresAt: now + 3 * 60 * 60 * 1000,
+      },
+    }])
+  })
+
   test('registers every committed anime while preserving cache fields, order, timing, and lease deletion', async () => {
     const t = createHarness()
     const second = {

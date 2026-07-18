@@ -37,6 +37,26 @@ const deps = (): CatalogPersonCacheDependencies => ({
 })
 
 describe('catalog person cache orchestration', () => {
+  test('passes the configured server token to raw detail and work reads', async () => {
+    const detailTokens: Array<string | undefined> = []
+    const workTokens: Array<string | undefined> = []
+    const dependencies = deps()
+    dependencies.client.readDetail = async (_kind, _personId, token) => {
+      detailTokens.push(token)
+      return { status: 'fresh', entry: { payload: detail, refreshedAt: 1, expiresAt: 2 } }
+    }
+    dependencies.client.readWorkPage = async (_kind, _personId, _page, token) => {
+      workTokens.push(token)
+      return { status: 'fresh', entry: { payload: page, refreshedAt: 1, expiresAt: 2 } }
+    }
+
+    await getCatalogPersonServer('character', 12, dependencies)
+    await getCatalogPersonWorksServer('character', 12, 1, dependencies)
+
+    expect(detailTokens).toEqual(['token'])
+    expect(workTokens).toEqual(['token'])
+  })
+
   test('returns fresh detail without upstream request', async () => {
     const dependencies = deps()
     dependencies.client.readDetail = async () => ({ status: 'fresh', entry: { payload: detail, refreshedAt: 1, expiresAt: 2 } })

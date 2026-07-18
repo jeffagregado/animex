@@ -29,6 +29,11 @@ const resolveProviderRefs = makeFunctionReference<
   { token: string; refs: ProviderRef[] },
   PublicIdentity[]
 >('catalogIdentity:resolveProviderRefs')
+const resolveProviderByPublicId = makeFunctionReference<
+  'query',
+  { token: string; publicId: string; kind: Kind },
+  ProviderRef
+>('catalogIdentity:resolveProviderByPublicId')
 
 const token = 'catalog-identity-test-token'
 const ref = (providerId: number, kind: Kind = 'anime'): ProviderRef => ({
@@ -57,6 +62,11 @@ describe('catalog identity registry', () => {
       token: 'wrong',
       refs: [ref(1)],
     })).rejects.toThrow('CACHE_WRITE_UNAUTHORIZED')
+    await expect(t.query(resolveProviderByPublicId, {
+      token: 'wrong',
+      publicId: 'public_anime',
+      kind: 'anime',
+    })).rejects.toThrow('CACHE_WRITE_UNAUTHORIZED')
     await expect(t.mutation(ensureProviderRefs, {
       refs: [ref(1)],
     } as never)).rejects.toThrow()
@@ -65,6 +75,66 @@ describe('catalog identity registry', () => {
       refs: [ref(1)],
       unexpected: true,
     } as never)).rejects.toThrow()
+  })
+
+  test('reverse-resolves one public ID with kind validation', async () => {
+    const t = createHarness()
+    const [identity] = await t.mutation(ensureProviderRefs, {
+      token,
+      refs: [ref(52991)],
+    })
+    if (!identity) throw new TypeError('Expected ensured catalog identity.')
+
+    await expect(t.query(resolveProviderByPublicId, {
+      token,
+      publicId: identity.publicId,
+      kind: 'anime',
+    })).resolves.toEqual(ref(52991))
+    await expect(t.query(resolveProviderByPublicId, {
+      token,
+      publicId: identity.publicId,
+      kind: 'staff',
+    })).rejects.toThrow('CATALOG_ENTITY_KIND_CONFLICT')
+  })
+
+  test('reverse resolution rejects duplicate and corrupt provider mappings', async () => {
+    const t = createHarness()
+    const publicId = await t.run(async (ctx) => {
+      const now = Date.now()
+      const entityId = await ctx.db.insert('catalogEntities', {
+        kind: 'anime',
+        createdAt: now,
+        updatedAt: now,
+      })
+      for (const providerId of [1, 2]) {
+        await ctx.db.insert('catalogProviderRefs', {
+          entityId,
+          provider: 'anilist',
+          kind: 'anime',
+          providerId,
+          createdAt: now,
+          updatedAt: now,
+        })
+      }
+      return String(entityId)
+    })
+
+    await expect(t.query(resolveProviderByPublicId, {
+      token,
+      publicId,
+      kind: 'anime',
+    })).rejects.toThrow('CATALOG_ENTITY_PROVIDER_CONFLICT')
+
+    const missingRef = createHarness()
+    const missingRefPublicId = await missingRef.run(async (ctx) => String(await ctx.db.insert(
+      'catalogEntities',
+      { kind: 'staff', createdAt: Date.now(), updatedAt: Date.now() },
+    )))
+    await expect(missingRef.query(resolveProviderByPublicId, {
+      token,
+      publicId: missingRefPublicId,
+      kind: 'staff',
+    })).rejects.toThrow('CATALOG_PROVIDER_REF_MISSING')
   })
 
   test('returns stable serialized public IDs in input order under retries', async () => {

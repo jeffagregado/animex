@@ -26,8 +26,8 @@ export type AnimePeoplePageState = { status: 'ready'; page: PeoplePage } | { sta
 type CacheErrorState = Extract<AnimeDetailServerState, { status: 'error' }>
 
 export interface AnimeDetailCacheClient {
-  readDetail: (anilistId: number) => Promise<CacheRead<AnimeDetailProvider>>
-  readPeoplePage: (anilistId: number, kind: AnimeProviderPeopleKind, page: number) => Promise<CacheRead<PeoplePage>>
+  readDetail: (anilistId: number, token: string) => Promise<CacheRead<AnimeDetailProvider>>
+  readPeoplePage: (anilistId: number, kind: AnimeProviderPeopleKind, page: number, token: string) => Promise<CacheRead<PeoplePage>>
   acquireLease: (key: string, leaseId: string, token: string) => Promise<{ acquired: boolean; leaseUntil: number | null }>
   commitDetail: (leaseId: string, summary: AnimeSummaryProvider, detail: AnimeDetailProvider, token: string) => Promise<void>
   commitPeoplePage: (anilistId: number, kind: AnimeProviderPeopleKind, page: number, payload: PeoplePage, leaseId: string, token: string) => Promise<void>
@@ -70,7 +70,7 @@ const releasePreservingError = async (dependencies: AnimeDetailCacheDependencies
 /** Reads one detail and converts cache failures to public errors. */
 const readDetailState = async (anilistId: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimeDetailServerState | null> => {
   try {
-    return ready(await dependencies.client.readDetail(anilistId))
+    return ready(await dependencies.client.readDetail(anilistId, dependencies.writeToken))
   } catch (error) {
     return errorState(error)
   }
@@ -99,7 +99,7 @@ const refreshDetail = async (anilistId: number, key: string, leaseId: string, de
       return { status: 'not-found', code: 'NOT_FOUND', message: 'Anime was not found.' }
     }
     await dependencies.client.commitDetail(leaseId, fetched.summary, fetched.detail, dependencies.writeToken)
-    const reread = ready(await dependencies.client.readDetail(anilistId))
+    const reread = ready(await dependencies.client.readDetail(anilistId, dependencies.writeToken))
     return reread ?? errorState(new Error('Committed detail was unavailable.'))
   } catch (error) {
     await releasePreservingError(dependencies, key, leaseId)
@@ -123,7 +123,7 @@ export const getAnimeDetailServer = async (anilistId: number, dependencies: Anim
 /** Reads one people page and converts cache failures to public errors. */
 const readPeoplePageState = async (anilistId: number, kind: AnimeProviderPeopleKind, page: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState | null> => {
   try {
-    const cached = await dependencies.client.readPeoplePage(anilistId, kind, page)
+    const cached = await dependencies.client.readPeoplePage(anilistId, kind, page, dependencies.writeToken)
     return cached.status === 'fresh' ? { status: 'ready', page: cached.entry.payload } : null
   } catch (error) {
     return peopleErrorState(error)
@@ -153,7 +153,7 @@ const refreshPeoplePage = async (anilistId: number, kind: AnimeProviderPeopleKin
       return { status: 'not-found' }
     }
     await dependencies.client.commitPeoplePage(anilistId, kind, page, fetched, leaseId, dependencies.writeToken)
-    const reread = await dependencies.client.readPeoplePage(anilistId, kind, page)
+    const reread = await dependencies.client.readPeoplePage(anilistId, kind, page, dependencies.writeToken)
     if (reread.status !== 'fresh') throw new TypeError('Committed anime people page was unavailable.')
     return { status: 'ready', page: reread.entry.payload }
   } catch (error) {
@@ -186,8 +186,8 @@ const requireEnv = (name: 'VITE_CONVEX_URL' | 'DISCOVER_CACHE_WRITE_TOKEN'): str
 export const createAnimeDetailCacheDependencies = (): AnimeDetailCacheDependencies => {
   const convex = new ConvexHttpClient(requireEnv('VITE_CONVEX_URL'))
   const client: AnimeDetailCacheClient = {
-    readDetail: async (anilistId) => await convex.query(api.animeDetailCache.readDetail, { anilistId }) as CacheRead<AnimeDetailProvider>,
-    readPeoplePage: async (anilistId, kind, page) => await convex.query(api.animeDetailCache.readPeoplePage, { anilistId, kind, page }) as CacheRead<PeoplePage>,
+    readDetail: async (anilistId, token) => await convex.query(api.animeDetailCache.readDetail, { anilistId, token }) as CacheRead<AnimeDetailProvider>,
+    readPeoplePage: async (anilistId, kind, page, token) => await convex.query(api.animeDetailCache.readPeoplePage, { anilistId, kind, page, token }) as CacheRead<PeoplePage>,
     acquireLease: async (key, leaseId, token) => await convex.mutation(api.animeDetailCache.acquireLease, { key, leaseId, token }),
     commitDetail: async (leaseId, summary, detail, token) => { await convex.mutation(api.animeDetailCache.commitDetail, { leaseId, summary, detail, token }) },
     commitPeoplePage: async (anilistId, kind, page, payload, leaseId, token) => { await convex.mutation(api.animeDetailCache.commitPeoplePage, { anilistId, kind, page, items: payload.items, hasNextPage: payload.hasNextPage, leaseId, token }) },

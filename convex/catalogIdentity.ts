@@ -7,6 +7,7 @@ import { requireCacheWriteToken } from './animeCache'
 import {
   CatalogIdentityModelError,
   ensureCatalogEntity,
+  resolveProviderByCatalogPublicId,
   resolveProviderRef,
 } from './catalogIdentityModel'
 import {
@@ -90,6 +91,24 @@ export const resolveProviderRefs = query({
         identities.push({ publicId: entityId, kind: ref.kind })
       }
       return identities
+    } catch (error) {
+      return throwIdentityError(error)
+    }
+  },
+})
+
+/** Reverse-resolves one public ID for token-gated server metadata reads. */
+export const resolveProviderByPublicId = query({
+  args: {
+    token: v.string(),
+    publicId: v.string(),
+    kind: catalogEntityKindValidator,
+  },
+  returns: providerRefValidator,
+  handler: async (ctx, args) => {
+    requireCacheWriteToken(args.token)
+    try {
+      return await resolveProviderByCatalogPublicId(ctx, args.publicId, args.kind)
     } catch (error) {
       return throwIdentityError(error)
     }

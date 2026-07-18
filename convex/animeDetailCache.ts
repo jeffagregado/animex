@@ -66,8 +66,9 @@ const assertCacheKey = (key: string): void => {
 
 /** Reads a detail record without exposing expired data. */
 export const readDetail = query({
-  args: { anilistId: v.number() }, returns: detailReadValidator,
+  args: { anilistId: v.number(), token: v.string() }, returns: detailReadValidator,
   handler: async (ctx, args) => {
+    requireCacheWriteToken(args.token)
     assertPositive(args.anilistId, 'anilistId')
     const record = await ctx.db.query('animeDetails').withIndex('by_anilist_id', (q) => q.eq('anilistId', args.anilistId)).unique()
     return resolveDetailRead(record ? { payload: record.detail, refreshedAt: record.refreshedAt, expiresAt: record.expiresAt } : null, Date.now())
@@ -76,8 +77,9 @@ export const readDetail = query({
 
 /** Reads one Character or Staff page without exposing expired data. */
 export const readPeoplePage = query({
-  args: { anilistId: v.number(), kind: kindValidator, page: v.number() }, returns: pageReadValidator,
+  args: { anilistId: v.number(), kind: kindValidator, page: v.number(), token: v.string() }, returns: pageReadValidator,
   handler: async (ctx, args) => {
+    requireCacheWriteToken(args.token)
     try { validatePeoplePage(args.anilistId, args.kind, args.page, []) } catch (error) { return failPolicy(error) }
     const record = await ctx.db.query('animeDetailPeoplePages').withIndex('by_anime_kind_page', (q) => q.eq('anilistId', args.anilistId).eq('kind', args.kind).eq('page', args.page)).unique()
     return resolveDetailRead(record ? { payload: { items: record.items, currentPage: record.page, hasNextPage: record.hasNextPage, perPage: 24 as const }, refreshedAt: record.refreshedAt, expiresAt: record.expiresAt } : null, Date.now())

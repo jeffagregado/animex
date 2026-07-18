@@ -22,8 +22,8 @@ export type CatalogPersonWorksState = { status: 'ready'; page: CatalogPersonProv
 type WorkFetch = { page: CatalogPersonProviderWorkPage; summaries: AnimeSummaryProvider[] }
 
 export interface CatalogPersonCacheClient {
-  readDetail: (kind: CatalogPersonProviderKind, personId: number) => Promise<CacheRead<CatalogPersonProviderDetail>>
-  readWorkPage: (kind: CatalogPersonProviderKind, personId: number, page: number) => Promise<CacheRead<CatalogPersonProviderWorkPage>>
+  readDetail: (kind: CatalogPersonProviderKind, personId: number, token: string) => Promise<CacheRead<CatalogPersonProviderDetail>>
+  readWorkPage: (kind: CatalogPersonProviderKind, personId: number, page: number, token: string) => Promise<CacheRead<CatalogPersonProviderWorkPage>>
   acquireLease: (key: string, leaseId: string, token: string) => Promise<{ acquired: boolean; leaseUntil: number | null }>
   commitDetail: (kind: CatalogPersonProviderKind, personId: number, detail: CatalogPersonProviderDetail, leaseId: string, token: string) => Promise<void>
   commitWorkPage: (kind: CatalogPersonProviderKind, personId: number, page: number, payload: WorkFetch, leaseId: string, token: string) => Promise<void>
@@ -40,8 +40,8 @@ export interface CatalogPersonCacheDependencies {
   fetchWorks: (kind: CatalogPersonProviderKind, id: number, page: number) => Promise<WorkFetch | null>
 }
 
-const readDetailRef = makeFunctionReference<'query', { kind: CatalogPersonProviderKind; personId: number }, CacheRead<CatalogPersonProviderDetail>>('catalogPersonCache:readDetail')
-const readWorkRef = makeFunctionReference<'query', { kind: CatalogPersonProviderKind; personId: number; page: number }, CacheRead<CatalogPersonProviderWorkPage>>('catalogPersonCache:readWorkPage')
+const readDetailRef = makeFunctionReference<'query', { kind: CatalogPersonProviderKind; personId: number; token: string }, CacheRead<CatalogPersonProviderDetail>>('catalogPersonCache:readDetail')
+const readWorkRef = makeFunctionReference<'query', { kind: CatalogPersonProviderKind; personId: number; page: number; token: string }, CacheRead<CatalogPersonProviderWorkPage>>('catalogPersonCache:readWorkPage')
 const acquireRef = makeFunctionReference<'mutation', { key: string; leaseId: string; token: string }, { acquired: boolean; leaseUntil: number | null }>('catalogPersonCache:acquireLease')
 const commitDetailRef = makeFunctionReference<'mutation', { kind: CatalogPersonProviderKind; personId: number; detail: CatalogPersonProviderDetail; leaseId: string; token: string }, null>('catalogPersonCache:commitDetail')
 const commitWorkRef = makeFunctionReference<'mutation', { kind: CatalogPersonProviderKind; personId: number; page: number; items: Array<{ animeId: number; role: string | null }>; hasNextPage: boolean; summaries: AnimeSummaryProvider[]; leaseId: string; token: string }, null>('catalogPersonCache:commitWorkPage')
@@ -65,14 +65,14 @@ const releasePreserving = async (dependencies: CatalogPersonCacheDependencies, k
 
 const readDetailState = async (kind: CatalogPersonProviderKind, id: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonState | null> => {
   try {
-    const read = await dependencies.client.readDetail(kind, id)
+    const read = await dependencies.client.readDetail(kind, id, dependencies.writeToken)
     return read.status === 'fresh' ? { status: 'ready', entry: { detail: read.entry.payload, refreshedAt: read.entry.refreshedAt, expiresAt: read.entry.expiresAt } } : null
   } catch (error) { return errorState(error) }
 }
 
 const readWorkState = async (kind: CatalogPersonProviderKind, id: number, page: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonWorksState | null> => {
   try {
-    const read = await dependencies.client.readWorkPage(kind, id, page)
+    const read = await dependencies.client.readWorkPage(kind, id, page, dependencies.writeToken)
     return read.status === 'fresh' ? { status: 'ready', page: read.entry.payload } : null
   } catch (error) { return errorState(error) }
 }
@@ -143,8 +143,8 @@ const requireServerEnv = (name: 'VITE_CONVEX_URL' | 'DISCOVER_CACHE_WRITE_TOKEN'
 export const createCatalogPersonCacheDependencies = (): CatalogPersonCacheDependencies => {
   const convex = new ConvexHttpClient(requireServerEnv('VITE_CONVEX_URL'))
   const client: CatalogPersonCacheClient = {
-    readDetail: async (kind, personId) => await convex.query(readDetailRef, { kind, personId }),
-    readWorkPage: async (kind, personId, page) => await convex.query(readWorkRef, { kind, personId, page }),
+    readDetail: async (kind, personId, token) => await convex.query(readDetailRef, { kind, personId, token }),
+    readWorkPage: async (kind, personId, page, token) => await convex.query(readWorkRef, { kind, personId, page, token }),
     acquireLease: async (key, leaseId, token) => await convex.mutation(acquireRef, { key, leaseId, token }),
     commitDetail: async (kind, personId, detail, leaseId, token) => { await convex.mutation(commitDetailRef, { kind, personId, detail, leaseId, token }) },
     commitWorkPage: async (kind, personId, page, payload, leaseId, token) => {

@@ -28,7 +28,7 @@ const summary = (id: number) => ({
 })
 
 type CacheClient = {
-  readSections: (keys: string[]) => Promise<unknown>
+  readSections: (keys: string[], token?: string) => Promise<unknown>
   acquireSectionLease: (key: string, leaseId: string, token: string) => Promise<unknown>
   commitSection: (key: string, leaseId: string, summaries: unknown[], token: string) => Promise<unknown>
   releaseSectionLease: (key: string, leaseId: string, token: string) => Promise<unknown>
@@ -58,6 +58,24 @@ const fresh = (key: string, id: number) => ({
 })
 
 describe('Discover cache server orchestration', () => {
+  test('passes the configured server token to raw cache reads', async () => {
+    const readTokens: Array<string | undefined> = []
+    const client: CacheClient = {
+      readSections: async (keys, token) => {
+        readTokens.push(token)
+        return keys.map((key, index) => fresh(key, index + 1))
+      },
+      acquireSectionLease: async () => ({ acquired: false, leaseUntil: null }),
+      commitSection: async () => null,
+      releaseSectionLease: async () => false,
+    }
+    const fixture = createDependencies(client)
+
+    await getDiscoverPageServer(fixture.dependencies)
+
+    expect(readTokens).toEqual(['token'])
+  })
+
   test('stays independent from browser-public Discover contracts', async () => {
     const source = await readFile(
       new URL('./discover-cache.server.ts', import.meta.url),

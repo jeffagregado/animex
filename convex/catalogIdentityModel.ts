@@ -121,6 +121,53 @@ export const resolveCatalogEntityByPublicId = async (
   return entity
 }
 
+/** Reverse-resolves one public ID to its sole validated AniList provider reference. */
+export const resolveProviderByCatalogPublicId = async (
+  ctx: CatalogIdentityReader,
+  publicId: CatalogPublicId,
+  kind: CatalogProviderRef['kind'],
+): Promise<CatalogProviderRef> => {
+  const entity = await resolveCatalogEntityByPublicId(ctx, publicId)
+  if (entity.kind !== kind) {
+    throw new CatalogIdentityPolicyError(
+      'CATALOG_ENTITY_KIND_CONFLICT',
+      `Catalog entity kind ${entity.kind} does not match requested kind ${kind}.`,
+    )
+  }
+  const refs = await ctx.db
+    .query('catalogProviderRefs')
+    .withIndex('by_entity_provider', (q) => q
+      .eq('entityId', entity._id)
+      .eq('provider', 'anilist'))
+    .take(2)
+  if (refs.length === 0) {
+    throw new CatalogIdentityModelError(
+      'CATALOG_PROVIDER_REF_MISSING',
+      `Catalog entity ${publicId} has no AniList provider reference.`,
+    )
+  }
+  if (refs.length > 1) {
+    throw new CatalogIdentityPolicyError(
+      'CATALOG_ENTITY_PROVIDER_CONFLICT',
+      `Catalog entity ${publicId} has multiple AniList provider references.`,
+    )
+  }
+  const mapping = refs[0]
+  if (!mapping) {
+    throw new CatalogIdentityModelError(
+      'CATALOG_PROVIDER_REF_MISSING',
+      `Catalog entity ${publicId} has no AniList provider reference.`,
+    )
+  }
+  const ref: CatalogProviderRef = {
+    provider: mapping.provider,
+    kind: mapping.kind,
+    providerId: mapping.providerId,
+  }
+  assertEntityAcceptsProviderRef(entity.kind, ref, ref)
+  return ref
+}
+
 /** Ensures one stable entity exists for a provider tuple. */
 export const ensureCatalogEntity = async (
   ctx: MutationCtx,

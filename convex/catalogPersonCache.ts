@@ -91,9 +91,10 @@ const currentDetail = (detail: Doc<'catalogPersonDetails'>['detail']): CatalogPe
 
 /** Reads one person detail without expired fallback. */
 export const readDetail = query({
-  args: { kind: kindValidator, personId: v.number() },
+  args: { kind: kindValidator, personId: v.number(), token: v.string() },
   returns: detailReadValidator,
   handler: async (ctx, args) => {
+    requireCacheWriteToken(args.token)
     try { personDetailKey(args.kind, args.personId) } catch (error) { failPolicy(error) }
     const record = await ctx.db.query('catalogPersonDetails').withIndex('by_kind_person', (q) => q.eq('kind', args.kind).eq('personId', args.personId)).unique()
     if (!record) return resolveCatalogPersonRead<CatalogPersonProviderDetail>(null, Date.now())
@@ -105,9 +106,10 @@ export const readDetail = query({
 
 /** Reads and hydrates one ordered work page. */
 export const readWorkPage = query({
-  args: { kind: kindValidator, personId: v.number(), page: v.number() },
+  args: { kind: kindValidator, personId: v.number(), page: v.number(), token: v.string() },
   returns: workReadValidator,
   handler: async (ctx, args) => {
+    requireCacheWriteToken(args.token)
     try { personWorkKey(args.kind, args.personId, args.page) } catch (error) { failPolicy(error) }
     const record = await ctx.db.query('catalogPersonWorkPages').withIndex('by_kind_person_page', (q) => q.eq('kind', args.kind).eq('personId', args.personId).eq('page', args.page)).unique()
     const timed = resolveCatalogPersonRead(record ? { payload: record, refreshedAt: record.refreshedAt, expiresAt: record.expiresAt } : null, Date.now())
