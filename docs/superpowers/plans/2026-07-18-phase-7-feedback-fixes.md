@@ -125,6 +125,8 @@ Tasks 2 and 5 may run in parallel only after Task 1 commits the RED tests and re
 
 **Owner:** QA researcher observes runtime read-only. Controller/test worker owns every listed checkpoint/test write and releases those locks after the RED commit.
 
+**Staged TDD note:** Task 1 covers behavior that can fail through existing seams. Tests for new auth-state, Profile-read, and User Search server-facade modules move to the first RED slice of Task 3, before those production modules are created. This avoids module-resolution setup failures while preserving test-first implementation.
+
 **Files:**
 
 - Create: `docs/superpowers/checkpoints/2026-07-18-phase-7-feedback-fixes-start.md`
