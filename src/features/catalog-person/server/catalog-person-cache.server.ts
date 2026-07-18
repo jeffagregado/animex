@@ -2,12 +2,12 @@ import { ConvexHttpClient } from 'convex/browser'
 import { makeFunctionReference } from 'convex/server'
 
 import { AniListRequestError, createAniListDependencies } from '../../../lib/anilist-client.server'
-import { type AnimeSummary } from '../../discover/shared/discover-contracts'
+import { type AnimeSummaryProvider } from '../../discover/server/discover-provider-cache-contracts.server'
 import {
-  type CatalogPersonDetail,
-  type CatalogPersonKind,
-  type CatalogPersonWorkPage,
-} from '../shared/catalog-person-contracts'
+  type CatalogPersonProviderDetail,
+  type CatalogPersonProviderKind,
+  type CatalogPersonProviderWorkPage,
+} from './catalog-person-provider-cache-contracts.server'
 import {
   fetchCatalogPersonFromAniList,
   fetchCatalogPersonWorksFromAniList,
@@ -17,16 +17,16 @@ const CONTENTION_READS = 6
 const CONTENTION_DELAY_MS = 500
 type CacheRead<T> = { status: 'fresh'; entry: { payload: T; refreshedAt: number; expiresAt: number } } | { status: 'missing' | 'expired'; entry: null }
 type ErrorState = { status: 'error'; code: 'UPSTREAM' | 'RATE_LIMITED'; message: string; retryAfterSeconds: number | null }
-export type CatalogPersonState = { status: 'ready'; entry: { detail: CatalogPersonDetail; refreshedAt: number; expiresAt: number } } | { status: 'not-found' } | ErrorState
-export type CatalogPersonWorksState = { status: 'ready'; page: CatalogPersonWorkPage } | { status: 'not-found' } | ErrorState
-type WorkFetch = { page: CatalogPersonWorkPage; summaries: AnimeSummary[] }
+export type CatalogPersonState = { status: 'ready'; entry: { detail: CatalogPersonProviderDetail; refreshedAt: number; expiresAt: number } } | { status: 'not-found' } | ErrorState
+export type CatalogPersonWorksState = { status: 'ready'; page: CatalogPersonProviderWorkPage } | { status: 'not-found' } | ErrorState
+type WorkFetch = { page: CatalogPersonProviderWorkPage; summaries: AnimeSummaryProvider[] }
 
 export interface CatalogPersonCacheClient {
-  readDetail: (kind: CatalogPersonKind, personId: number) => Promise<CacheRead<CatalogPersonDetail>>
-  readWorkPage: (kind: CatalogPersonKind, personId: number, page: number) => Promise<CacheRead<CatalogPersonWorkPage>>
+  readDetail: (kind: CatalogPersonProviderKind, personId: number) => Promise<CacheRead<CatalogPersonProviderDetail>>
+  readWorkPage: (kind: CatalogPersonProviderKind, personId: number, page: number) => Promise<CacheRead<CatalogPersonProviderWorkPage>>
   acquireLease: (key: string, leaseId: string, token: string) => Promise<{ acquired: boolean; leaseUntil: number | null }>
-  commitDetail: (kind: CatalogPersonKind, personId: number, detail: CatalogPersonDetail, leaseId: string, token: string) => Promise<void>
-  commitWorkPage: (kind: CatalogPersonKind, personId: number, page: number, payload: WorkFetch, leaseId: string, token: string) => Promise<void>
+  commitDetail: (kind: CatalogPersonProviderKind, personId: number, detail: CatalogPersonProviderDetail, leaseId: string, token: string) => Promise<void>
+  commitWorkPage: (kind: CatalogPersonProviderKind, personId: number, page: number, payload: WorkFetch, leaseId: string, token: string) => Promise<void>
   releaseLease: (key: string, leaseId: string, token: string) => Promise<boolean>
 }
 
@@ -36,23 +36,23 @@ export interface CatalogPersonCacheDependencies {
   createLeaseId: () => string
   delay: (milliseconds: number) => Promise<void>
   warn: (message: string) => void
-  fetchDetail: (kind: CatalogPersonKind, id: number) => Promise<CatalogPersonDetail | null>
-  fetchWorks: (kind: CatalogPersonKind, id: number, page: number) => Promise<WorkFetch | null>
+  fetchDetail: (kind: CatalogPersonProviderKind, id: number) => Promise<CatalogPersonProviderDetail | null>
+  fetchWorks: (kind: CatalogPersonProviderKind, id: number, page: number) => Promise<WorkFetch | null>
 }
 
-const readDetailRef = makeFunctionReference<'query', { kind: CatalogPersonKind; personId: number }, CacheRead<CatalogPersonDetail>>('catalogPersonCache:readDetail')
-const readWorkRef = makeFunctionReference<'query', { kind: CatalogPersonKind; personId: number; page: number }, CacheRead<CatalogPersonWorkPage>>('catalogPersonCache:readWorkPage')
+const readDetailRef = makeFunctionReference<'query', { kind: CatalogPersonProviderKind; personId: number }, CacheRead<CatalogPersonProviderDetail>>('catalogPersonCache:readDetail')
+const readWorkRef = makeFunctionReference<'query', { kind: CatalogPersonProviderKind; personId: number; page: number }, CacheRead<CatalogPersonProviderWorkPage>>('catalogPersonCache:readWorkPage')
 const acquireRef = makeFunctionReference<'mutation', { key: string; leaseId: string; token: string }, { acquired: boolean; leaseUntil: number | null }>('catalogPersonCache:acquireLease')
-const commitDetailRef = makeFunctionReference<'mutation', { kind: CatalogPersonKind; personId: number; detail: CatalogPersonDetail; leaseId: string; token: string }, null>('catalogPersonCache:commitDetail')
-const commitWorkRef = makeFunctionReference<'mutation', { kind: CatalogPersonKind; personId: number; page: number; items: Array<{ animeId: number; role: string | null }>; hasNextPage: boolean; summaries: AnimeSummary[]; leaseId: string; token: string }, null>('catalogPersonCache:commitWorkPage')
+const commitDetailRef = makeFunctionReference<'mutation', { kind: CatalogPersonProviderKind; personId: number; detail: CatalogPersonProviderDetail; leaseId: string; token: string }, null>('catalogPersonCache:commitDetail')
+const commitWorkRef = makeFunctionReference<'mutation', { kind: CatalogPersonProviderKind; personId: number; page: number; items: Array<{ animeId: number; role: string | null }>; hasNextPage: boolean; summaries: AnimeSummaryProvider[]; leaseId: string; token: string }, null>('catalogPersonCache:commitWorkPage')
 const releaseRef = makeFunctionReference<'mutation', { key: string; leaseId: string; token: string }, boolean>('catalogPersonCache:releaseLease')
 
 const errorState = (error: unknown): ErrorState => error instanceof AniListRequestError
   ? { status: 'error', code: error.code, message: error.message, retryAfterSeconds: error.retryAfterSeconds }
   : { status: 'error', code: 'UPSTREAM', message: 'Catalog person is temporarily unavailable.', retryAfterSeconds: null }
 
-const detailKey = (kind: CatalogPersonKind, id: number): string => `person:${kind}:${id}`
-const workKey = (kind: CatalogPersonKind, id: number, page: number): string => `person-work:${kind}:${id}:${page}`
+const detailKey = (kind: CatalogPersonProviderKind, id: number): string => `person:${kind}:${id}`
+const workKey = (kind: CatalogPersonProviderKind, id: number, page: number): string => `person-work:${kind}:${id}:${page}`
 
 const release = async (dependencies: CatalogPersonCacheDependencies, key: string, leaseId: string): Promise<void> => {
   const released = await dependencies.client.releaseLease(key, leaseId, dependencies.writeToken)
@@ -63,21 +63,21 @@ const releasePreserving = async (dependencies: CatalogPersonCacheDependencies, k
   try { await release(dependencies, key, leaseId) } catch { dependencies.warn('Catalog person cache lease release failed while preserving the primary error.') }
 }
 
-const readDetailState = async (kind: CatalogPersonKind, id: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonState | null> => {
+const readDetailState = async (kind: CatalogPersonProviderKind, id: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonState | null> => {
   try {
     const read = await dependencies.client.readDetail(kind, id)
     return read.status === 'fresh' ? { status: 'ready', entry: { detail: read.entry.payload, refreshedAt: read.entry.refreshedAt, expiresAt: read.entry.expiresAt } } : null
   } catch (error) { return errorState(error) }
 }
 
-const readWorkState = async (kind: CatalogPersonKind, id: number, page: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonWorksState | null> => {
+const readWorkState = async (kind: CatalogPersonProviderKind, id: number, page: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonWorksState | null> => {
   try {
     const read = await dependencies.client.readWorkPage(kind, id, page)
     return read.status === 'fresh' ? { status: 'ready', page: read.entry.payload } : null
   } catch (error) { return errorState(error) }
 }
 
-const waitDetail = async (kind: CatalogPersonKind, id: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonState> => {
+const waitDetail = async (kind: CatalogPersonProviderKind, id: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonState> => {
   for (let attempt = 0; attempt < CONTENTION_READS; attempt += 1) {
     await dependencies.delay(CONTENTION_DELAY_MS)
     const state = await readDetailState(kind, id, dependencies)
@@ -86,7 +86,7 @@ const waitDetail = async (kind: CatalogPersonKind, id: number, dependencies: Cat
   return errorState(new Error('Catalog person detail refresh contention.'))
 }
 
-const waitWork = async (kind: CatalogPersonKind, id: number, page: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonWorksState> => {
+const waitWork = async (kind: CatalogPersonProviderKind, id: number, page: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonWorksState> => {
   for (let attempt = 0; attempt < CONTENTION_READS; attempt += 1) {
     await dependencies.delay(CONTENTION_DELAY_MS)
     const state = await readWorkState(kind, id, page, dependencies)
@@ -96,7 +96,7 @@ const waitWork = async (kind: CatalogPersonKind, id: number, page: number, depen
 }
 
 /** Reads or refreshes one person detail without stale success. */
-export const getCatalogPersonServer = async (kind: CatalogPersonKind, id: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonState> => {
+export const getCatalogPersonServer = async (kind: CatalogPersonProviderKind, id: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonState> => {
   const cached = await readDetailState(kind, id, dependencies)
   if (cached) return cached
   const key = detailKey(kind, id); const leaseId = dependencies.createLeaseId()
@@ -115,7 +115,7 @@ export const getCatalogPersonServer = async (kind: CatalogPersonKind, id: number
 }
 
 /** Reads or refreshes one ordered work page without stale success. */
-export const getCatalogPersonWorksServer = async (kind: CatalogPersonKind, id: number, page: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonWorksState> => {
+export const getCatalogPersonWorksServer = async (kind: CatalogPersonProviderKind, id: number, page: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonWorksState> => {
   const cached = await readWorkState(kind, id, page, dependencies)
   if (cached) return cached
   const key = workKey(kind, id, page); const leaseId = dependencies.createLeaseId()

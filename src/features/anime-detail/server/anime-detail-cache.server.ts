@@ -2,35 +2,35 @@ import { ConvexHttpClient } from 'convex/browser'
 
 import { api } from '../../../../convex/_generated/api'
 import { AniListRequestError, createAniListDependencies } from '../../../lib/anilist-client.server'
-import { type AnimeSummary } from '../../discover/shared/discover-contracts'
 import {
-  parseAnilistId,
-  parseAnimePage,
-  type AnimeCharacter,
-  type AnimeDetail,
-  type AnimePeopleKind,
-  type AnimePeoplePage,
-  type AnimeStaff,
-  type PublicAnimeDetailState,
-} from '../shared/anime-detail-contracts'
+  parseProviderAnimePage,
+  parseProviderAnilistId,
+  type AnimeDetailProvider,
+  type AnimeDetailServerState,
+  type AnimeProviderCharacter,
+  type AnimeProviderPeopleKind,
+  type AnimeProviderPeoplePage,
+  type AnimeProviderStaff,
+  type AnimeSummaryProvider,
+} from './anime-detail-provider-cache-contracts.server'
 import { fetchAnimeDetailCachePayload, fetchAnimePeoplePageFromAniList } from './anilist-detail.server'
 
 const CONTENTION_READS = 6
 const CONTENTION_DELAY_MS = 500
 
 type CacheRead<T> = { status: 'fresh'; entry: { payload: T; refreshedAt: number; expiresAt: number } } | { status: 'missing' | 'expired'; entry: null }
-type PeoplePage = AnimePeoplePage<AnimeCharacter> | AnimePeoplePage<AnimeStaff>
+type PeoplePage = AnimeProviderPeoplePage<AnimeProviderCharacter> | AnimeProviderPeoplePage<AnimeProviderStaff>
 type CacheLease = { acquired: boolean; leaseUntil: number | null }
 
 export type AnimePeoplePageState = { status: 'ready'; page: PeoplePage } | { status: 'not-found' } | { status: 'error'; code: 'UPSTREAM' | 'RATE_LIMITED'; message: string; retryAfterSeconds: number | null }
-type CacheErrorState = Extract<PublicAnimeDetailState, { status: 'error' }>
+type CacheErrorState = Extract<AnimeDetailServerState, { status: 'error' }>
 
 export interface AnimeDetailCacheClient {
-  readDetail: (anilistId: number) => Promise<CacheRead<AnimeDetail>>
-  readPeoplePage: (anilistId: number, kind: AnimePeopleKind, page: number) => Promise<CacheRead<PeoplePage>>
+  readDetail: (anilistId: number) => Promise<CacheRead<AnimeDetailProvider>>
+  readPeoplePage: (anilistId: number, kind: AnimeProviderPeopleKind, page: number) => Promise<CacheRead<PeoplePage>>
   acquireLease: (key: string, leaseId: string, token: string) => Promise<{ acquired: boolean; leaseUntil: number | null }>
-  commitDetail: (leaseId: string, summary: AnimeSummary, detail: AnimeDetail, token: string) => Promise<void>
-  commitPeoplePage: (anilistId: number, kind: AnimePeopleKind, page: number, payload: PeoplePage, leaseId: string, token: string) => Promise<void>
+  commitDetail: (leaseId: string, summary: AnimeSummaryProvider, detail: AnimeDetailProvider, token: string) => Promise<void>
+  commitPeoplePage: (anilistId: number, kind: AnimeProviderPeopleKind, page: number, payload: PeoplePage, leaseId: string, token: string) => Promise<void>
   releaseLease: (key: string, leaseId: string, token: string) => Promise<boolean>
 }
 
@@ -40,8 +40,8 @@ export interface AnimeDetailCacheDependencies {
   createLeaseId: () => string
   delay: (milliseconds: number) => Promise<void>
   warn: (message: string) => void
-  fetchDetail: (anilistId: number) => Promise<{ detail: AnimeDetail; summary: AnimeSummary } | null>
-  fetchPeople: (anilistId: number, kind: AnimePeopleKind, page: number) => Promise<PeoplePage | null>
+  fetchDetail: (anilistId: number) => Promise<{ detail: AnimeDetailProvider; summary: AnimeSummaryProvider } | null>
+  fetchPeople: (anilistId: number, kind: AnimeProviderPeopleKind, page: number) => Promise<PeoplePage | null>
 }
 
 const errorState = (error: unknown): CacheErrorState => error instanceof AniListRequestError
@@ -50,7 +50,7 @@ const errorState = (error: unknown): CacheErrorState => error instanceof AniList
 
 const peopleErrorState = (error: unknown): Extract<AnimePeoplePageState, { status: 'error' }> => errorState(error)
 
-const ready = (read: CacheRead<AnimeDetail>): PublicAnimeDetailState | null => read.status === 'fresh'
+const ready = (read: CacheRead<AnimeDetailProvider>): AnimeDetailServerState | null => read.status === 'fresh'
   ? { status: 'ready', entry: { detail: read.entry.payload, refreshedAt: read.entry.refreshedAt, expiresAt: read.entry.expiresAt } }
   : null
 
@@ -68,7 +68,7 @@ const releasePreservingError = async (dependencies: AnimeDetailCacheDependencies
 }
 
 /** Reads one detail and converts cache failures to public errors. */
-const readDetailState = async (anilistId: number, dependencies: AnimeDetailCacheDependencies): Promise<PublicAnimeDetailState | null> => {
+const readDetailState = async (anilistId: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimeDetailServerState | null> => {
   try {
     return ready(await dependencies.client.readDetail(anilistId))
   } catch (error) {
@@ -77,7 +77,7 @@ const readDetailState = async (anilistId: number, dependencies: AnimeDetailCache
 }
 
 /** Waits for another request to commit one fresh detail. */
-const waitForDetail = async (anilistId: number, dependencies: AnimeDetailCacheDependencies): Promise<PublicAnimeDetailState> => {
+const waitForDetail = async (anilistId: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimeDetailServerState> => {
   for (let attempt = 0; attempt < CONTENTION_READS; attempt += 1) {
     await dependencies.delay(CONTENTION_DELAY_MS)
     const reread = await readDetailState(anilistId, dependencies)
@@ -87,7 +87,7 @@ const waitForDetail = async (anilistId: number, dependencies: AnimeDetailCacheDe
 }
 
 /** Fetches and commits one detail while holding its lease. */
-const refreshDetail = async (anilistId: number, key: string, leaseId: string, dependencies: AnimeDetailCacheDependencies): Promise<PublicAnimeDetailState> => {
+const refreshDetail = async (anilistId: number, key: string, leaseId: string, dependencies: AnimeDetailCacheDependencies): Promise<AnimeDetailServerState> => {
   try {
     const fetched = await dependencies.fetchDetail(anilistId)
     if (fetched === null) {
@@ -108,8 +108,8 @@ const refreshDetail = async (anilistId: number, key: string, leaseId: string, de
 }
 
 /** Reads or refreshes one public detail without serving expired data. */
-export const getAnimeDetailServer = async (anilistId: number, dependencies: AnimeDetailCacheDependencies): Promise<PublicAnimeDetailState> => {
-  const id = parseAnilistId(anilistId)
+export const getAnimeDetailServer = async (anilistId: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimeDetailServerState> => {
+  const id = parseProviderAnilistId(anilistId)
   const cached = await readDetailState(id, dependencies)
   if (cached) return cached
   const key = `detail:${id}`
@@ -121,7 +121,7 @@ export const getAnimeDetailServer = async (anilistId: number, dependencies: Anim
 }
 
 /** Reads one people page and converts cache failures to public errors. */
-const readPeoplePageState = async (anilistId: number, kind: AnimePeopleKind, page: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState | null> => {
+const readPeoplePageState = async (anilistId: number, kind: AnimeProviderPeopleKind, page: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState | null> => {
   try {
     const cached = await dependencies.client.readPeoplePage(anilistId, kind, page)
     return cached.status === 'fresh' ? { status: 'ready', page: cached.entry.payload } : null
@@ -131,7 +131,7 @@ const readPeoplePageState = async (anilistId: number, kind: AnimePeopleKind, pag
 }
 
 /** Waits for another request to commit one fresh people page. */
-const waitForPeoplePage = async (anilistId: number, kind: AnimePeopleKind, page: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState> => {
+const waitForPeoplePage = async (anilistId: number, kind: AnimeProviderPeopleKind, page: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState> => {
   for (let attempt = 0; attempt < CONTENTION_READS; attempt += 1) {
     await dependencies.delay(CONTENTION_DELAY_MS)
     const reread = await readPeoplePageState(anilistId, kind, page, dependencies)
@@ -141,7 +141,7 @@ const waitForPeoplePage = async (anilistId: number, kind: AnimePeopleKind, page:
 }
 
 /** Fetches and commits one people page while holding its lease. */
-const refreshPeoplePage = async (anilistId: number, kind: AnimePeopleKind, page: number, key: string, leaseId: string, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState> => {
+const refreshPeoplePage = async (anilistId: number, kind: AnimeProviderPeopleKind, page: number, key: string, leaseId: string, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState> => {
   try {
     const fetched = await dependencies.fetchPeople(anilistId, kind, page)
     if (fetched === null) {
@@ -163,9 +163,9 @@ const refreshPeoplePage = async (anilistId: number, kind: AnimePeopleKind, page:
 }
 
 /** Reads or refreshes one independent people page without stale fallback. */
-export const getAnimePeoplePageServer = async (anilistId: number, kind: AnimePeopleKind, page: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState> => {
-  const id = parseAnilistId(anilistId)
-  const validPage = parseAnimePage(page)
+export const getAnimePeoplePageServer = async (anilistId: number, kind: AnimeProviderPeopleKind, page: number, dependencies: AnimeDetailCacheDependencies): Promise<AnimePeoplePageState> => {
+  const id = parseProviderAnilistId(anilistId)
+  const validPage = parseProviderAnimePage(page)
   const cached = await readPeoplePageState(id, kind, validPage, dependencies)
   if (cached) return cached
   const key = `people:${id}:${kind}:${validPage}`
@@ -186,7 +186,7 @@ const requireEnv = (name: 'VITE_CONVEX_URL' | 'DISCOVER_CACHE_WRITE_TOKEN'): str
 export const createAnimeDetailCacheDependencies = (): AnimeDetailCacheDependencies => {
   const convex = new ConvexHttpClient(requireEnv('VITE_CONVEX_URL'))
   const client: AnimeDetailCacheClient = {
-    readDetail: async (anilistId) => await convex.query(api.animeDetailCache.readDetail, { anilistId }) as CacheRead<AnimeDetail>,
+    readDetail: async (anilistId) => await convex.query(api.animeDetailCache.readDetail, { anilistId }) as CacheRead<AnimeDetailProvider>,
     readPeoplePage: async (anilistId, kind, page) => await convex.query(api.animeDetailCache.readPeoplePage, { anilistId, kind, page }) as CacheRead<PeoplePage>,
     acquireLease: async (key, leaseId, token) => await convex.mutation(api.animeDetailCache.acquireLease, { key, leaseId, token }),
     commitDetail: async (leaseId, summary, detail, token) => { await convex.mutation(api.animeDetailCache.commitDetail, { leaseId, summary, detail, token }) },

@@ -129,72 +129,7 @@ export const animeSearchInputSchema: z.ZodType<AnimeSearchInput> = z
     error: 'Choose a search term or filter.',
   })
 
-const animeDateSchema = z.object({
-  year: z.number().int().nullable(),
-  month: z.number().int().min(1).max(12).nullable(),
-  day: z.number().int().min(1).max(31).nullable(),
-})
-
-const anilistLightweightMediaSchema = z.object({
-  id: z.number().int().positive(),
-  type: z.literal('ANIME'),
-  isAdult: z.boolean(),
-  title: z.object({
-    english: z.string().nullable(),
-    romaji: z.string().nullable(),
-    native: z.string().nullable(),
-  }),
-  coverImage: z.object({ large: z.url().nullable() }).nullable(),
-  bannerImage: z.url().nullable(),
-  format: animeFormatSchema.nullable(),
-  season: animeSeasonSchema.nullable(),
-  seasonYear: z.number().int().nullable(),
-  episodes: z.number().int().nonnegative().nullable(),
-  genres: z.array(z.string()),
-  popularity: z.number().int().nonnegative(),
-  averageScore: z.number().int().min(0).max(100).nullable(),
-  trending: z.number().int().nonnegative().nullable(),
-  startDate: animeDateSchema.nullable(),
-  nextAiringEpisode: z.object({ airingAt: z.number().int().nonnegative() }).nullable(),
-})
-
-const trimTitle = (value: string | null): string | null => {
-  if (value === null) {
-    return null
-  }
-
-  const trimmedValue = value.trim()
-  return trimmedValue.length > 0 ? trimmedValue : null
-}
-
-class AnimeMediaValidationError extends TypeError {
-  readonly cause: z.ZodError
-
-  constructor(message: string, cause: z.ZodError) {
-    super(message)
-    this.name = 'AnimeMediaValidationError'
-    this.cause = cause
-  }
-}
-
-/** Converts Zod failures into safe actionable normalization errors. */
-const createMediaValidationError = (error: z.ZodError): TypeError => {
-  const issue = error.issues[0]
-  if (issue === undefined) {
-    throw new AnimeMediaValidationError(
-      'AniList media validation failed without a reported issue.',
-      error,
-    )
-  }
-
-  const path = issue.path.length > 0 ? issue.path.join('.') : 'root'
-  return new AnimeMediaValidationError(
-    `Invalid AniList media at ${path}: ${issue.message}`,
-    error,
-  )
-}
-
-/** Creates a URL-safe display slug from a real AniList title. */
+/** Creates a URL-safe display slug from an anime title. */
 export const slugifyAnimeTitle = (title: string): string => {
   const slug = title
     .trim()
@@ -208,45 +143,6 @@ export const slugifyAnimeTitle = (title: string): string => {
   }
 
   return slug
-}
-
-/** Converts unknown AniList lightweight media into an app-safe summary. */
-export const normalizeAnimeSummary = (value: unknown): AnimeSummary => {
-  const parsedMedia = anilistLightweightMediaSchema.safeParse(value)
-  if (!parsedMedia.success) {
-    throw createMediaValidationError(parsedMedia.error)
-  }
-  if (parsedMedia.data.isAdult) {
-    throw new TypeError('Adult media is not supported.')
-  }
-
-  const english = trimTitle(parsedMedia.data.title.english)
-  const romaji = trimTitle(parsedMedia.data.title.romaji)
-  const native = trimTitle(parsedMedia.data.title.native)
-  const display = english ?? romaji ?? native
-  if (display === null) {
-    throw new TypeError('AniList media requires a title.')
-  }
-
-  const genres = [...new Set(parsedMedia.data.genres.map((genre) => genre.trim()).filter(Boolean))]
-
-  return {
-    anilistId: parsedMedia.data.id,
-    slug: slugifyAnimeTitle(display),
-    titles: { display, english, romaji, native },
-    coverImageUrl: parsedMedia.data.coverImage?.large ?? null,
-    bannerImageUrl: parsedMedia.data.bannerImage,
-    format: parsedMedia.data.format,
-    season: parsedMedia.data.season,
-    seasonYear: parsedMedia.data.seasonYear,
-    episodes: parsedMedia.data.episodes,
-    genres,
-    popularity: parsedMedia.data.popularity,
-    averageScore: parsedMedia.data.averageScore,
-    trending: parsedMedia.data.trending,
-    startDate: parsedMedia.data.startDate,
-    nextAiringAt: parsedMedia.data.nextAiringEpisode?.airingAt ?? null,
-  }
 }
 
 /** Returns calendar season for a UTC timestamp. */

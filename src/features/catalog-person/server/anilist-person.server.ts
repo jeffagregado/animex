@@ -7,20 +7,13 @@ import {
   type AniListDependencies,
 } from '../../../lib/anilist-client.server'
 import { normalizeDescriptionText } from '../../anime-detail/server/anilist-detail.server'
-import { normalizeAnimeSummary, type AnimeSummary } from '../../discover/shared/discover-contracts'
+import { normalizeAnimeSummary } from '../../discover/server/anilist-normalization.server'
+import { type AnimeSummaryProvider } from '../../discover/server/discover-provider-cache-contracts.server'
 import {
   CATALOG_PERSON_PAGE_SIZE,
-  catalogPersonDetailSchema,
   catalogPersonSearchPageSchema,
-  catalogPersonWorkPageSchema,
   createCatalogPersonPath,
-  parseCatalogPersonId,
-  type CatalogAnimeSummary,
-  type CatalogPersonDetail,
-  type CatalogPersonKind,
   type CatalogPersonSearchPage,
-  type CatalogPersonWorkPage,
-  type CatalogVoiceActor,
 } from '../shared/catalog-person-contracts'
 import {
   characterDetailResponseSchema,
@@ -31,6 +24,17 @@ import {
   staffSearchResponseSchema,
   staffWorksResponseSchema,
 } from './anilist-person.schemas'
+import {
+  CATALOG_PERSON_PROVIDER_PAGE_SIZE,
+  catalogPersonProviderDetailSchema,
+  catalogPersonProviderWorkPageSchema,
+  parseProviderCatalogPersonId,
+  type CatalogPersonProviderAnimeSummary,
+  type CatalogPersonProviderDetail,
+  type CatalogPersonProviderKind,
+  type CatalogPersonProviderVoiceActor,
+  type CatalogPersonProviderWorkPage,
+} from './catalog-person-provider-cache-contracts.server'
 
 const mediaSelection = `id type isAdult title { english romaji native } coverImage { large } bannerImage format season seasonYear episodes genres popularity averageScore trending startDate { year month day } nextAiringEpisode { airingAt }`
 const voiceActorMediaSelection = `pageInfo { currentPage hasNextPage } edges { node { isAdult } voiceActorRoles { voiceActor { id name { full } image { large } languageV2 } } }`
@@ -105,8 +109,8 @@ const formatActiveYears = (years: number[] | null): string | null => {
 /** Keeps first-seen actors from all non-adult Character anime roles. */
 const normalizeVoiceActors = (
   mediaPages: CharacterVoiceActorMedia[],
-): CatalogVoiceActor[] => {
-  const actors = new Map<number, CatalogVoiceActor>()
+): CatalogPersonProviderVoiceActor[] => {
+  const actors = new Map<number, CatalogPersonProviderVoiceActor>()
   for (const media of mediaPages) {
     for (const edge of media.edges) {
       if (edge.node.isAdult) continue
@@ -151,7 +155,7 @@ const fetchVoiceActorMediaPages = async (
   return pages
 }
 
-const summaryForCatalog = (summary: AnimeSummary): CatalogAnimeSummary => ({
+const summaryForCatalog = (summary: AnimeSummaryProvider): CatalogPersonProviderAnimeSummary => ({
   id: summary.anilistId,
   slug: summary.slug,
   title: summary.titles.display,
@@ -165,12 +169,12 @@ const parseCharacterDetail = async (
   body: unknown,
   id: number,
   dependencies: AniListDependencies,
-): Promise<CatalogPersonDetail | null> => {
+): Promise<CatalogPersonProviderDetail | null> => {
   const parsed = characterDetailResponseSchema.parse(body).data.Character
   if (!parsed) return null
   if (parsed.id !== id) throw upstreamError()
   const mediaPages = await fetchVoiceActorMediaPages(parsed.id, parsed.media, dependencies)
-  return catalogPersonDetailSchema.parse({
+  return catalogPersonProviderDetailSchema.parse({
     kind: 'character', id: parsed.id, name: parsed.name.full.trim(), nativeName: text(parsed.name.native),
     imageUrl: parsed.image?.large ?? null, description: normalizeDescriptionText(parsed.description),
     age: text(parsed.age), gender: text(parsed.gender), birthday: formatBirthday(parsed.dateOfBirth),
@@ -180,12 +184,12 @@ const parseCharacterDetail = async (
 }
 
 /** Validates and normalizes Staff detail. */
-const parseStaffDetail = (body: unknown, id: number): CatalogPersonDetail | null => {
+const parseStaffDetail = (body: unknown, id: number): CatalogPersonProviderDetail | null => {
   const parsed = staffDetailResponseSchema.parse(body).data.Staff
   if (!parsed) return null
   if (parsed.id !== id) throw upstreamError()
   const occupations = [...new Set(parsed.primaryOccupations.map((value) => value.trim()).filter(Boolean))]
-  return catalogPersonDetailSchema.parse({
+  return catalogPersonProviderDetailSchema.parse({
     kind: 'staff', id: parsed.id, name: parsed.name.full.trim(), nativeName: text(parsed.name.native),
     imageUrl: parsed.image?.large ?? null, description: normalizeDescriptionText(parsed.description),
     occupations, language: text(parsed.languageV2), hometown: text(parsed.homeTown),
@@ -195,11 +199,11 @@ const parseStaffDetail = (body: unknown, id: number): CatalogPersonDetail | null
 
 /** Fetches strict Character or Staff detail. */
 export const fetchCatalogPersonFromAniList = async (
-  kind: CatalogPersonKind,
+  kind: CatalogPersonProviderKind,
   id: number,
   dependencies: AniListDependencies,
-): Promise<CatalogPersonDetail | null> => {
-  const input = personInputSchema.parse({ kind, id: parseCatalogPersonId(id) })
+): Promise<CatalogPersonProviderDetail | null> => {
+  const input = personInputSchema.parse({ kind, id: parseProviderCatalogPersonId(id) })
   const body = await requestAniListAllowingNotFound(
     input.kind === 'character' ? documents.characterDetail : documents.staffDetail,
     input.kind === 'character'
@@ -221,16 +225,16 @@ export const fetchCatalogPersonFromAniList = async (
 
 /** Fetches strict ordered work page plus full cache summaries. */
 export const fetchCatalogPersonWorksFromAniList = async (
-  kind: CatalogPersonKind,
+  kind: CatalogPersonProviderKind,
   id: number,
   page: number,
   dependencies: AniListDependencies,
-): Promise<{ page: CatalogPersonWorkPage; summaries: AnimeSummary[] } | null> => {
-  const input = personInputSchema.parse({ kind, id: parseCatalogPersonId(id) })
+): Promise<{ page: CatalogPersonProviderWorkPage; summaries: AnimeSummaryProvider[] } | null> => {
+  const input = personInputSchema.parse({ kind, id: parseProviderCatalogPersonId(id) })
   const validPage = pageSchema.parse(page)
   const body = await requestAniListAllowingNotFound(
     kind === 'character' ? documents.characterWorks : documents.staffWorks,
-    { id: input.id, page: validPage, perPage: CATALOG_PERSON_PAGE_SIZE },
+    { id: input.id, page: validPage, perPage: CATALOG_PERSON_PROVIDER_PAGE_SIZE },
     dependencies,
     kind === 'character' ? 'Character' : 'Staff',
   )
@@ -247,14 +251,14 @@ export const fetchCatalogPersonWorksFromAniList = async (
       summary: normalizeAnimeSummary(edge.node),
       role: 'characterRole' in edge ? text(edge.characterRole) : text(edge.staffRole),
     }))
-    const summaries = new Map<number, AnimeSummary>()
+    const summaries = new Map<number, AnimeSummaryProvider>()
     for (const edge of edges) summaries.set(edge.summary.anilistId, edge.summary)
     return {
-      page: catalogPersonWorkPageSchema.parse({
+      page: catalogPersonProviderWorkPageSchema.parse({
         items: edges.map(({ summary, role }) => ({ anime: summaryForCatalog(summary), role })),
         currentPage: parsed.pageInfo.currentPage,
         hasNextPage: parsed.pageInfo.hasNextPage,
-        perPage: CATALOG_PERSON_PAGE_SIZE,
+        perPage: CATALOG_PERSON_PROVIDER_PAGE_SIZE,
       }),
       summaries: [...summaries.values()],
     }
@@ -266,7 +270,7 @@ export const fetchCatalogPersonWorksFromAniList = async (
 
 /** Searches Character or Staff without persistent cache. */
 export const searchCatalogPeopleFromAniList = async (
-  kind: CatalogPersonKind,
+  kind: CatalogPersonProviderKind,
   query: string,
   page: number,
   dependencies: AniListDependencies,

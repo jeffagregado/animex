@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { describe, expect, test, vi } from 'vitest'
 
 import {
@@ -64,6 +66,16 @@ const createDependencies = (
 }
 
 describe('AniList server transport', () => {
+  test('imports provider normalization only from the server-only boundary', () => {
+    const source = readFileSync(new URL('./anilist.server.ts', import.meta.url), 'utf8')
+    const sharedImport = source.match(
+      /import\s*\{[\s\S]*?\}\s*from '\.\.\/shared\/discover-contracts'/,
+    )?.[0]
+
+    expect(source).toContain("from './anilist-normalization.server'")
+    expect(sharedImport).not.toContain('normalizeAnimeSummary')
+  })
+
   test('retries network and 5xx failures no more than three total attempts', async () => {
     const fixture = createDependencies([
       response({}, 503),

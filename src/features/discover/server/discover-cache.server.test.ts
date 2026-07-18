@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+
 import { describe, expect, test } from 'vitest'
 
 import {
@@ -56,6 +58,15 @@ const fresh = (key: string, id: number) => ({
 })
 
 describe('Discover cache server orchestration', () => {
+  test('stays independent from browser-public Discover contracts', async () => {
+    const source = await readFile(
+      new URL('./discover-cache.server.ts', import.meta.url),
+      'utf8',
+    )
+
+    expect(source).not.toContain('../shared/discover-contracts')
+  })
+
   test('returns fresh page sections without calling AniList', async () => {
     const client: CacheClient = {
       readSections: async () => ['trending', 'seasonal', 'recommendations', 'upcoming'].map((key, index) => fresh(key, index + 1)),

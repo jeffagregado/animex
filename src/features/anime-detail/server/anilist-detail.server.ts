@@ -1,22 +1,23 @@
 import { z } from 'zod'
 
 import { AniListRequestError, requestAniListAllowingNotFound, type AniListDependencies } from '../../../lib/anilist-client.server'
-import { animeFormatSchema, slugifyAnimeTitle } from '../../discover/shared/discover-contracts'
-import { type AnimeSummary } from '../../discover/shared/discover-contracts'
 import {
-  ANIME_PEOPLE_PER_PAGE,
-  animeCharacterPageSchema,
-  animeDetailSchema,
-  animeStaffPageSchema,
-  parseAnilistId,
-  parseAnimePage,
-  type AnimeCharacter,
-  type AnimeDetail,
-  type AnimeDetailListItem,
-  type AnimePeopleKind,
-  type AnimePeoplePage,
-  type AnimeStaff,
-} from '../shared/anime-detail-contracts'
+  ANIME_PROVIDER_PEOPLE_PER_PAGE,
+  animeDetailProviderSchema,
+  animeProviderCharacterPageSchema,
+  animeProviderFormatSchema,
+  animeProviderStaffPageSchema,
+  parseProviderAnimePage,
+  parseProviderAnilistId,
+  slugifyProviderAnimeTitle,
+  type AnimeDetailProvider,
+  type AnimeProviderCharacter,
+  type AnimeProviderListItem,
+  type AnimeProviderPeopleKind,
+  type AnimeProviderPeoplePage,
+  type AnimeProviderStaff,
+  type AnimeSummaryProvider,
+} from './anime-detail-provider-cache-contracts.server'
 
 const detailDocument = `query AnimeDetail($id: Int!) { Media(id: $id, type: ANIME, isAdult: false) { id type isAdult title { english romaji native } coverImage { extraLarge } bannerImage description format status source season seasonYear episodes duration popularity averageScore trending nextAiringEpisode { airingAt } startDate { year month day } endDate { year month day } genres studios { edges { isMain node { name siteUrl } } } relations { edges { node { id type isAdult title { english romaji native } coverImage { large } format seasonYear } } } recommendations { nodes { mediaRecommendation { id type isAdult title { english romaji native } coverImage { large } format seasonYear } } } trailer { id site thumbnail } externalLinks { site url } } }`
 const characterDocument = `query AnimeCharacters($id: Int!, $page: Int!, $perPage: Int!) { Media(id: $id, type: ANIME, isAdult: false) { characters(page: $page, perPage: $perPage, sort: [ROLE, RELEVANCE, ID]) { pageInfo { currentPage hasNextPage } edges { role node { id name { full } image { large } } voiceActorRoles { voiceActor { id name { full } image { large } languageV2 } } } } } }`
@@ -49,15 +50,15 @@ const titleParts = (title: z.infer<typeof titleSchema>) => {
   return { display, english, romaji, native }
 }
 
-const listItem = (media: z.infer<typeof listMediaSchema>): AnimeDetailListItem | null => {
+const listItem = (media: z.infer<typeof listMediaSchema>): AnimeProviderListItem | null => {
   if (media.type !== 'ANIME' || media.isAdult !== false) return null
   const title = titleParts(media.title).display
-  return { anilistId: media.id, slug: slugifyAnimeTitle(title), title, coverImageUrl: media.coverImage?.large ?? null, format: animeFormatSchema.nullable().parse(media.format), seasonYear: media.seasonYear }
+  return { anilistId: media.id, slug: slugifyProviderAnimeTitle(title), title, coverImageUrl: media.coverImage?.large ?? null, format: animeProviderFormatSchema.nullable().parse(media.format), seasonYear: media.seasonYear }
 }
 
 /** Fetches and strictly normalizes public anime metadata. */
-export const fetchAnimeDetailCachePayload = async (anilistId: number, dependencies: AniListDependencies): Promise<{ detail: AnimeDetail; summary: AnimeSummary } | null> => {
-  const body = await requestAniListAllowingNotFound(detailDocument, { id: parseAnilistId(anilistId) }, dependencies, 'Media')
+export const fetchAnimeDetailCachePayload = async (anilistId: number, dependencies: AniListDependencies): Promise<{ detail: AnimeDetailProvider; summary: AnimeSummaryProvider } | null> => {
+  const body = await requestAniListAllowingNotFound(detailDocument, { id: parseProviderAnilistId(anilistId) }, dependencies, 'Media')
   const parsed = detailResponseSchema.safeParse(body)
   if (!parsed.success) throw new AniListRequestError('UPSTREAM', 'AniList is temporarily unavailable.', null)
   const media = parsed.data.data.Media
@@ -69,8 +70,8 @@ export const fetchAnimeDetailCachePayload = async (anilistId: number, dependenci
       fetchAnimePeoplePageFromAniList(anilistId, 'staff', 1, dependencies),
     ])
     if (!charactersPage || !staffPage) throw new TypeError('AniList people pages were missing.')
-    const detail = animeDetailSchema.parse({
-      anilistId: media.id, slug: slugifyAnimeTitle(titles.display), titles,
+    const detail = animeDetailProviderSchema.parse({
+      anilistId: media.id, slug: slugifyProviderAnimeTitle(titles.display), titles,
       coverImageUrl: media.coverImage?.extraLarge ?? null, bannerImageUrl: media.bannerImage, synopsis: normalizeDescriptionText(media.description),
       format: media.format, status: media.status, source: media.source, season: media.season, seasonYear: media.seasonYear,
       episodes: media.episodes, durationMinutes: media.duration, startDate: media.startDate, endDate: media.endDate,
@@ -104,7 +105,7 @@ export const fetchAnimeDetailCachePayload = async (anilistId: number, dependenci
 }
 
 /** Fetches full detail with initial Character and Staff pages. */
-export const fetchAnimeDetailFromAniList = async (anilistId: number, dependencies: AniListDependencies): Promise<AnimeDetail | null> => {
+export const fetchAnimeDetailFromAniList = async (anilistId: number, dependencies: AniListDependencies): Promise<AnimeDetailProvider | null> => {
   const payload = await fetchAnimeDetailCachePayload(anilistId, dependencies)
   return payload?.detail ?? null
 }
@@ -113,22 +114,22 @@ const peopleResponseSchema = z.object({ data: z.object({ Media: z.record(z.strin
 const pageSchema = z.object({ pageInfo: z.object({ currentPage: z.number().int().positive(), hasNextPage: z.boolean() }), edges: z.array(z.object({ role: z.string(), node: z.object({ id: z.number().int().positive(), name: z.object({ full: z.string() }), image: z.object({ large: z.url().nullable() }).nullable() }), voiceActorRoles: z.array(z.object({ voiceActor: z.object({ id: z.number().int().positive(), name: z.object({ full: z.string() }), image: z.object({ large: z.url().nullable() }).nullable(), languageV2: z.string() }) })).optional() })) })
 
 /** Fetches one independent 24-item Character or Staff connection page. */
-export const fetchAnimePeoplePageFromAniList = async (anilistId: number, kind: AnimePeopleKind, page: number, dependencies: AniListDependencies): Promise<AnimePeoplePage<AnimeCharacter> | AnimePeoplePage<AnimeStaff> | null> => {
-  const validId = parseAnilistId(anilistId)
-  const validPage = parseAnimePage(page)
-  const body = await requestAniListAllowingNotFound(kind === 'characters' ? characterDocument : staffDocument, { id: validId, page: validPage, perPage: ANIME_PEOPLE_PER_PAGE }, dependencies, 'Media')
+export const fetchAnimePeoplePageFromAniList = async (anilistId: number, kind: AnimeProviderPeopleKind, page: number, dependencies: AniListDependencies): Promise<AnimeProviderPeoplePage<AnimeProviderCharacter> | AnimeProviderPeoplePage<AnimeProviderStaff> | null> => {
+  const validId = parseProviderAnilistId(anilistId)
+  const validPage = parseProviderAnimePage(page)
+  const body = await requestAniListAllowingNotFound(kind === 'characters' ? characterDocument : staffDocument, { id: validId, page: validPage, perPage: ANIME_PROVIDER_PEOPLE_PER_PAGE }, dependencies, 'Media')
   const response = peopleResponseSchema.safeParse(body)
   if (!response.success) throw new AniListRequestError('UPSTREAM', 'AniList is temporarily unavailable.', null)
   if (response.data.data.Media === null) return null
   const parsed = pageSchema.safeParse(response.data.data.Media[kind])
   if (!parsed.success) throw new AniListRequestError('UPSTREAM', 'AniList is temporarily unavailable.', null)
   try {
-    const base = { currentPage: parsed.data.pageInfo.currentPage, hasNextPage: parsed.data.pageInfo.hasNextPage, perPage: ANIME_PEOPLE_PER_PAGE }
-    if (kind === 'characters') return animeCharacterPageSchema.parse({ ...base, items: parsed.data.edges.map((edge) => {
+    const base = { currentPage: parsed.data.pageInfo.currentPage, hasNextPage: parsed.data.pageInfo.hasNextPage, perPage: ANIME_PROVIDER_PEOPLE_PER_PAGE }
+    if (kind === 'characters') return animeProviderCharacterPageSchema.parse({ ...base, items: parsed.data.edges.map((edge) => {
       const actor = edge.voiceActorRoles?.find((role) => role.voiceActor.languageV2 === 'Japanese')?.voiceActor
       return { anilistId: edge.node.id, name: edge.node.name.full, role: edge.role, imageUrl: edge.node.image?.large ?? null, japaneseVoiceActor: actor ? { anilistId: actor.id, name: actor.name.full, imageUrl: actor.image?.large ?? null, language: 'Japanese' } : null }
     }) })
-    return animeStaffPageSchema.parse({ ...base, items: parsed.data.edges.map((edge) => ({ anilistId: edge.node.id, name: edge.node.name.full, role: edge.role, imageUrl: edge.node.image?.large ?? null })) })
+    return animeProviderStaffPageSchema.parse({ ...base, items: parsed.data.edges.map((edge) => ({ anilistId: edge.node.id, name: edge.node.name.full, role: edge.role, imageUrl: edge.node.image?.large ?? null })) })
   } catch {
     throw new AniListRequestError('UPSTREAM', 'AniList is temporarily unavailable.', null)
   }

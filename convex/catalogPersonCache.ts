@@ -2,7 +2,7 @@ import { ConvexError, v } from 'convex/values'
 
 import { type Doc } from './_generated/dataModel'
 import { mutation, query, type MutationCtx } from './_generated/server'
-import { type CatalogPersonDetail } from '../src/features/catalog-person/shared/catalog-person-contracts'
+import { type CatalogPersonProviderDetail } from '../src/features/catalog-person/server/catalog-person-provider-cache-contracts.server'
 import { requireCacheWriteToken } from './animeCache'
 import {
   CATALOG_PERSON_LEASE_MS,
@@ -81,7 +81,7 @@ const ensureIdentityRefs = async (
 }
 
 /** Expires Character rows written before the all-language actor contract. */
-const currentDetail = (detail: Doc<'catalogPersonDetails'>['detail']): CatalogPersonDetail | null => {
+const currentDetail = (detail: Doc<'catalogPersonDetails'>['detail']): CatalogPersonProviderDetail | null => {
   if (detail.kind === 'character') {
     if (detail.voiceActorScope !== 'all-languages' || detail.voiceActors === undefined) return null
     return { ...detail, voiceActorScope: detail.voiceActorScope, voiceActors: detail.voiceActors }
@@ -96,7 +96,7 @@ export const readDetail = query({
   handler: async (ctx, args) => {
     try { personDetailKey(args.kind, args.personId) } catch (error) { failPolicy(error) }
     const record = await ctx.db.query('catalogPersonDetails').withIndex('by_kind_person', (q) => q.eq('kind', args.kind).eq('personId', args.personId)).unique()
-    if (!record) return resolveCatalogPersonRead<CatalogPersonDetail>(null, Date.now())
+    if (!record) return resolveCatalogPersonRead<CatalogPersonProviderDetail>(null, Date.now())
     const detail = currentDetail(record.detail)
     if (!detail) return { status: 'expired' as const, entry: null }
     return resolveCatalogPersonRead({ payload: detail, refreshedAt: record.refreshedAt, expiresAt: record.expiresAt }, Date.now())
