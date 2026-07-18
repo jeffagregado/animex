@@ -26,7 +26,10 @@ type Detail = {
     language: string
   }>
 }
-const modules = import.meta.glob(['./_generated/**/*.*', './{animeCache,catalogPersonCache}.ts'])
+const modules = import.meta.glob([
+  './_generated/**/*.*',
+  './{animeCache,catalogIdentityModel,catalogPersonCache}.ts',
+])
 const readDetail = makeFunctionReference<'query', { kind: Kind; personId: number }, unknown>('catalogPersonCache:readDetail')
 const readWorkPage = makeFunctionReference<'query', { kind: Kind; personId: number; page: number }, unknown>('catalogPersonCache:readWorkPage')
 const acquireLease = makeFunctionReference<'mutation', { key: string; leaseId: string; token: string }, { acquired: boolean; leaseUntil: number | null }>('catalogPersonCache:acquireLease')
@@ -44,6 +47,7 @@ const commitWorkPage = makeFunctionReference<'mutation', {
 const releaseLease = makeFunctionReference<'mutation', { key: string; leaseId: string; token: string }, boolean>('catalogPersonCache:releaseLease')
 
 const token = 'catalog-person-test-token'
+const now = new Date('2026-07-17T00:00:00.000Z').getTime()
 const detail: Detail = {
   kind: 'character', id: 12, name: 'Frieren', nativeName: null, imageUrl: null,
   description: null, age: null, gender: null, birthday: null, bloodType: null,
@@ -63,7 +67,7 @@ const createHarness = () => convexTest(schema, modules)
 
 beforeEach(() => {
   vi.useFakeTimers()
-  vi.setSystemTime(new Date('2026-07-17T00:00:00.000Z'))
+  vi.setSystemTime(now)
   vi.stubEnv('DISCOVER_CACHE_WRITE_TOKEN', token)
 })
 
@@ -94,10 +98,19 @@ describe('catalog person Convex cache', () => {
       .resolves.toMatchObject({ status: 'fresh', entry: { payload: detail } })
     expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonDetails')
       .withIndex('by_kind_person', (q) => q.eq('kind', 'character').eq('personId', 12))
-      .unique())).not.toBeNull()
+      .unique())).toMatchObject({
+        kind: 'character',
+        personId: 12,
+        detail,
+        refreshedAt: now,
+        expiresAt: now + 24 * 60 * 60 * 1000,
+      })
     expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonCacheLeases')
       .withIndex('by_key', (q) => q.eq('key', 'person:character:12'))
       .unique())).toBeNull()
+    const refs = await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect())
+    expect(refs.map(({ kind, providerId }) => `${kind}:${providerId}`).sort())
+      .toEqual(['character:12', 'staff:21', 'staff:22'])
   })
 
   test('upserts full summaries and hydrates ordered work transactionally', async () => {
@@ -129,9 +142,26 @@ describe('catalog person Convex cache', () => {
       })
     expect(await t.run(async (ctx) => await ctx.db.query('animeSummaries').collect()))
       .toHaveLength(2)
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonWorkPages')
+      .withIndex('by_kind_person_page', (q) => q
+        .eq('kind', 'staff')
+        .eq('personId', 21)
+        .eq('page', 1))
+      .unique())).toMatchObject({
+        kind: 'staff',
+        personId: 21,
+        page: 1,
+        items: [{ animeId: 2, role: 'Director' }, { animeId: 1, role: null }],
+        hasNextPage: true,
+        refreshedAt: now,
+        expiresAt: now + 24 * 60 * 60 * 1000,
+      })
     expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonCacheLeases')
       .withIndex('by_key', (q) => q.eq('key', 'person-work:staff:21:1'))
       .unique())).toBeNull()
+    const refs = await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect())
+    expect(refs.map(({ kind, providerId }) => `${kind}:${providerId}`).sort())
+      .toEqual(['anime:1', 'anime:2', 'staff:21'])
   })
 
   test('expires exactly at 24 hours and never returns stale detail', async () => {

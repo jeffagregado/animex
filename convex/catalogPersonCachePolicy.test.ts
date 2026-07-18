@@ -68,6 +68,15 @@ describe('catalog person cache policy', () => {
     }
     expect(() => validateCatalogPersonDetail('character', 12, detail)).not.toThrow()
     expect(() => validateCatalogPersonDetail('staff', 12, detail)).toThrow()
+    expect(() => validateCatalogPersonDetail('character', 12, {
+      ...detail,
+      voiceActors: Array.from({ length: 100 }, (_, index) => ({
+        id: index + 1,
+        name: `Actor ${index + 1}`,
+        imageUrl: null,
+        language: 'Japanese',
+      })),
+    })).toThrow('cannot exceed 99')
     expect(() => validateCatalogPersonWorkPage('character', 12, 1, Array.from({ length: 21 }, () => ({ animeId: 1, role: null })))).toThrow()
     expect(() => validateCatalogPersonWorkPage('character', 12, 1, [{ animeId: 0, role: null }])).toThrow()
   })

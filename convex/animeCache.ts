@@ -15,6 +15,8 @@ import {
   validateCacheWriteToken,
   validateSectionCommit,
 } from './animeCachePolicy'
+import { ensureCatalogEntity } from './catalogIdentityModel'
+import { type CatalogProviderRef } from './catalogIdentityPolicy'
 
 const sectionKeyValidator = v.union(
   v.literal('trending'),
@@ -237,6 +239,18 @@ const validateCacheSectionCommit = (
   }
 }
 
+/** Registers each unique Anime provider reference once. */
+const ensureAnimeIdentities = async (
+  ctx: MutationCtx,
+  summaries: CachedAnimeSummary[],
+): Promise<void> => {
+  const ids = new Set(summaries.map((summary) => summary.anilistId))
+  for (const providerId of ids) {
+    const ref: CatalogProviderRef = { provider: 'anilist', kind: 'anime', providerId }
+    await ensureCatalogEntity(ctx, ref)
+  }
+}
+
 /** Upserts one anime summary from a valid section commit. */
 const upsertAnimeSummary = async (
   ctx: MutationCtx,
@@ -353,6 +367,7 @@ export const commitSection = mutation({
       .unique()
     const activeLease = requireActiveSectionLease(lease, args.leaseId, now)
     validateCacheSectionCommit(args.key, args.summaries, timing)
+    await ensureAnimeIdentities(ctx, args.summaries)
     for (const summary of args.summaries) {
       await upsertAnimeSummary(ctx, summary, now)
     }
