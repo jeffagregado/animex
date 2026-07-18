@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { ComponentProps, ComponentType } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { UserAvatar } from './user-avatar'
+
+type FeedbackAvatarProps = Omit<ComponentProps<typeof UserAvatar>, 'size'> & {
+  size: ComponentProps<typeof UserAvatar>['size'] | 'search' | 'profile'
+}
+const FeedbackUserAvatar = UserAvatar as ComponentType<FeedbackAvatarProps>
 
 afterEach(cleanup)
 
@@ -50,20 +56,20 @@ describe('UserAvatar', () => {
   })
 
   it.each([
-    ['search', 'size-16', 'text-2xl'],
-    ['profile', 'size-24', 'text-4xl'],
-  ] as const)('uses locked %s fallback geometry', (size, boxClass, glyphClass) => {
+    ['search', ['size-16'], ['text-2xl']],
+    ['profile', ['size-24', 'sm:size-32'], ['text-4xl', 'sm:text-5xl']],
+  ] as const)('uses locked %s fallback geometry', (size, boxClasses, glyphClasses) => {
     render(
-      <UserAvatar
+      <FeedbackUserAvatar
         avatarUrl={null}
         displayName="Mika"
         label={`${size} avatar`}
-        size={size as never}
+        size={size}
       />,
     )
     const avatar = screen.getByRole('img', { name: `${size} avatar` })
-    expect(avatar.className).toContain(boxClass)
-    expect(avatar.className).toContain(glyphClass)
+    for (const boxClass of boxClasses) expect(avatar.className).toContain(boxClass)
+    for (const glyphClass of glyphClasses) expect(avatar.className).toContain(glyphClass)
     expect(avatar.className).toContain('aspect-square')
     expect(avatar.className).toContain('overflow-hidden')
   })

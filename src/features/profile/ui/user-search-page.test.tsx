@@ -13,7 +13,12 @@ import { getProfileDestination } from '#/routes/_public/_profile/route'
 const convex = vi.hoisted(() => ({ query: vi.fn() }))
 vi.mock('convex/react', () => ({ useConvex: () => convex }))
 
-const user = (id: string, username: string, name: string) => ({
+const user = (id: string, username: string, name: string): {
+  avatarUrl: string | null
+  id: string
+  name: string
+  username: string
+} => ({
   id,
   username,
   name,

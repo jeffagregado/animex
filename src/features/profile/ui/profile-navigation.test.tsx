@@ -7,34 +7,39 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  useLocation,
 } from '@tanstack/react-router'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { ProfilePage, type ProfileResult } from './profile-page'
 
-const mocks = vi.hoisted(() => ({
-  profile: {
-    access: 'full',
-    owner: false,
+const mocks = vi.hoisted(() => {
+  const query = vi.fn()
+  return {
+    client: { query },
     profile: {
-      avatarUrl: null,
-      bannerUrl: null,
-      bio: '',
-      favorites: [],
-      id: 'profile-1',
-      name: 'Mika',
-      profileVisibility: 'public',
-      progress: { completed: 0, dropped: 0, planned: 0, watching: 0 },
-      username: 'mika',
-    },
-  } as ProfileResult,
-  page: { items: [], cursor: null, hasMore: false },
-  query: vi.fn(),
-}))
+      access: 'full',
+      owner: false,
+      profile: {
+        avatarUrl: null,
+        bannerUrl: null,
+        bio: '',
+        favorites: [],
+        id: 'profile-1',
+        name: 'Mika',
+        profileVisibility: 'public',
+        progress: { completed: 0, dropped: 0, planned: 0, watching: 0 },
+        username: 'mika',
+      },
+    } as ProfileResult,
+    page: { items: [], cursor: null, hasMore: false },
+    query,
+  }
+})
 
 vi.mock('convex/react', () => ({
-  useConvex: () => ({ query: mocks.query }),
+  useConvex: () => mocks.client,
   useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
   useMutation: () => vi.fn(),
   useQuery: () => mocks.profile,
@@ -45,11 +50,20 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+const ProfileRouteView = () => {
+  const location = useLocation()
+  const rawTab = new URLSearchParams(location.searchStr).get('tab')
+  const tab = rawTab === 'reviews' || rawTab === 'favorites'
+    ? rawTab
+    : 'activity'
+  return <ProfilePage tab={tab} username="mika" />
+}
+
 it('changes Profile tabs through router history without scroll reset', async () => {
   mocks.query.mockResolvedValue(mocks.page)
   const root = createRootRoute()
   const profile = createRoute({
-    component: () => <ProfilePage tab="activity" username="mika" />,
+    component: ProfileRouteView,
     getParentRoute: () => root,
     path: 'users/$username',
   })
@@ -69,13 +83,21 @@ it('changes Profile tabs through router history without scroll reset', async () 
     </QueryClientProvider>,
   )
 
-  let preventedByProfileLink = false
-  const stopDocumentNavigation = (event: MouseEvent): void => {
-    preventedByProfileLink = event.defaultPrevented
-    event.preventDefault()
+  const blockNativeDocumentNavigation = (event: MouseEvent): void => {
+    if (!event.defaultPrevented) event.preventDefault()
   }
-  document.addEventListener('click', stopDocumentNavigation, { once: true })
+  document.addEventListener('click', blockNativeDocumentNavigation)
   fireEvent.click(await screen.findByRole('link', { name: 'reviews' }))
-  expect(preventedByProfileLink).toBe(true)
+  await waitFor(() => expect(history.location.search).toBe('?tab=reviews'))
+  expect(screen.getByRole('link', { name: 'reviews' }).getAttribute('aria-current')).toBe('page')
+
+  await act(async () => { history.back() })
+  await waitFor(() => expect(history.location.search).toBe(''))
+  expect(screen.getByRole('link', { name: 'activity' }).getAttribute('aria-current')).toBe('page')
+
+  await act(async () => { history.forward() })
+  await waitFor(() => expect(history.location.search).toBe('?tab=reviews'))
+  expect(screen.getByRole('link', { name: 'reviews' }).getAttribute('aria-current')).toBe('page')
   expect(scrollTo).not.toHaveBeenCalled()
+  document.removeEventListener('click', blockNativeDocumentNavigation)
 })

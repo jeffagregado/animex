@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { PublicAuthStateProvider, usePublicAuthState } from '../shell/public-auth-context'
 
-const Status = () => {
+const Status = ({ label }: { label: string }) => {
   const state = usePublicAuthState()
-  return createElement('p', null, state.status)
+  return createElement('p', null, `${label}: ${state.status}`)
 }
 
 afterEach(() => {
@@ -16,7 +16,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-it('reuses one hydrated auth query across nested public and Profile boundaries', async () => {
+it('shares one provider auth request with every public Profile consumer', async () => {
   const fetchMock = vi.fn(async () => ({
     ok: true,
     json: async () => ({ status: 'signedOut' }),
@@ -27,12 +27,15 @@ it('reuses one hydrated auth query across nested public and Profile boundaries',
     PublicAuthStateProvider,
     null,
     createElement(
-      PublicAuthStateProvider,
-      null,
-      createElement(Status),
+      'section',
+      { 'aria-label': 'Auth consumers' },
+      createElement(Status, { label: 'Shell' }),
+      createElement(Status, { label: 'Profile' }),
     ),
   ))
 
-  await screen.findByText('ready')
+  const consumers = within(screen.getByRole('region', { name: 'Auth consumers' }))
+  await consumers.findByText('Shell: ready')
+  expect(consumers.getByText('Profile: ready')).toBeTruthy()
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
 })

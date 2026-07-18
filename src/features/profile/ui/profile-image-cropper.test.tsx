@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ComponentProps, ComponentType } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ProfileImageCropper } from './profile-image-cropper'
@@ -14,18 +15,13 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
   order: [] as string[],
   revoke: vi.fn(),
-  invalidate: vi.fn(),
+  profileChanged: vi.fn(),
 }))
 
-vi.mock('@tanstack/react-query', async () => {
-  const actual = await vi.importActual<typeof import('@tanstack/react-query')>(
-    '@tanstack/react-query',
-  )
-  return {
-    ...actual,
-    useQueryClient: () => ({ invalidateQueries: mocks.invalidate }),
-  }
-})
+type FeedbackCropperProps = ComponentProps<typeof ProfileImageCropper> & {
+  onProfileChanged: () => Promise<void>
+}
+const FeedbackProfileImageCropper = ProfileImageCropper as ComponentType<FeedbackCropperProps>
 
 vi.mock('convex/server', () => ({
   makeFunctionReference: (_kind: string) => _kind,
@@ -118,14 +114,15 @@ vi.mock('react-easy-crop', async () => {
 const source = new File(['source'], 'source.png', { type: 'image/png' })
 
 const renderCropper = (
-  values: Partial<React.ComponentProps<typeof ProfileImageCropper>> = {},
+  values: Partial<FeedbackCropperProps> = {},
 ) => render(
-  <ProfileImageCropper
+  <FeedbackProfileImageCropper
     active
     currentUrl={null}
     disabled={false}
     kind="avatar"
     onBusyChange={vi.fn()}
+    onProfileChanged={mocks.profileChanged}
     {...values}
   />,
 )
@@ -175,8 +172,8 @@ beforeEach(() => {
   mocks.register.mockResolvedValue(null)
   mocks.finalize.mockResolvedValue(null)
   mocks.remove.mockResolvedValue(null)
-  mocks.invalidate.mockReset()
-  mocks.invalidate.mockResolvedValue(undefined)
+  mocks.profileChanged.mockReset()
+  mocks.profileChanged.mockResolvedValue(undefined)
   vi.stubGlobal('fetch', vi.fn(async () => {
     mocks.order.push('post')
     return new Response(JSON.stringify({ storageId: 'storage-1' }), {
@@ -238,6 +235,7 @@ describe('ProfileImageCropper', () => {
     expect(mocks.revoke).toHaveBeenCalledWith('blob:source')
     expect(fetch).not.toHaveBeenCalled()
     expect(mocks.generate).not.toHaveBeenCalled()
+    expect(mocks.profileChanged).not.toHaveBeenCalled()
   })
 
   it('remove calls only remove(kind)', async () => {
@@ -250,23 +248,29 @@ describe('ProfileImageCropper', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('refreshes the authenticated server Profile query after successful finalize', async () => {
+  it('awaits Profile refresh only after successful finalize', async () => {
+    const changed = deferred<void>()
+    mocks.profileChanged.mockReturnValue(changed.promise)
     renderCropper()
     choose()
     await applyAvatar()
     await waitFor(() => expect(mocks.finalize).toHaveBeenCalled())
-    expect(mocks.invalidate).toHaveBeenCalledWith({
-      queryKey: ['profile', 'server'],
-    })
+    expect(mocks.profileChanged).toHaveBeenCalledOnce()
+    expect(screen.queryByText('Avatar updated.')).toBeNull()
+    changed.resolve()
+    expect(await screen.findByText('Avatar updated.')).toBeTruthy()
   })
 
-  it('refreshes the authenticated server Profile query after successful removal', async () => {
+  it('awaits Profile refresh only after successful removal', async () => {
+    const changed = deferred<void>()
+    mocks.profileChanged.mockReturnValue(changed.promise)
     renderCropper({ currentUrl: 'https://image.test/avatar.webp' })
     fireEvent.click(screen.getByRole('button', { name: 'Remove avatar' }))
     await waitFor(() => expect(mocks.remove).toHaveBeenCalled())
-    expect(mocks.invalidate).toHaveBeenCalledWith({
-      queryKey: ['profile', 'server'],
-    })
+    expect(mocks.profileChanged).toHaveBeenCalledOnce()
+    expect(screen.queryByText('Avatar removed.')).toBeNull()
+    changed.resolve()
+    expect(await screen.findByText('Avatar removed.')).toBeTruthy()
   })
 
   it('shows strict upload failure and retries a fresh full sequence', async () => {
@@ -279,6 +283,7 @@ describe('ProfileImageCropper', () => {
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Profile media upload failed.',
     )
+    expect(mocks.profileChanged).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Retry avatar' }))
     await waitFor(() => expect(mocks.finalize).toHaveBeenCalledWith({
       kind: 'avatar',
