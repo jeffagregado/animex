@@ -304,13 +304,18 @@ describe('PublicShell', () => {
   })
 
   it('awaits sign out before navigating to Home', async () => {
+    const prepare = vi.fn()
     const request = vi.fn(async () => undefined)
     const navigate = vi.fn()
 
-    await runHeaderSignOut(request, navigate)
+    await runHeaderSignOut(prepare, request, navigate)
 
+    expect(prepare).toHaveBeenCalledOnce()
     expect(request).toHaveBeenCalledOnce()
     expect(navigate).toHaveBeenCalledWith('/home')
+    expect(prepare.mock.invocationCallOrder[0]).toBeLessThan(
+      request.mock.invocationCallOrder[0],
+    )
   })
 
   it('prevents duplicate sign out while pending and re-enables after failure', async () => {
@@ -333,11 +338,7 @@ describe('PublicShell', () => {
     fireEvent.click(signOut)
     expect(account.signOut).toHaveBeenCalledOnce()
 
-    fireEvent.click(trigger)
-    const pending = await screen.findByRole('menuitem', {
-      name: 'Signing out…',
-    })
-    expect(pending.getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('link', { name: 'Sign in' })).toBeTruthy()
     reject(new Error('Session service unavailable.'))
     await waitFor(() => expect(account.toastError).toHaveBeenCalledWith(
       'Session service unavailable.',
@@ -346,10 +347,9 @@ describe('PublicShell', () => {
       name: 'Mika account menu',
     })).toBeTruthy()
 
-    fireEvent.keyDown(document.activeElement ?? document.body, {
-      key: 'Escape',
-    })
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Mika account menu',
+    }))
     const retry = await screen.findByRole('menuitem', { name: 'Sign out' })
     expect(retry.getAttribute('aria-disabled')).not.toBe('true')
   })

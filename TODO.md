@@ -967,7 +967,7 @@ Validation: initial red run failed 14/52 focused tests; final focused run passes
 
 # Post-Phase 7 Public Catalog Identity
 
-Status: IMPLEMENTATION COMPLETE; AUTHENTICATED QA BLOCKED. Additive registry, dev backfill/verification, durable entity refs, and publicId cutover are implemented on `jeff-cx/public-catalog-identity`. Automated gates and signed-out responsive browser QA pass. Both configured dev QA logins are rejected, so authenticated browser checks remain open. Safe staged rollout remains active; Phase 8 stays blocked.
+Status: IMPLEMENTATION COMPLETE; AUTHENTICATED FLOW QA OPEN. Additive registry, dev backfill/verification, durable entity refs, and publicId cutover are implemented on `jeff-cx/public-catalog-identity`. Automated gates and signed-out responsive browser QA pass. Both configured AnimeX QA accounts are valid; authenticated sign-out passes after the private-query race fix, while the remaining authenticated flow matrix stays open. Safe staged rollout remains active; Phase 8 stays blocked.
 
 - [x] Lock `catalogEntities._id` as client-facing `publicId`; keep provider mappings separate and server-only.
 - [x] Lock cache-preserving architecture: existing cache rows, AniList keys, TTLs, leases, and image URLs remain unchanged.
@@ -986,12 +986,12 @@ Status: IMPLEMENTATION COMPLETE; AUTHENTICATED QA BLOCKED. Additive registry, de
 - [x] Update current-state data-flow docs; Metadata Image Proxy stays untouched and unscheduled.
 - [x] Run full tests, TypeScript, build, client AniList-ID/endpoint scans, Fallow, React Doctor no-regression comparison, and integrated review.
 - [x] Run signed-out browser QA at 390/768/1280 for Discover, Quick Search, Anime, Character, Staff, Home, Reviews, legacy redirects, overflow, and console errors.
-- [ ] Re-run authenticated Status, Score, Favorite, Rewatch, Review creation/detail, Feed, and Profile browser QA when valid dev QA credentials are available.
+- [ ] Re-run authenticated Status, Score, Favorite, Rewatch, Review creation/detail, Feed, and Profile browser QA with the verified AnimeX QA accounts.
 - [ ] Close phase and request approval before Phase 8.
 
 Dev migration receipt: identity lanes covered 199 Anime summaries, 64 Anime details, 4 Anime people pages, 49 Catalog Person details, 13 Catalog Person work pages, 5 user Anime rows, 0 rewatches, 4 milestones, 2 Reviews, 6 feed cards, and 1 Review-stat row. Two full identity verification cycles reached terminal cursors across 140 pages with zero missing/conflicting mappings. A bounded 49-row Catalog Person repair then materialized 24 provider references embedded in biographies and independently verified zero missing/conflicting mappings. Durable first pass patched `5/0/4/2/7/1` rows for user Anime/rewatches/milestones/Reviews/feed/stats; reruns patched zero. One authorized stale derived milestone feed card was deleted after projection-only verification; no Review, Post, or authoritative milestone source row was deleted. Final durable verification and aggregate checks returned zero issues; production migration and required-field tightening remain deferred.
 
-Validation receipt: 152 test files pass / 2 skipped; 1030 tests pass / 3 skipped. Root and Convex TypeScript checks, client + SSR build, route generation, client-bundle/source-boundary scans, and `git diff --check` pass. Fallow reports zero introduced findings; React Doctor remains at the inherited 63/100 baseline with the unchanged Discover render-time ref finding outside this phase. Signed-out browser QA has no overflow or console errors and proves opaque public links plus real Anime/Character legacy redirects. Staff work links pass after the biography repair. Authenticated QA remains blocked only by rejected configured dev credentials.
+Validation receipt: 152 test files pass / 2 skipped; 1031 tests pass / 3 skipped. Root and Convex TypeScript checks, client + SSR build, route generation, client-bundle/source-boundary scans, and `git diff --check` pass. Fallow reports zero introduced findings; React Doctor remains at the inherited 63/100 baseline with the unchanged Discover render-time ref finding outside this phase. Signed-out browser QA has no overflow or console errors and proves opaque public links plus real Anime/Character legacy redirects. Staff work links pass after the biography repair. Both configured AnimeX QA accounts sign in; direct Discover and active Anime-detail sign-out both return cleanly to signed-out Home.
 
 # Phase 8 Notifications, Privacy, Moderation
 
@@ -1000,6 +1000,19 @@ Status: SCOPE ADJUSTED. Detailed planning has not started.
 - [x] Keep notification foundations, required moderation notifications, Public/Private privacy tools, Block/Unblock, and Post/Review reports in Phase 8.
 - [x] Defer social notifications, preferences, deduplication, Followers-only UI, Comment/Reply reports, social moderation, and social Block integrations to Phase 9.
 - [ ] Write and approve Phase 8 design/spec and implementation plan.
+
+# Public Catalog Sign-Out Stability Follow-up
+
+Status: COMPLETE. Direct Discover and active Anime-detail sign-out return cleanly to signed-out Home without the reported `userAnime:getMine` unauthenticated error.
+
+- [x] Verify both configured AnimeX QA accounts can sign in.
+- [x] Reproduce and trace sign-out failure to private Convex subscriptions remaining mounted while Better Auth clears its token.
+- [x] Add RED regression coverage for pre-request shared auth transition and failed-request restoration.
+- [x] Publish signed-out state synchronously before sign-out request without weakening Convex authorization.
+- [x] Run focused/full tests, TypeScript, build, Fallow, React Doctor, review, and browser sign-out QA.
+- [x] Record result and commit follow-up on `jeff-cx/public-catalog-identity`.
+
+Validation: focused 13/13 and full 1031/1034 tests pass with 3 skipped; TypeScript, client + SSR build, `git diff --check`, and Fallow pass. React Doctor stays at 63/100 with the inherited Discover error plus an intentional urgent-transition warning for `flushSync`. Both QA accounts sign in; direct Discover and active Anime-detail sign-out reach signed-out Home without an error boundary.
 
 # Phase 9 Social Interactions
 

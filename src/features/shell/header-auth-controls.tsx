@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { Link } from '@tanstack/react-router'
 import {
   LoaderCircle,
@@ -20,17 +21,23 @@ import {
 import { authClient } from '../../lib/auth-client'
 import { assertAuthResponse } from '../auth/auth-actions'
 import { isCompleteAuthState } from '../auth/use-auth-state'
-import { usePublicAuthState } from './public-auth-context'
+import {
+  usePublicAuthActions,
+  usePublicAuthState,
+} from './public-auth-context'
 
 type HeaderAuthView = 'loading' | 'signedOut' | 'pending' | 'complete' | 'error'
+type PrepareSignOut = () => void
 type SignOutRequest = () => Promise<void>
 type NavigateAfterSignOut = (path: string) => void
 
-/** Completes one sign-out request before full-document Home navigation. */
+/** Publishes sign-out, completes its request, then performs Home navigation. */
 export const runHeaderSignOut = async (
+  prepare: PrepareSignOut,
   request: SignOutRequest,
   navigate: NavigateAfterSignOut,
 ): Promise<void> => {
+  prepare()
   await request()
   navigate('/home')
 }
@@ -46,6 +53,7 @@ const getHeaderAuthView = (
 
 export function HeaderAuthControls() {
   const authState = usePublicAuthState()
+  const { beginSignOut, cancelSignOut } = usePublicAuthActions()
   const [isSigningOut, setIsSigningOut] = useState(false)
   const signingOutRef = useRef(false)
   const view = getHeaderAuthView(authState)
@@ -56,12 +64,16 @@ export function HeaderAuthControls() {
     setIsSigningOut(true)
     try {
       await runHeaderSignOut(
+        () => {
+          flushSync(beginSignOut)
+        },
         async () => {
           await assertAuthResponse(await authClient.signOut(), 'Sign out failed.')
         },
         (path) => window.location.assign(path),
       )
     } catch (error: unknown) {
+      cancelSignOut()
       signingOutRef.current = false
       setIsSigningOut(false)
       toast.error(
