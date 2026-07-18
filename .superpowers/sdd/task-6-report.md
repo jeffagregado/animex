@@ -4,42 +4,58 @@ Status: DONE
 
 ## Scope
 
-- Completed/Rewatched rows show cached `year · format`.
-- Missing values show `TBA · Anime`.
-- Whole milestone row stays Anime Detail link.
-- Post and milestone destructive labels: `Delete`.
-- Review activity destructive label: `Remove`.
-- Review menu contains no `Delete Review`.
-- Existing dialogs, mutations, ownership checks, Sonner messages unchanged.
-- Post media rendering untouched.
+- Added owner-only Profile media upload registration, finalization, removal, retry, and cleanup lifecycle.
+- Added static WebP parser for VP8, VP8L, VP8X, exact dimensions, 2 MiB limit, and animation rejection.
+- Added daily 03:15 UTC expired-upload cleanup using typed function references and `by_expiry` pagination.
+- Kept `convex/profiles.ts`, schema, generated files, dependency files, routes, and parallel work untouched.
 
-`convex/feed.ts` already hydrated `seasonYear` and `format` from `animeSummaries` at base commit `f72dded`. No backend implementation edit needed. Integration assertion now locks behavior.
-
-## TDD
+## TDD Evidence
 
 RED:
 
-- Command: `pnpm exec vitest run convex/feedMilestones.integration.test.ts src/features/feed/feed-card.test.tsx src/features/feed/feed-owner-actions.test.tsx`
-- Result: 10 expected failures; old `View Anime Detail`, `Delete Post`, `Remove activity`, `Remove feed activity`, and `Delete Review` behavior exposed.
-- Cached hydration assertion passed at baseline because implementation already existed.
+```text
+pnpm test -- convex/profileMediaPolicy.test.ts convex/profileMedia.integration.test.ts
+2 failed files; policy module missing; 9 integration tests failed because profileMedia module missing.
+```
 
 GREEN:
 
-- Same focused command: PASS, 3 files and 23 tests.
+```text
+pnpm test -- convex/profileMediaPolicy.test.ts convex/profileMedia.integration.test.ts
+2 files passed; 17 tests passed.
+```
 
-## Validation
+Integrated Profile validation:
 
-- `pnpm exec tsc --noEmit`: PASS.
-- `pnpm exec fallow audit --base HEAD --gate new-only --format json --quiet`: PASS; 0 introduced dead code, complexity, or duplication findings.
-- `git diff --check`: PASS.
-- React review: semantic link/menu controls preserved; no hook, state, media, or accessibility behavior changed.
-- Browser QA not run by worker; controller QA owns integrated viewport and console pass.
+```text
+pnpm test -- convex/profileMediaPolicy.test.ts convex/profileMedia.integration.test.ts convex/profileEdit.integration.test.ts convex/profile.integration.test.ts
+4 files passed; 29 tests passed.
+```
 
-## Risk
+Type check:
 
-- Fallow reports one inherited `react-dom` test-only dependency finding and emitted a `node_modules directory not found` warning. Neither finding was introduced by Task 6.
-- No AniList call or non-feed DTO changed.
+```text
+pnpm exec tsc --noEmit
+PASS.
+```
 
-## Commit
+## Review Fix
 
-`fix: simplify feed activity actions`
+RED:
+
+```text
+pnpm test -- convex/profileMediaPolicy.test.ts
+2 failed, 4 passed. Real static alpha VP8X+ALPH+VP8 rejected as duplicate header; bare VP8X incorrectly accepted.
+```
+
+GREEN:
+
+- Accepts real encoded 512x512 static alpha extended WebP.
+- Requires exactly one VP8/VP8L image-data chunk and matching VP8X canvas.
+- Rejects missing/duplicate/mismatched headers, ANIM/ANMF, animation flag, malformed sizes, padding, and RIFF bounds.
+- Covers cleanup continuation beyond 50 rows and cleanup-failure original category.
+
+## Notes
+
+- `convex dev --once` and codegen intentionally deferred to Task 15.
+- All Task 6 source/test files remain below 500 lines.

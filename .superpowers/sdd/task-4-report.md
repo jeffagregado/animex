@@ -4,171 +4,96 @@ Status: DONE_WITH_CONCERNS
 
 ## Scope
 
-- Final Post writes store `media: PostMedia | null`.
-- Feed hydration returns stored external media directly. No server URL fetch.
-- Public Post upload writers removed.
-- Final schema removes Post `imageIds`, `postImages`, and all legacy indexes.
-- Migration module and integration test removed after live verification.
-- Text-only Posts preserved.
+- Added signed-in `/users/$username` Profile gate and tab route.
+- Added locked responsive Profile header, stats, Favorites, Reviews, Activity.
+- Added typed Task 3 function references. No generated API edit.
+- Added scope epoch, cursor in-flight dedupe, ID merge dedupe, auto paging, visible Load more.
+- Social controls/counts/footer, Anime List, Favorite Genres absent.
 
 ## TDD
 
 RED:
 
 ```text
-pnpm exec vitest run convex/socialPolicy.test.ts convex/social.integration.test.ts -t "validates text-only|creates media-only|rejects invalid external"
-Tests 3 failed
-Expected causes: old imageIds validator, old normalize helper, upload writer still callable.
-```
-
-Recovery RED:
-
-```text
-pnpm exec vitest run convex/postMediaMigration.integration.test.ts
-Tests 1 failed
-Expected cause: final schema rejected empty legacy imageIds before cleanup support existed.
+pnpm test -- src/features/profile/ui/profile-page.test.tsx
+FAIL: Failed to resolve import "./use-profile-pages"
+Expected cause: Profile UI and page hook did not exist.
 ```
 
 GREEN:
 
 ```text
-pnpm exec vitest run convex/social.integration.test.ts convex/socialPolicy.test.ts convex/socialValidators.test.ts
-Test Files 3 passed
-Tests 32 passed
-
-pnpm exec vitest run convex/postMediaMigration.integration.test.ts
+pnpm test -- src/features/profile/ui/profile-page.test.tsx
 Test Files 1 passed
-Tests 1 passed
+Tests 10 passed
 ```
 
-Coverage includes text-only, media-only, image/video validation, create retry intent, ownership, visibility, feed source truth, media replace/remove, Post removal, and absent upload writers.
+Cases cover auth destinations/readiness, invalid-tab pre-query replace, owner Edit
+callback, Public/Private projections, four stats, 10 latest Favorites, truthful tab
+states, social embargo, visible/manual and automatic paging, cursor in-flight dedupe,
+ID merge dedupe, and stale-scope rejection.
 
-## Transitional Sync
+## Validation
 
-```text
-pnpm exec convex dev --once
-PASS
-Deployment: quiet-husky-184 development
-Added migration indexes for Posts, Post images, and Post feed cards.
-```
+- Focused suite: PASS, 10/10.
+- Line counts: PASS, 67-358.
+- `git diff --check`: PASS.
+- Typecheck/codegen: not run. Task 15 owns integrated route generation and TypeScript.
+- Browser/React Doctor/Fallow: controller integration gates.
+- shadcn docs CLI unavailable in installed project; reused existing Base UI-backed
+  Button/Card-era primitives without dependency or registry changes.
 
-Public `generateUploadUrl`, `registerImage`, and `discardImage` writers were absent before live inspection.
-
-## Live Inspection
-
-Page size: 50. Each target completed in one page from null cursor.
-
-| Target | Processed | Legacy Posts | Post Images | Orphan Post Cards |
-| --- | ---: | ---: | ---: | ---: |
-| posts | 1 | 0 | 0 | 0 |
-| postImages | 0 | 0 | 0 | 0 |
-| feedCards | 1 | 0 | 0 | 0 |
-
-No Post content, media URLs, or storage IDs were printed.
-
-## Live Migration
-
-Order: `posts` -> `postImages` -> `feedCards`. Page size 50. Each target completed in one page.
-
-| Target | Processed | Preserved Posts | Deleted Posts | Deleted Images | Deleted Cards | Deleted Storage |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| posts | 1 | 1 | 0 | 0 | 0 | 0 |
-| postImages | 0 | 0 | 0 | 0 | 0 | 0 |
-| feedCards | 1 | 0 | 0 | 0 | 0 | 0 |
-
-## Verification
-
-First full verification and immediate pre-removal verification each scanned:
-
-- posts: 1
-- postImages: 0
-- feedCards: 1
-
-Both runs accumulated zero `legacyPostIds`, zero `postImageIds`, and zero `orphanPostFeedCardIds`.
-
-First final sync then failed safely because preserved text Post still contained empty `imageIds: []`. Narrow internal recovery migration removed only empty fields and failed explicitly if any non-empty field appeared.
-
-Recovery results:
-
-```text
-First page: processed 1, cleared 1, done
-Immediate repeat: processed 1, cleared 0, done
-```
-
-No Post was deleted or changed beyond removing empty legacy field.
-
-## Final Sync
-
-```text
-pnpm exec convex dev --once
-PASS
-```
-
-Final live schema has required nullable `media`; no `imageIds`, `postImages`, upload writers, or migration functions remain.
-
-## Final Validation
-
-- Focused backend tests: PASS, 32/32.
-- Convex TypeScript: PASS, `pnpm exec tsc --noEmit -p convex/tsconfig.json`.
-- Root TypeScript: expected FAIL only in Task 5 legacy feed/Post UI consumers and tests still using `imageIds`, `imageUrls`, upload writers, removed constants/table types, or missing activity metadata.
-- Fallow: PASS for assigned changed files; complexity 0, duplication 0. One inherited `react-dom` dependency finding excluded by gate.
-- `git diff --check`: PASS. Line-ending warnings only.
-- Generated files: required CLI produced no Git diff. Generated files were not staged or committed, per controller ownership.
+Commit: `79dd199` (`feat: add user profile destination`).
 
 ## Changed Files
 
-- `convex/schema.ts`
-- `convex/posts.ts`
-- `convex/socialPolicy.ts`
-- `convex/socialPolicy.test.ts`
-- `convex/socialValidators.test.ts`
-- `convex/feed.ts`
-- `convex/social.integration.test.ts`
-- Deleted `convex/postMediaMigration.ts`
-- Deleted `convex/postMediaMigration.integration.test.ts`
-- `.superpowers/sdd/task-4-report.md`
+- `src/routes/_public/_profile/route.tsx`
+- `src/routes/_public/_profile/users/$username.tsx`
+- `src/features/profile/ui/profile-page.tsx`
+- `src/features/profile/ui/profile-header.tsx`
+- `src/features/profile/ui/profile-stats.tsx`
+- `src/features/profile/ui/profile-favorites.tsx`
+- `src/features/profile/ui/profile-reviews.tsx`
+- `src/features/profile/ui/profile-activity.tsx`
+- `src/features/profile/ui/use-profile-pages.ts`
+- `src/features/profile/ui/profile-page.test.tsx`
+- `.superpowers/sdd/task-4-report.md` (ignored)
 
-## Commit
+## Self-review And Concerns
 
-Implementation commit: `efb5f39` (`feat: store external post media`).
-
-## Self-review And Risks
-
-- External media validation uses locked shared Zod contract after Convex argument validation.
-- Create retry compares normalized stored media intent exactly.
-- Transitional source rows without `media` were suppressed from feed hydration until migration completion.
-- No arbitrary media URL fetch exists in Convex Post/feed path.
-- Root TypeScript remains blocked until Task 5 updates UI consumers to final contracts.
-- Live destructive counts were zero. Only one empty legacy field was removed from preserved text Post.
+- Exact owned source only. Tooling dirtied locked `src/routeTree.gen.ts`; left
+  untouched and unstaged per brief.
+- Private non-owner projection never mounts content query hook.
+- Invalid tab never mounts Profile query hook.
+- `FeedCard` receives `owner={false}`. `FeedList` unused.
+- `PublishedReviewCard` reused directly.
+- Header owner button uses explicit `onEditProfile` callback. `profile-page.tsx`
+  currently supplies intentional no-op until Task 5 integrates real dialog; no fake
+  dialog or success state added.
+- Favorites backend projection has no document ID. Merge dedupe uses canonical
+  AniList ID; Reviews and Activity use returned document IDs.
 
 ## Review Follow-up
 
-Controller kept write ownership limited to assigned backend files and report. Controller explicitly extended `convex/socialValidators.test.ts` ownership only to remove its stale static assertion after verified migration-file deletion.
-
-- Removed transitional `PostMedia | null | undefined` comparison widening. Final create retry comparison accepts only `PostMedia | null`.
-- Removed feed suppression for `post.media === undefined`. Final required schema now either returns stored media or raises schema/data errors.
-- Added authenticated non-owner integration coverage for update, remove, and visibility mutation denial. Source Post and feed projection must remain byte-for-byte unchanged.
-- Did not rerun live migration or live schema commands during review follow-up.
-
-Ownership regression RED:
+Legal empty continuation page RED:
 
 ```text
-pnpm exec vitest run convex/social.integration.test.ts -t "rejects non-owner Post mutations"
-Tests 1 failed
-Expected cause: ownership guard was temporarily removed; forged update resolved instead of rejecting.
+pnpm test -- src/features/profile/ui/profile-page.test.tsx
+Test Files 1 failed
+Tests 1 failed, 10 passed
+Expected cause: Activity rendered "No activity yet" while `hasMore` was true.
 ```
 
-Ownership regression GREEN:
+GREEN:
 
 ```text
-pnpm exec vitest run convex/social.integration.test.ts -t "rejects non-owner Post mutations"
-Tests 1 passed
+pnpm test -- src/features/profile/ui/profile-page.test.tsx
+Test Files 1 passed
+Tests 11 passed
 ```
 
-Review validation:
+Activity, Reviews, and Favorites now render terminal empty state only when
+`items.length === 0 && !hasMore`. Empty continuation pages keep visible Load more
+and observer continuation.
 
-- Focused backend suite: PASS, 33/33.
-- Convex TypeScript: PASS.
-- Root TypeScript: expected FAIL only in Task 5 legacy feed/Post UI consumers and tests.
-- Fallow against `efb5f39`: PASS for assigned changed files; complexity 0, duplication 0. Inherited `react-dom` finding excluded.
-- `git diff --check`: PASS. Line-ending warnings only.
+Follow-up commit: `6164e82` (`fix: preserve profile pagination progress`).

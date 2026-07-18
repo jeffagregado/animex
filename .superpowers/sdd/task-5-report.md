@@ -1,85 +1,56 @@
-# Task 5 Post URL Media Report
+# Task 5 Report
 
-Status: complete after review fixes
+Status: DONE_WITH_CONCERNS
 
-Implementation commit: `37df5dc`
+## Changed
 
-Review-fix commit: `5bbd175`
-
-## Result
-
-- Replaced Post file uploads with one explicit Image or Video HTTPS URL attachment.
-- Kept invalid URL drafts visible with inline and Sonner errors.
-- Supports text-only, media-only, text-plus-media, edit, replace, and remove flows.
-- Images use lazy loading, no-referrer requests, contextual alt text, and fixed unavailable geometry.
-- Videos render safe external links only. Valid YouTube IDs receive thumbnails. No iframe, playback, server fetch, or metadata request exists.
-- Whole-Post spoiler reveal still covers text and media with card-local state.
-- Removed upload, compression, pending cleanup, reorder, four-image grid, and browser file-input code.
-- Broken image state resets when a different media type or URL is rendered.
-- Native form URL validation is disabled so shared schema validation owns errors and Sonner reporting.
+- `convex/profiles.ts`: owner mutation, stable field errors, trim/limits, sparse patch, persisted re-read, atomic search upsert.
+- `convex/profileEdit.integration.test.ts`: auth, strict args, errors, normalization, visibility, projection, rollback.
+- `src/features/profile/ui/edit-profile-dialog.tsx`: TanStack Form + Zod, raw Base UI Dialog, fade-only motion, disabled media, progress, retry, focus.
+- `src/features/profile/ui/edit-profile-dialog.test.tsx`: cancel, errors/focus, pending, retry, focus return, fade-only.
+- `src/features/profile/ui/profile-header.tsx`: passes actual Edit Profile button.
+- `src/features/profile/ui/profile-page.tsx`: stable trigger ref; mounted controlled Dialog Root.
+- `src/features/profile/ui/profile-page.test.tsx`: production focus/fade lifecycle, typed route mock, Private→Public regression.
 
 ## TDD Evidence
 
-RED:
+- RED: `pnpm test -- convex/profileEdit.integration.test.ts src/features/profile/ui/edit-profile-dialog.test.tsx`
+- Result: exit 1. Missing `profiles.update`; missing `edit-profile-dialog`.
+- GREEN: same command.
+- Result: exit 0. 2 files, 10 tests passed.
+- Review RED: `pnpm test -- src/features/profile/ui/profile-page.test.tsx`
+- Result: exit 1. Header passed event instead of button; close removed Dialog before `data-closed` lifecycle.
+- Visibility RED: focused Profile UI suite.
+- Result: exit 1. Private→Public edit reached mutation 0 times because form reset during field rerender.
+- Review GREEN: `pnpm test -- src/features/profile/ui/profile-page.test.tsx src/features/profile/ui/edit-profile-dialog.test.tsx`
+- Result: exit 0. 2 files, 19 tests passed.
 
-- `pnpm exec vitest run src/features/feed/use-post-composer.test.tsx src/features/feed/post-media-card.test.tsx`
-- Result: 2 files failed. Four hook behavior tests failed against legacy image-array state; media-card import failed because component did not exist.
-- `pnpm exec vitest run src/features/feed/post-composer.test.tsx src/features/feed/feed-card.test.tsx src/features/feed/post-media-card.test.tsx src/features/feed/use-post-composer.test.tsx`
-- Result: 5 tests failed against legacy file-picker and `imageUrls` rendering.
-- Review RED: `pnpm exec vitest run src/features/feed/post-media-card.test.tsx src/features/feed/post-composer.test.tsx src/features/feed/use-post-composer.test.tsx`
-- Result: 3 files failed on broken-image rerender recovery, malformed native URL submission, and persisted-media removal coverage.
+## Validation
 
-GREEN:
-
-- `pnpm exec vitest run src/features/feed/post-composer.test.tsx src/features/feed/use-post-composer.test.tsx src/features/feed/post-media-card.test.tsx src/features/feed/feed-card.test.tsx src/features/social/shared/feed-ranking.test.ts src/features/feed/feed-list.test.tsx src/features/feed/feed-owner-actions.test.tsx src/features/feed/feed-state.test.ts`
-- Result: 8 files passed, 35 tests passed.
-- Review focused: `pnpm exec vitest run src/features/feed/post-composer.test.tsx src/features/feed/use-post-composer.test.tsx src/features/feed/post-media-card.test.tsx src/features/feed/feed-card.test.tsx src/features/feed/use-feed-pages.test.tsx src/features/feed/feed-card-detail-page.test.tsx src/features/home/home-page.test.tsx`
-- Result: 7 files passed, 45 tests passed.
-- Full suite: `pnpm test`
-- Result: 85 files passed, 2 skipped; 588 tests passed, 3 skipped.
+- `pnpm test -- convex/profileEdit.integration.test.ts src/features/profile/ui/edit-profile-dialog.test.tsx src/features/profile/ui/profile-page.test.tsx`
+- Result: exit 0. 3 files, 21 tests passed.
+- `git diff --check -- <owned files>`
+- Result: exit 0.
+- Assigned UI file sizes: 413, 143, 69, 482, 196 lines. All under 500.
 - `pnpm exec tsc --noEmit`
-- Result: passed.
-- `pnpm exec fallow audit --format json --quiet --base 3354c34`
-- Result: passed with zero introduced findings. Existing `react-dom` dependency placement and `usePostComposer` complexity warnings remain inherited.
-- `git diff --check`
-- Result: passed.
-
-## Changed Files
-
-- `src/features/feed/post-composer.tsx`
-- `src/features/feed/post-composer.test.tsx`
-- `src/features/feed/use-post-composer.ts`
-- `src/features/feed/use-post-composer.test.tsx`
-- `src/features/feed/feed-card.tsx`
-- `src/features/feed/feed-card.test.tsx`
-- `src/features/feed/post-media-card.tsx`
-- `src/features/feed/post-media-card.test.tsx`
-- `src/features/social/shared/feed-ranking.test.ts`
-- `src/features/feed/feed-list.test.tsx`
-- `src/features/feed/feed-owner-actions.test.tsx`
-- `src/features/feed/feed-state.test.ts`
-- `src/features/feed/post-composer-dialog.tsx`
-- `src/features/feed/use-feed-pages.test.tsx`
-- `src/features/feed/feed-card-detail-page.test.tsx`
-- `src/features/home/home-page.test.tsx`
-
-Deleted:
-
-- `src/features/feed/post-image-grid.tsx`
-- `src/features/feed/process-post-image.ts`
-- `src/features/feed/process-post-image.test.ts`
+- Result: exit 1. Assigned files clean. Latest post-commit run has one concurrent catalog-person error: `convex/catalogPersonCache.ts:64` TS2322.
+- Route-tree errors: none reported.
 
 ## Self-review
 
-- Shared media schema and provider helpers remain source of validation truth.
-- Media type is user-selected; URL extensions never determine Image versus Video.
-- Submission failure does not clear draft state.
-- Persisted media removal sends `media: null`; replacement sends the complete new discriminated media value.
-- Restored blocker predicates, failed-save retention, card metadata, responsiveness, and cover-geometry regression assertions.
-- External links use `target="_blank"` and `rel="noreferrer noopener"`.
-- No dependency, generated file, Convex file, route, TODO, or unrelated product behavior changed.
+- No username/auth/email/content visibility/media mutation fields.
+- Empty bio removes stored field.
+- Projection failure rolls back user patch.
+- No `userSearch.ts` import/cycle.
+- Popup/backdrop opacity transitions only. No zoom/scale.
+- Cancel sends no mutation. Failure stays visible; Save retries.
+- Media controls remain disabled.
+- Real trigger supplied through `event.currentTarget`; Base UI owns final focus.
+- Owner Dialog Root remains mounted while `open` controls popup lifecycle.
+- Form reset guarded by closed→open transition or Profile ID change.
+- Typed route mock rejects non-object options before spreading.
+- Existing task-4 report and generated route tree untouched.
 
-## Risks
+## Concern
 
-- Browser QA remains controller-owned after integration.
-- Remote image and YouTube thumbnail availability is external; UI exposes truthful unavailable or linked states without fallback fetching.
+- Full typecheck blocked by concurrent out-of-scope `catalogPersonCache.ts` work.
