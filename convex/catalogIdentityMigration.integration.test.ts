@@ -54,7 +54,7 @@ const verifyLane = makeFunctionReference<
   { lane: CatalogIdentityLane; paginationOpts: { numItems: number; cursor: string | null } },
   MigrationResult
 >('catalogIdentityMigration:verifyLane')
-const page = (cursor: string | null = null, numItems = 50) => ({ numItems, cursor })
+const page = (cursor: string | null, numItems: number) => ({ numItems, cursor })
 const createHarness = () => convexTest(schema, modules)
 
 const animeDetail = {
@@ -214,7 +214,7 @@ describe('catalog identity migration', () => {
   test('returns explicit empty results for every lane', async () => {
     const t = createHarness()
     for (const lane of lanes) {
-      await expect(t.mutation(backfillLane, { lane, paginationOpts: page() })).resolves.toEqual({
+      await expect(t.mutation(backfillLane, { lane, paginationOpts: page(null, 50) })).resolves.toEqual({
         lane,
         continueCursor: expect.any(String),
         isDone: true,
@@ -224,7 +224,7 @@ describe('catalog identity migration', () => {
         missingCount: 0,
         conflictCount: 0,
       })
-      await expect(t.mutation(verifyLane, { lane, paginationOpts: page() })).resolves.toMatchObject({
+      await expect(t.mutation(verifyLane, { lane, paginationOpts: page(null, 50) })).resolves.toMatchObject({
         lane,
         isDone: true,
         processedCount: 0,
@@ -239,10 +239,10 @@ describe('catalog identity migration', () => {
     await seedAllLanes(t)
 
     for (const lane of lanes) {
-      const backfill = await t.mutation(backfillLane, { lane, paginationOpts: page() })
+      const backfill = await t.mutation(backfillLane, { lane, paginationOpts: page(null, 50) })
       expect(backfill).toMatchObject({ lane, isDone: true, missingCount: 0, conflictCount: 0 })
       expect(backfill.processedCount).toBeGreaterThan(0)
-      const verification = await t.mutation(verifyLane, { lane, paginationOpts: page() })
+      const verification = await t.mutation(verifyLane, { lane, paginationOpts: page(null, 50) })
       expect(verification).toMatchObject({ lane, isDone: true, missingCount: 0, conflictCount: 0 })
     }
 
@@ -282,7 +282,7 @@ describe('catalog identity migration', () => {
 
     const rerun = await t.mutation(backfillLane, {
       lane: 'anime-review-stats',
-      paginationOpts: page(),
+      paginationOpts: page(null, 50),
     })
     expect(rerun).toMatchObject({ createdCount: 0, existingCount: 2 })
   })
@@ -309,7 +309,10 @@ describe('catalog identity migration', () => {
       }
     })
 
-    await t.mutation(backfillLane, { lane: 'catalog-person-details', paginationOpts: page() })
+    await t.mutation(backfillLane, {
+      lane: 'catalog-person-details',
+      paginationOpts: page(null, 50),
+    })
     const refs = await t.run(async (ctx) => await ctx.db
       .query('catalogProviderRefs')
       .withIndex('by_provider_kind_id', (q) => q.eq('provider', 'anilist'))
@@ -353,8 +356,39 @@ describe('catalog identity migration', () => {
 
     await expect(t.mutation(backfillLane, {
       lane: 'catalog-person-details',
-      paginationOpts: page(),
+      paginationOpts: page(null, 50),
     })).rejects.toThrow('embedded provider references')
+  })
+
+  test('rejects aggregate page overflow before creating any mappings', async () => {
+    const t = createHarness()
+    await t.run(async (ctx) => {
+      for (const [rowIndex, kind] of (['character', 'staff'] as const).entries()) {
+        const baseAnimeId = rowIndex * 50
+        await ctx.db.insert('catalogPersonWorkPages', {
+          kind,
+          personId: 900 + rowIndex,
+          page: 1,
+          items: Array.from({ length: 50 }, (_, itemIndex) => ({
+            animeId: baseAnimeId + itemIndex + 1,
+            role: null,
+          })),
+          hasNextPage: false,
+          refreshedAt: 1,
+          expiresAt: 1,
+        })
+      }
+    })
+
+    await expect(t.mutation(backfillLane, {
+      lane: 'catalog-person-work-pages',
+      paginationOpts: page(null, 2),
+    })).rejects.toThrow('CATALOG_IDENTITY_PAGE_UNBOUNDED')
+    const counts = await t.run(async (ctx) => ({
+      entities: (await ctx.db.query('catalogEntities').collect()).length,
+      mappings: (await ctx.db.query('catalogProviderRefs').collect()).length,
+    }))
+    expect(counts).toEqual({ entities: 0, mappings: 0 })
   })
 
   test('reports missing mappings and fails explicit mapping conflicts', async () => {
@@ -367,7 +401,7 @@ describe('catalog identity migration', () => {
     })
     await expect(t.mutation(verifyLane, {
       lane: 'anime-review-stats',
-      paginationOpts: page(),
+      paginationOpts: page(null, 50),
     })).resolves.toMatchObject({ missingCount: 1, conflictCount: 0 })
 
     const corrupt = createHarness()
@@ -388,11 +422,11 @@ describe('catalog identity migration', () => {
     })
     await expect(corrupt.mutation(backfillLane, {
       lane: 'anime-review-stats',
-      paginationOpts: page(),
+      paginationOpts: page(null, 50),
     })).rejects.toThrow('multiple mappings')
     await expect(corrupt.mutation(verifyLane, {
       lane: 'anime-review-stats',
-      paginationOpts: page(),
+      paginationOpts: page(null, 50),
     })).rejects.toThrow('multiple mappings')
   })
 })

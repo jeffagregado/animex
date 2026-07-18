@@ -31,13 +31,13 @@ anime-review-stats
 Start one lane:
 
 ```powershell
-pnpm exec convex run catalogIdentityMigration:backfillLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
+pnpm exec convex run --deployment dev catalogIdentityMigration:backfillLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
 Pass returned `continueCursor` into next page:
 
 ```powershell
-pnpm exec convex run catalogIdentityMigration:backfillLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":"RETURNED_CURSOR"}}'
+pnpm exec convex run --deployment dev catalogIdentityMigration:backfillLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":"RETURNED_CURSOR"}}'
 ```
 
 Repeat until `isDone: true`. Then run next lane from `cursor: null`.
@@ -49,19 +49,30 @@ missingCount: 0
 conflictCount: 0
 ```
 
-On failure, fix explicit cause. Restart lane from last successful page cursor. Never skip failed page.
+On page-bound failure, retry same cursor with smaller `paginationOpts.numItems`. On other failure, fix explicit cause. Restart lane from last successful page cursor. Never skip failed page.
 
 ## Verify
 
 Verify each lane independently from null cursor:
 
 ```powershell
-pnpm exec convex run catalogIdentityMigration:verifyLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
+pnpm exec convex run --deployment dev catalogIdentityMigration:verifyLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
 Continue with returned cursor until `isDone: true`. Repeat for all lanes.
 
 Accept only zero `missingCount` and zero `conflictCount` on every page. Any thrown conflict blocks rollout.
+
+## Production
+
+Blocked until separate explicit approval. After approval, use explicit production deployment forms:
+
+```powershell
+pnpm exec convex run --deployment prod catalogIdentityMigration:backfillLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
+pnpm exec convex run --deployment prod catalogIdentityMigration:verifyLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
+```
+
+Follow same cursor, page-bound, lane, and zero-count gates.
 
 ## Retention And Rollback
 

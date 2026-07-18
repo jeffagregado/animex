@@ -61,10 +61,20 @@ type IdentityCounts = {
   conflictCount: number
 }
 
+type CatalogIdentityMigrationErrorCode =
+  | 'CATALOG_ENTITY_KIND_CONFLICT'
+  | 'CATALOG_ENTITY_PROVIDER_CONFLICT'
+  | 'CATALOG_IDENTITY_PAGE_UNBOUNDED'
+  | 'CATALOG_IDENTITY_SOURCE_UNBOUNDED'
+  | 'CATALOG_PROVIDER_REF_CONFLICT'
+
 class CatalogIdentityMigrationError extends Error {
-  constructor(code: string, message: string) {
+  readonly code: CatalogIdentityMigrationErrorCode
+
+  constructor(code: CatalogIdentityMigrationErrorCode, message: string) {
     super(`${code}: ${message}`)
     this.name = 'CatalogIdentityMigrationError'
+    this.code = code
   }
 }
 
@@ -99,6 +109,18 @@ const boundedRefs = (refs: CatalogProviderRef[]): CatalogProviderRef[] => {
     throw new CatalogIdentityMigrationError(
       'CATALOG_IDENTITY_SOURCE_UNBOUNDED',
       `Source row has more than ${CATALOG_PROVIDER_REF_BATCH_MAX} embedded provider references.`,
+    )
+  }
+  return unique
+}
+
+/** Caps aggregate page work before any identity reads or writes start. */
+const boundedPageRefs = (refs: CatalogProviderRef[]): CatalogProviderRef[] => {
+  const unique = uniqueRefs(refs)
+  if (unique.length > CATALOG_PROVIDER_REF_BATCH_MAX) {
+    throw new CatalogIdentityMigrationError(
+      'CATALOG_IDENTITY_PAGE_UNBOUNDED',
+      `Page has ${unique.length} unique provider references; retry the same cursor with a smaller paginationOpts.numItems value so the page has at most ${CATALOG_PROVIDER_REF_BATCH_MAX}.`,
     )
   }
   return unique
@@ -285,7 +307,8 @@ export const backfillLane = internalMutation({
   returns: migrationResultValidator,
   handler: async (ctx, args) => {
     const page = await paginateIdentityLane(ctx, args.lane, args.paginationOpts)
-    const counts = await ensureCatalogEntities(ctx, page.refs)
+    const refs = boundedPageRefs(page.refs)
+    const counts = await ensureCatalogEntities(ctx, refs)
     return {
       lane: args.lane,
       continueCursor: page.continueCursor,
@@ -302,7 +325,8 @@ export const verifyLane = internalMutation({
   returns: migrationResultValidator,
   handler: async (ctx, args) => {
     const page = await paginateIdentityLane(ctx, args.lane, args.paginationOpts)
-    const counts = await verifyCatalogEntities(ctx, page.refs)
+    const refs = boundedPageRefs(page.refs)
+    const counts = await verifyCatalogEntities(ctx, refs)
     return {
       lane: args.lane,
       continueCursor: page.continueCursor,
