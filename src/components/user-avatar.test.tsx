@@ -48,4 +48,23 @@ describe('UserAvatar', () => {
     render(<UserAvatar avatarUrl={null} displayName="Mika" label={`${size} avatar`} size={size} />)
     expect(screen.getByLabelText(`${size} avatar`).className).toContain(className)
   })
+
+  it.each([
+    ['search', 'size-16', 'text-2xl'],
+    ['profile', 'size-24', 'text-4xl'],
+  ] as const)('uses locked %s fallback geometry', (size, boxClass, glyphClass) => {
+    render(
+      <UserAvatar
+        avatarUrl={null}
+        displayName="Mika"
+        label={`${size} avatar`}
+        size={size as never}
+      />,
+    )
+    const avatar = screen.getByRole('img', { name: `${size} avatar` })
+    expect(avatar.className).toContain(boxClass)
+    expect(avatar.className).toContain(glyphClass)
+    expect(avatar.className).toContain('aspect-square')
+    expect(avatar.className).toContain('overflow-hidden')
+  })
 })

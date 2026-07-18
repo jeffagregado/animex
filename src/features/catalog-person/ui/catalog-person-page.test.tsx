@@ -79,13 +79,15 @@ describe('CatalogPersonPage', () => {
     expect(screen.getByText('No character facts available.')).toBeTruthy()
   })
 
-  it('renders Staff metadata and only mounts work grid for valid work tabs', () => {
+  it('renders Staff metadata and exposes the shared Anime tab', () => {
     const view = render(<CatalogPersonPage id={8} kind="staff" onRetry={() => undefined} onTabChange={() => undefined} state={staffState()} tab="overview" />)
     expect(screen.getByText('Voice Actor')).toBeTruthy()
     expect(screen.getByText('Japanese')).toBeTruthy()
     expect(screen.getByText('2012–present')).toBeTruthy()
     expect(screen.queryByTestId('work-grid')).toBeNull()
-    view.rerender(<CatalogPersonPage id={8} kind="staff" onRetry={() => undefined} onTabChange={() => undefined} state={staffState()} tab="works" />)
+    expect(screen.getByRole('tab', { name: 'Anime' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: 'Works' })).toBeNull()
+    view.rerender(<CatalogPersonPage id={8} kind="staff" onRetry={() => undefined} onTabChange={() => undefined} state={staffState()} tab={'anime' as never} />)
     expect(screen.getByTestId('work-grid').textContent).toContain('staff')
   })
 

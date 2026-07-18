@@ -171,4 +171,20 @@ describe('UserSearchPage', () => {
     expect(await screen.findByRole('alert')).toBeTruthy()
     expect(screen.queryByText('private@example.com')).toBeNull()
   })
+
+  it('renders labelled 64px shared avatars for valid and missing images', async () => {
+    convex.query.mockResolvedValueOnce(result([
+      { ...user('1', 'mika', 'Mika'), avatarUrl: 'https://example.test/mika.jpg' },
+      user('2', 'sora', 'Sora'),
+    ], '', true))
+    renderPage('mi')
+
+    const mika = await screen.findByRole('img', { name: 'Mika avatar' })
+    const sora = screen.getByRole('img', { name: 'Sora avatar' })
+    for (const avatar of [mika, sora]) {
+      expect(avatar.className).toContain('size-16')
+      expect(avatar.className).toContain('rounded-full')
+    }
+    expect(sora.textContent).toBe('S')
+  })
 })

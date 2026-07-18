@@ -68,9 +68,9 @@ describe('catalog person contracts', () => {
     expect(parseCatalogPersonTab('character', undefined)).toBe('overview')
     expect(parseCatalogPersonTab('character', 'anime')).toBe('anime')
     expect(parseCatalogPersonTab('staff', undefined)).toBe('overview')
-    expect(parseCatalogPersonTab('staff', 'works')).toBe('works')
+    expect(parseCatalogPersonTab('staff', 'anime')).toBe('anime')
     expect(() => parseCatalogPersonTab('character', 'works')).toThrow('CATALOG_PERSON_TAB_INVALID')
-    expect(() => parseCatalogPersonTab('staff', 'anime')).toThrow('CATALOG_PERSON_TAB_INVALID')
+    expect(() => parseCatalogPersonTab('staff', 'works')).toThrow('CATALOG_PERSON_TAB_INVALID')
   })
 
   test('validates strict provider-neutral detail data and HTTPS images', () => {

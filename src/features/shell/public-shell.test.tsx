@@ -153,6 +153,35 @@ describe('PublicShell', () => {
     expect(screen.getByRole('dialog', { name: 'Quick Search' })).toBeTruthy()
   })
 
+  it('renders complete auth as a labelled 44px account menu with Profile and Sign out', async () => {
+    setViewport(true)
+    vi.stubGlobal('scrollTo', vi.fn())
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        status: 'complete',
+        email: 'mika@example.com',
+        profile: {
+          id: 'profile-1',
+          username: 'mika',
+          name: 'Mika',
+          avatarUrl: null,
+          visibility: 'private',
+        },
+      }),
+    }) as Response))
+    const { router } = createPublicTestRouter('/home')
+    render(<RouterProvider router={router} />)
+
+    const trigger = await screen.findByRole('button', { name: 'Open account menu' })
+    expect(trigger.className).toContain('size-11')
+    expect(within(trigger).getByRole('img', { name: 'Mika avatar' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
+    fireEvent.click(trigger)
+    expect(screen.getAllByRole('menuitem', { name: 'Profile' })).toHaveLength(1)
+    expect(screen.getAllByRole('menuitem', { name: 'Sign out' })).toHaveLength(1)
+  })
+
   it('renders only Home, Discover, and Search while complete auth is not Convex-ready', async () => {
     convex.authenticated = false
     setViewport(false)

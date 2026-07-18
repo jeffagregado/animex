@@ -14,7 +14,18 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
   order: [] as string[],
   revoke: vi.fn(),
+  invalidate: vi.fn(),
 }))
+
+vi.mock('@tanstack/react-query', async () => {
+  const actual = await vi.importActual<typeof import('@tanstack/react-query')>(
+    '@tanstack/react-query',
+  )
+  return {
+    ...actual,
+    useQueryClient: () => ({ invalidateQueries: mocks.invalidate }),
+  }
+})
 
 vi.mock('convex/server', () => ({
   makeFunctionReference: (_kind: string) => _kind,
@@ -164,6 +175,8 @@ beforeEach(() => {
   mocks.register.mockResolvedValue(null)
   mocks.finalize.mockResolvedValue(null)
   mocks.remove.mockResolvedValue(null)
+  mocks.invalidate.mockReset()
+  mocks.invalidate.mockResolvedValue(undefined)
   vi.stubGlobal('fetch', vi.fn(async () => {
     mocks.order.push('post')
     return new Response(JSON.stringify({ storageId: 'storage-1' }), {
@@ -235,6 +248,25 @@ describe('ProfileImageCropper', () => {
     }))
     expect(mocks.order).toEqual(['remove'])
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('refreshes the authenticated server Profile query after successful finalize', async () => {
+    renderCropper()
+    choose()
+    await applyAvatar()
+    await waitFor(() => expect(mocks.finalize).toHaveBeenCalled())
+    expect(mocks.invalidate).toHaveBeenCalledWith({
+      queryKey: ['profile', 'server'],
+    })
+  })
+
+  it('refreshes the authenticated server Profile query after successful removal', async () => {
+    renderCropper({ currentUrl: 'https://image.test/avatar.webp' })
+    fireEvent.click(screen.getByRole('button', { name: 'Remove avatar' }))
+    await waitFor(() => expect(mocks.remove).toHaveBeenCalled())
+    expect(mocks.invalidate).toHaveBeenCalledWith({
+      queryKey: ['profile', 'server'],
+    })
   })
 
   it('shows strict upload failure and retries a fresh full sequence', async () => {
