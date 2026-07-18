@@ -8,7 +8,6 @@ import {
   type RefObject,
 } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useConvexAuth } from 'convex/react'
 
 import { usePublicAuthState } from '../../shell/public-auth-context'
 import { QuickSearchDialog } from './quick-search-dialog'
@@ -153,14 +152,11 @@ function QuickSearchRoot({
 /** Enables Quick Search with authenticated User results on public pages. */
 export function QuickSearchProvider({ children }: { children: ReactNode }) {
   const auth = usePublicAuthState()
-  const convexAuth = useConvexAuth()
   const completeProfile = auth.status === 'ready'
     && auth.authState.status === 'complete'
     ? auth.authState.profile
     : null
   const usersEnabled = completeProfile !== null
-    && convexAuth.isAuthenticated
-    && !convexAuth.isLoading
 
   return (
     <QuickSearchRoot

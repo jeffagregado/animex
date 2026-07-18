@@ -13,6 +13,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { ProfilePage, type ProfileResult } from './profile-page'
+import { profileQueryKey, refreshProfileQuery } from './profile-route'
 
 const mocks = vi.hoisted(() => {
   const query = vi.fn()
@@ -43,6 +44,10 @@ vi.mock('convex/react', () => ({
   useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
   useMutation: () => vi.fn(),
   useQuery: () => mocks.profile,
+}))
+vi.mock('../server/profile-read.functions', () => ({
+  getProfileByUsername: async () => mocks.profile,
+  getProfileContentPage: async () => mocks.page,
 }))
 
 afterEach(() => {
@@ -87,8 +92,11 @@ it('changes Profile tabs through router history without scroll reset', async () 
     if (!event.defaultPrevented) event.preventDefault()
   }
   document.addEventListener('click', blockNativeDocumentNavigation)
-  fireEvent.click(await screen.findByRole('link', { name: 'reviews' }))
+  const reviewsLink = await screen.findByRole('link', { name: 'reviews' })
+  scrollTo.mockClear()
+  fireEvent.click(reviewsLink)
   await waitFor(() => expect(history.location.search).toBe('?tab=reviews'))
+  expect(scrollTo).not.toHaveBeenCalled()
   expect(screen.getByRole('link', { name: 'reviews' }).getAttribute('aria-current')).toBe('page')
 
   await act(async () => { history.back() })
@@ -98,6 +106,25 @@ it('changes Profile tabs through router history without scroll reset', async () 
   await act(async () => { history.forward() })
   await waitFor(() => expect(history.location.search).toBe('?tab=reviews'))
   expect(screen.getByRole('link', { name: 'reviews' }).getAttribute('aria-current')).toBe('page')
-  expect(scrollTo).not.toHaveBeenCalled()
   document.removeEventListener('click', blockNativeDocumentNavigation)
+})
+
+it('awaits exact username-scoped Profile invalidation and refetch', async () => {
+  const calls: string[] = []
+  const queryClient = {
+    invalidateQueries: vi.fn(async () => { calls.push('invalidate') }),
+    refetchQueries: vi.fn(async () => { calls.push('refetch') }),
+  }
+
+  await refreshProfileQuery(queryClient as unknown as QueryClient, 'mika')
+
+  expect(calls).toEqual(['invalidate', 'refetch'])
+  expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+    queryKey: profileQueryKey('mika'),
+    refetchType: 'none',
+  })
+  expect(queryClient.refetchQueries).toHaveBeenCalledWith({
+    queryKey: profileQueryKey('mika'),
+    exact: true,
+  })
 })

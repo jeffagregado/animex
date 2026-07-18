@@ -1,6 +1,8 @@
 import { createContext, useContext, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
-import { type ClientAuthState, useAuthState } from '../auth/use-auth-state'
+import { authStateQueryOptions } from '../auth/auth-state-query'
+import type { ClientAuthState } from '../auth/use-auth-state'
 
 const PublicAuthStateContext = createContext<ClientAuthState | null>(null)
 
@@ -10,7 +12,17 @@ type PublicAuthStateProviderProps = {
 
 /** Reads public auth state once for all public-page consumers. */
 export function PublicAuthStateProvider({ children }: PublicAuthStateProviderProps) {
-  const authState = useAuthState()
+  const query = useQuery(authStateQueryOptions())
+  const authState: ClientAuthState = query.isPending
+    ? { status: 'loading' }
+    : query.isError
+      ? {
+          status: 'error',
+          message: query.error instanceof Error
+            ? query.error.message
+            : 'AUTH_STATE_UNAVAILABLE',
+        }
+      : { status: 'ready', authState: query.data }
 
   return <PublicAuthStateContext.Provider value={authState}>{children}</PublicAuthStateContext.Provider>
 }

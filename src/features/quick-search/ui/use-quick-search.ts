@@ -5,10 +5,8 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useConvex } from 'convex/react'
-import { makeFunctionReference } from 'convex/server'
-import { z } from 'zod'
 
+import { searchUsersPreview } from '../../profile/server/user-search.functions'
 import {
   createQuickSearchDestination,
   QUICK_SEARCH_DEBOUNCE_MS,
@@ -19,13 +17,6 @@ import {
   type QuickSearchRow,
 } from '../shared/quick-search-contracts'
 import { searchQuickCatalog } from '../server/quick-search.functions'
-
-interface UserPreview {
-  avatarUrl: string | null
-  id: string
-  name: string
-  username: string
-}
 
 interface SearchData<T> {
   query: string
@@ -85,19 +76,6 @@ interface SearchResultState {
   items: QuickSearchItem[]
   queryReady: boolean
 }
-
-const userSearchPreviewRef = makeFunctionReference<
-  'query',
-  { query: string },
-  UserPreview[]
->('userSearch:searchPreview')
-
-const userPreviewsSchema: z.ZodType<UserPreview[]> = z.array(z.object({
-  avatarUrl: z.string().url().nullable(),
-  id: z.string().min(1),
-  name: z.string().trim().min(1),
-  username: z.string().trim().min(1),
-}).strict()).max(5)
 
 const emptyGroups = (): QuickSearchGroups => ({
   anime: [],
@@ -170,13 +148,12 @@ function useUserSearch(
   requestQuery: string,
   usersEnabled: boolean,
 ) {
-  const convex = useConvex()
   return useQuery({
     queryKey: ['quick-search', 'users', authScope, requestQuery],
     queryFn: async (): Promise<SearchData<QuickSearchRow[]>> => {
-      const rows = userPreviewsSchema.parse(
-        await convex.query(userSearchPreviewRef, { query: requestQuery }),
-      )
+      const rows = await searchUsersPreview({
+        data: { query: requestQuery },
+      })
       return {
         query: requestQuery,
         value: rows.map((user) => ({

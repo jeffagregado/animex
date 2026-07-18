@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
-import type { ClientAuthState } from '#/features/auth/use-auth-state'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { FeedCard } from '#/features/social/shared/social-contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -15,8 +15,8 @@ import {
   ProfileRouteContent,
 } from '../../../routes/_public/_profile/users/$username'
 import {
-  canMountProfile,
-  getProfileDestination,
+  getProfileAuthDestination,
+  loadProfileRouteAuth,
 } from '../../../routes/_public/_profile/route'
 
 const mocks = vi.hoisted(() => ({
@@ -32,6 +32,17 @@ vi.mock('convex/react', () => ({
   useQuery: () => mocks.profile,
   useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
 }))
+vi.mock('../server/profile-read.functions', () => ({
+  getProfileByUsername: async () => mocks.profile,
+  getProfileContentPage: async ({
+    data,
+  }: {
+    data: { cursor: string | null; tab: string; username: string }
+  }) => await mocks.query(`${data.tab}:listForProfile`, {
+    cursor: data.cursor,
+    username: data.username,
+  }),
+}))
 
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual<typeof import('@tanstack/react-router')>(
@@ -45,24 +56,26 @@ vi.mock('@tanstack/react-router', async () => {
       }
       return { ...options }
     },
+    Link: ({
+      children,
+      params,
+      search,
+    }: {
+      children: React.ReactNode
+      params: { username: string }
+      search: { tab: string | undefined }
+    }) => (
+      <a
+        href={`/users/${params.username}${
+          search.tab === undefined ? '' : `?tab=${search.tab}`
+        }`}
+      >
+        {children}
+      </a>
+    ),
     Outlet: () => <div>Profile child</div>,
   }
 })
-
-const complete: ClientAuthState = {
-  status: 'ready',
-  authState: {
-    status: 'complete',
-    email: 'rinko@example.test',
-    profile: {
-      id: 'user-rinko',
-      username: 'rinko',
-      name: 'Rinko',
-      avatarUrl: null,
-      visibility: 'public',
-    },
-  },
-}
 
 const header = {
   id: 'user-rinko',
@@ -138,6 +151,17 @@ const deferred = <T,>() => {
   return { promise, reject, resolve }
 }
 
+const renderProfile = (tab: 'activity' | 'reviews' | 'favorites') => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ProfilePage tab={tab} username="rinko" />
+    </QueryClientProvider>,
+  )
+}
+
 beforeEach(() => {
   mocks.profile = fullProfile
   mocks.query.mockReset()
@@ -154,41 +178,54 @@ afterEach(() => {
 })
 
 describe('Profile auth and route contract', () => {
+  it('awaits server auth before protected children and preserves auth errors', async () => {
+    const signedOut = {
+      ensureQueryData: vi.fn(async () => ({ status: 'signedOut' as const })),
+    }
+    await expect(loadProfileRouteAuth(
+      signedOut,
+      '/users/rinko?tab=reviews',
+    )).rejects.toMatchObject({
+      options: {
+        href: '/auth/sign-in?returnTo=%2Fusers%2Frinko%3Ftab%3Dreviews',
+      },
+    })
+    expect(signedOut.ensureQueryData).toHaveBeenCalledOnce()
+
+    const unavailable = {
+      ensureQueryData: vi.fn(async () => {
+        throw new Error('AUTH_STATE_UNAVAILABLE')
+      }),
+    }
+    await expect(loadProfileRouteAuth(
+      unavailable,
+      '/users/rinko',
+    )).rejects.toThrow('AUTH_STATE_UNAVAILABLE')
+  })
+
   it('preserves a validated signed-out return target and routes pending profile states', () => {
     const target = '/users/rinko?tab=reviews'
-    expect(getProfileDestination(
-      { status: 'ready', authState: { status: 'signedOut' } },
+    expect(getProfileAuthDestination(
+      { status: 'signedOut' },
       target,
     )).toBe('/auth/sign-in?returnTo=%2Fusers%2Frinko%3Ftab%3Dreviews')
-    expect(getProfileDestination(
-      {
-        status: 'ready',
-        authState: { status: 'emailUnverified', email: 'rinko@example.test' },
-      },
+    expect(getProfileAuthDestination(
+      { status: 'emailUnverified', email: 'rinko@example.test' },
       target,
     )).toBe('/auth/verify-email?returnTo=%2Fusers%2Frinko%3Ftab%3Dreviews')
-    expect(getProfileDestination(
+    expect(getProfileAuthDestination(
       {
-        status: 'ready',
-        authState: {
-          status: 'needsProfile',
-          email: 'rinko@example.test',
-          signupMethod: 'password',
-          suggestedUsername: null,
-        },
+        status: 'needsProfile',
+        email: 'rinko@example.test',
+        signupMethod: 'password',
+        suggestedUsername: null,
       },
       target,
     )).toBe('/auth/username?returnTo=%2Fusers%2Frinko%3Ftab%3Dreviews')
-    expect(getProfileDestination(
-      { status: 'ready', authState: { status: 'signedOut' } },
+    expect(getProfileAuthDestination(
+      { status: 'signedOut' },
       '//outside.test',
     )).toBe('/auth/sign-in?returnTo=%2Fhome')
-  })
-
-  it('blocks child mounting until public and Convex auth agree', () => {
-    expect(canMountProfile({ status: 'loading' }, false)).toBe(false)
-    expect(canMountProfile(complete, false)).toBe(false)
-    expect(canMountProfile(complete, true)).toBe(true)
   })
 
   it('replaces invalid tabs before any profile query hook mounts', () => {
@@ -218,8 +255,8 @@ describe('Profile responsive content contract', () => {
     expect(onEditProfile).toHaveBeenCalledWith(editTrigger)
     cleanup()
 
-    render(<ProfilePage tab="activity" username="rinko" />)
-    expect(screen.getByRole('heading', { name: 'Rinko' })).toBeTruthy()
+    renderProfile('activity')
+    expect(await screen.findByRole('heading', { name: 'Rinko' })).toBeTruthy()
     expect(screen.getByText('@rinko')).toBeTruthy()
     expect(screen.getByText('132')).toBeTruthy()
     expect(screen.getByText('24')).toBeTruthy()
@@ -254,8 +291,10 @@ describe('Profile responsive content contract', () => {
     document.body.append(distractor)
     distractor.focus()
     try {
-      render(<ProfilePage tab="activity" username="rinko" />)
-      const editTrigger = screen.getByRole('button', { name: 'Edit Profile' })
+      renderProfile('activity')
+      const editTrigger = await screen.findByRole('button', {
+        name: 'Edit Profile',
+      })
 
       fireEvent.click(editTrigger)
       expect(await screen.findByRole('dialog', { name: 'Edit Profile' })).toBeTruthy()
@@ -289,9 +328,9 @@ describe('Profile responsive content contract', () => {
         profileVisibility: 'private',
       },
     }
-    render(<ProfilePage tab="activity" username="rinko" />)
+    renderProfile('activity')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Profile' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Profile' }))
     const visibility = await screen.findByRole('combobox', {
       name: /Profile Visibility/,
     })
@@ -306,21 +345,21 @@ describe('Profile responsive content contract', () => {
     }))
   })
 
-  it('shows only header and privacy notice for a Private profile viewer', () => {
+  it('shows only header and privacy notice for a Private profile viewer', async () => {
     mocks.profile = {
       access: 'header',
       owner: false,
       profile: { ...header, profileVisibility: 'private' },
     }
-    render(<ProfilePage tab="reviews" username="rinko" />)
-    expect(screen.getByRole('heading', { name: 'Rinko' })).toBeTruthy()
+    renderProfile('reviews')
+    expect(await screen.findByRole('heading', { name: 'Rinko' })).toBeTruthy()
     expect(screen.getByText(/profile is private/i)).toBeTruthy()
     expect(screen.queryByText('List Progress')).toBeNull()
     expect(mocks.query).not.toHaveBeenCalled()
   })
 
   it('keeps social, list, and genre UI out of Profile', async () => {
-    render(<ProfilePage tab="activity" username="rinko" />)
+    renderProfile('activity')
     await waitFor(() => expect(screen.getByText('No activity yet')).toBeTruthy())
     for (const banned of [
       'Follow',

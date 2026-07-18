@@ -15,6 +15,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from '../home/home-page'
 import { PublicShell } from './public-shell'
 
+vi.mock('../auth/auth-state.functions', () => ({
+  getAuthState: async () => {
+    const response = await fetch('/api/profile/state')
+    return await response.json()
+  },
+}))
+
 const convex = vi.hoisted(() => {
   const query = vi.fn(async () => ({ items: [], cursor: null, hasMore: false }))
   return { authenticated: true, query, client: { query }, mutation: vi.fn(() => vi.fn()) }
@@ -131,7 +138,7 @@ describe('PublicShell', () => {
 
     render(<RouterProvider router={router} />)
 
-    await screen.findByRole('button', { name: 'Sign out' })
+    await screen.findByRole('button', { name: 'Mika account menu' })
     const mobileNavigation = within(screen.getByRole('navigation', { name: 'Mobile' }))
     expect(
       Array.from(screen.getByRole('navigation', { name: 'Mobile' }).querySelectorAll('.mobile-nav-item'))
@@ -173,7 +180,7 @@ describe('PublicShell', () => {
     const { router } = createPublicTestRouter('/home')
     render(<RouterProvider router={router} />)
 
-    const trigger = await screen.findByRole('button', { name: 'Open account menu' })
+    const trigger = await screen.findByRole('button', { name: 'Mika account menu' })
     expect(trigger.className).toContain('size-11')
     expect(within(trigger).getByRole('img', { name: 'Mika avatar' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
@@ -189,7 +196,7 @@ describe('PublicShell', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ status: 'complete', email: 'mika@example.com', profile: { id: 'profile-1', username: 'mika', name: 'Mika', avatarUrl: null, visibility: 'private' } }) }) as Response))
     const { router } = createPublicTestRouter('/home')
     render(<RouterProvider router={router} />)
-    await screen.findByRole('button', { name: 'Sign out' })
+    await screen.findByRole('button', { name: 'Mika account menu' })
     const mobileNavigation = within(screen.getByRole('navigation', { name: 'Mobile' }))
     expect(
       Array.from(screen.getByRole('navigation', { name: 'Mobile' }).querySelectorAll('.mobile-nav-item'))

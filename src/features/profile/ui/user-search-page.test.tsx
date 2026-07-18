@@ -8,10 +8,25 @@ import {
   resolveUserSearchQuery,
   UserSearchPage,
 } from './user-search-page'
-import { getProfileDestination } from '#/routes/_public/_profile/route'
+import { getProfileAuthDestination } from '#/routes/_public/_profile/route'
 
 const convex = vi.hoisted(() => ({ query: vi.fn() }))
 vi.mock('convex/react', () => ({ useConvex: () => convex }))
+vi.mock('../server/user-search.functions', () => ({
+  searchUsers: async ({
+    data,
+  }: {
+    data: { cursor: string | null; query: string }
+  }) => {
+    const { userSearchPageSchema } = await import(
+      '../shared/user-search-contracts'
+    )
+    return userSearchPageSchema.parse(await convex.query('userSearch:search', {
+      query: data.query,
+      paginationOpts: { cursor: data.cursor, numItems: 20 },
+    }))
+  },
+}))
 
 const user = (id: string, username: string, name: string): {
   avatarUrl: string | null
@@ -61,8 +76,8 @@ describe('UserSearchPage', () => {
   })
 
   it('preserves exact protected User-search return target through the parent guard', () => {
-    expect(getProfileDestination(
-      { status: 'ready', authState: { status: 'signedOut' } },
+    expect(getProfileAuthDestination(
+      { status: 'signedOut' },
       '/search/users?q=Case%20Sensitive',
     )).toBe('/auth/sign-in?returnTo=%2Fsearch%2Fusers%3Fq%3DCase%2520Sensitive')
     expect(convex.query).not.toHaveBeenCalled()

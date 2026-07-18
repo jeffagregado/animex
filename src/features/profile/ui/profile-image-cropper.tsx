@@ -33,6 +33,7 @@ interface ProfileImageCropperProps {
   disabled: boolean
   kind: ProfileMediaKind
   onBusyChange: (busy: boolean) => void
+  onProfileChanged: () => Promise<void>
 }
 
 const label: Record<ProfileMediaKind, string> = {
@@ -104,7 +105,11 @@ function useProfileImageCropper({
   active,
   kind,
   onBusyChange,
-}: Pick<ProfileImageCropperProps, 'active' | 'kind' | 'onBusyChange'>) {
+  onProfileChanged,
+}: Pick<
+  ProfileImageCropperProps,
+  'active' | 'kind' | 'onBusyChange' | 'onProfileChanged'
+>) {
   const {
     convex,
     generateUploadUrl,
@@ -248,6 +253,8 @@ function useProfileImageCropper({
       if (!prepared) return
       const saved = await saveCrop(current, prepared.storageId)
       if (!saved) return
+      await onProfileChanged()
+      if (!current()) return
       if (abortRef.current === prepared.controller) abortRef.current = null
       finish(token, `${kind === 'avatar' ? 'Avatar' : 'Banner'} updated.`)
     } catch (error) {
@@ -263,6 +270,7 @@ function useProfileImageCropper({
     setStatus(`Removing ${label[kind]}…`)
     try {
       await removeMedia({ kind })
+      await onProfileChanged()
       finish(token, `${kind === 'avatar' ? 'Avatar' : 'Banner'} removed.`)
     } catch (error) {
       fail(token, error)
@@ -303,8 +311,14 @@ export function ProfileImageCropper({
   disabled,
   kind,
   onBusyChange,
+  onProfileChanged,
 }: ProfileImageCropperProps) {
-  const model = useProfileImageCropper({ active, kind, onBusyChange })
+  const model = useProfileImageCropper({
+    active,
+    kind,
+    onBusyChange,
+    onProfileChanged,
+  })
   return (
     <ProfileImageCropperView
       currentUrl={currentUrl}

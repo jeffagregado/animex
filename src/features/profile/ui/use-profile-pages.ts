@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useConvex } from 'convex/react'
-import { makeFunctionReference } from 'convex/server'
-import { z } from 'zod'
 
 import type { ProfileTab } from '../shared/profile-contracts'
+import { getProfileContentPage } from '../server/profile-read.functions'
 import {
-  feedPageSchema,
-  reviewListItemSchema,
   type FeedCard,
   type ReviewListItem,
 } from '../../social/shared/social-contracts'
@@ -36,53 +32,11 @@ export interface ProfilePageState<T> extends CursorPage<T> {
 }
 
 type ProfilePageItem = FeedCard | ReviewListItem | ProfileFavorite
-type ProfileQueryArgs = { username: string; cursor: string | null }
-type ProfileFeedPage = CursorPage<FeedCard>
-type ProfileReviewPage = CursorPage<ReviewListItem>
-type ProfileFavoritePage = CursorPage<ProfileFavorite>
-
 interface ScopedPageState extends CursorPage<ProfilePageItem> {
   scope: string
   loading: boolean
   error: string | null
 }
-
-const profileActivityQuery = makeFunctionReference<
-  'query',
-  ProfileQueryArgs,
-  ProfileFeedPage
->('feed:listForProfile')
-const profileReviewsQuery = makeFunctionReference<
-  'query',
-  ProfileQueryArgs,
-  ProfileReviewPage
->('reviews:listForProfile')
-const profileFavoritesQuery = makeFunctionReference<
-  'query',
-  ProfileQueryArgs,
-  ProfileFavoritePage
->('userAnime:listProfileFavorites')
-
-const cursorSchema = z.string().nullable()
-const favoriteSchema = z.object({
-  favoriteAt: z.number().finite().nonnegative(),
-  anime: z.object({
-    anilistId: z.number().int().positive(),
-    slug: z.string().min(1),
-    title: z.string().min(1),
-    coverImageUrl: z.string().url().nullable(),
-  }).strict(),
-}).strict()
-const reviewPageSchema = z.object({
-  items: z.array(reviewListItemSchema),
-  cursor: cursorSchema,
-  hasMore: z.boolean(),
-}).strict()
-const favoritePageSchema = z.object({
-  items: z.array(favoriteSchema),
-  cursor: cursorSchema,
-  hasMore: z.boolean(),
-}).strict()
 
 const emptyScope = (scope: string, enabled: boolean): ScopedPageState => ({
   scope,
@@ -142,7 +96,6 @@ export function useProfilePages(
   tab: ProfileTab,
   enabled: boolean,
 ): ProfilePageState<ProfilePageItem> {
-  const client = useConvex()
   const scope = `${username}:${tab}`
   const scopeRef = useRef(scope)
   const epochRef = useRef(0)
@@ -163,17 +116,10 @@ export function useProfilePages(
   const queryPage = useCallback(async (
     cursor: string | null,
   ): Promise<CursorPage<ProfilePageItem>> => {
-    const args = { username, cursor }
-    if (tab === 'activity') {
-      return feedPageSchema.parse(await client.query(profileActivityQuery, args))
-    }
-    if (tab === 'reviews') {
-      return reviewPageSchema.parse(await client.query(profileReviewsQuery, args))
-    }
-    return favoritePageSchema.parse(
-      await client.query(profileFavoritesQuery, args),
-    )
-  }, [client, tab, username])
+    return await getProfileContentPage({
+      data: { username, cursor, tab },
+    }) as CursorPage<ProfilePageItem>
+  }, [tab, username])
 
   const load = useCallback((
     cursor: string | null,

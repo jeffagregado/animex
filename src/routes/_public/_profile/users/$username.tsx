@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 
 import { ProfilePage } from '#/features/profile/ui/profile-page'
+import { profileQueryOptions } from '#/features/profile/ui/profile-route'
 import { profileTabSchema } from '#/features/profile/shared/profile-contracts'
 
 interface ProfileNavigationOptions {
@@ -18,6 +19,8 @@ interface ProfileRouteContentProps {
 
 export const Route = createFileRoute('/_public/_profile/users/$username')({
   validateSearch: (search: Record<string, unknown>) => ({ tab: search.tab }),
+  loader: async ({ context, params }) => await context.queryClient
+    .ensureQueryData(profileQueryOptions(params.username)),
   component: ProfileRoute,
 })
 

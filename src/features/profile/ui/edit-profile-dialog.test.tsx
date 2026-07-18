@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditProfileDialog } from './edit-profile-dialog'
 
 const mocks = vi.hoisted(() => ({
+  profileChanged: vi.fn(async () => undefined),
   update: vi.fn(),
 }))
 
@@ -30,6 +31,7 @@ const renderDialog = (
   <EditProfileDialog
     finalFocus={finalFocus}
     onOpenChange={onOpenChange}
+    onProfileChanged={mocks.profileChanged}
     open
     profile={profile}
   />,
@@ -37,6 +39,7 @@ const renderDialog = (
 
 beforeEach(() => {
   mocks.update.mockReset()
+  mocks.profileChanged.mockClear()
   mocks.update.mockResolvedValue(null)
 })
 
@@ -55,6 +58,7 @@ describe('EditProfileDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(mocks.update).not.toHaveBeenCalled()
+    expect(mocks.profileChanged).not.toHaveBeenCalled()
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
@@ -92,6 +96,7 @@ describe('EditProfileDialog', () => {
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Saving changes…' }).disabled).toBe(true)
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Cancel' }).disabled).toBe(true)
     resolve(null)
+    await waitFor(() => expect(mocks.profileChanged).toHaveBeenCalledOnce())
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 
@@ -105,9 +110,11 @@ describe('EditProfileDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
     expect((await screen.findByRole('alert')).textContent).toContain('Profile service unavailable.')
     expect(onOpenChange).not.toHaveBeenCalled()
+    expect(mocks.profileChanged).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(mocks.profileChanged).toHaveBeenCalledOnce())
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 
@@ -124,6 +131,7 @@ describe('EditProfileDialog', () => {
       <EditProfileDialog
         finalFocus={trigger}
         onOpenChange={onOpenChange}
+        onProfileChanged={mocks.profileChanged}
         open={false}
         profile={profile}
       />,

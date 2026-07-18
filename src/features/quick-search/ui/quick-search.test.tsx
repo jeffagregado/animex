@@ -36,6 +36,11 @@ vi.mock('@tanstack/react-router', () => ({
 vi.mock('../server/quick-search.functions', () => ({
   searchQuickCatalog: mocks.provider,
 }))
+vi.mock('../../profile/server/user-search.functions', () => ({
+  searchUsersPreview: async ({ data }: { data: { query: string } }) => (
+    await mocks.users('userSearch:searchPreview', { query: data.query })
+  ),
+}))
 
 const row = (
   id: string,

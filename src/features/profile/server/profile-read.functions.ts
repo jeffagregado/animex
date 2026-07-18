@@ -1,11 +1,17 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
-import type {
-  ProfileContentPage,
-  ProfileResult,
-  ProfileTab,
+import { api } from '../../../../convex/_generated/api'
+import { getAuthProxy } from '../../../lib/server-auth-proxy'
+import {
+  profileContentPageSchema,
+  profileResultSchema,
+  type ProfileContentPage,
+  type ProfileResult,
+  type ProfileTab,
 } from '../shared/profile-contracts'
+
+const PROFILE_READ_SCOPE = 'Profile server read'
 
 export const profileUsernameInputSchema = z.object({
   username: z.string().trim().min(1),
@@ -17,31 +23,49 @@ export const profileContentInputSchema = profileUsernameInputSchema.extend({
 
 /** Runs a strict Profile header read through authenticated server transport. */
 export const runProfileRead = async (
-  _input: unknown,
-  _query: (input: { username: string }) => Promise<unknown>,
+  input: unknown,
+  query: (input: { username: string }) => Promise<unknown>,
 ): Promise<ProfileResult> => {
-  throw new Error('NOT_IMPLEMENTED: authenticated Profile read')
+  const parsed = profileUsernameInputSchema.parse(input)
+  return profileResultSchema.parse(await query(parsed))
 }
 
 /** Runs one strict Profile content lane through authenticated server transport. */
 export const runProfileContentRead = async (
-  _input: unknown,
-  _query: (
+  input: unknown,
+  query: (
     tab: ProfileTab,
     input: { username: string; cursor: string | null },
   ) => Promise<unknown>,
 ): Promise<ProfileContentPage> => {
-  throw new Error('NOT_IMPLEMENTED: authenticated Profile content read')
+  const parsed = profileContentInputSchema.parse(input)
+  const result = await query(parsed.tab, {
+    username: parsed.username,
+    cursor: parsed.cursor,
+  })
+  return profileContentPageSchema.parse(result)
 }
 
 export const getProfileByUsername = createServerFn({ method: 'GET' })
   .validator(profileUsernameInputSchema)
-  .handler(async ({ data }) => await runProfileRead(data, async () => {
-    throw new Error('NOT_IMPLEMENTED: Profile proxy transport')
-  }))
+  .handler(async ({ data }) => await runProfileRead(
+    data,
+    async (input) => await getAuthProxy(PROFILE_READ_SCOPE)
+      .fetchAuthQuery(api.profiles.getByUsername, input),
+  ))
 
 export const getProfileContentPage = createServerFn({ method: 'GET' })
   .validator(profileContentInputSchema)
-  .handler(async ({ data }) => await runProfileContentRead(data, async () => {
-    throw new Error('NOT_IMPLEMENTED: Profile content proxy transport')
-  }))
+  .handler(async ({ data }) => await runProfileContentRead(
+    data,
+    async (tab, input) => {
+      const proxy = getAuthProxy(PROFILE_READ_SCOPE)
+      if (tab === 'activity') {
+        return await proxy.fetchAuthQuery(api.feed.listForProfile, input)
+      }
+      if (tab === 'reviews') {
+        return await proxy.fetchAuthQuery(api.reviews.listForProfile, input)
+      }
+      return await proxy.fetchAuthQuery(api.userAnime.listProfileFavorites, input)
+    },
+  ))

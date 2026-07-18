@@ -1,42 +1,16 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { useConvex } from 'convex/react'
-import { makeFunctionReference } from 'convex/server'
-import { z } from 'zod'
 
-export interface UserSearchRow {
-  avatarUrl: string | null
-  id: string
-  name: string
-  username: string
-}
+import { searchUsers } from '../server/user-search.functions'
+import type {
+  UserSearchPage,
+  UserSearchRow,
+} from '../shared/user-search-contracts'
 
-interface UserSearchResult {
-  continueCursor: string
-  isDone: boolean
-  page: UserSearchRow[]
-}
-
-const resultSchema: z.ZodType<UserSearchResult> = z.object({
-  page: z.array(z.object({
-    id: z.string().min(1),
-    username: z.string().trim().min(1),
-    name: z.string().trim().min(1),
-    avatarUrl: z.string().url().nullable(),
-  }).strict()).max(20),
-  continueCursor: z.string(),
-  isDone: z.boolean(),
-}).strict()
-
-const searchUsersRef = makeFunctionReference<
-  'query',
-  { query: string; paginationOpts: { cursor: string | null; numItems: 20 } },
-  UserSearchResult
->('userSearch:search')
+export type { UserSearchRow } from '../shared/user-search-contracts'
 
 /** Loads authenticated identity-only User search pages. */
 export function useUserSearchPages(queryText: string, enabled: boolean) {
-  const convex = useConvex()
   const continuation = useRef<string | null>(null)
   const guard = useRef<{ scope: string; token: symbol } | null>(null)
   const cursorHistoryRef = useRef<{
@@ -46,17 +20,15 @@ export function useUserSearchPages(queryText: string, enabled: boolean) {
   const query = useInfiniteQuery({
     queryKey: ['user-search', queryText],
     initialPageParam: null as string | null,
-    queryFn: async ({ pageParam }): Promise<UserSearchResult> => {
+    queryFn: async ({ pageParam }): Promise<UserSearchPage> => {
       if (cursorHistoryRef.current.scope !== queryText) {
         cursorHistoryRef.current = { cursors: new Set(), scope: queryText }
       }
       const successfulCursors = cursorHistoryRef.current.cursors
       if (pageParam === null) successfulCursors.clear()
-      const raw = await convex.query(searchUsersRef, {
-        query: queryText,
-        paginationOpts: { cursor: pageParam, numItems: 20 },
+      const result = await searchUsers({
+        data: { query: queryText, cursor: pageParam },
       })
-      const result = resultSchema.parse(raw)
       if (
         !result.isDone
         && (
@@ -133,7 +105,7 @@ export function useUserSearchPages(queryText: string, enabled: boolean) {
   }
 }
 
-const dedupeUsers = (pages: UserSearchResult[]): UserSearchRow[] => {
+const dedupeUsers = (pages: UserSearchPage[]): UserSearchRow[] => {
   const ids = new Set<string>()
   return pages.flatMap((page) => page.page.filter((user) => {
     if (ids.has(user.id)) return false
@@ -142,7 +114,7 @@ const dedupeUsers = (pages: UserSearchResult[]): UserSearchRow[] => {
   }))
 }
 
-const countNewUsers = (pages: UserSearchResult[]): number => {
+const countNewUsers = (pages: UserSearchPage[]): number => {
   const lastPage = pages.at(-1)
   if (!lastPage) return 0
   const known = new Set(pages.slice(0, -1).flatMap((page) => page.page.map((user) => user.id)))

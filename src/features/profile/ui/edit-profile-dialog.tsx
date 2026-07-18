@@ -34,6 +34,7 @@ type EditableProfile = ProfileEditFormValues & {
 interface EditProfileDialogProps {
   finalFocus: HTMLElement | null
   onOpenChange: (open: boolean) => void
+  onProfileChanged: () => Promise<void>
   open: boolean
   profile: EditableProfile
 }
@@ -128,6 +129,7 @@ const useProfileEditState = () => {
 export function EditProfileDialog({
   finalFocus,
   onOpenChange,
+  onProfileChanged,
   open,
   profile,
 }: EditProfileDialogProps) {
@@ -171,6 +173,7 @@ export function EditProfileDialog({
           bio: input.bio ?? '',
           profileVisibility: input.profileVisibility,
         })
+        await onProfileChanged()
         onOpenChange(false)
       } catch (error) {
         const validation = getProfileEditError(error)
@@ -416,6 +419,7 @@ export function EditProfileDialog({
                 disabled={busy}
                 kind="avatar"
                 onBusyChange={changeMediaBusy}
+                onProfileChanged={onProfileChanged}
               />
               <ProfileImageCropper
                 active={open}
@@ -423,6 +427,7 @@ export function EditProfileDialog({
                 disabled={busy}
                 kind="banner"
                 onBusyChange={changeMediaBusy}
+                onProfileChanged={onProfileChanged}
               />
             </fieldset>
 

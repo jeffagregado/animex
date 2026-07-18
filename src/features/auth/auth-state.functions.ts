@@ -1,17 +1,24 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import type { AuthState } from './auth-contracts'
+import { api } from '../../../convex/_generated/api'
+import { getAuthProxy } from '../../lib/server-auth-proxy'
+import { authStateSchema, type AuthState } from './auth-contracts'
 
 export const PROFILE_ROUTE_AUTH_SCOPE = 'Profile route authentication'
 
 /** Runs the authenticated application-state query through server transport. */
 export const runAuthStateQuery = async (
-  _query: () => Promise<unknown>,
+  query: () => Promise<unknown>,
 ): Promise<AuthState> => {
-  throw new Error('NOT_IMPLEMENTED: authenticated server state')
+  try {
+    return authStateSchema.parse(await query())
+  } catch (error) {
+    throw new Error('AUTH_STATE_UNAVAILABLE', { cause: error })
+  }
 }
 
 export const getAuthState = createServerFn({ method: 'GET' })
-  .handler(async () => await runAuthStateQuery(async () => {
-    throw new Error('NOT_IMPLEMENTED: auth proxy transport')
-  }))
+  .handler(async () => await runAuthStateQuery(
+    async () => await getAuthProxy(PROFILE_ROUTE_AUTH_SCOPE)
+      .fetchAuthQuery(api.users.getAuthState, {}),
+  ))

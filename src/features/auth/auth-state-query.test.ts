@@ -1,12 +1,20 @@
 // @vitest-environment jsdom
 
-import { QueryClient, dehydrate, hydrate } from '@tanstack/react-query'
+import {
+  QueryClient,
+  QueryClientProvider,
+  dehydrate,
+  hydrate,
+} from '@tanstack/react-query'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { PublicAuthStateProvider, usePublicAuthState } from '../shell/public-auth-context'
 import { authStateQueryOptions } from './auth-state-query'
+
+const authQuery = vi.hoisted(() => vi.fn())
+vi.mock('./auth-state.functions', () => ({ getAuthState: authQuery }))
 
 const Status = ({ label }: { label: string }) => {
   const state = usePublicAuthState()
@@ -15,31 +23,35 @@ const Status = ({ label }: { label: string }) => {
 
 afterEach(() => {
   cleanup()
+  authQuery.mockReset()
   vi.unstubAllGlobals()
 })
 
 it('shares one provider auth request with every public Profile consumer', async () => {
-  const fetchMock = vi.fn(async () => ({
-    ok: true,
-    json: async () => ({ status: 'signedOut' }),
-  }) as Response)
-  vi.stubGlobal('fetch', fetchMock)
+  authQuery.mockResolvedValue({ status: 'signedOut' })
 
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   render(createElement(
-    PublicAuthStateProvider,
-    null,
+    QueryClientProvider,
+    { client },
     createElement(
-      'section',
-      { 'aria-label': 'Auth consumers' },
-      createElement(Status, { label: 'Shell' }),
-      createElement(Status, { label: 'Profile' }),
+      PublicAuthStateProvider,
+      null,
+      createElement(
+        'section',
+        { 'aria-label': 'Auth consumers' },
+        createElement(Status, { label: 'Shell' }),
+        createElement(Status, { label: 'Profile' }),
+      ),
     ),
   ))
 
   const consumers = within(screen.getByRole('region', { name: 'Auth consumers' }))
   await consumers.findByText('Shell: ready')
   expect(consumers.getByText('Profile: ready')).toBeTruthy()
-  expect(fetchMock).toHaveBeenCalledTimes(1)
+  expect(authQuery).toHaveBeenCalledTimes(1)
 })
 
 it('reuses the server-prefetched auth query after dehydration and hydration', async () => {

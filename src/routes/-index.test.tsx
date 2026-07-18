@@ -16,6 +16,13 @@ import { LandingPage } from '#/features/landing/landing-page'
 import { getLandingHead } from './-index-head'
 import { Route } from './index'
 
+vi.mock('#/features/auth/auth-state.functions', () => ({
+  getAuthState: async () => {
+    const response = await fetch('/api/profile/state')
+    return await response.json()
+  },
+}))
+
 vi.mock('convex/react', () => ({
   useConvex: () => ({ query: vi.fn() }),
   useConvexAuth: () => ({
@@ -130,7 +137,7 @@ describe('Root landing route', () => {
 
     renderLandingRouter(router)
 
-    expect(await screen.findByRole('button', { name: 'Sign out' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Mika account menu' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Find anime worth remembering.' })).toBeTruthy()
     expect(history.location.pathname).toBe('/')
     expect(screen.queryByRole('navigation', { name: 'Mobile' })).toBeNull()

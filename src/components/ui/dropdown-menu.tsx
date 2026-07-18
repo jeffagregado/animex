@@ -14,6 +14,11 @@ function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
   return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
 }
 
+/** Groups related dropdown menu items. */
+function DropdownMenuGroup({ ...props }: MenuPrimitive.Group.Props) {
+  return <MenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
+}
+
 /** Positions dropdown menu content. */
 function DropdownMenuContent({
   align,
@@ -94,6 +99,7 @@ function DropdownMenuSeparator({
 export {
   DropdownMenu,
   DropdownMenuTrigger,
+  DropdownMenuGroup,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
