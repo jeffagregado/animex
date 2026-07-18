@@ -61,6 +61,14 @@ const sourceKeyResultValidator = v.object({
   patchedCount: v.number(),
 })
 
+const purgeResultValidator = v.object({
+  continueCursor: v.string(),
+  isDone: v.boolean(),
+  processedCount: v.number(),
+  deletedReviewCount: v.number(),
+  deletedMilestoneCount: v.number(),
+})
+
 const verificationResultValidator = v.object({
   lane: laneValidator,
   continueCursor: v.string(),
@@ -286,6 +294,57 @@ export const backfillMilestoneSourceKeys = internalMutation({
   },
 })
 
+/** Deletes one bounded page of mismatched Anime-backed feed projections. */
+export const purgeMismatchedFeedProjections = internalMutation({
+  args: { confirm: v.literal(true), paginationOpts: paginationOptsValidator },
+  returns: purgeResultValidator,
+  handler: async (ctx, args) => {
+    const [state, receipt] = await Promise.all([
+      ctx.db.query('catalogAnimeDataVerificationState').withIndex('by_lane', (q) => q.eq('lane', 'feed-cards')).unique(),
+      ctx.db.query('catalogAnimeDataVerificationReceipts').withIndex('by_lane', (q) => q.eq('lane', 'feed-cards')).unique(),
+    ])
+    if (!state) throw new Error('Feed projection repair requires completed feed-cards verification state.')
+    if (receipt) throw new Error('Feed projection repair found corrupt feed-cards verification receipt alongside repair state.')
+    if (!state.isDone) throw new Error('Feed projection repair requires terminal feed-cards verification state.')
+    if (
+      state.missingAnimeId !== 0
+      || state.mismatchedProviderRef !== 0
+      || state.duplicateUserAnime !== 0
+      || state.duplicateReview !== 0
+      || state.duplicateMilestoneSourceKey !== 0
+      || state.aggregateMismatch !== 0
+      || state.projectionMismatch <= 0
+    ) {
+      throw new Error('Feed projection repair requires projection-only verification issues.')
+    }
+    const cursor = args.paginationOpts.cursor
+    if (cursor === null && state.repairCursor !== undefined) {
+      throw new Error('Feed projection repair cursor exists; continue with its exact value.')
+    }
+    if (cursor !== null && state.repairCursor !== cursor) {
+      throw new Error('Feed projection repair cursor does not match durable state.')
+    }
+    const page = await ctx.db.query('feedCards').paginate(args.paginationOpts)
+    let deletedReviewCount = 0
+    let deletedMilestoneCount = 0
+    for (const card of page.page) {
+      if (card.kind === 'post' || await projectionMatches(ctx, card)) continue
+      await ctx.db.delete('feedCards', card._id)
+      if (card.kind === 'review') deletedReviewCount += 1
+      else deletedMilestoneCount += 1
+    }
+    if (page.isDone) await ctx.db.delete('catalogAnimeDataVerificationState', state._id)
+    else await ctx.db.patch('catalogAnimeDataVerificationState', state._id, { repairCursor: page.continueCursor })
+    return {
+      continueCursor: page.continueCursor,
+      isDone: page.isDone,
+      processedCount: page.page.length,
+      deletedReviewCount,
+      deletedMilestoneCount,
+    }
+  },
+})
+
 /** Verifies provider/entity agreement and lane-specific durable uniqueness. */
 export const verifyAnimeRefs = internalMutation({
   args: { lane: laneValidator, paginationOpts: paginationOptsValidator },
@@ -350,7 +409,7 @@ export const verifyAnimeRefs = internalMutation({
       if (activeState) await ctx.db.delete('catalogAnimeDataVerificationState', activeState._id)
       await ctx.db.insert('catalogAnimeDataVerificationReceipts', { lane: args.lane, verifiedAt: now })
     } else {
-      const fields = { lane: args.lane, nextCursor: page.continueCursor, ...totals, updatedAt: now }
+      const fields = { lane: args.lane, nextCursor: page.continueCursor, isDone: page.isDone, ...totals, updatedAt: now }
       if (activeState) await ctx.db.patch('catalogAnimeDataVerificationState', activeState._id, fields)
       else await ctx.db.insert('catalogAnimeDataVerificationState', fields)
     }

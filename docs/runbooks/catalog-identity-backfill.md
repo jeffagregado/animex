@@ -114,6 +114,14 @@ projectionMismatch = 0
 
 Any nonzero counter blocks public cutover. Keep legacy `anilistId` fields and indexes in this rollout.
 
+If `feed-cards` reports `projectionMismatch > 0`, stop. With explicit deployment-specific data-deletion approval, delete only mismatched derived Review/milestone feed projections:
+
+```powershell
+pnpm exec convex run --deployment dev catalogAnimeDataMigration:purgeMismatchedFeedProjections '{"confirm":true,"paginationOpts":{"numItems":50,"cursor":null}}'
+```
+
+The purge starts only after terminal `feed-cards` verification proves projection mismatch is the sole issue. Follow each returned repair cursor exactly to terminal. The operator deletes no post, Review, or milestone source row. A premature, skipped-cursor, or post-terminal purge must reject. Restart `feed-cards` verification from null after terminal repair. Production use requires separate explicit production approval even when development deletion was approved.
+
 Enumerate every aggregate target through bounded pages:
 
 ```powershell
@@ -155,6 +163,20 @@ pnpm exec convex run --deployment dev catalogAnimeDataMigration:backfillMileston
 Missing receipt or duplicate target blocks rollout. Fix cause, rerun verification from null cursor, then retry source migration. Full source-key rerun must report `patchedCount: 0`.
 
 Final verification is mandatory after source-key migration: rerun identity verification, verify the first five durable-reference lanes, enumerate and verify every aggregate target, then verify `anime-review-stats`. Require every counter to remain zero. Finally rerun milestone source-key migration and require `patchedCount: 0`.
+
+## Development Evidence
+
+Development deployment verification completed on 2026-07-18:
+
+- Additive schema and functions synced successfully.
+- Final identity source rows: summaries `199`, details `64`, Anime people pages `4`, person details `49`, person work pages `13`, user Anime `5`, rewatches `0`, milestones `4`, Reviews `2`, feed cards `6`, Review stats `1`.
+- Both full identity verification cycles reached terminal cursors across `140` pages with zero missing mappings and zero conflicts.
+- Durable first pass patched user Anime/rewatches/milestones/Reviews/feed/stats as `5/0/4/2/7/1`; full reruns patched zero.
+- One mismatched derived milestone feed card was explicitly purged after approval. No Review, post, or authoritative milestone row was deleted. Repair rerun deleted zero.
+- Final durable verification processed `5/0/4/2/6` rows across the first five lanes with every counter zero.
+- One aggregate target and one public Review verified with zero mismatch; the stats lane verified one row with every counter zero.
+- Milestone source-key migration patched `4` of `6` feed cards; both required reruns patched zero.
+- Local validation passed `140` test files and `972` tests, with `2` files and `3` tests skipped; root and Convex TypeScript checks passed.
 
 ## Production
 

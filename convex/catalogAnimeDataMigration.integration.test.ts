@@ -313,6 +313,44 @@ describe('catalog Anime durable data migration', () => {
     })).resolves.toMatchObject({ aggregateMismatch: 1 })
   })
 
+  test('persists nonterminal and terminal verification checkpoint status', async () => {
+    const t = createHarness()
+    const ids = await seedLegacyGraph(t)
+    for (const lane of ['anime-milestones', 'reviews', 'feed-cards'] as DurableAnimeLane[]) {
+      await t.mutation(backfillAnimeRefs, { lane, paginationOpts })
+    }
+    const first = await t.mutation(verifyAnimeRefs, {
+      lane: 'feed-cards',
+      paginationOpts: { numItems: 1, cursor: null },
+    })
+    await expect(t.run(async (ctx) => await ctx.db.query('catalogAnimeDataVerificationState')
+      .withIndex('by_lane', (q) => q.eq('lane', 'feed-cards'))
+      .unique())).resolves.toMatchObject({
+      nextCursor: first.continueCursor,
+      isDone: false,
+    })
+    await t.run(async (ctx) => await ctx.db.insert('feedCards', {
+      sourceKey: `review:mismatched:${ids.reviewId}`,
+      kind: 'review',
+      userId: ids.userId,
+      sourceId: ids.reviewId,
+      anilistId: 101,
+      animeId: ids.animeId,
+      visibility: 'public',
+      active: true,
+      orderKey: 'mismatched',
+      occurredAt: 90,
+      updatedAt: 100,
+    }))
+    await t.mutation(verifyAnimeRefs, { lane: 'feed-cards', paginationOpts })
+    await expect(t.run(async (ctx) => await ctx.db.query('catalogAnimeDataVerificationState')
+      .withIndex('by_lane', (q) => q.eq('lane', 'feed-cards'))
+      .unique())).resolves.toMatchObject({
+      isDone: true,
+      projectionMismatch: 1,
+    })
+  })
+
   test('fails with table and document evidence when provider mapping is missing', async () => {
     const t = createHarness()
     const userId = await t.run(async (ctx) => await ctx.db.insert('users', {

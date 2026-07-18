@@ -352,6 +352,8 @@ export default defineSchema({
   catalogAnimeDataVerificationState: defineTable({
     lane: durableAnimeLaneValidator,
     nextCursor: v.string(),
+    isDone: v.boolean(),
+    repairCursor: v.optional(v.string()),
     missingAnimeId: v.number(),
     mismatchedProviderRef: v.number(),
     duplicateUserAnime: v.number(),

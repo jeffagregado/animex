@@ -574,6 +574,7 @@ git commit -m "feat(catalog): migrate durable anime references"
 
 - Create: `src/features/catalog-identity/server/catalog-identity.server.ts`
 - Create: `src/features/catalog-identity/server/catalog-identity.server.test.ts`
+- Create: server-only provider/cache contract modules for Discover, Anime Detail, and Catalog Person
 - Modify: `src/features/discover/shared/discover-contracts.ts`
 - Modify: `src/features/discover/shared/discover-contracts.test.ts`
 - Create: `src/features/discover/server/anilist-normalization.server.ts`
@@ -592,6 +593,12 @@ git commit -m "feat(catalog): migrate durable anime references"
 - Modify: `src/features/quick-search/shared/quick-search-contracts.ts`
 - Modify: `src/features/quick-search/server/anilist-quick-search.server.ts`
 - Modify: `src/features/quick-search/server/quick-search.functions.ts`
+- Modify: `convex/catalogIdentity.ts`
+- Modify: `convex/catalogIdentityModel.ts`
+- Modify: `convex/animeCache.ts`
+- Modify: `convex/animeDetailCache.ts`
+- Modify: `convex/catalogPersonCache.ts`
+- Modify: `convex/catalogPersonCachePolicy.ts`
 - Modify: matching server/shared tests
 
 **Interfaces:**
@@ -600,6 +607,19 @@ git commit -m "feat(catalog): migrate durable anime references"
 - Provider/cache types retain `anilistId` only in `.server.ts` and Convex cache modules.
 - `ensurePublicIds(refs)` materializes live search identities once per bounded response.
 - `resolvePublicIds(refs)` batch-resolves cache results without writes.
+- `resolveProviderByPublicId({ publicId, kind })` is token-gated and server-only.
+- Raw Convex cache reads require the server cache token; browsers cannot read provider/cache DTOs directly.
+
+Execute Task 5 in this order:
+
+```text
+5A provider/cache model isolation
+5B identity gateway and raw-cache security
+5C Discover + 5D Quick Search + 5E Anime Detail + 5F Catalog Person
+Task 5 integrated review
+```
+
+Only the four metadata lanes may run in parallel, and only after 5A and 5B release their contracts.
 
 - [ ] **Step 1: Write failing strict public-contract tests**
 
@@ -616,6 +636,8 @@ expect(() => animeSummarySchema.parse({ ...summary, anilistId: 52991 })).toThrow
 
 Apply strict rejection to Anime Detail root/list/people/voice actors, Catalog Person detail/work/search, Quick Search rows, profile favorites, social Anime, Review outputs, and feed outputs.
 
+Also reject every digit-only canonical `publicId`, including `0` and leading-zero values. Only positive safe decimal route segments without leading zeros enter explicit legacy redirect resolution.
+
 - [ ] **Step 2: Run focused contract tests and confirm RED**
 
 ```powershell
@@ -627,6 +649,8 @@ Expected: public models still require numeric provider IDs.
 - [ ] **Step 3: Move provider normalization behind server-only modules**
 
 `normalizeAnimeSummary` and provider schemas move from shared browser contracts to `anilist-normalization.server.ts`. Public shared modules retain display types, slugs, filters, tabs, and `publicId` validators only.
+
+Complete provider/cache isolation before public schema edits. Convex cache validators and storage DTOs must import server/cache-owned provider contracts, never browser-public DTOs. Preserve every stored cache shape, key, TTL, lease, and refresh behavior.
 
 - [ ] **Step 4: Add one indexed identity round trip per response**
 
@@ -640,6 +664,10 @@ const identities = await identity.ensurePublicIds(refs)
 ```
 
 Use `ensurePublicIds` for uncached Discover, Quick Search, Character search, and Staff search. Use `resolvePublicIds` for cache reads after Task 3 verification. Missing cache mapping throws `CATALOG_IDENTITY_MISSING`; it does not refetch or expose provider ID.
+
+Add a token-gated reverse resolver for canonical public routes and provider-backed cache reads. It validates the requested entity kind and returns provider data only to server modules. Public route helpers return `publicId`, kind, source, and safe status only. Sanitize provider tuples and numeric IDs from browser errors.
+
+Token-gate the existing raw cache reads in `animeCache`, `animeDetailCache`, and `catalogPersonCache`; all current callers are server modules and must pass the server cache token.
 
 - [ ] **Step 5: Map nested Anime Detail identities**
 
@@ -706,6 +734,17 @@ git commit -m "feat(catalog): expose public ids from server boundaries"
 - Legacy decimal params resolve server-side, then replace to canonical path.
 - User Anime and Review Convex functions accept `animeId: v.id('catalogEntities')`.
 - Review detail IDs and user profile IDs remain unchanged.
+
+Execute Task 6 in this order:
+
+```text
+6A durable/social Convex API cutover
+6B Anime + Reviews | 6C Feed + Profile + Home | 6D Catalog + Search browser consumers
+6E serialized route-tree cutover and one route generation
+Task 6 integrated review
+```
+
+Only the three browser-consumer lanes may run in parallel. Shared public contracts release from 6A first. The controller owns route moves, `src/routeTree.gen.ts`, and generated Convex files.
 
 - [ ] **Step 1: Write failing route tests**
 
@@ -792,6 +831,8 @@ git commit -m "feat(catalog): route client surfaces by public id"
 - Retain: `convex/catalogIdentityMigration.integration.test.ts`
 - Retain: `convex/catalogAnimeDataMigration.ts`
 - Retain: `convex/catalogAnimeDataMigration.integration.test.ts`
+- Retain: `convex/catalogAnimeAggregateVerification.ts`
+- Retain: `convex/catalogAnimeAggregateVerification.integration.test.ts`
 - Modify: `docs/runbooks/catalog-identity-backfill.md`
 - Regenerate: `convex/_generated/*`
 
@@ -802,7 +843,7 @@ git commit -m "feat(catalog): route client surfaces by public id"
 - Final public functions contain no provider-ID args or returns.
 - Transitional durable fields remain additive until separately approved production backfill and tightening.
 
-- [ ] **Step 1: Push additive schema and functions to Convex dev**
+- [x] **Step 1: Push additive schema and functions to Convex dev**
 
 ```powershell
 pnpm exec convex dev --once
@@ -810,49 +851,60 @@ pnpm exec convex dev --once
 
 Expected: successful migration-safe dev sync. Stop on schema/function error.
 
-- [ ] **Step 2: Backfill every identity lane**
+- [x] **Step 2: Backfill every identity lane**
 
 Start each lane with:
 
 ```powershell
-pnpm exec convex run catalogIdentityMigration:backfillLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
+pnpm exec convex run --deployment dev catalogIdentityMigration:backfillLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
 Repeat with each returned cursor until `isDone: true`, then repeat for every lane named in Task 3.
 
-- [ ] **Step 3: Verify every identity lane**
+- [x] **Step 3: Verify every identity lane**
 
 ```powershell
-pnpm exec convex run catalogIdentityMigration:verifyLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
+pnpm exec convex run --deployment dev catalogIdentityMigration:verifyLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
 Require zero missing/conflict/mismatch counts for every lane.
 
-- [ ] **Step 4: Backfill durable Anime references**
+- [x] **Step 4: Backfill durable Anime references**
 
-Run each `catalogAnimeDataMigration` lane from null cursor to `isDone: true`. Then migrate milestone source keys. Rerun all lanes once and require zero patches.
+Run each `catalogAnimeDataMigration` lane from null cursor to `isDone: true`. Rerun every lane once and require zero patches. Do not migrate milestone source keys yet.
 
-- [ ] **Step 5: Verify durable data**
+- [x] **Step 5: Verify durable data**
+
+Use this exact order:
+
+1. Verify the first five durable lanes to terminal zero counters.
+2. Enumerate every aggregate target through `catalogAnimeAggregateVerification:listReviewAggregateTargets`.
+3. Verify every target through `catalogAnimeAggregateVerification:verifyReviewAggregate`, following its database-owned cursor.
+4. Verify the `anime-review-stats` lane to create its terminal receipt.
 
 Require zero values for every Task 4 verification counter. Record only counts/cursors; never record credentials or private Review/profile content.
 
-- [ ] **Step 6: Run migration-focused regression before teardown**
+- [x] **Step 6: Migrate milestone source keys**
+
+Run `catalogAnimeDataMigration:backfillMilestoneSourceKeys` only after all six durable lane receipts exist. Rerun from null cursor and require zero patches. Run final durable verification and require terminal zero counters.
+
+- [x] **Step 7: Run migration-focused regression**
 
 ```powershell
-pnpm test -- convex/catalogIdentity.integration.test.ts convex/catalogIdentityMigration.integration.test.ts convex/catalogAnimeDataMigration.integration.test.ts convex/userAnime.integration.test.ts
+pnpm test -- convex/catalogIdentity.integration.test.ts convex/catalogIdentityMigration.integration.test.ts convex/catalogAnimeDataMigration.integration.test.ts convex/catalogAnimeAggregateVerification.integration.test.ts convex/userAnime.integration.test.ts
 ```
 
 Expected: registry, migration reruns, and additive durable model pass against verified dev data shape.
 
-- [ ] **Step 7: Run post-backfill identity and domain regression**
+- [x] **Step 8: Run post-backfill identity and domain regression**
 
 ```powershell
-pnpm test -- convex/catalogIdentity.integration.test.ts convex/catalogIdentityMigration.integration.test.ts convex/catalogAnimeDataMigration.integration.test.ts convex/userAnime.integration.test.ts convex/feedMilestones.integration.test.ts convex/reviewDiscoveryPolicy.test.ts convex/feedPolicy.test.ts
+pnpm test -- convex/catalogIdentity.integration.test.ts convex/catalogIdentityMigration.integration.test.ts convex/catalogAnimeDataMigration.integration.test.ts convex/catalogAnimeAggregateVerification.integration.test.ts convex/userAnime.integration.test.ts convex/feedMilestones.integration.test.ts convex/reviewDiscoveryPolicy.test.ts convex/feedPolicy.test.ts
 ```
 
 Expected: registry, retained migration tooling, and additive durable model pass.
 
-- [ ] **Step 8: Record dev migration evidence and commit generated state**
+- [x] **Step 9: Record dev migration evidence and commit generated state**
 
 Update runbook with exact dev lane counts, terminal cursors, rerun results, and zero-mismatch verification. Do not record credentials or private Review/profile content.
 
