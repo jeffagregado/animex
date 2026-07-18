@@ -14,7 +14,7 @@ const catalogPublicIdSchema = z.string()
 export const parseCatalogPublicId = (value: unknown): CatalogPublicId => {
   const result = catalogPublicIdSchema.safeParse(value)
   if (!result.success) {
-    throw new RangeError('CATALOG_PUBLIC_ID_INVALID', { cause: result.error })
+    throw new RangeError('CATALOG_PUBLIC_ID_INVALID')
   }
   return result.data
 }
