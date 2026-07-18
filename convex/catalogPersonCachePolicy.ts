@@ -1,9 +1,7 @@
 import { catalogPersonDetailSchema, type CatalogPersonKind } from '../src/features/catalog-person/shared/catalog-person-contracts'
-import { CATALOG_PROVIDER_REF_BATCH_MAX } from './catalogIdentityPolicy'
 
 export const CATALOG_PERSON_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 export const CATALOG_PERSON_LEASE_MS = 60_000
-export const CATALOG_PERSON_VOICE_ACTOR_LIMIT = CATALOG_PROVIDER_REF_BATCH_MAX - 1
 export const CATALOG_PERSON_WORK_LIMIT = 20
 
 type Lease = { leaseId: string; leaseUntil: number }
@@ -89,15 +87,6 @@ export const validateCatalogPersonDetail = (kind: CatalogPersonKind, personId: n
   const result = catalogPersonDetailSchema.safeParse(detail)
   if (!result.success || result.data.kind !== kind || result.data.id !== personId) {
     throw new CatalogPersonCachePolicyError('INVALID_DETAIL', 'Catalog person detail identity or payload is invalid.')
-  }
-  if (
-    result.data.kind === 'character'
-    && result.data.voiceActors.length > CATALOG_PERSON_VOICE_ACTOR_LIMIT
-  ) {
-    throw new CatalogPersonCachePolicyError(
-      'VOICE_ACTOR_LIMIT_EXCEEDED',
-      `Catalog person detail voice actors cannot exceed ${CATALOG_PERSON_VOICE_ACTOR_LIMIT} items.`,
-    )
   }
 }
 

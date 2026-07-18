@@ -12,7 +12,7 @@ type Detail = {
   id: number
   name: string
   nativeName: null
-  imageUrl: null
+  imageUrl: string | null
   description: null
   age: null
   gender: null
@@ -49,7 +49,8 @@ const releaseLease = makeFunctionReference<'mutation', { key: string; leaseId: s
 const token = 'catalog-person-test-token'
 const now = new Date('2026-07-17T00:00:00.000Z').getTime()
 const detail: Detail = {
-  kind: 'character', id: 12, name: 'Frieren', nativeName: null, imageUrl: null,
+  kind: 'character', id: 12, name: 'Frieren', nativeName: null,
+  imageUrl: 'https://example.com/frieren.jpg',
   description: null, age: null, gender: null, birthday: null, bloodType: null,
   voiceActorScope: 'all-languages',
   voiceActors: [
@@ -59,7 +60,7 @@ const detail: Detail = {
 }
 const summary = {
   anilistId: 1, slug: 'one', titles: { display: 'One', english: 'One', romaji: null, native: null },
-  coverImageUrl: null, bannerImageUrl: null, format: 'TV' as const, season: null,
+  coverImageUrl: 'https://example.com/one.jpg', bannerImageUrl: null, format: 'TV' as const, season: null,
   seasonYear: 2024, episodes: 12, genres: [], popularity: 1, averageScore: 80,
   trending: null, startDate: { year: 2024, month: 1, day: 1 }, nextAiringAt: null,
 }
@@ -111,6 +112,44 @@ describe('catalog person Convex cache', () => {
     const refs = await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect())
     expect(refs.map(({ kind, providerId }) => `${kind}:${providerId}`).sort())
       .toEqual(['character:12', 'staff:21', 'staff:22'])
+
+    const refreshedAt = now + 1_000
+    vi.setSystemTime(refreshedAt)
+    const refreshedDetail: Detail = {
+      ...detail,
+      imageUrl: 'https://example.com/refreshed-frieren.jpg',
+      voiceActors: [...detail.voiceActors].reverse().map((actor, index) => ({
+        ...actor,
+        imageUrl: `https://example.com/refreshed-actor-${index + 1}.jpg`,
+      })),
+    }
+    await t.mutation(acquireLease, {
+      key: 'person:character:12', leaseId: 'refresh-owner', token,
+    })
+    await t.mutation(commitDetail, {
+      kind: 'character',
+      personId: 12,
+      detail: refreshedDetail,
+      leaseId: 'refresh-owner',
+      token,
+    })
+
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect()))
+      .toHaveLength(3)
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogEntities').collect()))
+      .toHaveLength(3)
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonDetails')
+      .withIndex('by_kind_person', (q) => q.eq('kind', 'character').eq('personId', 12))
+      .unique())).toMatchObject({
+        kind: 'character',
+        personId: 12,
+        detail: refreshedDetail,
+        refreshedAt,
+        expiresAt: refreshedAt + 24 * 60 * 60 * 1000,
+      })
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonCacheLeases')
+      .withIndex('by_key', (q) => q.eq('key', 'person:character:12'))
+      .unique())).toBeNull()
   })
 
   test('upserts full summaries and hydrates ordered work transactionally', async () => {
@@ -162,6 +201,78 @@ describe('catalog person Convex cache', () => {
     const refs = await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect())
     expect(refs.map(({ kind, providerId }) => `${kind}:${providerId}`).sort())
       .toEqual(['anime:1', 'anime:2', 'staff:21'])
+
+    const refreshedAt = now + 1_000
+    vi.setSystemTime(refreshedAt)
+    const refreshedSummary = {
+      ...summary,
+      coverImageUrl: 'https://example.com/refreshed-one.jpg',
+      popularity: 2,
+    }
+    const refreshedSecond = {
+      ...second,
+      coverImageUrl: 'https://example.com/refreshed-two.jpg',
+      popularity: 3,
+    }
+    await t.mutation(acquireLease, {
+      key: 'person-work:staff:21:1', leaseId: 'refresh-owner', token,
+    })
+    await t.mutation(commitWorkPage, {
+      kind: 'staff',
+      personId: 21,
+      page: 1,
+      items: [{ animeId: 1, role: 'Writer' }, { animeId: 2, role: 'Director' }],
+      hasNextPage: false,
+      summaries: [refreshedSummary, refreshedSecond],
+      leaseId: 'refresh-owner',
+      token,
+    })
+
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect()))
+      .toHaveLength(3)
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogEntities').collect()))
+      .toHaveLength(3)
+    expect(await t.query(readWorkPage, { kind: 'staff', personId: 21, page: 1 }))
+      .toMatchObject({
+        status: 'fresh',
+        entry: {
+          payload: {
+            items: [
+              {
+                anime: {
+                  id: 1,
+                  coverImageUrl: 'https://example.com/refreshed-one.jpg',
+                },
+                role: 'Writer',
+              },
+              {
+                anime: {
+                  id: 2,
+                  coverImageUrl: 'https://example.com/refreshed-two.jpg',
+                },
+                role: 'Director',
+              },
+            ],
+            hasNextPage: false,
+          },
+          refreshedAt,
+          expiresAt: refreshedAt + 24 * 60 * 60 * 1000,
+        },
+      })
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonWorkPages')
+      .withIndex('by_kind_person_page', (q) => q
+        .eq('kind', 'staff')
+        .eq('personId', 21)
+        .eq('page', 1))
+      .unique())).toMatchObject({
+        items: [{ animeId: 1, role: 'Writer' }, { animeId: 2, role: 'Director' }],
+        hasNextPage: false,
+        refreshedAt,
+        expiresAt: refreshedAt + 24 * 60 * 60 * 1000,
+      })
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonCacheLeases')
+      .withIndex('by_key', (q) => q.eq('key', 'person-work:staff:21:1'))
+      .unique())).toBeNull()
   })
 
   test('expires exactly at 24 hours and never returns stale detail', async () => {

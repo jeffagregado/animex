@@ -76,7 +76,7 @@ describe('catalog person cache policy', () => {
         imageUrl: null,
         language: 'Japanese',
       })),
-    })).toThrow('cannot exceed 99')
+    })).not.toThrow()
     expect(() => validateCatalogPersonWorkPage('character', 12, 1, Array.from({ length: 21 }, () => ({ animeId: 1, role: null })))).toThrow()
     expect(() => validateCatalogPersonWorkPage('character', 12, 1, [{ animeId: 0, role: null }])).toThrow()
   })

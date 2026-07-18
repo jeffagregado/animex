@@ -27,7 +27,7 @@ const commitPeoplePage = makeFunctionReference<
     anilistId: number
     kind: PeopleKind
     page: number
-    items: typeof characters
+    items: Array<(typeof characters)[number] | (typeof staff)[number]>
     hasNextPage: boolean
     leaseId: string
     token: string
@@ -159,10 +159,66 @@ describe('anime detail Convex cache identity bridge', () => {
     expect(await t.run(async (ctx) => await ctx.db.query('animeDetailCacheLeases')
       .withIndex('by_key', (q) => q.eq('key', 'detail:1'))
       .unique())).toBeNull()
+
+    const refreshedAt = now + 1_000
+    vi.setSystemTime(refreshedAt)
+    const refreshedDetail = {
+      ...detail,
+      coverImageUrl: 'https://example.com/refreshed-cover.jpg',
+      bannerImageUrl: 'https://example.com/refreshed-banner.jpg',
+      recommendations: [recommendation, related],
+    }
+    const refreshedSummary = {
+      ...summary,
+      coverImageUrl: refreshedDetail.coverImageUrl,
+      bannerImageUrl: refreshedDetail.bannerImageUrl,
+      popularity: 101,
+    }
+    await t.mutation(acquireLease, { key: 'detail:1', leaseId: 'refresh-owner', token })
+    await t.mutation(commitDetail, {
+      leaseId: 'refresh-owner',
+      token,
+      summary: refreshedSummary,
+      detail: refreshedDetail,
+    })
+
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect()))
+      .toHaveLength(6)
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogEntities').collect()))
+      .toHaveLength(6)
+    expect(await t.run(async (ctx) => await ctx.db.query('animeDetails')
+      .withIndex('by_anilist_id', (q) => q.eq('anilistId', 1))
+      .unique())).toMatchObject({
+        anilistId: 1,
+        detail: refreshedDetail,
+        refreshedAt,
+        expiresAt: refreshedAt + 24 * 60 * 60 * 1000,
+      })
+    expect(await t.run(async (ctx) => await ctx.db.query('animeSummaries')
+      .withIndex('by_anilist_id', (q) => q.eq('anilistId', 1))
+      .unique())).toMatchObject({ ...refreshedSummary, updatedAt: refreshedAt })
+    expect(await t.run(async (ctx) => await ctx.db.query('animeDetailCacheLeases')
+      .withIndex('by_key', (q) => q.eq('key', 'detail:1'))
+      .unique())).toBeNull()
   })
 
   test('registers every person in committed people pages while preserving page fields and lease deletion', async () => {
     const t = createHarness()
+    const peopleCharacters = [
+      ...characters,
+      {
+        anilistId: 11,
+        name: 'Second Character',
+        role: 'SUPPORTING' as const,
+        imageUrl: 'https://example.com/second-character.jpg',
+        japaneseVoiceActor: {
+          anilistId: 31,
+          name: 'Second Voice Actor',
+          imageUrl: 'https://example.com/second-actor.jpg',
+          language: 'Japanese' as const,
+        },
+      },
+    ]
     await t.mutation(acquireLease, {
       key: 'people:1:characters:2',
       leaseId: 'owner',
@@ -172,7 +228,7 @@ describe('anime detail Convex cache identity bridge', () => {
       anilistId: 1,
       kind: 'characters',
       page: 2,
-      items: characters,
+      items: peopleCharacters,
       hasNextPage: false,
       leaseId: 'owner',
       token,
@@ -180,7 +236,7 @@ describe('anime detail Convex cache identity bridge', () => {
 
     const refs = await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect())
     expect(refs.map(({ kind, providerId }) => `${kind}:${providerId}`).sort())
-      .toEqual(['character:10', 'staff:30'])
+      .toEqual(['character:10', 'character:11', 'staff:30', 'staff:31'])
     const stored = await t.run(async (ctx) => await ctx.db.query('animeDetailPeoplePages')
       .withIndex('by_anime_kind_page', (q) => q
         .eq('anilistId', 1)
@@ -191,13 +247,132 @@ describe('anime detail Convex cache identity bridge', () => {
       anilistId: 1,
       kind: 'characters',
       page: 2,
-      items: characters,
+      items: peopleCharacters,
       hasNextPage: false,
       refreshedAt: now,
       expiresAt: now + 24 * 60 * 60 * 1000,
     })
     expect(await t.run(async (ctx) => await ctx.db.query('animeDetailCacheLeases')
       .withIndex('by_key', (q) => q.eq('key', 'people:1:characters:2'))
+      .unique())).toBeNull()
+
+    const refreshedAt = now + 1_000
+    vi.setSystemTime(refreshedAt)
+    const refreshedCharacters = [...peopleCharacters].reverse().map((character, index) => ({
+      ...character,
+      imageUrl: `https://example.com/refreshed-character-${index + 1}.jpg`,
+      japaneseVoiceActor: {
+        ...character.japaneseVoiceActor,
+        imageUrl: `https://example.com/refreshed-actor-${index + 1}.jpg`,
+      },
+    }))
+    await t.mutation(acquireLease, {
+      key: 'people:1:characters:2',
+      leaseId: 'refresh-owner',
+      token,
+    })
+    await t.mutation(commitPeoplePage, {
+      anilistId: 1,
+      kind: 'characters',
+      page: 2,
+      items: refreshedCharacters,
+      hasNextPage: true,
+      leaseId: 'refresh-owner',
+      token,
+    })
+
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect()))
+      .toHaveLength(4)
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogEntities').collect()))
+      .toHaveLength(4)
+    expect(await t.run(async (ctx) => await ctx.db.query('animeDetailPeoplePages')
+      .withIndex('by_anime_kind_page', (q) => q
+        .eq('anilistId', 1)
+        .eq('kind', 'characters')
+        .eq('page', 2))
+      .unique())).toMatchObject({
+        anilistId: 1,
+        kind: 'characters',
+        page: 2,
+        items: refreshedCharacters,
+        hasNextPage: true,
+        refreshedAt,
+        expiresAt: refreshedAt + 24 * 60 * 60 * 1000,
+      })
+    expect(await t.run(async (ctx) => await ctx.db.query('animeDetailCacheLeases')
+      .withIndex('by_key', (q) => q.eq('key', 'people:1:characters:2'))
+      .unique())).toBeNull()
+  })
+
+  test('registers and refreshes Staff people pages without changing cache invariants', async () => {
+    const t = createHarness()
+    const peopleStaff = [
+      ...staff,
+      {
+        anilistId: 21,
+        name: 'Writer',
+        role: 'Writer',
+        imageUrl: 'https://example.com/writer.jpg',
+      },
+    ]
+    await t.mutation(acquireLease, {
+      key: 'people:1:staff:2',
+      leaseId: 'owner',
+      token,
+    })
+    await t.mutation(commitPeoplePage, {
+      anilistId: 1,
+      kind: 'staff',
+      page: 2,
+      items: peopleStaff,
+      hasNextPage: false,
+      leaseId: 'owner',
+      token,
+    })
+
+    const refreshedAt = now + 1_000
+    vi.setSystemTime(refreshedAt)
+    const refreshedStaff = [...peopleStaff].reverse().map((person, index) => ({
+      ...person,
+      role: index === 0 ? 'Series Writer' : 'Series Director',
+      imageUrl: `https://example.com/refreshed-staff-${index + 1}.jpg`,
+    }))
+    await t.mutation(acquireLease, {
+      key: 'people:1:staff:2',
+      leaseId: 'refresh-owner',
+      token,
+    })
+    await t.mutation(commitPeoplePage, {
+      anilistId: 1,
+      kind: 'staff',
+      page: 2,
+      items: refreshedStaff,
+      hasNextPage: true,
+      leaseId: 'refresh-owner',
+      token,
+    })
+
+    const refs = await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect())
+    expect(refs.map(({ kind, providerId }) => `${kind}:${providerId}`).sort())
+      .toEqual(['staff:20', 'staff:21'])
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogEntities').collect()))
+      .toHaveLength(2)
+    expect(await t.run(async (ctx) => await ctx.db.query('animeDetailPeoplePages')
+      .withIndex('by_anime_kind_page', (q) => q
+        .eq('anilistId', 1)
+        .eq('kind', 'staff')
+        .eq('page', 2))
+      .unique())).toMatchObject({
+        anilistId: 1,
+        kind: 'staff',
+        page: 2,
+        items: refreshedStaff,
+        hasNextPage: true,
+        refreshedAt,
+        expiresAt: refreshedAt + 24 * 60 * 60 * 1000,
+      })
+    expect(await t.run(async (ctx) => await ctx.db.query('animeDetailCacheLeases')
+      .withIndex('by_key', (q) => q.eq('key', 'people:1:staff:2'))
       .unique())).toBeNull()
   })
 })

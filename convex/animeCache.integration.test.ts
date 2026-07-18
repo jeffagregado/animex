@@ -95,5 +95,44 @@ describe('discover Convex cache identity bridge', () => {
     expect(await t.run(async (ctx) => await ctx.db.query('discoverCacheLeases')
       .withIndex('by_key', (q) => q.eq('key', 'trending'))
       .unique())).toBeNull()
+
+    const refreshedAt = now + 1_000
+    vi.setSystemTime(refreshedAt)
+    const refreshed = {
+      ...summary,
+      coverImageUrl: 'https://example.com/refreshed-cover.jpg',
+      bannerImageUrl: 'https://example.com/refreshed-banner.jpg',
+      popularity: 101,
+    }
+    await t.mutation(acquireSectionLease, {
+      key: 'trending',
+      leaseId: 'refresh-owner',
+      token,
+    })
+    await t.mutation(commitSection, {
+      key: 'trending',
+      leaseId: 'refresh-owner',
+      summaries: [refreshed, second],
+      token,
+    })
+
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect()))
+      .toHaveLength(2)
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogEntities').collect()))
+      .toHaveLength(2)
+    expect(await t.run(async (ctx) => await ctx.db.query('discoverSectionCache')
+      .withIndex('by_key', (q) => q.eq('key', 'trending'))
+      .unique())).toMatchObject({
+        key: 'trending',
+        animeIds: [1, 2],
+        refreshedAt,
+        expiresAt: refreshedAt + 3 * 60 * 60 * 1000,
+      })
+    expect(await t.run(async (ctx) => await ctx.db.query('animeSummaries')
+      .withIndex('by_anilist_id', (q) => q.eq('anilistId', 1))
+      .unique())).toMatchObject({ ...refreshed, updatedAt: refreshedAt })
+    expect(await t.run(async (ctx) => await ctx.db.query('discoverCacheLeases')
+      .withIndex('by_key', (q) => q.eq('key', 'trending'))
+      .unique())).toBeNull()
   })
 })
