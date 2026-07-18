@@ -74,17 +74,19 @@ const verificationResultValidator = v.object({
   aggregateMismatch: v.number(),
   projectionMismatch: v.number(),
 })
-const aggregateStateValidator = v.object({
-  count: v.number(),
-  ratingSum: v.number(),
-  bands: v.array(v.number()),
-})
 const aggregateResultValidator = v.object({
   continueCursor: v.string(),
   isDone: v.boolean(),
   processedCount: v.number(),
-  state: aggregateStateValidator,
+  count: v.number(),
+  ratingSum: v.number(),
+  bands: v.array(v.number()),
   aggregateMismatch: v.number(),
+})
+const aggregateTargetResultValidator = v.object({
+  page: v.array(v.id('animeReviewStats')),
+  continueCursor: v.string(),
+  isDone: v.boolean(),
 })
 
 const tableName = (lane: DurableAnimeLane): string => {
@@ -158,6 +160,37 @@ const emptyCounts = (): VerificationCounts => ({
   projectionMismatch: 0,
 })
 
+/** Compares two fixed Review rating-band snapshots. */
+const bandsMatch = (left: number[], right: number[]): boolean => left.length === right.length
+  && left.every((value, index) => value === right[index])
+
+/** Checks that one public Review has exactly one matching aggregate row. */
+const reviewAggregateMatches = async (
+  ctx: MutationCtx,
+  review: Doc<'reviews'>,
+): Promise<boolean> => {
+  if (!review.animeId || review.state !== 'published' || review.visibility !== 'public') return true
+  const matches = await ctx.db.query('animeReviewStats').withIndex('by_anime_entity', (q) => q.eq('animeId', review.animeId)).take(2)
+  return matches.length === 1 && matches[0]?.anilistId === review.anilistId
+}
+
+/** Checks that one aggregate has a current authoritative verification receipt. */
+const aggregateReceiptMatches = async (
+  ctx: MutationCtx,
+  aggregate: Doc<'animeReviewStats'>,
+): Promise<boolean> => {
+  if (!aggregate.animeId) return false
+  const receipt = await ctx.db.query('catalogAnimeAggregateVerificationReceipts')
+    .withIndex('by_stats_id', (q) => q.eq('statsId', aggregate._id))
+    .unique()
+  return receipt !== null
+    && receipt.animeId === aggregate.animeId
+    && receipt.count === aggregate.count
+    && receipt.ratingSum === aggregate.ratingSum
+    && bandsMatch(receipt.bands, aggregate.bands)
+    && receipt.statsUpdatedAt === aggregate.updatedAt
+}
+
 /** Compares one Anime-backed feed card with its authoritative source. */
 const projectionMatches = async (
   ctx: MutationCtx,
@@ -209,6 +242,14 @@ export const backfillAnimeRefs = internalMutation({
       }
       if (!row.animeId) {
         await ctx.db.patch(row._id, { animeId })
+        if (args.lane === 'anime-review-stats') {
+          const [checkpoint, aggregateReceipt] = await Promise.all([
+            ctx.db.query('catalogAnimeAggregateVerificationState').withIndex('by_stats_id', (q) => q.eq('statsId', row._id as Id<'animeReviewStats'>)).unique(),
+            ctx.db.query('catalogAnimeAggregateVerificationReceipts').withIndex('by_stats_id', (q) => q.eq('statsId', row._id as Id<'animeReviewStats'>)).unique(),
+          ])
+          if (checkpoint) await ctx.db.delete('catalogAnimeAggregateVerificationState', checkpoint._id)
+          if (aggregateReceipt) await ctx.db.delete('catalogAnimeAggregateVerificationReceipts', aggregateReceipt._id)
+        }
         patchedCount += 1
       }
     }
@@ -293,6 +334,12 @@ export const verifyAnimeRefs = internalMutation({
       if (args.lane === 'reviews' && 'userId' in row) {
         const matches = await ctx.db.query('reviews').withIndex('by_user_anime_entity', (q) => q.eq('userId', row.userId).eq('animeId', row.animeId)).take(2)
         if (matches.length > 1) counts.duplicateReview += 1
+        if ('state' in row && 'rating' in row && !await reviewAggregateMatches(ctx, row as Doc<'reviews'>)) {
+          counts.aggregateMismatch += 1
+        }
+      }
+      if (args.lane === 'anime-review-stats' && 'bands' in row && !await aggregateReceiptMatches(ctx, row as Doc<'animeReviewStats'>)) {
+        counts.aggregateMismatch += 1
       }
       if (args.lane === 'feed-cards' && 'kind' in row && 'userId' in row && (row.kind === 'completed' || row.kind === 'rewatched')) {
         const target = `${row.kind}:${row.userId}:${row.animeId}`
@@ -332,23 +379,53 @@ export const verifyAnimeRefs = internalMutation({
   },
 })
 
-/** Verifies one Review aggregate through caller-carried bounded page state. */
+/** Lists bounded aggregate targets for authoritative per-row verification. */
+export const listReviewAggregateTargets = internalMutation({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: aggregateTargetResultValidator,
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query('animeReviewStats').paginate(args.paginationOpts)
+    return {
+      page: page.page.map((aggregate) => aggregate._id),
+      continueCursor: page.continueCursor,
+      isDone: page.isDone,
+    }
+  },
+})
+
+/** Verifies one Review aggregate through a database-owned bounded checkpoint. */
 export const verifyReviewAggregate = internalMutation({
   args: {
     statsId: v.id('animeReviewStats'),
     paginationOpts: paginationOptsValidator,
-    state: aggregateStateValidator,
   },
   returns: aggregateResultValidator,
   handler: async (ctx, args) => {
-    if (args.state.bands.length !== 10) throw new Error('Aggregate verification state must contain 10 bands.')
     const aggregate = await ctx.db.get('animeReviewStats', args.statsId)
     if (!aggregate?.animeId) throw new Error(`animeReviewStats ${args.statsId} is missing animeId.`)
+    const [checkpoint, receipt] = await Promise.all([
+      ctx.db.query('catalogAnimeAggregateVerificationState').withIndex('by_stats_id', (q) => q.eq('statsId', args.statsId)).unique(),
+      ctx.db.query('catalogAnimeAggregateVerificationReceipts').withIndex('by_stats_id', (q) => q.eq('statsId', args.statsId)).unique(),
+    ])
+    if (args.paginationOpts.cursor === null) {
+      if (checkpoint) throw new Error(`Aggregate verification checkpoint for ${args.statsId} already exists.`)
+      if (receipt) await ctx.db.delete('catalogAnimeAggregateVerificationReceipts', receipt._id)
+    } else if (!checkpoint || checkpoint.nextCursor !== args.paginationOpts.cursor) {
+      throw new Error(`Aggregate verification cursor for ${args.statsId} does not match durable checkpoint.`)
+    }
+    if (checkpoint && (
+      checkpoint.animeId !== aggregate.animeId
+      || checkpoint.statsUpdatedAt !== aggregate.updatedAt
+    )) {
+      throw new Error(`animeReviewStats ${args.statsId} changed after its aggregate verification checkpoint.`)
+    }
     const page = await ctx.db.query('reviews').withIndex('by_anime_entity_state_visibility_newest', (q) => q
       .eq('animeId', aggregate.animeId)
       .eq('state', 'published')
       .eq('visibility', 'public')).paginate(args.paginationOpts)
-    const state = { count: args.state.count, ratingSum: args.state.ratingSum, bands: [...args.state.bands] }
+    const state = checkpoint
+      ? { count: checkpoint.count, ratingSum: checkpoint.ratingSum, bands: [...checkpoint.bands] }
+      : { count: 0, ratingSum: 0, bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
     for (const review of page.page) {
       if (review.rating === null) continue
       state.count += 1
@@ -359,14 +436,39 @@ export const verifyReviewAggregate = internalMutation({
     const aggregateMismatch = page.isDone && (
       aggregate.count !== state.count
       || aggregate.ratingSum !== state.ratingSum
-      || aggregate.bands.length !== state.bands.length
-      || aggregate.bands.some((value, index) => value !== state.bands[index])
+      || !bandsMatch(aggregate.bands, state.bands)
     ) ? 1 : 0
+    const now = Date.now()
+    if (page.isDone) {
+      if (checkpoint) await ctx.db.delete('catalogAnimeAggregateVerificationState', checkpoint._id)
+      if (aggregateMismatch === 0) {
+        await ctx.db.insert('catalogAnimeAggregateVerificationReceipts', {
+          statsId: aggregate._id,
+          animeId: aggregate.animeId,
+          count: aggregate.count,
+          ratingSum: aggregate.ratingSum,
+          bands: aggregate.bands,
+          statsUpdatedAt: aggregate.updatedAt,
+          verifiedAt: now,
+        })
+      }
+    } else {
+      const fields = {
+        statsId: aggregate._id,
+        animeId: aggregate.animeId,
+        nextCursor: page.continueCursor,
+        ...state,
+        statsUpdatedAt: aggregate.updatedAt,
+        updatedAt: now,
+      }
+      if (checkpoint) await ctx.db.patch('catalogAnimeAggregateVerificationState', checkpoint._id, fields)
+      else await ctx.db.insert('catalogAnimeAggregateVerificationState', fields)
+    }
     return {
       continueCursor: page.continueCursor,
       isDone: page.isDone,
       processedCount: page.page.length,
-      state,
+      ...state,
       aggregateMismatch,
     }
   },

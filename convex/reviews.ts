@@ -263,7 +263,10 @@ export const publish = mutation({
       if (byRequest.animeId && byRequest.animeId !== anime.animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Review ${byRequest._id} conflicts with provider mapping ${anime.animeId}.`)
       await ctx.db.patch('reviews', repeatedId, { animeId: anime.animeId, ...buildReviewDiscoveryFields(byRequest._id, byRequest.state, byRequest.rating, byRequest.publishedAt, byRequest.updatedAt, profile, anime) })
       const repeated = await ctx.db.get('reviews', repeatedId)
-      if (repeated) await upsertReviewCard(ctx, repeated)
+      if (repeated) {
+        await applyAggregate(ctx, args.anilistId, anime.animeId, byRequest, repeated)
+        await upsertReviewCard(ctx, repeated)
+      }
       return repeatedId
     }
     const existing = await readMine(ctx, profile._id, args.anilistId)

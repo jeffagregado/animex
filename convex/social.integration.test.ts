@@ -73,13 +73,14 @@ describe('social Convex integration', () => {
       const conflictId = await ctx.db.insert('catalogEntities', { kind: 'anime', createdAt: 1, updatedAt: 1 })
       return { statsId: stats._id, conflictId }
     })
-    await owner.client.mutation(socialApi.reviews.setVisibility, { reviewId, visibility: 'public' })
+    const repeated = {
+      anilistId: 701, requestId: 'aggregate-identity', rating: 90,
+      summary: 'Aggregate identity', containsSpoiler: false, bodyJson, visibility: 'public',
+    }
+    expect(await owner.client.mutation(socialApi.reviews.publish, repeated)).toBe(reviewId)
     expect((await t.run(async (ctx) => await ctx.db.get('animeReviewStats', ids.statsId)))?.animeId).toBe(animeId)
     await t.run(async (ctx) => await ctx.db.patch('animeReviewStats', ids.statsId, { animeId: ids.conflictId }))
-    await expect(owner.client.mutation(socialApi.reviews.setVisibility, {
-      reviewId,
-      visibility: 'private',
-    })).rejects.toThrow('conflicts with provider mapping')
+    await expect(owner.client.mutation(socialApi.reviews.publish, repeated)).rejects.toThrow('conflicts with provider mapping')
   })
 
   test('links legacy milestone and card refs before visibility and removal updates', async () => {

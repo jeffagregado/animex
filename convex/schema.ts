@@ -356,6 +356,25 @@ export default defineSchema({
     lane: v.string(),
     verifiedAt: v.number(),
   }).index('by_lane', ['lane']),
+  catalogAnimeAggregateVerificationState: defineTable({
+    statsId: v.id('animeReviewStats'),
+    animeId: v.id('catalogEntities'),
+    nextCursor: v.string(),
+    count: v.number(),
+    ratingSum: v.number(),
+    bands: v.array(v.number()),
+    statsUpdatedAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_stats_id', ['statsId']),
+  catalogAnimeAggregateVerificationReceipts: defineTable({
+    statsId: v.id('animeReviewStats'),
+    animeId: v.id('catalogEntities'),
+    count: v.number(),
+    ratingSum: v.number(),
+    bands: v.array(v.number()),
+    statsUpdatedAt: v.number(),
+    verifiedAt: v.number(),
+  }).index('by_stats_id', ['statsId']),
   discoverSectionCache: defineTable({
     key: v.union(
       v.literal('trending'),

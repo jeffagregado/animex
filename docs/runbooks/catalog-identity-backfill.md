@@ -86,7 +86,15 @@ Continue with returned cursor until `isDone: true`. Require no error. `patchedCo
 
 Missing mapping or conflicting stored `animeId` blocks rollout. Error includes table and document ID. Fix identity data; retry same cursor.
 
-Verify every durable lane:
+After all six backfills finish, verify these durable-reference lanes:
+
+```text
+user-anime-entries
+anime-rewatches
+anime-milestones
+reviews
+feed-cards
+```
 
 ```powershell
 pnpm exec convex run --deployment dev catalogAnimeDataMigration:verifyAnimeRefs '{"lane":"user-anime-entries","paginationOpts":{"numItems":50,"cursor":null}}'
@@ -106,21 +114,39 @@ projectionMismatch = 0
 
 Any nonzero counter blocks public cutover. Keep legacy `anilistId` fields and indexes in this rollout.
 
-Verify each `animeReviewStats` row through bounded Review pages:
+Enumerate every aggregate target through bounded pages:
 
 ```powershell
-pnpm exec convex run --deployment dev catalogAnimeDataMigration:verifyReviewAggregate '{"statsId":"STATS_ID","paginationOpts":{"numItems":50,"cursor":null},"state":{"count":0,"ratingSum":0,"bands":[0,0,0,0,0,0,0,0,0,0]}}'
+pnpm exec convex run --deployment dev catalogAnimeDataMigration:listReviewAggregateTargets '{"paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
-Pass returned cursor and `state` into next page. Require terminal `aggregateMismatch: 0`.
+Continue enumeration with exactly returned cursor until `isDone: true`. Record every returned `statsId`; skipping a target blocks rollout.
 
-Only after all six lane receipts and aggregate checks pass, migrate milestone feed keys:
+Verify every returned `statsId` from a null cursor:
+
+```powershell
+pnpm exec convex run --deployment dev catalogAnimeDataMigration:verifyReviewAggregate '{"statsId":"STATS_ID","paginationOpts":{"numItems":50,"cursor":null}}'
+```
+
+Continue each target with exactly its returned cursor. Aggregate count, rating sum, and bands live in a database checkpoint; callers must not carry or alter them. A changed or skipped cursor fails. Require terminal `aggregateMismatch: 0`, which writes a snapshot receipt for that stats row.
+
+After every target has a current receipt, verify the aggregate lane:
+
+```powershell
+pnpm exec convex run --deployment dev catalogAnimeDataMigration:verifyAnimeRefs '{"lane":"anime-review-stats","paginationOpts":{"numItems":50,"cursor":null}}'
+```
+
+Continue with exactly returned cursor. A missing receipt or a receipt whose Anime, count, rating sum, bands, or stats update time is stale increments `aggregateMismatch` and blocks the lane receipt.
+
+Only after all six lane receipts exist, migrate milestone feed keys:
 
 ```powershell
 pnpm exec convex run --deployment dev catalogAnimeDataMigration:backfillMilestoneSourceKeys '{"paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
 Missing receipt or duplicate target blocks rollout. Fix cause, rerun verification from null cursor, then retry source migration. Full source-key rerun must report `patchedCount: 0`.
+
+Final verification is mandatory after source-key migration: rerun identity verification, verify the first five durable-reference lanes, enumerate and verify every aggregate target, then verify `anime-review-stats`. Require every counter to remain zero. Finally rerun milestone source-key migration and require `patchedCount: 0`.
 
 ## Production
 
@@ -131,7 +157,16 @@ pnpm exec convex run --deployment prod catalogIdentityMigration:backfillLane '{"
 pnpm exec convex run --deployment prod catalogIdentityMigration:verifyLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
-Follow same cursor, page-bound, lane, and zero-count gates. Run identity lanes, durable Anime lanes, milestone source keys, then both verification sets.
+Follow the same cursor, page-bound, lane, and zero-count gates. Exact order:
+
+```text
+identity verification
+durable-reference verification
+enumerate and verify every Review aggregate
+anime-review-stats receipt verification
+milestone source-key migration
+final verification
+```
 
 ## Retention And Rollback
 
