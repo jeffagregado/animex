@@ -135,35 +135,44 @@ describe('anime detail contracts', () => {
   })
 
   test('validates exact identity-free mutation inputs', () => {
-    expect(setAnimeStatusInputSchema.parse({ anilistId: 52991, status: 'watching' })).toEqual({ anilistId: 52991, status: 'watching' })
-    expect(setAnimeScoreInputSchema.parse({ anilistId: 52991, score: null })).toEqual({ anilistId: 52991, score: null })
-    expect(setAnimeFavoriteInputSchema.parse({ anilistId: 52991, isFavorite: false })).toEqual({ anilistId: 52991, isFavorite: false })
-    expect(recordAnimeRewatchInputSchema.parse({ anilistId: 52991 })).toEqual({ anilistId: 52991 })
-    expect(removeLatestAnimeRewatchInputSchema.parse({ anilistId: 52991 })).toEqual({ anilistId: 52991 })
-    expect(() => setAnimeStatusInputSchema.parse({ anilistId: 52991, status: 'watching', userId: 'leak' })).toThrow()
-    expect(() => setAnimeFavoriteInputSchema.parse({ anilistId: 52991 })).toThrow()
-    expect(() => recordAnimeRewatchInputSchema.parse({ anilistId: 52991, completedAt: 1 })).toThrow()
+    const animeId = 'anime_frieren'
+
+    expect(setAnimeStatusInputSchema.parse({ animeId, status: 'watching' })).toEqual({ animeId, status: 'watching' })
+    expect(setAnimeScoreInputSchema.parse({ animeId, score: null })).toEqual({ animeId, score: null })
+    expect(setAnimeFavoriteInputSchema.parse({ animeId, isFavorite: false })).toEqual({ animeId, isFavorite: false })
+    expect(recordAnimeRewatchInputSchema.parse({ animeId })).toEqual({ animeId })
+    expect(removeLatestAnimeRewatchInputSchema.parse({ animeId })).toEqual({ animeId })
+    expect(() => setAnimeStatusInputSchema.parse({ animeId, status: 'watching', userId: 'leak' })).toThrow()
+    expect(() => setAnimeStatusInputSchema.parse({ animeId: '52991', status: 'watching' })).toThrow()
+    expect(() => setAnimeStatusInputSchema.parse({ anilistId: 52991, status: 'watching' })).toThrow()
+    expect(() => setAnimeFavoriteInputSchema.parse({ animeId })).toThrow()
+    expect(() => recordAnimeRewatchInputSchema.parse({ animeId, completedAt: 1 })).toThrow()
   })
 
   test('validates strict cursor-based rewatch pagination input', () => {
-    const input = { anilistId: 52991, paginationOpts: { numItems: 20, cursor: null } }
+    const input = { animeId: 'anime_frieren', paginationOpts: { numItems: 20, cursor: null } }
 
     expect(animeRewatchPageInputSchema.parse(input)).toEqual(input)
     expect(animeRewatchPageInputSchema.parse({ ...input, paginationOpts: { ...input.paginationOpts, cursor: 'next-page' } }).paginationOpts.cursor).toBe('next-page')
+    expect(() => animeRewatchPageInputSchema.parse({ anilistId: 52991, paginationOpts: input.paginationOpts })).toThrow()
     expect(() => animeRewatchPageInputSchema.parse({ ...input, userId: 'leak' })).toThrow()
     expect(() => animeRewatchPageInputSchema.parse({ ...input, paginationOpts: { ...input.paginationOpts, numItems: 21 } })).toThrow()
     expect(() => animeRewatchPageInputSchema.parse({ ...input, paginationOpts: { ...input.paginationOpts, endCursor: null } })).toThrow()
   })
 
   test('validates user entry, milestone, rewatch page, and mutation result semantics', () => {
-    const entry = { anilistId: 52991, status: null, score: 9.5, isFavorite: true, favoriteChangedAt: 10, rewatchCount: 1, createdAt: 1, updatedAt: 10 }
-    const milestone = { anilistId: 52991, kind: 'completed', settledAt: 10 }
-    const rewatch = { id: 'rewatch-1', anilistId: 52991, completedAt: 10 }
+    const animeId = 'anime_frieren'
+    const entry = { animeId, status: null, score: 9.5, isFavorite: true, favoriteChangedAt: 10, rewatchCount: 1, createdAt: 1, updatedAt: 10 }
+    const milestone = { animeId, kind: 'completed', settledAt: 10 }
+    const rewatch = { id: 'rewatch-1', animeId, completedAt: 10 }
 
     expect(userAnimeEntrySchema.parse(entry)).toEqual(entry)
     expect(animeMilestoneSchema.parse(milestone)).toEqual(milestone)
     expect(animeRewatchPageSchema.parse({ items: [rewatch], continueCursor: 'next-page', isDone: false, perPage: 20 }).items).toEqual([rewatch])
     expect(userAnimeMutationResultSchema.parse({ status: 'saved', entry })).toEqual({ status: 'saved', entry })
+    expect(userAnimeMutationResultSchema.parse({ status: 'removed', animeId })).toEqual({ status: 'removed', animeId })
+    expect(() => userAnimeEntrySchema.parse({ ...entry, anilistId: 52991 })).toThrow()
+    expect(() => userAnimeMutationResultSchema.parse({ status: 'removed', anilistId: 52991 })).toThrow()
     expect(() => animeMilestoneSchema.parse({ ...milestone, kind: 'started' })).toThrow()
     expect(() => animeRewatchPageSchema.parse({ items: Array.from({ length: 21 }, () => rewatch), continueCursor: 'done', isDone: true, perPage: 20 })).toThrow()
     expect(() => animeRewatchPageSchema.parse({ items: [rewatch], continueCursor: null, isDone: true, perPage: 20 })).toThrow()

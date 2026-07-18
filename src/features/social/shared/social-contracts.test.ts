@@ -27,7 +27,7 @@ const author = {
 }
 
 const anime = {
-  anilistId: 52991,
+  publicId: 'anime_frieren',
   slug: 'frieren-beyond-journeys-end',
   title: "Frieren: Beyond Journey's End",
   coverImageUrl: null,
@@ -84,6 +84,10 @@ describe('social contracts', () => {
     expect(socialAuthorSchema.parse(author)).toEqual(author)
     expect(socialAnimeSchema.parse(anime)).toEqual(anime)
     expect(() => socialAuthorSchema.parse({ ...author, role: 'admin' })).toThrow()
+    expect(() => socialAnimeSchema.parse({ ...anime, publicId: '52991' })).toThrow()
+    expect(() => socialAnimeSchema.parse({ ...anime, anilistId: 52991 })).toThrow()
+    expect(() => socialAnimeSchema.parse({ ...anime, providerId: 52991 })).toThrow()
+    expect(() => socialAnimeSchema.parse({ ...anime, provider: 'anilist' })).toThrow()
     expect(() => socialAnimeSchema.parse({ ...anime, internalId: 'secret' })).toThrow()
     expect(() => socialAuthorSchema.parse({ ...author, avatarUrl: 'http://example.com/avatar.jpg' })).toThrow()
   })
@@ -127,6 +131,10 @@ describe('social contracts', () => {
     expect(() => reviewPublishInputSchema.parse({ ...input, rating: null })).toThrow()
     expect(() => reviewPublishInputSchema.parse({ ...input, summary: '   ' })).toThrow()
     expect(() => reviewPublishInputSchema.parse({ ...input, requestId: 'x'.repeat(129) })).toThrow()
+    expect(() => reviewDraftInputSchema.parse({ ...input, animeId: '52991', rating: null })).toThrow()
+    expect(() => reviewPublishInputSchema.parse({ ...input, animeId: '52991' })).toThrow()
+    expect(() => reviewDraftInputSchema.parse({ ...input, rating: null, anilistId: 52991 })).toThrow()
+    expect(() => reviewPublishInputSchema.parse({ ...input, providerId: 52991 })).toThrow()
   })
 
   test('accepts text-only, media-only, or text-and-media Posts with at most one media item', () => {

@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+import {
+  parseCatalogPublicId,
+  type CatalogPublicId,
+} from '../../catalog-identity/shared/catalog-identity-contracts'
 import { animeFormatSchema, type AnimeFormat } from '../../discover/shared/discover-contracts'
 
 import { postMediaSchema, type PostMedia } from './external-media'
@@ -26,6 +30,14 @@ export type ReviewState = z.infer<typeof reviewStateSchema>
 export type ReviewSort = z.infer<typeof reviewSortSchema>
 
 const idSchema = z.string().trim().min(1).max(REQUEST_ID_MAX_LENGTH)
+const catalogPublicIdSchema = z.string().transform((value, context) => {
+  try {
+    return parseCatalogPublicId(value)
+  } catch {
+    context.addIssue({ code: 'custom', message: 'CATALOG_PUBLIC_ID_INVALID' })
+    return z.NEVER
+  }
+})
 const timestampSchema = z.number().finite().nonnegative()
 const nullableHttpsUrlSchema = z.url({ protocol: /^https$/ }).nullable()
 
@@ -37,7 +49,7 @@ export interface SocialAuthor {
 }
 
 export interface SocialAnime {
-  anilistId: number
+  publicId: CatalogPublicId
   slug: string
   title: string
   coverImageUrl: string | null
@@ -56,7 +68,7 @@ export const socialAuthorSchema: z.ZodType<SocialAuthor> = z.object({
 }).strict()
 
 export const socialAnimeSchema = z.object({
-  anilistId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  publicId: catalogPublicIdSchema,
   coverImageUrl: nullableHttpsUrlSchema,
   slug: z.string().trim().min(1).max(128),
   title: z.string().trim().min(1).max(256),
@@ -185,7 +197,7 @@ export interface ReviewDraftInput {
 export interface ReviewPublishInput extends Omit<ReviewDraftInput, 'rating'> { rating: number }
 
 const reviewDraftInputFields = {
-  animeId: idSchema,
+  animeId: catalogPublicIdSchema,
   body: reviewDocumentSchema,
   rating: reviewRatingSchema,
   requestId: idSchema,

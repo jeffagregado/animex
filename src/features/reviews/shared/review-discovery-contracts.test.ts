@@ -13,7 +13,7 @@ import {
 } from './review-discovery-contracts'
 
 const review = {
-  anime: { anilistId: 1, coverImageUrl: null, slug: 'frieren', title: 'Frieren' },
+  anime: { publicId: 'anime_frieren', coverImageUrl: null, slug: 'frieren', title: 'Frieren' },
   author: { avatarUrl: null, displayName: 'Fern', id: 'author-1', username: 'fern' },
   id: 'review-1',
   publishedAt: 100,
@@ -69,6 +69,11 @@ describe('review discovery contracts', () => {
 
   test('accepts strict pages containing at most 12 shared Review items', () => {
     expect(reviewDiscoveryPageSchema.parse({ cursor: null, hasMore: false, items: [review] }).items[0]).toEqual(review)
+    expect(reviewDiscoveryPageSchema.safeParse({
+      cursor: null,
+      hasMore: false,
+      items: [{ ...review, anime: { ...review.anime, anilistId: 1 } }],
+    }).success).toBe(false)
     expect(reviewDiscoveryPageSchema.safeParse({ cursor: null, hasMore: false, items: [{ ...review, containsSpoiler: undefined, [removedSpoilerField]: false }] }).success).toBe(false)
     expect(reviewDiscoveryPageSchema.safeParse({ cursor: null, hasMore: false, items: Array.from({ length: 13 }, () => review) }).success).toBe(false)
     expect(reviewDiscoveryPageSchema.safeParse({ cursor: null, hasMore: false, items: [], extra: true }).success).toBe(false)

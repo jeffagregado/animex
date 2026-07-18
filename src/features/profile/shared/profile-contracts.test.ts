@@ -40,7 +40,7 @@ describe('profile contracts', () => {
       hasMore: false,
       items: [{
         anime: {
-          anilistId: 1,
+          publicId: 'anime_frieren',
           coverImageUrl: null,
           slug: 'frieren',
           title: 'Frieren',
@@ -50,6 +50,18 @@ describe('profile contracts', () => {
     }
 
     expect(parseProfileContentPage('favorites', favorites)).toEqual(favorites)
+    expect(() => parseProfileContentPage('favorites', {
+      ...favorites,
+      items: [{ ...favorites.items[0], anime: { ...favorites.items[0].anime, publicId: '52991' } }],
+    })).toThrow()
+    expect(() => parseProfileContentPage('favorites', {
+      ...favorites,
+      items: [{ ...favorites.items[0], anime: { ...favorites.items[0].anime, anilistId: 1 } }],
+    })).toThrow()
+    expect(() => parseProfileContentPage('favorites', {
+      ...favorites,
+      items: [{ ...favorites.items[0], anime: { ...favorites.items[0].anime, providerId: 1 } }],
+    })).toThrow()
     expect(() => parseProfileContentPage('reviews', favorites)).toThrow()
   })
 
