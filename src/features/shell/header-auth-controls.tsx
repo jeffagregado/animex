@@ -139,6 +139,11 @@ export function HeaderAuthControls() {
             className="min-h-11"
             render={(
               <Link
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return
+                  event.preventDefault()
+                  event.currentTarget.click()
+                }}
                 params={{ username: profile.username }}
                 search={{ tab: undefined }}
                 to="/users/$username"

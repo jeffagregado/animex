@@ -225,7 +225,7 @@ describe('PublicShell', () => {
     expect(signOutItem.className).toContain('min-h-11')
   })
 
-  it('supports keyboard focus and Escape before typed Profile navigation', async () => {
+  it('supports keyboard focus, Escape, and typed Profile navigation', async () => {
     setViewport(true)
     vi.stubGlobal('scrollTo', vi.fn())
     stubCompleteAuth()
@@ -255,7 +255,8 @@ describe('PublicShell', () => {
       name: 'Profile',
     })
     await waitFor(() => expect(document.activeElement).toBe(profileAgain))
-    fireEvent.click(profileAgain)
+    fireEvent.keyDown(profileAgain, { key: 'Enter' })
+    fireEvent.keyUp(profileAgain, { key: 'Enter' })
     await waitFor(() => expect(history.location.pathname).toBe('/users/mika'))
   })
 
