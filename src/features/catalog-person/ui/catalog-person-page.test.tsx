@@ -8,12 +8,12 @@ import type { CatalogPersonState } from '../server/catalog-person-cache.server'
 import { CatalogPersonPage } from './catalog-person-page'
 
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children, className, params, to }: { children: ReactNode; className?: string; params: Record<string, string>; to: string }) => {
+  Link: ({ children, className, params, preload, to }: { children: ReactNode; className?: string; params: Record<string, string>; preload?: false | 'intent' | 'render' | 'viewport'; to: string }) => {
     const href = Object.entries(params).reduce(
       (path, [key, value]) => path.replace(`$${key}`, encodeURIComponent(value)),
       to,
     )
-    return <a className={className} data-to={to} href={href}>{children}</a>
+    return <a className={className} data-preload={preload} data-to={to} href={href}>{children}</a>
   },
 }))
 
@@ -125,14 +125,18 @@ describe('CatalogPersonPage', () => {
 
     const anime = screen.getByRole('link', { name: "Kino's Journey" })
     expect(anime.dataset.to).toBe('/anime/$anilistId/$slug')
+    expect(anime.dataset.preload).toBe('false')
     expect(anime.getAttribute('href')).toBe('/anime/486/kinos-journey')
     const character = screen.getByRole('link', { name: 'Sakura' })
     expect(character.dataset.to).toBe('/characters/$id/$slug')
+    expect(character.dataset.preload).toBe('false')
     expect(character.getAttribute('href')).toBe('/characters/15429/sakura')
     const staff = screen.getByRole('link', { name: 'Ayana Taketatsu' })
     expect(staff.dataset.to).toBe('/staff/$id/$slug')
+    expect(staff.dataset.preload).toBe('false')
     expect(staff.getAttribute('href')).toBe('/staff/101996/ayana-taketatsu')
     const nestedStaff = screen.getByRole('link', { name: 'Mossa' })
+    expect(nestedStaff.dataset.preload).toBe('false')
     expect(nestedStaff.getAttribute('href')).toBe('/staff/341209/mossa')
     expect(nestedStaff.closest('strong')).toBeTruthy()
 

@@ -76,12 +76,12 @@ function renderPart(part: DescriptionPart): ReactNode {
     return <a className={LINK_CLASS} href={link.href} rel="noopener noreferrer" target="_blank">{part.label}</a>
   }
   if (link.kind === 'anime') {
-    return <Link className={LINK_CLASS} params={{ anilistId: String(link.id), slug: link.slug }} to="/anime/$anilistId/$slug">{part.label}</Link>
+    return <Link className={LINK_CLASS} params={{ anilistId: String(link.id), slug: link.slug }} preload={false} to="/anime/$anilistId/$slug">{part.label}</Link>
   }
   if (link.kind === 'character') {
-    return <Link className={LINK_CLASS} params={{ id: String(link.id), slug: link.slug }} to="/characters/$id/$slug">{part.label}</Link>
+    return <Link className={LINK_CLASS} params={{ id: String(link.id), slug: link.slug }} preload={false} to="/characters/$id/$slug">{part.label}</Link>
   }
-  return <Link className={LINK_CLASS} params={{ id: String(link.id), slug: link.slug }} to="/staff/$id/$slug">{part.label}</Link>
+  return <Link className={LINK_CLASS} params={{ id: String(link.id), slug: link.slug }} preload={false} to="/staff/$id/$slug">{part.label}</Link>
 }
 
 /** Converts supported AniList entity URLs to typed app destinations. */

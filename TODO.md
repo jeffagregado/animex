@@ -939,6 +939,19 @@ Status: COMPLETE. Character and Staff biographies render supported lightweight f
 
 Validation: focused Catalog Person 5/5; full suite 131 passed + 2 skipped files / 927 passed + 3 skipped tests; TypeScript, client + SSR build, Fallow patch audit, diff check, and route-tree hash pass. Live Browser QA covers Aoi Yuuki, Viktoriya Serebryakov, and 20 random people from Chainsmoker Cat at mobile width. Random QA found and closed one nested bold-link gap; final rerun is 10/10 Characters and 10/10 Staff with zero raw Markdown, AniList anchors, unsafe external links, invalid internal routes, horizontal overflow, console errors, or app-log warnings. React Doctor repeats one pre-existing Discover ref-mutation error outside this patch; biography files have no finding.
 
+# Phase 7 Catalog Hover Stability Fix
+
+Status: COMPLETE. Direct TanStack versions are pinned, generated biography links do not intent-preload, and the optimized dependency cache was rebuilt.
+
+- [x] Pin direct TanStack packages to the committed lockfile resolutions.
+- [x] Disable intent preloading on generated Anime, Character, and Staff biography links.
+- [x] Lock preload behavior with a red-green Catalog Person regression test.
+- [x] Run focused/full tests, TypeScript, build, React Doctor, Fallow, and diff/hash checks.
+- [x] Rapidly hover multiple internal biography links repeatedly in Chrome; verify responsiveness and clean client/server logs.
+- [x] Stop the QA server and free port 3000.
+
+Validation: preload test failed before implementation and passes 5/5 after it; full suite passes 131 files + 2 skipped / 927 tests + 3 skipped. TypeScript, client + SSR build, frozen offline install, Fallow, diff check, route-tree hash, and independent review pass. React Doctor reports the existing Discover ref-mutation error outside this patch. After the required hard reload for the rebuilt optimizer cache, 30 rapid Chrome hover transitions across 10 internal biography links caused no route preloads, new console/server errors, page hang, or unresponsive dialog. Chrome and the QA server were closed; port 3000 is free.
+
 # Phase 8 Notifications, Privacy, Moderation
 
 Status: SCOPE ADJUSTED. Detailed planning has not started.
