@@ -133,6 +133,21 @@ export default defineSchema({
   })
     .index('by_key', ['key'])
     .index('by_next_allowed_at', ['nextAllowedAt']),
+  catalogEntities: defineTable({
+    kind: v.union(v.literal('anime'), v.literal('character'), v.literal('staff')),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
+  catalogProviderRefs: defineTable({
+    entityId: v.id('catalogEntities'),
+    provider: v.literal('anilist'),
+    kind: v.union(v.literal('anime'), v.literal('character'), v.literal('staff')),
+    providerId: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_provider_kind_id', ['provider', 'kind', 'providerId'])
+    .index('by_entity_provider', ['entityId', 'provider']),
   animeSummaries: defineTable({
     anilistId: v.number(),
     slug: v.string(),
