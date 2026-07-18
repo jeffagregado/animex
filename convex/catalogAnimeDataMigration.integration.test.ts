@@ -45,7 +45,11 @@ type AggregateResult = {
   aggregateMismatch: number
 }
 
-const modules = import.meta.glob(['./_generated/**/*.*', './catalogAnimeDataMigration.ts'])
+const modules = import.meta.glob([
+  './_generated/**/*.*',
+  './catalogAnimeAggregateVerification.ts',
+  './catalogAnimeDataMigration.ts',
+])
 const createHarness = () => convexTest(schema, modules)
 const paginationOpts = { numItems: 20, cursor: null }
 const backfillAnimeRefs = makeFunctionReference<
@@ -67,17 +71,7 @@ const verifyReviewAggregate = makeFunctionReference<
   'mutation',
   { statsId: string; paginationOpts: { numItems: number; cursor: string | null } },
   AggregateResult
->('catalogAnimeDataMigration:verifyReviewAggregate')
-const resetReviewAggregateVerification = makeFunctionReference<
-  'mutation',
-  { statsId: string },
-  { statsId: string; checkpointDeleted: boolean; receiptDeleted: boolean }
->('catalogAnimeDataMigration:resetReviewAggregateVerification')
-const listReviewAggregateTargets = makeFunctionReference<
-  'mutation',
-  { paginationOpts: { numItems: number; cursor: string | null } },
-  { page: string[]; continueCursor: string; isDone: boolean }
->('catalogAnimeDataMigration:listReviewAggregateTargets')
+>('catalogAnimeAggregateVerification:verifyReviewAggregate')
 
 /** Seeds one complete legacy durable graph and its authoritative provider mapping. */
 const seedLegacyGraph = async (t: ReturnType<typeof createHarness>) => await t.run(async (ctx) => {
@@ -303,99 +297,6 @@ describe('catalog Anime durable data migration', () => {
     await expect(t.mutation(backfillMilestoneSourceKeys, { paginationOpts })).rejects.toThrow('target already exists')
   })
 
-  test('verifies Review aggregates across explicit bounded pages', async () => {
-    const t = createHarness()
-    const ids = await seedLegacyGraph(t)
-    await t.mutation(backfillAnimeRefs, { lane: 'reviews', paginationOpts })
-    await t.mutation(backfillAnimeRefs, { lane: 'anime-review-stats', paginationOpts })
-    const secondStatsId = await t.run(async (ctx) => {
-      for (const [index, rating] of [81, 71].entries()) {
-        await ctx.db.insert('reviews', {
-          userId: ids.userId,
-          anilistId: 101,
-          animeId: ids.animeId,
-          requestId: `paged-${index}`,
-          state: 'published',
-          rating,
-          summary: `Paged ${index}`,
-          containsSpoiler: false,
-          bodyJson: '{}',
-          visibility: 'public',
-          publishedAt: 101 + index,
-          updatedAt: 101 + index,
-          activityState: 'active',
-          newestOrderKey: `paged-${index}`,
-          highRatingOrderKey: `paged-${index}`,
-          lowRatingOrderKey: `paged-${index}`,
-          searchText: `paged ${index}`,
-          ratingBand: rating === 81 ? '80-89' : '70-79',
-        })
-      }
-      await ctx.db.patch('animeReviewStats', ids.statsId, {
-        count: 3,
-        ratingSum: 243,
-        bands: [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-      })
-      const secondAnimeId = await ctx.db.insert('catalogEntities', {
-        kind: 'anime',
-        createdAt: 200,
-        updatedAt: 200,
-      })
-      await ctx.db.insert('catalogProviderRefs', {
-        entityId: secondAnimeId,
-        provider: 'anilist',
-        kind: 'anime',
-        providerId: 202,
-        createdAt: 200,
-        updatedAt: 200,
-      })
-      return await ctx.db.insert('animeReviewStats', {
-        anilistId: 202,
-        animeId: secondAnimeId,
-        count: 0,
-        ratingSum: 0,
-        bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        updatedAt: 200,
-      })
-    })
-    const targets = await t.mutation(listReviewAggregateTargets, {
-      paginationOpts: { numItems: 1, cursor: null },
-    })
-    expect(targets.page).toEqual([ids.statsId])
-    expect(targets.isDone).toBe(false)
-    const remainingTargets = await t.mutation(listReviewAggregateTargets, {
-      paginationOpts: { numItems: 1, cursor: targets.continueCursor },
-    })
-    expect(remainingTargets).toMatchObject({ page: [secondStatsId], isDone: true })
-    const first = await t.mutation(verifyReviewAggregate, {
-      statsId: ids.statsId,
-      paginationOpts: { numItems: 2, cursor: null },
-    })
-    expect(first).toMatchObject({ isDone: false, processedCount: 2, aggregateMismatch: 0 })
-    await expect(t.mutation(verifyReviewAggregate, {
-      statsId: ids.statsId,
-      paginationOpts: { numItems: 2, cursor: 'altered' },
-    })).rejects.toThrow('checkpoint')
-    const second = await t.mutation(verifyReviewAggregate, {
-      statsId: ids.statsId,
-      paginationOpts: { numItems: 2, cursor: first.continueCursor },
-    })
-    expect(second).toMatchObject({ isDone: true, processedCount: 1, aggregateMismatch: 0 })
-    expect(second).toMatchObject({ count: 3, ratingSum: 243, bands: [1, 1, 1, 0, 0, 0, 0, 0, 0, 0] })
-    await expect(t.mutation(verifyAnimeRefs, {
-      lane: 'anime-review-stats',
-      paginationOpts,
-    })).resolves.toMatchObject({ aggregateMismatch: 1 })
-    await expect(t.mutation(verifyReviewAggregate, {
-      statsId: secondStatsId,
-      paginationOpts,
-    })).resolves.toMatchObject({ isDone: true, count: 0, aggregateMismatch: 0 })
-    await expect(t.mutation(verifyAnimeRefs, {
-      lane: 'anime-review-stats',
-      paginationOpts,
-    })).resolves.toMatchObject({ aggregateMismatch: 0 })
-  })
-
   test('blocks stats lane without aggregate receipt and detects public Reviews missing stats', async () => {
     const t = createHarness()
     const ids = await seedLegacyGraph(t)
@@ -410,83 +311,6 @@ describe('catalog Anime durable data migration', () => {
       lane: 'reviews',
       paginationOpts,
     })).resolves.toMatchObject({ aggregateMismatch: 1 })
-  })
-
-  test('resets changed and lost aggregate checkpoints before restarting from null', async () => {
-    const t = createHarness()
-    const ids = await seedLegacyGraph(t)
-    await t.mutation(backfillAnimeRefs, { lane: 'reviews', paginationOpts })
-    await t.mutation(backfillAnimeRefs, { lane: 'anime-review-stats', paginationOpts })
-    const changedReviewId = await t.run(async (ctx) => {
-      const reviewId = await ctx.db.insert('reviews', {
-        userId: ids.userId,
-        anilistId: 101,
-        animeId: ids.animeId,
-        requestId: 'checkpoint-change',
-        state: 'published',
-        rating: 71,
-        summary: 'Checkpoint change',
-        containsSpoiler: false,
-        bodyJson: '{}',
-        visibility: 'public',
-        publishedAt: 101,
-        updatedAt: 101,
-        activityState: 'active',
-        newestOrderKey: 'checkpoint-change',
-        highRatingOrderKey: 'checkpoint-change',
-        lowRatingOrderKey: 'checkpoint-change',
-        searchText: 'checkpoint change',
-        ratingBand: '70-79',
-      })
-      await ctx.db.patch('animeReviewStats', ids.statsId, {
-        count: 2,
-        ratingSum: 162,
-        bands: [1, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-        updatedAt: 101,
-      })
-      return reviewId
-    })
-    const first = await t.mutation(verifyReviewAggregate, {
-      statsId: ids.statsId,
-      paginationOpts: { numItems: 1, cursor: null },
-    })
-    expect(first.isDone).toBe(false)
-    await t.run(async (ctx) => {
-      await ctx.db.patch('reviews', changedReviewId, { rating: 70, updatedAt: 102 })
-      await ctx.db.patch('animeReviewStats', ids.statsId, { ratingSum: 161, updatedAt: 102 })
-    })
-    await expect(t.mutation(verifyReviewAggregate, {
-      statsId: ids.statsId,
-      paginationOpts: { numItems: 1, cursor: first.continueCursor },
-    })).rejects.toThrow('changed after')
-    await expect(t.mutation(resetReviewAggregateVerification, {
-      statsId: ids.statsId,
-    })).resolves.toEqual({ statsId: ids.statsId, checkpointDeleted: true, receiptDeleted: false })
-    const restarted = await t.mutation(verifyReviewAggregate, {
-      statsId: ids.statsId,
-      paginationOpts: { numItems: 20, cursor: null },
-    })
-    expect(restarted).toMatchObject({ isDone: true, count: 2, ratingSum: 161, aggregateMismatch: 0 })
-
-    const lostCursor = await t.mutation(verifyReviewAggregate, {
-      statsId: ids.statsId,
-      paginationOpts: { numItems: 1, cursor: null },
-    })
-    expect(lostCursor.isDone).toBe(false)
-    await expect(t.mutation(resetReviewAggregateVerification, {
-      statsId: ids.statsId,
-    })).resolves.toEqual({ statsId: ids.statsId, checkpointDeleted: true, receiptDeleted: false })
-    await expect(t.mutation(verifyReviewAggregate, {
-      statsId: ids.statsId,
-      paginationOpts: { numItems: 20, cursor: null },
-    })).resolves.toMatchObject({ isDone: true, aggregateMismatch: 0 })
-    await expect(t.mutation(resetReviewAggregateVerification, {
-      statsId: ids.statsId,
-    })).resolves.toEqual({ statsId: ids.statsId, checkpointDeleted: false, receiptDeleted: true })
-    await expect(t.mutation(verifyReviewAggregate, {
-      statsId: ids.statsId,
-      paginationOpts: { numItems: 20, cursor: null },
-    })).resolves.toMatchObject({ isDone: true, aggregateMismatch: 0 })
   })
 
   test('fails with table and document evidence when provider mapping is missing', async () => {

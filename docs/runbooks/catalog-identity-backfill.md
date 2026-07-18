@@ -117,7 +117,7 @@ Any nonzero counter blocks public cutover. Keep legacy `anilistId` fields and in
 Enumerate every aggregate target through bounded pages:
 
 ```powershell
-pnpm exec convex run --deployment dev catalogAnimeDataMigration:listReviewAggregateTargets '{"paginationOpts":{"numItems":50,"cursor":null}}'
+pnpm exec convex run --deployment dev catalogAnimeAggregateVerification:listReviewAggregateTargets '{"paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
 Continue enumeration with exactly returned cursor until `isDone: true`. Record every returned `statsId`; skipping a target blocks rollout.
@@ -125,7 +125,7 @@ Continue enumeration with exactly returned cursor until `isDone: true`. Record e
 Verify every returned `statsId` from a null cursor:
 
 ```powershell
-pnpm exec convex run --deployment dev catalogAnimeDataMigration:verifyReviewAggregate '{"statsId":"STATS_ID","paginationOpts":{"numItems":50,"cursor":null}}'
+pnpm exec convex run --deployment dev catalogAnimeAggregateVerification:verifyReviewAggregate '{"statsId":"STATS_ID","paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
 Continue each target with exactly its returned cursor. Aggregate count, rating sum, and bands live in a database checkpoint; callers must not carry or alter them. A changed or skipped cursor fails. Require terminal `aggregateMismatch: 0`, which writes a snapshot receipt for that stats row.
@@ -133,7 +133,7 @@ Continue each target with exactly its returned cursor. Aggregate count, rating s
 Reset one target only when its continuation rejects because stats changed after the checkpoint, or when its exact continuation cursor was lost:
 
 ```powershell
-pnpm exec convex run --deployment dev catalogAnimeDataMigration:resetReviewAggregateVerification '{"statsId":"STATS_ID"}'
+pnpm exec convex run --deployment dev catalogAnimeAggregateVerification:resetReviewAggregateVerification '{"statsId":"STATS_ID"}'
 ```
 
 The reset deletes only verification checkpoint and receipt data for that stats row, and invalidates the aggregate-lane receipt. It does not alter Reviews or aggregate stats. After reset, restart that target with `verifyReviewAggregate` and `cursor: null`. Never use reset to bypass a terminal mismatch; repair the Review or stats data first.
@@ -168,7 +168,7 @@ pnpm exec convex run --deployment prod catalogIdentityMigration:verifyLane '{"la
 Production reset also requires that explicit approval and is allowed only for a rejected changed-stats checkpoint or a lost exact cursor:
 
 ```powershell
-pnpm exec convex run --deployment prod catalogAnimeDataMigration:resetReviewAggregateVerification '{"statsId":"STATS_ID"}'
+pnpm exec convex run --deployment prod catalogAnimeAggregateVerification:resetReviewAggregateVerification '{"statsId":"STATS_ID"}'
 ```
 
 Restart the approved target from null immediately, complete its receipt, then rerun `anime-review-stats` lane verification.
