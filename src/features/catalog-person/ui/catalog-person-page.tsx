@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react'
 import { DetailPageLayout } from '#/components/detail-page-layout'
 import { AnimeImage } from '#/features/anime-detail/ui/anime-image'
 import type { CatalogPersonDetail, CatalogPersonKind, CatalogPersonTab } from '../shared/catalog-person-contracts'
+import { CatalogPersonDescription } from './catalog-person-description'
 import type { CatalogPersonPageState } from './catalog-person-route'
 import { CatalogPersonWorkGrid } from './catalog-person-work-grid'
 
@@ -75,7 +76,7 @@ function PersonTabs({ kind, onTabChange, tab }: { kind: CatalogPersonKind; onTab
 }
 
 function PersonOverview({ detail }: { detail: CatalogPersonDetail }) {
-  return <section aria-labelledby="catalog-person-about"><h2 className="text-xl font-black" id="catalog-person-about">About</h2>{detail.description ? <p className="mt-4 whitespace-pre-line leading-7 text-muted-foreground">{detail.description}</p> : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No biography available.</p>}</section>
+  return <section aria-labelledby="catalog-person-about"><h2 className="text-xl font-black" id="catalog-person-about">About</h2>{detail.description ? <CatalogPersonDescription description={detail.description} /> : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No biography available.</p>}</section>
 }
 
 function PersonFacts({ detail }: { detail: CatalogPersonDetail }) {

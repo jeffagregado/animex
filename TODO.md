@@ -928,6 +928,17 @@ Status: COMPLETE. The committed Profile avatar positioning/border adjustment in 
 
 Validation: focused Discover results 7/7; full suite 131 passed + 2 skipped files / 926 passed + 3 skipped tests; TypeScript, client + SSR build, Fallow patch audit, and diff check pass. Browser QA at 390, 768, and 1280 px confirms result cards equal the available grid width, document/card scroll widths stay contained, pointer navigation works, keyboard focus reaches the result link, and console output has no warnings or errors. React Doctor's branch-wide scan repeated the pre-existing render-time ref diagnostic outside this patch and its score API timed out; neither changed containment line was flagged.
 
+# Phase 7 Catalog Biography Feedback
+
+Status: COMPLETE. Character and Staff biographies render supported lightweight formatting safely; AniList entity links stay inside AnimeX.
+
+- [x] Verify Character and Staff biographies contain AniList lightweight Markdown.
+- [x] Render bold labels, nested formatted links, and safe external links without new dependency or raw HTML.
+- [x] Replace AniList anime, character, and staff links with AnimeX routes; remove other AniList links.
+- [x] Run focused/full gates and responsive browser QA, including 10 random Characters and 10 random Staff from one random anime.
+
+Validation: focused Catalog Person 5/5; full suite 131 passed + 2 skipped files / 927 passed + 3 skipped tests; TypeScript, client + SSR build, Fallow patch audit, diff check, and route-tree hash pass. Live Browser QA covers Aoi Yuuki, Viktoriya Serebryakov, and 20 random people from Chainsmoker Cat at mobile width. Random QA found and closed one nested bold-link gap; final rerun is 10/10 Characters and 10/10 Staff with zero raw Markdown, AniList anchors, unsafe external links, invalid internal routes, horizontal overflow, console errors, or app-log warnings. React Doctor repeats one pre-existing Discover ref-mutation error outside this patch; biography files have no finding.
+
 # Phase 8 Notifications, Privacy, Moderation
 
 Status: SCOPE ADJUSTED. Detailed planning has not started.

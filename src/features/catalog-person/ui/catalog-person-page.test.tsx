@@ -1,10 +1,21 @@
 // @vitest-environment jsdom
 
+import type { ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { CatalogPersonState } from '../server/catalog-person-cache.server'
 import { CatalogPersonPage } from './catalog-person-page'
+
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, className, params, to }: { children: ReactNode; className?: string; params: Record<string, string>; to: string }) => {
+    const href = Object.entries(params).reduce(
+      (path, [key, value]) => path.replace(`$${key}`, encodeURIComponent(value)),
+      to,
+    )
+    return <a className={className} data-to={to} href={href}>{children}</a>
+  },
+}))
 
 vi.mock('./catalog-person-work-grid', () => ({
   CatalogPersonWorkGrid: ({ kind }: { kind: string }) => <div data-testid="work-grid">{kind}</div>,
@@ -92,6 +103,49 @@ describe('CatalogPersonPage', () => {
     expect(screen.queryByRole('tab', { name: 'Works' })).toBeNull()
     view.rerender(<CatalogPersonPage id={8} kind="staff" onRetry={() => undefined} onTabChange={() => undefined} state={staffState()} tab="anime" />)
     expect(screen.getByTestId('work-grid').textContent).toContain('staff')
+  })
+
+  it('formats biography labels and replaces AniList entity links with AnimeX routes', () => {
+    const description = [
+      '**Height:** 145 cm **Nicknames:** Ao-chan __Agency:__ Aoni Production',
+      '[Website](https://example.com/profile)',
+      "[Kino's Journey](https://anilist.co/anime/486/)",
+      '[Sakura](https://anilist.co/character/15429)',
+      '[Ayana Taketatsu](https://anilist.co/staff/101996)',
+      '**[Mossa](https://anilist.co/staff/341209/Mossa)**',
+      '[Manga](https://anilist.co/manga/1)',
+      '[Unsafe](javascript:evil)',
+    ].join(' ')
+
+    render(<CatalogPersonPage id={8} kind="staff" onRetry={() => undefined} onTabChange={() => undefined} state={staffState({ description })} tab="overview" />)
+
+    expect(screen.getByText('Height:').tagName).toBe('STRONG')
+    expect(screen.getByText('Nicknames:').tagName).toBe('STRONG')
+    expect(screen.getByText('Agency:').tagName).toBe('STRONG')
+
+    const anime = screen.getByRole('link', { name: "Kino's Journey" })
+    expect(anime.dataset.to).toBe('/anime/$anilistId/$slug')
+    expect(anime.getAttribute('href')).toBe('/anime/486/kinos-journey')
+    const character = screen.getByRole('link', { name: 'Sakura' })
+    expect(character.dataset.to).toBe('/characters/$id/$slug')
+    expect(character.getAttribute('href')).toBe('/characters/15429/sakura')
+    const staff = screen.getByRole('link', { name: 'Ayana Taketatsu' })
+    expect(staff.dataset.to).toBe('/staff/$id/$slug')
+    expect(staff.getAttribute('href')).toBe('/staff/101996/ayana-taketatsu')
+    const nestedStaff = screen.getByRole('link', { name: 'Mossa' })
+    expect(nestedStaff.getAttribute('href')).toBe('/staff/341209/mossa')
+    expect(nestedStaff.closest('strong')).toBeTruthy()
+
+    const website = screen.getByRole('link', { name: 'Website' })
+    expect(website.getAttribute('href')).toBe('https://example.com/profile')
+    expect(website.getAttribute('target')).toBe('_blank')
+    expect(website.getAttribute('rel')).toBe('noopener noreferrer')
+    expect(document.querySelector('a[href*="anilist.co"]')).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Manga' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Unsafe' })).toBeNull()
+    const about = screen.getByRole('heading', { level: 2, name: 'About' }).parentElement
+    expect(about?.textContent).toContain('Manga Unsafe')
+    expect(about?.textContent).not.toMatch(/\*\*|__/)
   })
 
   it('supports roving tab focus with Arrow, Home, and End keys', () => {
