@@ -70,6 +70,23 @@ describe('DiscoverSearchResults', () => {
     expect(link.getAttribute('href')).toBe('/anime/1/frieren')
     expect(link.className).toContain('focus-visible:ring-2')
   })
+
+  it('constrains mobile result cards to the available grid width', async () => {
+    serverMocks.searchAnime.mockResolvedValueOnce(page([anime], 1, false))
+
+    renderResults()
+
+    const link = await screen.findByRole('link', { name: /Frieren/ })
+    const heading = screen.getByRole('heading', { name: 'Search results' })
+    const grid = heading.nextElementSibling
+    if (!(grid instanceof HTMLElement)) {
+      throw new Error('Expected the search result grid.')
+    }
+
+    expect(grid.className).toContain('grid-cols-[minmax(0,1fr)]')
+    expect(link.className).toContain('min-w-0')
+  })
+
   it('renders an average score badge', async () => {
     serverMocks.searchAnime.mockResolvedValueOnce(page([anime], 1, false))
 

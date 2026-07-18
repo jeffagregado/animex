@@ -917,6 +917,17 @@ Status: COMPLETE. User feedback is implemented and locked in `docs/superpowers/s
 
 Final validation: 131 test files passed / 2 skipped; 925 tests passed / 3 skipped (928 total); TypeScript and client + SSR build passed with the existing >500 kB warning; Fallow against `3fdda5c` passed with one pre-existing non-error finding, zero complexity, and zero duplication; React Doctor score 53, equal to baseline. Protected `src/routeTree.gen.ts` SHA-256 remained `14A6932D22316BF69AF6EA6C1E343EE0C4704DE66039C8A674888D11ABA92DDD`. No Convex source change or deploy. Browser QA passed at 390×844, 768×1024, and 1280×800 with both accounts, including keyboard/pointer menu behavior, Profile SPA navigation, Quick Search/User Search avatars, Character/Staff tab migration, private-profile visibility, redirects, root not-found, no overflow, and clean console/server logs. QA server stopped and port 3000 freed.
 
+# Phase 7 Discover Mobile Search Feedback
+
+Status: COMPLETE. The committed Profile avatar positioning/border adjustment in `ac084c6` remains unchanged.
+
+- [x] Reproduce the `/discover` mobile search-result overflow.
+- [x] Add a focused responsive containment regression test.
+- [x] Apply the smallest Discover result-card fix.
+- [x] Run focused/full automated gates and responsive browser QA with clean console output.
+
+Validation: focused Discover results 7/7; full suite 131 passed + 2 skipped files / 926 passed + 3 skipped tests; TypeScript, client + SSR build, Fallow patch audit, and diff check pass. Browser QA at 390, 768, and 1280 px confirms result cards equal the available grid width, document/card scroll widths stay contained, pointer navigation works, keyboard focus reaches the result link, and console output has no warnings or errors. React Doctor's branch-wide scan repeated the pre-existing render-time ref diagnostic outside this patch and its score API timed out; neither changed containment line was flagged.
+
 # Phase 8 Notifications, Privacy, Moderation
 
 Status: SCOPE ADJUSTED. Detailed planning has not started.
