@@ -11,6 +11,13 @@ import { PublicAuthStateProvider } from '../shell/public-auth-context'
 import { HomePage } from './home-page'
 import { HomeWeeklyList } from './home-weekly-list'
 
+vi.mock('../auth/auth-state.functions', () => ({
+  getAuthState: async () => {
+    const response = await fetch('/api/profile/state')
+    return await response.json()
+  },
+}))
+
 const convex = vi.hoisted(() => {
   const query = vi.fn(async (..._args: unknown[]): Promise<unknown> => ({ items: [], cursor: null, hasMore: false }))
   return { authenticated: true, query, client: { query }, mutation: vi.fn(() => vi.fn()) }
@@ -27,8 +34,25 @@ const anime: AnimeSummary = {
 }
 const ready = (key: 'trending' | 'seasonal' | 'recommendations' | 'upcoming', items: AnimeSummary[] = [anime]) => ({ status: 'ready' as const, section: { key, items, refreshedAt: 1, expiresAt: 2 } })
 const data: DiscoverPageData = { sections: { trending: ready('trending'), seasonal: ready('seasonal'), recommendations: ready('recommendations'), upcoming: ready('upcoming') } }
-const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-const home = <QueryClientProvider client={client}><HomePage data={data} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider>
+const home = <HomePage data={data} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} />
+
+/** Supplies isolated auth-query state for each Home integration render. */
+const createAuthWrapper = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { gcTime: Infinity, retry: false },
+    },
+  })
+  return ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <PublicAuthStateProvider>{children}</PublicAuthStateProvider>
+    </QueryClientProvider>
+  )
+}
+
+const renderWithAuth = (ui: React.ReactElement) => render(ui, {
+  wrapper: createAuthWrapper(),
+})
 
 const mockAuthState = (state: AuthState): void => {
   vi.stubGlobal(
@@ -74,7 +98,7 @@ describe('HomePage', () => {
   it('renders Seasonal from hydrated Discover data with rail controls', () => {
     mockAuthState({ status: 'signedOut' })
 
-    render(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)
+    renderWithAuth(home)
 
     const seasonal = screen.getByRole('heading', { name: 'Seasonal Anime' }).closest('section')
     if (seasonal === null) throw new TypeError('Seasonal section is required.')
@@ -85,14 +109,14 @@ describe('HomePage', () => {
 
   it('preserves Seasonal loading, empty, and image-error states', () => {
     mockAuthState({ status: 'signedOut' })
-    const view = render(<PublicAuthStateProvider><QueryClientProvider client={client}><HomePage onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider></PublicAuthStateProvider>)
+    const view = renderWithAuth(<HomePage onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} />)
     expect(screen.getByLabelText('Seasonal Anime loading')).toBeTruthy()
 
     const emptyData: DiscoverPageData = { sections: { ...data.sections, seasonal: ready('seasonal', []) } }
-    view.rerender(<PublicAuthStateProvider><QueryClientProvider client={client}><HomePage data={emptyData} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider></PublicAuthStateProvider>)
+    view.rerender(<HomePage data={emptyData} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} />)
     expect(screen.getByText('No anime available in this section.')).toBeTruthy()
 
-    view.rerender(<PublicAuthStateProvider><QueryClientProvider client={client}><HomePage data={data} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider></PublicAuthStateProvider>)
+    view.rerender(<HomePage data={data} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} />)
     const seasonal = screen.getByRole('heading', { name: 'Seasonal Anime' }).closest('section')
     if (seasonal === null) throw new TypeError('Seasonal section is required.')
     fireEvent.error(within(seasonal).getByAltText('Loader Anime cover'))
@@ -104,7 +128,7 @@ describe('HomePage', () => {
     const errorData: DiscoverPageData = { sections: { ...data.sections, seasonal: { status: 'error', key: 'seasonal', code: 'RATE_LIMITED', retryAfterSeconds: 12 } } }
     serverMocks.refreshDiscoverSection.mockResolvedValueOnce(ready('seasonal'))
 
-    render(<PublicAuthStateProvider><QueryClientProvider client={client}><HomePage data={errorData} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider></PublicAuthStateProvider>)
+    renderWithAuth(<HomePage data={errorData} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Retry Seasonal Anime' }))
 
     await waitFor(() => expect(serverMocks.refreshDiscoverSection).toHaveBeenCalledWith({ data: 'seasonal' }))
@@ -163,7 +187,7 @@ describe('HomePage', () => {
       status: 'signedOut',
     })
 
-    render(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)
+    renderWithAuth(home)
 
     expect(screen.queryByRole('link', { name: /AnimeX/i })).toBeNull()
     expect(screen.queryByRole('navigation', { name: 'Primary' })).toBeNull()
@@ -190,7 +214,7 @@ describe('HomePage', () => {
       status: 'signedOut',
     })
 
-    render(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)
+    renderWithAuth(home)
 
     expect(screen.queryByRole('button', { name: 'Auth' })).toBeNull()
 
@@ -200,7 +224,7 @@ describe('HomePage', () => {
   it('does not render shell loading chrome while auth state loads', () => {
     mockPendingAuthState()
 
-    render(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)
+    renderWithAuth(home)
 
     expect(document.querySelector('[data-testid="header-auth-skeleton"]')).toBeNull()
   })
@@ -218,7 +242,7 @@ describe('HomePage', () => {
       },
     })
 
-    render(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)
+    renderWithAuth(home)
 
     await waitFor(() => expect(screen.getByRole('tab', { name: 'home' })).toBeTruthy())
     expect(screen.queryByRole('heading', { name: 'My Anime' })).toBeNull()
@@ -238,7 +262,7 @@ describe('HomePage', () => {
       suggestedUsername: null,
     })
 
-    render(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)
+    renderWithAuth(home)
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Seasonal Anime' })).toBeTruthy())
     expect(screen.queryByText('What are you watching?')).toBeNull()
@@ -253,7 +277,7 @@ describe('HomePage', () => {
       return { items: [{ id: 'card', kind: 'post', postId: 'post', author: { id: 'profile-1', username: 'mika', displayName: 'Mika', avatarUrl: null }, text: 'Public card', media: null, hasSpoiler: false, visibility: 'public', createdAt: 1, updatedAt: 1 }], cursor: null, hasMore: false } as never
     })
     mockAuthState({ status: 'complete', email: 'mika@example.com', profile: { id: 'profile-1', username: 'mika', name: 'Mika', avatarUrl: null, visibility: 'private' } })
-    const view = render(<PublicAuthStateProvider>{home}</PublicAuthStateProvider>)
+    const view = renderWithAuth(home)
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Global' })).toBeTruthy())
     await waitFor(() => expect(getFunctionName(convex.query.mock.calls.at(-1)?.[0] as Parameters<typeof getFunctionName>[0])).toBe('feed:listGlobal'))
     await screen.findByText('Public card')
@@ -261,7 +285,7 @@ describe('HomePage', () => {
     expect(screen.queryByRole('button', { name: 'Owner actions' })).toBeNull()
     expect(convex.mutation).not.toHaveBeenCalled()
     convex.authenticated = true
-    view.rerender(<PublicAuthStateProvider><QueryClientProvider client={client}><HomePage data={data} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} /></QueryClientProvider></PublicAuthStateProvider>)
+    view.rerender(<HomePage data={data} onSearchChange={() => undefined} search={{ feed: 'home', compose: false }} />)
     await waitFor(() => expect(screen.getByRole('tab', { name: 'home' })).toBeTruthy())
     await waitFor(() => expect(getFunctionName(convex.query.mock.calls.at(-1)?.[0] as Parameters<typeof getFunctionName>[0])).toBe('feed:listHome'))
     expect(screen.queryByText('What are you watching?')).toBeNull()

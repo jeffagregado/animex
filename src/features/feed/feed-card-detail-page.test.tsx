@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PublicAuthStateProvider } from '../shell/public-auth-context'
@@ -8,12 +9,29 @@ import { FeedCardDetailPage } from './feed-card-detail-page'
 
 const mocks = vi.hoisted(() => ({ result: null as unknown, query: vi.fn(), mutation: vi.fn(() => vi.fn()) }))
 vi.mock('convex/react', () => ({ useQuery: (...args: unknown[]) => { mocks.query(...args); return mocks.result }, useConvexAuth: () => ({ isAuthenticated: false, isLoading: false }), useMutation: mocks.mutation }))
+vi.mock('../auth/auth-state.functions', () => ({
+  getAuthState: async () => {
+    const response = await fetch('/api/profile/state')
+    return await response.json()
+  },
+}))
 
 afterEach(() => { cleanup(); mocks.query.mockClear(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 const renderDetail = (cardId: string) => {
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ status: 'signedOut' }) }) as Response))
-  return render(<PublicAuthStateProvider><FeedCardDetailPage cardId={cardId} /></PublicAuthStateProvider>)
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { gcTime: Infinity, retry: false },
+    },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <PublicAuthStateProvider>
+        <FeedCardDetailPage cardId={cardId} />
+      </PublicAuthStateProvider>
+    </QueryClientProvider>,
+  )
 }
 
 describe('FeedCardDetailPage', () => {

@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PublicAuthStateProvider } from '#/features/shell/public-auth-context'
 import { PublicShell } from '#/features/shell/public-shell'
+import { AUTH_STATE_QUERY_KEY } from '#/features/auth/auth-state-query'
 import { Route } from './home'
 
 const convex = vi.hoisted(() => {
@@ -38,6 +39,12 @@ vi.mock('convex/react', () => ({
   useMutation: () => vi.fn(),
 }))
 vi.mock('#/features/discover/server/discover.functions', () => ({ getDiscoverPage: vi.fn() }))
+vi.mock('#/features/auth/auth-state.functions', () => ({
+  getAuthState: async () => {
+    const response = await fetch('/api/profile/state')
+    return await response.json()
+  },
+}))
 
 afterEach(() => {
   cleanup()
@@ -61,8 +68,17 @@ describe('Home route', () => {
     const delayedLoader = new Promise<void>((resolve) => {
       finishLoader = resolve
     })
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { gcTime: Infinity, retry: false },
+      },
+    })
     const rootRoute = createRootRoute({
-      component: () => <PublicAuthStateProvider><Outlet /></PublicAuthStateProvider>,
+      component: () => (
+        <QueryClientProvider client={queryClient}>
+          <PublicAuthStateProvider><Outlet /></PublicAuthStateProvider>
+        </QueryClientProvider>
+      ),
     })
     const homeRoute = createRoute({
       getParentRoute: () => rootRoute,
@@ -89,7 +105,21 @@ describe('Home route', () => {
 
   it('canonicalizes stale Following search before loading the signed-in Home feed', async () => {
     convex.authenticated = true
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ status: 'complete', email: 'mika@example.com', profile: { id: 'profile-1', username: 'mika', name: 'Mika', avatarUrl: null, visibility: 'private' } }) }) as Response))
+    const authState = {
+      status: 'complete' as const,
+      email: 'mika@example.com',
+      profile: {
+        id: 'profile-1',
+        username: 'mika',
+        name: 'Mika',
+        avatarUrl: null,
+        visibility: 'private' as const,
+      },
+    }
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => authState,
+    }) as Response))
     vi.stubGlobal('scrollTo', vi.fn())
     const pendingComponent = Route.options.pendingComponent
     if (pendingComponent === undefined) {
@@ -99,6 +129,7 @@ describe('Home route', () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { gcTime: Infinity, retry: false } },
     })
+    queryClient.setQueryData(AUTH_STATE_QUERY_KEY, authState)
     const publicRoute = createRoute({
       getParentRoute: () => rootRoute,
       id: '_public',
