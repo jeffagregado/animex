@@ -5,6 +5,7 @@ import { FEED_PAGE_SIZE, type FeedCard } from '../src/features/social/shared/soc
 import { mergeFeedCards } from '../src/features/social/shared/feed-ranking'
 import type { Doc, Id } from './_generated/dataModel'
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { resolveProviderRef } from './catalogIdentityModel'
 import { decodeFeedCursor, encodeFeedCursor, makeOrderKey, type FeedView } from './feedPolicy'
 import { postMediaValidator } from './postValidators'
 import { resolveProfileAccess } from './profiles'
@@ -116,6 +117,7 @@ const matchesReviewProjection = (card: Doc<'feedCards'>, review: Doc<'reviews'>)
   card.sourceId === review._id,
   card.userId === review.userId,
   card.anilistId === review.anilistId,
+  card.animeId === review.animeId,
   card.visibility === review.visibility,
 ].every(Boolean)
 
@@ -131,8 +133,12 @@ const resolveReviewCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: Fe
 
 const resolveMilestoneCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {
   if (card.anilistId === undefined || (card.kind !== 'completed' && card.kind !== 'rewatched')) return fail('FEED_SOURCE_MISSING', 'Feed milestone source is missing.')
-  if (card.sourceKey !== `${card.kind}:${card.userId}:${card.anilistId}`) return null
-  const milestone = await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', card.userId).eq('anilistId', card.anilistId as number).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
+  const legacyKey = `${card.kind}:${card.userId}:${card.anilistId}`
+  const entityKey = card.animeId ? `${card.kind}:${card.userId}:${card.animeId}` : null
+  if (card.sourceKey !== legacyKey && card.sourceKey !== entityKey) return null
+  const milestone = card.animeId
+    ? await ctx.db.query('animeMilestones').withIndex('by_user_anime_entity_kind', (q) => q.eq('userId', card.userId).eq('animeId', card.animeId).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
+    : await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', card.userId).eq('anilistId', card.anilistId as number).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
   if (!milestone || card.visibility !== milestone.visibility || !canReadMilestone(milestone, read)) return null
   return { id: card._id, kind: milestone.kind, author: await getAuthor(ctx, milestone.userId), anime: await getActivityAnime(ctx, milestone.anilistId), settledAt: milestone.occurredAt, visibility: milestone.visibility }
 }
@@ -374,16 +380,34 @@ export const getById = query({
 })
 
 export const upsertMilestoneCard = async (ctx: MutationCtx, milestone: Doc<'animeMilestones'>, activate: boolean): Promise<void> => {
-  const sourceKey = `${milestone.kind}:${milestone.userId}:${milestone.anilistId}`
-  const existing = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', sourceKey)).unique()
-  const fields = { visibility: milestone.visibility, active: activate || !existing ? true : existing.active, orderKey: makeOrderKey(milestone.occurredAt, sourceKey), occurredAt: milestone.occurredAt, updatedAt: milestone.updatedAt }
-  if (existing) await ctx.db.patch('feedCards', existing._id, fields)
-  else await ctx.db.insert('feedCards', { sourceKey, kind: milestone.kind, userId: milestone.userId, anilistId: milestone.anilistId, ...fields })
+  if (!milestone.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Anime milestone ${milestone._id} is missing its Anime entity.`)
+  const sourceKey = `${milestone.kind}:${milestone.userId}:${milestone.animeId}`
+  const legacyKey = `${milestone.kind}:${milestone.userId}:${milestone.anilistId}`
+  const [entityCard, legacyCard] = await Promise.all([
+    ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', sourceKey)).unique(),
+    ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', legacyKey)).unique(),
+  ])
+  if (entityCard && legacyCard && entityCard._id !== legacyCard._id) return fail('MILESTONE_SOURCE_CONFLICT', `Milestone ${milestone._id} has duplicate legacy and entity feed cards.`)
+  const existing = entityCard ?? legacyCard
+  const effectiveKey = existing?.sourceKey ?? sourceKey
+  const fields = { visibility: milestone.visibility, active: activate || !existing ? true : existing.active, orderKey: makeOrderKey(milestone.occurredAt, effectiveKey), occurredAt: milestone.occurredAt, updatedAt: milestone.updatedAt }
+  if (existing) await ctx.db.patch('feedCards', existing._id, { animeId: milestone.animeId, ...fields })
+  else await ctx.db.insert('feedCards', { sourceKey, kind: milestone.kind, userId: milestone.userId, anilistId: milestone.anilistId, animeId: milestone.animeId, ...fields })
 }
 
-export const removeMilestoneCard = async (ctx: MutationCtx, userId: Id<'users'>, anilistId: number, kind: 'completed' | 'rewatched'): Promise<void> => {
-  const sourceKey = `${kind}:${userId}:${anilistId}`
+/** Resolves one existing Anime mapping without creating identity data. */
+const requireAnimeId = async (ctx: QueryCtx | MutationCtx, anilistId: number): Promise<Id<'catalogEntities'>> => {
+  await requireCachedAnime(ctx, anilistId)
+  const animeId = await resolveProviderRef(ctx, { provider: 'anilist', kind: 'anime', providerId: anilistId })
+  if (!animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Anime provider mapping anilist:anime:${anilistId} is missing.`)
+  return animeId
+}
+
+export const removeMilestoneCard = async (ctx: MutationCtx, userId: Id<'users'>, anilistId: number, animeId: Id<'catalogEntities'>, kind: 'completed' | 'rewatched'): Promise<void> => {
+  const sourceKey = `${kind}:${userId}:${animeId}`
+  const legacyKey = `${kind}:${userId}:${anilistId}`
   const card = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', sourceKey)).unique()
+    ?? await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', legacyKey)).unique()
   if (card) await ctx.db.patch('feedCards', card._id, { active: false, updatedAt: Date.now() })
 }
 
@@ -401,7 +425,9 @@ export const setActivityVisibility = mutation({
     const card = await readOwnedMilestoneCard(ctx, args.cardId, profile._id)
     if (card.anilistId === undefined) return fail('ACTIVITY_SOURCE_MISSING', 'Milestone activity source is missing.')
     await requireCachedAnime(ctx, card.anilistId)
-    const milestone = await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', profile._id).eq('anilistId', card.anilistId as number).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
+    const milestone = card.animeId
+      ? await ctx.db.query('animeMilestones').withIndex('by_user_anime_entity_kind', (q) => q.eq('userId', profile._id).eq('animeId', card.animeId).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
+      : await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', profile._id).eq('anilistId', card.anilistId as number).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
     if (!milestone) return fail('ACTIVITY_SOURCE_MISSING', 'Milestone activity source is missing.')
     const now = Date.now()
     await ctx.db.patch('animeMilestones', milestone._id, { visibility: args.visibility, updatedAt: now })
@@ -426,7 +452,7 @@ export const removeActivity = mutation({
 const matchesMilestoneProjection = (card: Doc<'feedCards'> | null, milestone: Doc<'animeMilestones'>, sourceKey: string): boolean => {
   if (!card) return false
   const fields = [
-    [card.kind, milestone.kind], [card.userId, milestone.userId], [card.anilistId, milestone.anilistId],
+    [card.kind, milestone.kind], [card.userId, milestone.userId], [card.anilistId, milestone.anilistId], [card.animeId, milestone.animeId],
     [card.visibility, milestone.visibility], [card.occurredAt, milestone.occurredAt], [card.updatedAt, milestone.updatedAt],
     [card.orderKey, makeOrderKey(milestone.occurredAt, sourceKey)],
   ]
@@ -440,11 +466,17 @@ export const projectMilestones = internalMutation({
     const page = await ctx.db.query('animeMilestones').paginate(args.paginationOpts)
     let verifiedCount = 0
     for (const milestone of page.page) {
-      await requireCachedAnime(ctx, milestone.anilistId)
-      await upsertMilestoneCard(ctx, milestone, false)
-      const sourceKey = `${milestone.kind}:${milestone.userId}:${milestone.anilistId}`
-      const card = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', sourceKey)).unique()
-      if (!matchesMilestoneProjection(card, milestone, sourceKey)) return fail('MILESTONE_PROJECTION_INVALID', `Milestone projection validation failed for ${sourceKey}.`)
+      const animeId = await requireAnimeId(ctx, milestone.anilistId)
+      if (milestone.animeId && milestone.animeId !== animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Anime milestone ${milestone._id} conflicts with provider mapping ${animeId}.`)
+      if (!milestone.animeId) await ctx.db.patch('animeMilestones', milestone._id, { animeId })
+      const current = { ...milestone, animeId }
+      await upsertMilestoneCard(ctx, current, false)
+      const entityKey = `${milestone.kind}:${milestone.userId}:${animeId}`
+      const legacyKey = `${milestone.kind}:${milestone.userId}:${milestone.anilistId}`
+      const card = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', entityKey)).unique()
+        ?? await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', legacyKey)).unique()
+      const sourceKey = card?.sourceKey ?? entityKey
+      if (!matchesMilestoneProjection(card, current, sourceKey)) return fail('MILESTONE_PROJECTION_INVALID', `Milestone projection validation failed for ${sourceKey}.`)
       verifiedCount += 1
     }
     return { continueCursor: page.continueCursor, isDone: page.isDone, processedCount: page.page.length, verifiedCount }

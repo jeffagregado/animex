@@ -55,11 +55,17 @@ const insertProfile = async (
 })
 
 const insertAnime = async (t: ReturnType<typeof createHarness>, anilistId: number) => await t.run(async (ctx) => {
+  const now = Date.now()
+  const animeId = await ctx.db.insert('catalogEntities', { kind: 'anime', createdAt: now, updatedAt: now })
+  await ctx.db.insert('catalogProviderRefs', {
+    entityId: animeId, provider: 'anilist', kind: 'anime', providerId: anilistId, createdAt: now, updatedAt: now,
+  })
   await ctx.db.insert('animeSummaries', {
     anilistId, slug: `anime-${anilistId}`, titles: { display: `Anime ${anilistId}`, english: null, romaji: null, native: null },
     coverImageUrl: null, bannerImageUrl: null, format: 'TV', season: null, seasonYear: 2024, episodes: 12,
-    genres: ['Fantasy'], popularity: 1, averageScore: 80, trending: 1, startDate: null, nextAiringAt: null, updatedAt: Date.now(),
+    genres: ['Fantasy'], popularity: 1, averageScore: 80, trending: 1, startDate: null, nextAiringAt: null, updatedAt: now,
   })
+  return animeId
 })
 
 const deleteProgress = async (t: ReturnType<typeof createHarness>, userId: Id<'users'>) => await t.run(async (ctx) => {
@@ -69,6 +75,29 @@ const deleteProgress = async (t: ReturnType<typeof createHarness>, userId: Id<'u
 })
 
 describe('user anime Convex integration', () => {
+  test('dual-writes one existing Anime entity across entry, rewatch, milestone, and feed projection', async () => {
+    const t = createHarness()
+    const owner = await createAuthUser(t, true, 'entity-dual-write')
+    const userId = await insertProfile(t, owner.authId, 'EntityDualWrite', 'public')
+    const animeId = await insertAnime(t, 501)
+
+    await owner.client.mutation(api.userAnime.setStatus, { anilistId: 501, status: 'completed' })
+    await owner.client.mutation(api.userAnime.recordRewatch, { anilistId: 501 })
+
+    const rows = await t.run(async (ctx) => ({
+      entry: await ctx.db.query('userAnimeEntries').withIndex('by_user_anime', (q) => q.eq('userId', userId).eq('anilistId', 501)).unique(),
+      rewatch: await ctx.db.query('animeRewatchEntries').withIndex('by_user_anime_sequence', (q) => q.eq('userId', userId).eq('anilistId', 501)).unique(),
+      milestones: await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', userId).eq('anilistId', 501)).collect(),
+      cards: await ctx.db.query('feedCards').withIndex('by_user_active_order', (q) => q.eq('userId', userId).eq('active', true)).collect(),
+    }))
+    expect(rows.entry?.animeId).toBe(animeId)
+    expect(rows.rewatch?.animeId).toBe(animeId)
+    expect(rows.milestones).toHaveLength(2)
+    expect(rows.milestones.every((row) => row.animeId === animeId)).toBe(true)
+    expect(rows.cards).toHaveLength(2)
+    expect(rows.cards.every((row) => row.animeId === animeId)).toBe(true)
+  })
+
   test('returns authenticated zero progress without creating an aggregate row', async () => {
     const t = createHarness()
     await expect(t.query(getMyProgress, {})).rejects.toThrow('Unauthenticated')
@@ -258,12 +287,17 @@ describe('user anime Convex integration', () => {
       status: 'saved', entry: { status: 'completed', rewatchCount: 0 },
     })
     expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 1, planned: 0, dropped: 0 })
-    const afterRollback = await t.run(async (ctx) => ({
-      completion: await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', ownerProfileId).eq('anilistId', 1).eq('kind', 'completed')).unique(),
-      rewatch: await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', ownerProfileId).eq('anilistId', 1).eq('kind', 'rewatched')).unique(),
-      completionCard: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `completed:${ownerProfileId}:1`)).unique(),
-      rewatchCard: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `rewatched:${ownerProfileId}:1`)).unique(),
-    }))
+    const afterRollback = await t.run(async (ctx) => {
+      const completion = await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', ownerProfileId).eq('anilistId', 1).eq('kind', 'completed')).unique()
+      const rewatch = await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', ownerProfileId).eq('anilistId', 1).eq('kind', 'rewatched')).unique()
+      if (!completion?.animeId) throw new Error('Expected completion Anime entity.')
+      return {
+        completion,
+        rewatch,
+        completionCard: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `completed:${ownerProfileId}:${completion.animeId}`)).unique(),
+        rewatchCard: await ctx.db.query('feedCards').withIndex('by_anime_entity', (q) => q.eq('animeId', completion.animeId)).filter((q) => q.eq(q.field('kind'), 'rewatched')).unique(),
+      }
+    })
     expect(afterRollback.completion).not.toBeNull()
     expect(afterRollback.rewatch).toBeNull()
     expect(afterRollback.completionCard?.active).toBe(true)
@@ -272,7 +306,8 @@ describe('user anime Convex integration', () => {
     await owner.client.mutation(api.userAnime.recordRewatch, { anilistId: 1 })
     expect(await owner.client.query(getMyProgress, {})).toEqual({ watching: 0, completed: 0, planned: 0, dropped: 0 })
     const bumpedCard = await t.run(async (ctx) => await ctx.db.query('feedCards')
-      .withIndex('by_source_key', (q) => q.eq('sourceKey', `rewatched:${ownerProfileId}:1`)).unique())
+      .withIndex('by_anime_entity', (q) => q.eq('animeId', afterRollback.completion.animeId))
+      .filter((q) => q.eq(q.field('kind'), 'rewatched')).unique())
     expect(bumpedCard?.active).toBe(true)
     expect(bumpedCard?.occurredAt).toBeGreaterThan(afterRollback.rewatchCard?.occurredAt ?? 0)
 

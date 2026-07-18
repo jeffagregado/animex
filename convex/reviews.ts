@@ -6,6 +6,7 @@ import { ANIME_REVIEWS_PAGE_SIZE, reviewDraftInputSchema, reviewPublishInputSche
 import { createReviewStats, parseReviewDocument, REVIEW_DOCUMENT_MAX_BYTES, validateDraftReview, validatePublishedReview } from '../src/features/social/shared/review-document'
 import type { Doc, Id } from './_generated/dataModel'
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { resolveProviderRef } from './catalogIdentityModel'
 import { makeOrderKey } from './feedPolicy'
 import { buildReviewDiscoveryFields, createDiscoveryCursorState, getActiveDiscoveryLanes, readLatestPublicReviews, readOrderedDiscoveryPage, readSearchDiscoveryPage, reviewDiscoveryFieldsMatch } from './reviewDiscovery'
 import { decodeReviewDiscoveryCursor, normalizeReviewDiscoveryQuery, type ReviewDiscoveryCursorScope, type ReviewDiscoveryCursorState, type ReviewDiscoveryLane } from './reviewDiscoveryPolicy'
@@ -66,7 +67,9 @@ const requireCachedAnime = async (ctx: QueryCtx | MutationCtx, anilistId: number
   if (!Number.isSafeInteger(anilistId) || anilistId < 1) return fail('INVALID_ANIME_ID', 'Anime ID must be a positive safe integer.')
   const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', anilistId)).unique()
   if (!anime) return fail('ANIME_NOT_CACHED', 'Anime must be loaded before writing a Review.')
-  return anime
+  const animeId = await resolveProviderRef(ctx, { provider: 'anilist', kind: 'anime', providerId: anilistId })
+  if (!animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Anime provider mapping anilist:anime:${anilistId} is missing.`)
+  return { ...anime, animeId }
 }
 
 const readMine = async (ctx: QueryCtx | MutationCtx, userId: Id<'users'>, anilistId: number) => await ctx.db
@@ -93,27 +96,30 @@ const nextAggregateFields = (current: Doc<'animeReviewStats'> | null, delta: Ret
   return { count: (current?.count ?? 0) + delta.count, ratingSum: (current?.ratingSum ?? 0) + delta.ratingSum, bands, updatedAt: Date.now() }
 }
 
-const applyAggregate = async (ctx: MutationCtx, anilistId: number, previous: Doc<'reviews'> | null, next: Doc<'reviews'> | null): Promise<void> => {
+const applyAggregate = async (ctx: MutationCtx, anilistId: number, animeId: Id<'catalogEntities'>, previous: Doc<'reviews'> | null, next: Doc<'reviews'> | null): Promise<void> => {
   const delta = transitionReviewAggregate(publicRating(previous), publicRating(next))
   if (!hasAggregateChange(delta)) return
   const current = await ctx.db.query('animeReviewStats').withIndex('by_anilist_id', (q) => q.eq('anilistId', anilistId)).unique()
+  if (current?.animeId && current.animeId !== animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Review aggregate ${current._id} conflicts with provider mapping ${animeId}.`)
   const fields = nextAggregateFields(current, delta)
   if (fields.count < 0 || fields.bands.some((value) => value < 0)) return fail('REVIEW_STATS_CORRUPT', 'Review aggregate transition would become negative.')
-  if (current) await ctx.db.patch('animeReviewStats', current._id, fields)
-  else await ctx.db.insert('animeReviewStats', { anilistId, ...fields })
+  if (current) await ctx.db.patch('animeReviewStats', current._id, { animeId, ...fields })
+  else await ctx.db.insert('animeReviewStats', { anilistId, animeId, ...fields })
 }
 
 const upsertReviewCard = async (ctx: MutationCtx, review: Doc<'reviews'>): Promise<void> => {
+  if (!review.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Review ${review._id} is missing its Anime entity.`)
   const sourceKey = `review:${review._id}`
   const existing = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', sourceKey)).unique()
   const active = review.state === 'published' && review.activityState === 'active'
   if (existing) {
-    await ctx.db.patch('feedCards', existing._id, { visibility: review.visibility, active, updatedAt: review.updatedAt })
+    if (existing.animeId && existing.animeId !== review.animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Review feed card ${existing._id} conflicts with Review ${review._id}.`)
+    await ctx.db.patch('feedCards', existing._id, { animeId: review.animeId, visibility: review.visibility, active, updatedAt: review.updatedAt })
     return
   }
   if (!active || review.publishedAt === undefined) return
   await ctx.db.insert('feedCards', {
-    sourceKey, kind: 'review', userId: review.userId, sourceId: review._id, anilistId: review.anilistId,
+    sourceKey, kind: 'review', userId: review.userId, sourceId: review._id, anilistId: review.anilistId, animeId: review.animeId,
     visibility: review.visibility, active: true, orderKey: makeOrderKey(review.publishedAt, sourceKey),
     occurredAt: review.publishedAt, updatedAt: review.updatedAt,
   })
@@ -229,11 +235,12 @@ export const saveDraft = mutation({
     const now = Date.now()
     if (existing) {
       const discovery = buildReviewDiscoveryFields(existing._id, 'draft', parsed.rating, undefined, now, profile, anime)
-      await ctx.db.patch('reviews', existing._id, { requestId, rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
+      if (existing.animeId && existing.animeId !== anime.animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Review ${existing._id} conflicts with provider mapping ${anime.animeId}.`)
+      await ctx.db.patch('reviews', existing._id, { animeId: anime.animeId, requestId, rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
       return existing._id
     }
     const discovery = buildReviewDiscoveryFields(`${profile._id}:${args.anilistId}`, 'draft', parsed.rating, undefined, now, profile, anime)
-    const reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'draft', rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, activityState: 'active', ...discovery })
+    const reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, animeId: anime.animeId, requestId, state: 'draft', rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, activityState: 'active', ...discovery })
     await ctx.db.patch('reviews', reviewId, buildReviewDiscoveryFields(reviewId, 'draft', parsed.rating, undefined, now, profile, anime))
     return reviewId
   },
@@ -252,26 +259,30 @@ export const publish = mutation({
     const byRequest = await ctx.db.query('reviews').withIndex('by_user_request', (q) => q.eq('userId', profile._id).eq('requestId', requestId)).unique()
     const repeatedId = readMatchingPublishRequest(byRequest, { ...args, rating: parsed.rating, summary: parsed.summary }, body.bodyJson)
     if (repeatedId && byRequest) {
-      await ctx.db.patch('reviews', repeatedId, buildReviewDiscoveryFields(byRequest._id, byRequest.state, byRequest.rating, byRequest.publishedAt, byRequest.updatedAt, profile, anime))
+      if (byRequest.animeId && byRequest.animeId !== anime.animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Review ${byRequest._id} conflicts with provider mapping ${anime.animeId}.`)
+      await ctx.db.patch('reviews', repeatedId, { animeId: anime.animeId, ...buildReviewDiscoveryFields(byRequest._id, byRequest.state, byRequest.rating, byRequest.publishedAt, byRequest.updatedAt, profile, anime) })
+      const repeated = await ctx.db.get('reviews', repeatedId)
+      if (repeated) await upsertReviewCard(ctx, repeated)
       return repeatedId
     }
     const existing = await readMine(ctx, profile._id, args.anilistId)
+    if (existing?.animeId && existing.animeId !== anime.animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Review ${existing._id} conflicts with provider mapping ${anime.animeId}.`)
     const now = Date.now()
     const publishedAt = existing?.publishedAt ?? now
     let reviewId: Id<'reviews'>
     if (existing) {
       const discovery = buildReviewDiscoveryFields(existing._id, 'published', parsed.rating, publishedAt, now, profile, anime)
-      await ctx.db.patch('reviews', existing._id, { requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, ...discovery })
+      await ctx.db.patch('reviews', existing._id, { animeId: anime.animeId, requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, ...discovery })
       reviewId = existing._id
     } else {
       const source = `${profile._id}:${args.anilistId}`
       const discovery = buildReviewDiscoveryFields(source, 'published', parsed.rating, publishedAt, now, profile, anime)
-      reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, activityState: 'active', ...discovery })
+      reviewId = await ctx.db.insert('reviews', { userId: profile._id, anilistId: args.anilistId, animeId: anime.animeId, requestId, state: 'published', rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, publishedAt, updatedAt: now, activityState: 'active', ...discovery })
       await ctx.db.patch('reviews', reviewId, buildReviewDiscoveryFields(reviewId, 'published', parsed.rating, publishedAt, now, profile, anime))
     }
     const next = await ctx.db.get('reviews', reviewId)
     if (!next) return fail('REVIEW_WRITE_FAILED', 'Review was not saved.')
-    await applyAggregate(ctx, args.anilistId, existing, next)
+    await applyAggregate(ctx, args.anilistId, anime.animeId, existing, next)
     await upsertReviewCard(ctx, next)
     return reviewId
   },
@@ -289,10 +300,11 @@ export const update = mutation({
     const parsed = validatePublishedReview(body.body, args.rating, args.summary)
     const now = Date.now()
     const discovery = buildReviewDiscoveryFields(review._id, 'published', parsed.rating, review.publishedAt, now, profile, anime)
-    await ctx.db.patch('reviews', review._id, { rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
+    if (review.animeId && review.animeId !== anime.animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Review ${review._id} conflicts with provider mapping ${anime.animeId}.`)
+    await ctx.db.patch('reviews', review._id, { animeId: anime.animeId, rating: parsed.rating, summary: parsed.summary, containsSpoiler: args.containsSpoiler, bodyJson: body.bodyJson, visibility: args.visibility, updatedAt: now, ...discovery })
     const next = await ctx.db.get('reviews', review._id)
     if (!next) return fail('REVIEW_WRITE_FAILED', 'Review update failed.')
-    await applyAggregate(ctx, review.anilistId, review, next)
+    await applyAggregate(ctx, review.anilistId, anime.animeId, review, next)
     await upsertReviewCard(ctx, next)
     return review._id
   },
@@ -429,9 +441,10 @@ export const setVisibility = mutation({
     const review = await readOwnedReview(ctx, args.reviewId, profile._id)
     const anime = await requireCachedAnime(ctx, review.anilistId)
     const updatedAt = Date.now()
-    await ctx.db.patch('reviews', review._id, { visibility: args.visibility, updatedAt, ...buildReviewDiscoveryFields(review._id, review.state, review.rating, review.publishedAt, updatedAt, profile, anime) })
+    if (review.animeId && review.animeId !== anime.animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Review ${review._id} conflicts with provider mapping ${anime.animeId}.`)
+    await ctx.db.patch('reviews', review._id, { animeId: anime.animeId, visibility: args.visibility, updatedAt, ...buildReviewDiscoveryFields(review._id, review.state, review.rating, review.publishedAt, updatedAt, profile, anime) })
     const next = await ctx.db.get('reviews', review._id)
-    if (next) { await applyAggregate(ctx, review.anilistId, review, next); await upsertReviewCard(ctx, next) }
+    if (next) { await applyAggregate(ctx, review.anilistId, anime.animeId, review, next); await upsertReviewCard(ctx, next) }
     return null
   },
 })
@@ -442,8 +455,9 @@ export const removeActivity = mutation({
     const { profile } = await requireProfile(ctx)
     const review = await readOwnedReview(ctx, args.reviewId, profile._id)
     if (review.state !== 'published') return fail('REVIEW_NOT_PUBLISHED', 'Activity can be removed only from published Reviews.')
-    await requireCachedAnime(ctx, review.anilistId)
-    await ctx.db.patch('reviews', review._id, { activityState: 'deleted', updatedAt: Date.now() })
+    const anime = await requireCachedAnime(ctx, review.anilistId)
+    if (review.animeId && review.animeId !== anime.animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Review ${review._id} conflicts with provider mapping ${anime.animeId}.`)
+    await ctx.db.patch('reviews', review._id, { animeId: anime.animeId, activityState: 'deleted', updatedAt: Date.now() })
     const next = await ctx.db.get('reviews', review._id)
     if (next) await upsertReviewCard(ctx, next)
     return null
@@ -455,8 +469,9 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx)
     const review = await readOwnedReview(ctx, args.reviewId, profile._id)
-    await requireCachedAnime(ctx, review.anilistId)
-    await applyAggregate(ctx, review.anilistId, review, null)
+    const anime = await requireCachedAnime(ctx, review.anilistId)
+    if (review.animeId && review.animeId !== anime.animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Review ${review._id} conflicts with provider mapping ${anime.animeId}.`)
+    await applyAggregate(ctx, review.anilistId, anime.animeId, review, null)
     await removeReviewCard(ctx, review._id)
     await ctx.db.delete('reviews', review._id)
     return null

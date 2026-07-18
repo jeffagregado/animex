@@ -34,11 +34,17 @@ const createOwner = async (t: ReturnType<typeof createHarness>, label: string) =
 }
 
 const insertAnime = async (t: ReturnType<typeof createHarness>, anilistId: number) => await t.run(async (ctx) => {
+  const now = Date.now()
+  const animeId = await ctx.db.insert('catalogEntities', { kind: 'anime', createdAt: now, updatedAt: now })
+  await ctx.db.insert('catalogProviderRefs', {
+    entityId: animeId, provider: 'anilist', kind: 'anime', providerId: anilistId, createdAt: now, updatedAt: now,
+  })
   await ctx.db.insert('animeSummaries', {
     anilistId, slug: `anime-${anilistId}`, titles: { display: `Anime ${anilistId}`, english: null, romaji: null, native: null },
     coverImageUrl: null, bannerImageUrl: null, format: 'TV', season: null, seasonYear: 2024, episodes: 12,
-    genres: ['Fantasy'], popularity: 1, averageScore: 80, trending: 1, startDate: null, nextAiringAt: null, updatedAt: Date.now(),
+    genres: ['Fantasy'], popularity: 1, averageScore: 80, trending: 1, startDate: null, nextAiringAt: null, updatedAt: now,
   })
+  return animeId
 })
 
 const body = {
@@ -52,6 +58,32 @@ const body = {
 const bodyJson = JSON.stringify(body)
 
 describe('social Convex integration', () => {
+  test('dual-writes one existing Anime entity to Review, aggregate, and Review feed card', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'review-entity-write')
+    const animeId = await insertAnime(t, 601)
+    const reviewId = await owner.client.mutation(socialApi.reviews.publish, {
+      anilistId: 601,
+      requestId: 'review-entity-write',
+      rating: 91,
+      summary: 'Entity linked Review',
+      containsSpoiler: false,
+      bodyJson,
+      visibility: 'public',
+    })
+
+    const rows = await t.run(async (ctx) => ({
+      review: await ctx.db.get('reviews', reviewId),
+      stats: await ctx.db.query('animeReviewStats').withIndex('by_anilist_id', (q) => q.eq('anilistId', 601)).unique(),
+      card: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `review:${reviewId}`)).unique(),
+      entities: await ctx.db.query('catalogEntities').collect(),
+    }))
+    expect(rows.review?.animeId).toBe(animeId)
+    expect(rows.stats?.animeId).toBe(animeId)
+    expect(rows.card?.animeId).toBe(animeId)
+    expect(rows.entities).toHaveLength(1)
+  })
+
   test('discovers latest Public Reviews without leaking viewer-owned visibility', async () => {
     const t = createHarness()
     const viewer = await createOwner(t, 'discovery-viewer')
@@ -785,7 +817,7 @@ describe('social Convex integration', () => {
   test('backfills milestone cards idempotently without reactivating removed activity', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'backfill-owner')
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     await t.run(async (ctx) => {
       const now = Date.now()
       await ctx.db.insert('animeMilestones', {
@@ -794,13 +826,13 @@ describe('social Convex integration', () => {
     })
     await t.mutation(socialInternal.feed.projectMilestones, { paginationOpts: { numItems: 10, cursor: null } })
     const cardId = await t.run(async (ctx) => {
-      const card = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `completed:${owner.profileId}:1`)).unique()
+      const card = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `completed:${owner.profileId}:${animeId}`)).unique()
       if (!card) throw new Error('Backfilled milestone card missing.')
       return card._id
     })
     await owner.client.mutation(socialApi.feed.removeActivity, { cardId })
     await t.mutation(socialInternal.feed.projectMilestones, { paginationOpts: { numItems: 10, cursor: null } })
-    const cards = await t.run(async (ctx) => await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `completed:${owner.profileId}:1`)).collect())
+    const cards = await t.run(async (ctx) => await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `completed:${owner.profileId}:${animeId}`)).collect())
     expect(cards).toHaveLength(1)
     expect(cards[0]?.active).toBe(false)
   }, 20_000)

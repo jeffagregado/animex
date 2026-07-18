@@ -3,6 +3,7 @@ import { ConvexError, v } from 'convex/values'
 
 import { type Doc, type Id } from './_generated/dataModel'
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { resolveProviderRef } from './catalogIdentityModel'
 import { removeMilestoneCard, upsertMilestoneCard } from './feed'
 import { resolveProfileAccess } from './profiles'
 import { requireProfile } from './users'
@@ -117,6 +118,14 @@ const requireCachedAnime = async (ctx: UserCtx, anilistId: number): Promise<void
   async (id) => await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', id)).unique(),
 )
 
+/** Resolves an existing Anime mapping without creating identity rows. */
+const requireAnimeId = async (ctx: UserCtx, anilistId: number): Promise<Id<'catalogEntities'>> => {
+  await requireCachedAnime(ctx, anilistId)
+  const animeId = await resolveProviderRef(ctx, { provider: 'anilist', kind: 'anime', providerId: anilistId })
+  if (!animeId) throw new ConvexError({ code: 'CATALOG_PROVIDER_REF_MISSING', message: `Anime provider mapping anilist:anime:${anilistId} is missing.` })
+  return animeId
+}
+
 const readEntry = async (ctx: UserCtx, userId: Id<'users'>, anilistId: number) => await ctx.db
   .query('userAnimeEntries').withIndex('by_user_anime', (q) => q.eq('userId', userId).eq('anilistId', anilistId)).unique()
 
@@ -194,10 +203,14 @@ const applyProgress = async (
   else await ctx.db.insert('userAnimeProgress', { userId, ...updated })
 }
 
-const getOrCreateEntry = async (ctx: MutationCtx, userId: Id<'users'>, anilistId: number, now: number): Promise<Doc<'userAnimeEntries'>> => {
+const getOrCreateEntry = async (ctx: MutationCtx, userId: Id<'users'>, anilistId: number, animeId: Id<'catalogEntities'>, now: number): Promise<Doc<'userAnimeEntries'>> => {
   const current = await readEntry(ctx, userId, anilistId)
-  if (current) return current
-  const id = await ctx.db.insert('userAnimeEntries', { userId, anilistId, status: null, score: null, favoriteAt: null, rewatchCount: 0, lastRewatchSequence: 0, createdAt: now, updatedAt: now })
+  if (current?.animeId && current.animeId !== animeId) throw new ConvexError({ code: 'CATALOG_PROVIDER_REF_CONFLICT', message: `User Anime entry ${current._id} conflicts with provider mapping ${animeId}.` })
+  if (current) {
+    if (!current.animeId) await ctx.db.patch(current._id, { animeId })
+    return { ...current, animeId }
+  }
+  const id = await ctx.db.insert('userAnimeEntries', { userId, anilistId, animeId, status: null, score: null, favoriteAt: null, rewatchCount: 0, lastRewatchSequence: 0, createdAt: now, updatedAt: now })
   const created = await ctx.db.get('userAnimeEntries', id)
   if (!created) throw new ConvexError({ code: 'ENTRY_CREATE_FAILED', message: 'User anime entry was not created.' })
   return created
@@ -206,11 +219,26 @@ const getOrCreateEntry = async (ctx: MutationCtx, userId: Id<'users'>, anilistId
 const readMilestone = async (ctx: UserCtx, userId: Id<'users'>, anilistId: number, kind: 'completed' | 'rewatched') => await ctx.db
   .query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', userId).eq('anilistId', anilistId).eq('kind', kind)).unique()
 
+/** Links one legacy milestone to its existing Anime entity. */
+const linkMilestone = async (
+  ctx: MutationCtx,
+  milestone: Doc<'animeMilestones'>,
+  animeId: Id<'catalogEntities'>,
+): Promise<Doc<'animeMilestones'>> => {
+  if (milestone.animeId && milestone.animeId !== animeId) throw new ConvexError({ code: 'CATALOG_PROVIDER_REF_CONFLICT', message: `Anime milestone ${milestone._id} conflicts with provider mapping ${animeId}.` })
+  if (!milestone.animeId) await ctx.db.patch(milestone._id, { animeId })
+  return { ...milestone, animeId }
+}
+
 /** Creates a milestone once, copying current profile visibility only at creation. */
-const createMilestoneOnce = async (ctx: MutationCtx, profile: Profile, anilistId: number, kind: 'completed' | 'rewatched', now: number) => {
+const createMilestoneOnce = async (ctx: MutationCtx, profile: Profile, anilistId: number, animeId: Id<'catalogEntities'>, kind: 'completed' | 'rewatched', now: number) => {
   const existing = await readMilestone(ctx, profile._id, anilistId, kind)
-  if (existing) { await upsertMilestoneCard(ctx, existing, false); return existing }
-  const id = await ctx.db.insert('animeMilestones', createMilestoneInsert(profile._id, anilistId, kind, profile.visibility, now))
+  if (existing) {
+    const current = await linkMilestone(ctx, existing, animeId)
+    await upsertMilestoneCard(ctx, current, false)
+    return current
+  }
+  const id = await ctx.db.insert('animeMilestones', { ...createMilestoneInsert(profile._id, anilistId, kind, profile.visibility, now), animeId })
   const milestone = await ctx.db.get('animeMilestones', id)
   if (milestone) await upsertMilestoneCard(ctx, milestone, true)
   return milestone
@@ -218,14 +246,16 @@ const createMilestoneOnce = async (ctx: MutationCtx, profile: Profile, anilistId
 
 /** Records one rewatch and creates or bumps its single milestone. */
 const addRewatch = async (ctx: MutationCtx, profile: Profile, entry: Doc<'userAnimeEntries'>, now: number): Promise<void> => {
+  if (!entry.animeId) throw new ConvexError({ code: 'CATALOG_PROVIDER_REF_MISSING', message: `User Anime entry ${entry._id} is missing its Anime entity.` })
   const sequence = entry.lastRewatchSequence + 1
-  await ctx.db.insert('animeRewatchEntries', { entryId: entry._id, userId: profile._id, anilistId: entry.anilistId, completedAt: now, sequence })
+  await ctx.db.insert('animeRewatchEntries', { entryId: entry._id, userId: profile._id, anilistId: entry.anilistId, animeId: entry.animeId, completedAt: now, sequence })
   const milestone = await readMilestone(ctx, profile._id, entry.anilistId, 'rewatched')
   if (milestone) {
-    await ctx.db.patch(milestone._id, createMilestoneTimestampPatch(now))
+    const linked = await linkMilestone(ctx, milestone, entry.animeId)
+    await ctx.db.patch(linked._id, createMilestoneTimestampPatch(now))
     const updated = await ctx.db.get('animeMilestones', milestone._id)
     if (updated) await upsertMilestoneCard(ctx, updated, true)
-  } else await createMilestoneOnce(ctx, profile, entry.anilistId, 'rewatched', now)
+  } else await createMilestoneOnce(ctx, profile, entry.anilistId, entry.animeId, 'rewatched', now)
   await ctx.db.patch(entry._id, { rewatchCount: entry.rewatchCount + 1, lastRewatchSequence: sequence, updatedAt: now })
 }
 
@@ -349,12 +379,13 @@ export const listMyRewatches = query({
 export const setStatus = mutation({
   args: { anilistId: v.number(), status: statusValidator }, returns: savedResultValidator,
   handler: async (ctx, args) => {
-    const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const now = Date.now()
-    const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
-    const completion = await readMilestone(ctx, profile._id, args.anilistId, 'completed')
+    const { profile } = await requireProfile(ctx); const animeId = await requireAnimeId(ctx, args.anilistId); const now = Date.now()
+    const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, animeId, now)
+    const storedCompletion = await readMilestone(ctx, profile._id, args.anilistId, 'completed')
+    const completion = storedCompletion ? await linkMilestone(ctx, storedCompletion, animeId) : null
     const effects = decideStatusChange(entry.status as AnimeStatus | null, args.status, Boolean(completion))
     await applyProgress(ctx, profile._id, entry.status as AnimeStatus | null, args.status)
-    if (effects.createCompletion) await createMilestoneOnce(ctx, profile, args.anilistId, 'completed', now)
+    if (effects.createCompletion) await createMilestoneOnce(ctx, profile, args.anilistId, animeId, 'completed', now)
     if (effects.recordRewatch) await addRewatch(ctx, profile, entry, now)
     await ctx.db.patch(entry._id, { status: args.status, updatedAt: now })
     const saved = await ctx.db.get('userAnimeEntries', entry._id)
@@ -367,13 +398,15 @@ export const setStatus = mutation({
 export const setScore = mutation({
   args: { anilistId: v.number(), score: v.union(v.number(), v.null()) }, returns: savedResultValidator,
   handler: async (ctx, args) => {
-    const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const now = Date.now(); let score
+    const { profile } = await requireProfile(ctx); const animeId = await requireAnimeId(ctx, args.anilistId); const now = Date.now(); let score
     try { score = normalizeScore(args.score) } catch (error) { throw new ConvexError({ code: 'INVALID_SCORE', message: error instanceof Error ? error.message : 'Score is invalid.' }) }
-    const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
+    const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, animeId, now)
     const status = entry.score === null && score !== null && entry.status === null ? 'watching' : entry.status
     await applyProgress(ctx, profile._id, entry.status as AnimeStatus | null, status as AnimeStatus | null)
     await ctx.db.patch(entry._id, { score, status, updatedAt: now })
-    const completion = await readMilestone(ctx, profile._id, args.anilistId, 'completed'); if (completion) await upsertMilestoneCard(ctx, completion, false)
+    const storedCompletion = await readMilestone(ctx, profile._id, args.anilistId, 'completed')
+    const completion = storedCompletion ? await linkMilestone(ctx, storedCompletion, animeId) : null
+    if (completion) await upsertMilestoneCard(ctx, completion, false)
     const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
   },
 })
@@ -382,7 +415,7 @@ export const setScore = mutation({
 export const setFavorite = mutation({
   args: { anilistId: v.number(), isFavorite: v.boolean() }, returns: savedResultValidator,
   handler: async (ctx, args) => {
-    const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const now = Date.now(); const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
+    const { profile } = await requireProfile(ctx); const animeId = await requireAnimeId(ctx, args.anilistId); const now = Date.now(); const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, animeId, now)
     await ctx.db.patch(entry._id, { favoriteAt: applyFavorite(entry.favoriteAt, args.isFavorite, now), updatedAt: now })
     const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
   },
@@ -392,7 +425,7 @@ export const setFavorite = mutation({
 export const recordRewatch = mutation({
   args: { anilistId: v.number() }, returns: savedResultValidator,
   handler: async (ctx, args) => {
-    const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const now = Date.now(); const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, now)
+    const { profile } = await requireProfile(ctx); const animeId = await requireAnimeId(ctx, args.anilistId); const now = Date.now(); const entry = await getOrCreateEntry(ctx, profile._id, args.anilistId, animeId, now)
     await applyProgress(ctx, profile._id, entry.status as AnimeStatus | null, 'rewatched')
     await addRewatch(ctx, profile, entry, now); await ctx.db.patch(entry._id, { status: 'rewatched', updatedAt: now })
     const saved = await ctx.db.get('userAnimeEntries', entry._id); if (!saved) throw new ConvexError({ code: 'ENTRY_NOT_FOUND', message: 'User anime entry no longer exists.' }); return toSavedResult(toPublicEntry(saved))
@@ -403,14 +436,17 @@ export const recordRewatch = mutation({
 export const removeLatestRewatch = mutation({
   args: { anilistId: v.number() }, returns: savedResultValidator,
   handler: async (ctx, args) => {
-    const { profile } = await requireProfile(ctx); await requireCachedAnime(ctx, args.anilistId); const entry = await readEntry(ctx, profile._id, args.anilistId)
+    const { profile } = await requireProfile(ctx); const animeId = await requireAnimeId(ctx, args.anilistId); const entry = await readEntry(ctx, profile._id, args.anilistId)
     if (!entry) throw new ConvexError({ code: 'REWATCH_NOT_FOUND', message: 'No rewatch exists to remove.' })
+    if (entry.animeId && entry.animeId !== animeId) throw new ConvexError({ code: 'CATALOG_PROVIDER_REF_CONFLICT', message: `User Anime entry ${entry._id} conflicts with provider mapping ${animeId}.` })
+    if (!entry.animeId) await ctx.db.patch(entry._id, { animeId })
     const history = await ctx.db.query('animeRewatchEntries').withIndex('by_user_anime_sequence', (q) => q.eq('userId', profile._id).eq('anilistId', args.anilistId)).order('desc').take(2)
     if (!history[0]) throw new ConvexError({ code: 'REWATCH_NOT_FOUND', message: 'No rewatch exists to remove.' })
     const now = Date.now(); const rollback = rollbackRewatch(history.map((item) => item.completedAt), entry.status as AnimeStatus | null); await ctx.db.delete(history[0]._id)
     await applyProgress(ctx, profile._id, entry.status as AnimeStatus | null, rollback.nextStatus)
-    const milestone = await readMilestone(ctx, profile._id, args.anilistId, 'rewatched')
-    if (milestone && rollback.milestoneAt === null) { await ctx.db.delete(milestone._id); await removeMilestoneCard(ctx, profile._id, args.anilistId, 'rewatched') }
+    const storedMilestone = await readMilestone(ctx, profile._id, args.anilistId, 'rewatched')
+    const milestone = storedMilestone ? await linkMilestone(ctx, storedMilestone, animeId) : null
+    if (milestone && rollback.milestoneAt === null) { await ctx.db.delete(milestone._id); await removeMilestoneCard(ctx, profile._id, args.anilistId, animeId, 'rewatched') }
     else if (milestone && rollback.milestoneAt !== null) {
       await ctx.db.patch(milestone._id, { ...createMilestoneTimestampPatch(now), occurredAt: rollback.milestoneAt })
       const updated = await ctx.db.get('animeMilestones', milestone._id); if (updated) await upsertMilestoneCard(ctx, updated, false)
