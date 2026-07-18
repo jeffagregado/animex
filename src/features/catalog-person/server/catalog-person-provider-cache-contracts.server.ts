@@ -64,6 +64,13 @@ const catalogPersonWorkSchema = z.object({
   anime: catalogAnimeSummarySchema,
   role: nullableTextSchema,
 }).strict()
+const catalogPersonSearchRowSchema = z.object({
+  kind: catalogPersonProviderKindSchema,
+  id: positiveSafeIntegerSchema,
+  name: z.string().trim().min(1),
+  nativeName: nullableTextSchema,
+  imageUrl: nullableHttpsUrlSchema,
+}).strict()
 
 export const catalogPersonProviderDetailSchema = z.discriminatedUnion(
   'kind',
@@ -77,9 +84,17 @@ export const catalogPersonProviderWorkPageSchema = z.object({
   perPage: z.literal(CATALOG_PERSON_PROVIDER_PAGE_SIZE),
 }).strict()
 
+export const catalogPersonProviderSearchPageSchema = z.object({
+  items: z.array(catalogPersonSearchRowSchema).max(CATALOG_PERSON_PROVIDER_PAGE_SIZE),
+  currentPage: positiveSafeIntegerSchema,
+  hasNextPage: z.boolean(),
+  perPage: z.literal(CATALOG_PERSON_PROVIDER_PAGE_SIZE),
+}).strict()
+
 export type CatalogPersonProviderKind = z.infer<typeof catalogPersonProviderKindSchema>
 export type CatalogPersonProviderDetail = z.infer<typeof catalogPersonProviderDetailSchema>
 export type CatalogPersonProviderWorkPage = z.infer<typeof catalogPersonProviderWorkPageSchema>
+export type CatalogPersonProviderSearchPage = z.infer<typeof catalogPersonProviderSearchPageSchema>
 export type CatalogPersonProviderAnimeSummary = z.infer<typeof catalogAnimeSummarySchema>
 export type CatalogPersonProviderVoiceActor = z.infer<typeof catalogVoiceActorSchema>
 

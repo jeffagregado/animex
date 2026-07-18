@@ -10,12 +10,6 @@ import { normalizeDescriptionText } from '../../anime-detail/server/anilist-deta
 import { normalizeAnimeSummary } from '../../discover/server/anilist-normalization.server'
 import { type AnimeSummaryProvider } from '../../discover/server/discover-provider-cache-contracts.server'
 import {
-  CATALOG_PERSON_PAGE_SIZE,
-  catalogPersonSearchPageSchema,
-  createCatalogPersonPath,
-  type CatalogPersonSearchPage,
-} from '../shared/catalog-person-contracts'
-import {
   characterDetailResponseSchema,
   characterSearchResponseSchema,
   characterVoiceActorsResponseSchema,
@@ -27,11 +21,13 @@ import {
 import {
   CATALOG_PERSON_PROVIDER_PAGE_SIZE,
   catalogPersonProviderDetailSchema,
+  catalogPersonProviderSearchPageSchema,
   catalogPersonProviderWorkPageSchema,
   parseProviderCatalogPersonId,
   type CatalogPersonProviderAnimeSummary,
   type CatalogPersonProviderDetail,
   type CatalogPersonProviderKind,
+  type CatalogPersonProviderSearchPage,
   type CatalogPersonProviderVoiceActor,
   type CatalogPersonProviderWorkPage,
 } from './catalog-person-provider-cache-contracts.server'
@@ -274,11 +270,11 @@ export const searchCatalogPeopleFromAniList = async (
   query: string,
   page: number,
   dependencies: AniListDependencies,
-): Promise<CatalogPersonSearchPage> => {
+): Promise<CatalogPersonProviderSearchPage> => {
   const input = searchInputSchema.parse({ query, page })
   const body = await requestAniList(
     kind === 'character' ? documents.characterSearch : documents.staffSearch,
-    { query: input.query, page: input.page, perPage: CATALOG_PERSON_PAGE_SIZE },
+    { query: input.query, page: input.page, perPage: CATALOG_PERSON_PROVIDER_PAGE_SIZE },
     dependencies,
   )
   try {
@@ -287,18 +283,17 @@ export const searchCatalogPeopleFromAniList = async (
       : staffSearchResponseSchema.parse(body).data.Page
     if (parsed.pageInfo.currentPage !== input.page) throw upstreamError()
     const people = 'characters' in parsed ? parsed.characters : parsed.staff
-    return catalogPersonSearchPageSchema.parse({
+    return catalogPersonProviderSearchPageSchema.parse({
       items: people.map((person) => {
         const name = person.name.full.trim()
         return {
           kind, id: person.id, name, nativeName: text(person.name.native),
           imageUrl: person.image?.large ?? null,
-          destination: createCatalogPersonPath(kind, person.id, name),
         }
       }),
       currentPage: parsed.pageInfo.currentPage,
       hasNextPage: parsed.pageInfo.hasNextPage,
-      perPage: CATALOG_PERSON_PAGE_SIZE,
+      perPage: CATALOG_PERSON_PROVIDER_PAGE_SIZE,
     })
   } catch {
     throw upstreamError()

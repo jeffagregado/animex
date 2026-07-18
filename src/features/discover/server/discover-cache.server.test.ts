@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 
 import { describe, expect, test } from 'vitest'
 
+import { CatalogIdentityGatewayError } from '../../catalog-identity/server/catalog-identity.server'
 import {
   getDiscoverPageServer,
   refreshDiscoverSectionServer,
@@ -45,6 +46,10 @@ const createDependencies = (client: CacheClient): { dependencies: DiscoverCacheD
       createLeaseId: () => 'lease-1',
       delay: async (milliseconds) => { delays.push(milliseconds) },
       fetchSection: async (key) => { fetched.push(key); return [summary(1)] },
+      ensurePublicIds: async (refs) => refs.map((ref) => ({
+        publicId: `anime_${ref.providerId}`,
+        kind: ref.kind,
+      })),
     },
     fetched,
     delays,
@@ -159,6 +164,65 @@ describe('Discover cache server orchestration', () => {
     expect(state.status).toBe('ready')
     expect(fixture.fetched).toEqual(['trending'])
     expect(mutations).toEqual(['acquire', 'commit'])
+  })
+
+  test('ensures one live section batch before committing provider cache data', async () => {
+    let reads = 0
+    const calls: string[] = []
+    const client: CacheClient = {
+      readSections: async () => {
+        reads += 1
+        return reads === 1
+          ? [{ key: 'trending', status: 'missing', section: null }]
+          : [fresh('trending', 1)]
+      },
+      acquireSectionLease: async () => ({ acquired: true, leaseUntil: 30_000 }),
+      commitSection: async (_key, _leaseId, summaries) => {
+        calls.push(`commit:${JSON.stringify(summaries)}`)
+        return null
+      },
+      releaseSectionLease: async () => true,
+    }
+    const fixture = createDependencies(client)
+    fixture.dependencies.ensurePublicIds = async (refs) => {
+      calls.push(`ensure:${refs.map((ref) => ref.providerId).join(',')}`)
+      return refs.map((ref) => ({ publicId: `anime_${ref.providerId}`, kind: ref.kind }))
+    }
+
+    await refreshDiscoverSectionServer('trending', fixture.dependencies)
+
+    expect(calls[0]).toBe('ensure:1')
+    expect(calls[1]).toContain('"anilistId":1')
+    expect(calls[1]).not.toContain('publicId')
+  })
+
+  test('raises missing identity without committing or refetching', async () => {
+    const mutations: string[] = []
+    const client: CacheClient = {
+      readSections: async () => [{ key: 'trending', status: 'missing', section: null }],
+      acquireSectionLease: async () => {
+        mutations.push('acquire')
+        return { acquired: true, leaseUntil: 30_000 }
+      },
+      commitSection: async () => {
+        mutations.push('commit')
+        return null
+      },
+      releaseSectionLease: async () => {
+        mutations.push('release')
+        return true
+      },
+    }
+    const fixture = createDependencies(client)
+    fixture.dependencies.ensurePublicIds = async () => {
+      throw new CatalogIdentityGatewayError('CATALOG_IDENTITY_MISSING')
+    }
+
+    await expect(
+      refreshDiscoverSectionServer('trending', fixture.dependencies),
+    ).rejects.toMatchObject({ code: 'CATALOG_IDENTITY_MISSING' })
+    expect(fixture.fetched).toEqual(['trending'])
+    expect(mutations).toEqual(['acquire', 'release'])
   })
 
   test('waits six bounded rereads for a competing lease before returning cache refresh error', async () => {

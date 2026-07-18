@@ -4,6 +4,7 @@ import {
   DISCOVER_GENRES,
   DISCOVER_SECTION_CONFIG,
   animeSearchInputSchema,
+  animeSummarySchema,
   getAnimeSeason,
   slugifyAnimeTitle,
   type AnimeGenre,
@@ -12,6 +13,37 @@ import {
 } from './discover-contracts'
 
 describe('discover contracts', () => {
+  test('accepts only strict browser summaries with opaque public IDs', () => {
+    const summary = {
+      publicId: 'anime_frieren_52991',
+      slug: 'frieren-beyond-journeys-end',
+      titles: {
+        display: 'Frieren: Beyond Journey\'s End',
+        english: 'Frieren: Beyond Journey\'s End',
+        romaji: 'Sousou no Frieren',
+        native: null,
+      },
+      coverImageUrl: null,
+      bannerImageUrl: null,
+      format: 'TV',
+      season: 'FALL',
+      seasonYear: 2023,
+      episodes: 28,
+      genres: ['Adventure', 'Drama'],
+      popularity: 1_234_567,
+      averageScore: 91,
+      trending: 12_345,
+      startDate: { year: 2023, month: 9, day: 29 },
+      nextAiringAt: null,
+    }
+
+    expect(animeSummarySchema.parse(summary)).toEqual(summary)
+    expect(() => animeSummarySchema.parse({ ...summary, publicId: '52991' })).toThrow(
+      'CATALOG_PUBLIC_ID_INVALID',
+    )
+    expect(() => animeSummarySchema.parse({ ...summary, anilistId: 52991 })).toThrow()
+  })
+
   test('defines the exact local Discover genre union', () => {
     const genre: AnimeGenre = 'Action'
 

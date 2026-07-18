@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import type { CatalogProviderRef } from '../../catalog-identity/server/catalog-identity.server'
+
 const animeProviderFormatSchema = z.enum([
   'TV',
   'TV_SHORT',
@@ -139,3 +141,17 @@ export const animeSummaryProviderSchema: z.ZodType<AnimeSummaryProvider> = z.obj
   startDate: animeProviderDateSchema.nullable(),
   nextAiringAt: z.number().int().nonnegative().nullable(),
 }).strict()
+
+/** Builds one unique bounded anime provider-reference batch. */
+export const createAnimeProviderRefs = (
+  summaries: readonly AnimeSummaryProvider[],
+): CatalogProviderRef[] => {
+  const ids = new Set<number>()
+  const refs: CatalogProviderRef[] = []
+  for (const summary of summaries) {
+    if (ids.has(summary.anilistId)) continue
+    ids.add(summary.anilistId)
+    refs.push({ provider: 'anilist', kind: 'anime', providerId: summary.anilistId })
+  }
+  return refs
+}

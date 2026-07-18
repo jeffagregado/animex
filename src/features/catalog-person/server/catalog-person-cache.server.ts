@@ -2,12 +2,24 @@ import { ConvexHttpClient } from 'convex/browser'
 import { makeFunctionReference } from 'convex/server'
 
 import { AniListRequestError, createAniListDependencies } from '../../../lib/anilist-client.server'
+import {
+  CatalogIdentityGatewayError,
+  ensurePublicIds,
+  resolveProviderByPublicId,
+  resolvePublicIds,
+  type CatalogIdentityGateway,
+} from '../../catalog-identity/server/catalog-identity.server'
 import { type AnimeSummaryProvider } from '../../discover/server/discover-provider-cache-contracts.server'
 import {
   type CatalogPersonProviderDetail,
   type CatalogPersonProviderKind,
   type CatalogPersonProviderWorkPage,
+  parseProviderCatalogPersonId,
 } from './catalog-person-provider-cache-contracts.server'
+import {
+  mapCatalogPersonDetail,
+  mapCatalogPersonWorkPage,
+} from './catalog-person-public.server'
 import {
   fetchCatalogPersonFromAniList,
   fetchCatalogPersonWorksFromAniList,
@@ -16,9 +28,11 @@ import {
 const CONTENTION_READS = 6
 const CONTENTION_DELAY_MS = 500
 type CacheRead<T> = { status: 'fresh'; entry: { payload: T; refreshedAt: number; expiresAt: number } } | { status: 'missing' | 'expired'; entry: null }
-type ErrorState = { status: 'error'; code: 'UPSTREAM' | 'RATE_LIMITED'; message: string; retryAfterSeconds: number | null }
-export type CatalogPersonState = { status: 'ready'; entry: { detail: CatalogPersonProviderDetail; refreshedAt: number; expiresAt: number } } | { status: 'not-found' } | ErrorState
-export type CatalogPersonWorksState = { status: 'ready'; page: CatalogPersonProviderWorkPage } | { status: 'not-found' } | ErrorState
+type ErrorState = { status: 'error'; code: 'UPSTREAM' | 'RATE_LIMITED' | 'CATALOG_IDENTITY_MISSING'; message: string; retryAfterSeconds: number | null }
+type PublicDetail = Awaited<ReturnType<typeof mapCatalogPersonDetail>>
+type PublicWorkPage = Awaited<ReturnType<typeof mapCatalogPersonWorkPage>>
+export type CatalogPersonState = { status: 'ready'; entry: { detail: PublicDetail; refreshedAt: number; expiresAt: number } } | { status: 'not-found' } | ErrorState
+export type CatalogPersonWorksState = { status: 'ready'; page: PublicWorkPage } | { status: 'not-found' } | ErrorState
 type WorkFetch = { page: CatalogPersonProviderWorkPage; summaries: AnimeSummaryProvider[] }
 
 export interface CatalogPersonCacheClient {
@@ -38,6 +52,7 @@ export interface CatalogPersonCacheDependencies {
   warn: (message: string) => void
   fetchDetail: (kind: CatalogPersonProviderKind, id: number) => Promise<CatalogPersonProviderDetail | null>
   fetchWorks: (kind: CatalogPersonProviderKind, id: number, page: number) => Promise<WorkFetch | null>
+  identity: Pick<CatalogIdentityGateway, 'ensurePublicIds' | 'resolvePublicIds' | 'resolveProviderByPublicId'>
 }
 
 const readDetailRef = makeFunctionReference<'query', { kind: CatalogPersonProviderKind; personId: number; token: string }, CacheRead<CatalogPersonProviderDetail>>('catalogPersonCache:readDetail')
@@ -47,12 +62,34 @@ const commitDetailRef = makeFunctionReference<'mutation', { kind: CatalogPersonP
 const commitWorkRef = makeFunctionReference<'mutation', { kind: CatalogPersonProviderKind; personId: number; page: number; items: Array<{ animeId: number; role: string | null }>; hasNextPage: boolean; summaries: AnimeSummaryProvider[]; leaseId: string; token: string }, null>('catalogPersonCache:commitWorkPage')
 const releaseRef = makeFunctionReference<'mutation', { key: string; leaseId: string; token: string }, boolean>('catalogPersonCache:releaseLease')
 
-const errorState = (error: unknown): ErrorState => error instanceof AniListRequestError
-  ? { status: 'error', code: error.code, message: error.message, retryAfterSeconds: error.retryAfterSeconds }
-  : { status: 'error', code: 'UPSTREAM', message: 'Catalog person is temporarily unavailable.', retryAfterSeconds: null }
+const errorState = (error: unknown): ErrorState => {
+  if (error instanceof AniListRequestError) {
+    return { status: 'error', code: error.code, message: error.message, retryAfterSeconds: error.retryAfterSeconds }
+  }
+  if (error instanceof CatalogIdentityGatewayError && error.code === 'CATALOG_IDENTITY_MISSING') {
+    return { status: 'error', code: error.code, message: error.message, retryAfterSeconds: null }
+  }
+  return { status: 'error', code: 'UPSTREAM', message: 'Catalog person is temporarily unavailable.', retryAfterSeconds: null }
+}
 
 const detailKey = (kind: CatalogPersonProviderKind, id: number): string => `person:${kind}:${id}`
 const workKey = (kind: CatalogPersonProviderKind, id: number, page: number): string => `person-work:${kind}:${id}:${page}`
+
+/** Reverse-resolves one browser-safe person identity to its provider cache key. */
+const resolvePersonProviderId = async (
+  kind: CatalogPersonProviderKind,
+  publicId: string,
+  dependencies: CatalogPersonCacheDependencies,
+): Promise<number> => {
+  const ref = await dependencies.identity.resolveProviderByPublicId({
+    publicId,
+    kind,
+  })
+  if (ref.kind !== kind) {
+    throw new CatalogIdentityGatewayError('CATALOG_IDENTITY_MISSING')
+  }
+  return parseProviderCatalogPersonId(ref.providerId)
+}
 
 const release = async (dependencies: CatalogPersonCacheDependencies, key: string, leaseId: string): Promise<void> => {
   const released = await dependencies.client.releaseLease(key, leaseId, dependencies.writeToken)
@@ -66,14 +103,34 @@ const releasePreserving = async (dependencies: CatalogPersonCacheDependencies, k
 const readDetailState = async (kind: CatalogPersonProviderKind, id: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonState | null> => {
   try {
     const read = await dependencies.client.readDetail(kind, id, dependencies.writeToken)
-    return read.status === 'fresh' ? { status: 'ready', entry: { detail: read.entry.payload, refreshedAt: read.entry.refreshedAt, expiresAt: read.entry.expiresAt } } : null
+    return read.status === 'fresh'
+      ? {
+          status: 'ready',
+          entry: {
+            detail: await mapCatalogPersonDetail(
+              read.entry.payload,
+              dependencies.identity.resolvePublicIds,
+            ),
+            refreshedAt: read.entry.refreshedAt,
+            expiresAt: read.entry.expiresAt,
+          },
+        }
+      : null
   } catch (error) { return errorState(error) }
 }
 
 const readWorkState = async (kind: CatalogPersonProviderKind, id: number, page: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonWorksState | null> => {
   try {
     const read = await dependencies.client.readWorkPage(kind, id, page, dependencies.writeToken)
-    return read.status === 'fresh' ? { status: 'ready', page: read.entry.payload } : null
+    return read.status === 'fresh'
+      ? {
+          status: 'ready',
+          page: await mapCatalogPersonWorkPage(
+            read.entry.payload,
+            dependencies.identity.resolvePublicIds,
+          ),
+        }
+      : null
   } catch (error) { return errorState(error) }
 }
 
@@ -96,7 +153,13 @@ const waitWork = async (kind: CatalogPersonProviderKind, id: number, page: numbe
 }
 
 /** Reads or refreshes one person detail without stale success. */
-export const getCatalogPersonServer = async (kind: CatalogPersonProviderKind, id: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonState> => {
+export const getCatalogPersonServer = async (kind: CatalogPersonProviderKind, publicId: string, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonState> => {
+  let id: number
+  try {
+    id = await resolvePersonProviderId(kind, publicId, dependencies)
+  } catch (error) {
+    return errorState(error)
+  }
   const cached = await readDetailState(kind, id, dependencies)
   if (cached) return cached
   const key = detailKey(kind, id); const leaseId = dependencies.createLeaseId()
@@ -106,8 +169,22 @@ export const getCatalogPersonServer = async (kind: CatalogPersonProviderKind, id
   try {
     const detail = await dependencies.fetchDetail(kind, id)
     if (!detail) { await release(dependencies, key, leaseId); return { status: 'not-found' } }
+    const publicDetail = await mapCatalogPersonDetail(
+      detail,
+      dependencies.identity.ensurePublicIds,
+    )
     await dependencies.client.commitDetail(kind, id, detail, leaseId, dependencies.writeToken)
-    return await readDetailState(kind, id, dependencies) ?? errorState(new Error('Committed catalog person detail was unavailable.'))
+    const reread = await dependencies.client.readDetail(kind, id, dependencies.writeToken)
+    return reread.status === 'fresh'
+      ? {
+          status: 'ready',
+          entry: {
+            detail: publicDetail,
+            refreshedAt: reread.entry.refreshedAt,
+            expiresAt: reread.entry.expiresAt,
+          },
+        }
+      : errorState(new Error('Committed catalog person detail was unavailable.'))
   } catch (error) {
     await releasePreserving(dependencies, key, leaseId)
     return errorState(error)
@@ -115,7 +192,13 @@ export const getCatalogPersonServer = async (kind: CatalogPersonProviderKind, id
 }
 
 /** Reads or refreshes one ordered work page without stale success. */
-export const getCatalogPersonWorksServer = async (kind: CatalogPersonProviderKind, id: number, page: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonWorksState> => {
+export const getCatalogPersonWorksServer = async (kind: CatalogPersonProviderKind, publicId: string, page: number, dependencies: CatalogPersonCacheDependencies): Promise<CatalogPersonWorksState> => {
+  let id: number
+  try {
+    id = await resolvePersonProviderId(kind, publicId, dependencies)
+  } catch (error) {
+    return errorState(error)
+  }
   const cached = await readWorkState(kind, id, page, dependencies)
   if (cached) return cached
   const key = workKey(kind, id, page); const leaseId = dependencies.createLeaseId()
@@ -125,8 +208,20 @@ export const getCatalogPersonWorksServer = async (kind: CatalogPersonProviderKin
   try {
     const payload = await dependencies.fetchWorks(kind, id, page)
     if (!payload) { await release(dependencies, key, leaseId); return { status: 'not-found' } }
+    const publicPage = await mapCatalogPersonWorkPage(
+      payload.page,
+      dependencies.identity.ensurePublicIds,
+    )
     await dependencies.client.commitWorkPage(kind, id, page, payload, leaseId, dependencies.writeToken)
-    return await readWorkState(kind, id, page, dependencies) ?? errorState(new Error('Committed catalog person work was unavailable.'))
+    const reread = await dependencies.client.readWorkPage(
+      kind,
+      id,
+      page,
+      dependencies.writeToken,
+    )
+    return reread.status === 'fresh'
+      ? { status: 'ready', page: publicPage }
+      : errorState(new Error('Committed catalog person work was unavailable.'))
   } catch (error) {
     await releasePreserving(dependencies, key, leaseId)
     return errorState(error)
@@ -160,5 +255,10 @@ export const createCatalogPersonCacheDependencies = (): CatalogPersonCacheDepend
     warn: (message) => console.warn(message),
     fetchDetail: async (kind, id) => await fetchCatalogPersonFromAniList(kind, id, createAniListDependencies()),
     fetchWorks: async (kind, id, page) => await fetchCatalogPersonWorksFromAniList(kind, id, page, createAniListDependencies()),
+    identity: {
+      ensurePublicIds,
+      resolvePublicIds,
+      resolveProviderByPublicId,
+    },
   }
 }

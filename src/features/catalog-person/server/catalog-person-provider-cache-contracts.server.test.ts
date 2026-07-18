@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest'
 
 import {
   catalogPersonProviderDetailSchema,
+  catalogPersonProviderSearchPageSchema,
   parseProviderCatalogPersonId,
 } from './catalog-person-provider-cache-contracts.server'
 
@@ -32,6 +33,24 @@ describe('catalog person provider and cache contracts', () => {
     expect(() => parseProviderCatalogPersonId('21')).toThrow(
       'AniList person ID must be a positive safe integer.',
     )
+
+    const searchPage = {
+      items: [{
+        kind: 'staff',
+        id: 21,
+        name: 'Atsumi Tanezaki',
+        nativeName: null,
+        imageUrl: null,
+      }],
+      currentPage: 1,
+      hasNextPage: false,
+      perPage: 20,
+    }
+    expect(catalogPersonProviderSearchPageSchema.parse(searchPage)).toEqual(searchPage)
+    expect(() => catalogPersonProviderSearchPageSchema.parse({
+      ...searchPage,
+      items: [{ ...searchPage.items[0], publicId: 'staff_21' }],
+    })).toThrow()
   })
 
   test('keeps provider and cache modules independent from browser-public person DTOs', async () => {
@@ -52,10 +71,6 @@ describe('catalog person provider and cache contracts', () => {
     ].map((match) => match[0])
 
     expect(providerSource).toContain("from './catalog-person-provider-cache-contracts.server'")
-    expect(sharedImports).toHaveLength(1)
-    expect(sharedImports[0]).toContain("from '../shared/catalog-person-contracts'")
-    expect(sharedImports[0]).not.toMatch(
-      /CatalogPersonDetail|CatalogPersonKind|CatalogPersonWorkPage|catalogPersonDetailSchema|catalogPersonWorkPageSchema|parseCatalogPersonId/,
-    )
+    expect(sharedImports).toHaveLength(0)
   })
 })

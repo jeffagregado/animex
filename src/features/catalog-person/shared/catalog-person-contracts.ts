@@ -4,6 +4,10 @@ import {
   animeFormatSchema,
   type AnimeFormat,
 } from '../../discover/shared/discover-contracts'
+import {
+  parseCatalogPublicId,
+  type CatalogPublicId,
+} from '../../catalog-identity/shared/catalog-identity-contracts'
 
 export const CATALOG_PERSON_PAGE_SIZE = 20 as const
 export const CATALOG_PERSON_CACHE_TTL_MS = 24 * 60 * 60 * 1000
@@ -19,7 +23,7 @@ const nullableHttpsUrlSchema = z.url({ protocol: /^https$/ }).nullable()
 const nullableTextSchema = z.string().trim().min(1).nullable()
 
 export interface CatalogAnimeSummary {
-  id: number
+  publicId: CatalogPublicId
   slug: string
   title: string
   coverImageUrl: string | null
@@ -28,7 +32,7 @@ export interface CatalogAnimeSummary {
 }
 
 export interface CatalogVoiceActor {
-  id: number
+  publicId: CatalogPublicId
   name: string
   imageUrl: string | null
   language: string
@@ -37,7 +41,7 @@ export interface CatalogVoiceActor {
 export type CatalogPersonDetail =
   | {
     kind: 'character'
-    id: number
+    publicId: CatalogPublicId
     name: string
     nativeName: string | null
     imageUrl: string | null
@@ -51,7 +55,7 @@ export type CatalogPersonDetail =
   }
   | {
     kind: 'staff'
-    id: number
+    publicId: CatalogPublicId
     name: string
     nativeName: string | null
     imageUrl: string | null
@@ -76,7 +80,7 @@ export interface CatalogPersonWorkPage {
 
 export interface CatalogPersonSearchRow {
   kind: CatalogPersonKind
-  id: number
+  publicId: CatalogPublicId
   name: string
   nativeName: string | null
   imageUrl: string | null
@@ -91,7 +95,7 @@ export interface CatalogPersonSearchPage {
 }
 
 const catalogAnimeSummarySchema: z.ZodType<CatalogAnimeSummary> = z.object({
-  id: positiveSafeIntegerSchema,
+  publicId: z.string().transform(parseCatalogPublicId),
   slug: z.string().trim().min(1),
   title: z.string().trim().min(1),
   coverImageUrl: nullableHttpsUrlSchema,
@@ -100,7 +104,7 @@ const catalogAnimeSummarySchema: z.ZodType<CatalogAnimeSummary> = z.object({
 }).strict()
 
 const catalogVoiceActorSchema: z.ZodType<CatalogVoiceActor> = z.object({
-  id: positiveSafeIntegerSchema,
+  publicId: z.string().transform(parseCatalogPublicId),
   name: z.string().trim().min(1),
   imageUrl: nullableHttpsUrlSchema,
   language: z.string().trim().min(1),
@@ -108,7 +112,7 @@ const catalogVoiceActorSchema: z.ZodType<CatalogVoiceActor> = z.object({
 
 const characterDetailSchema = z.object({
   kind: z.literal('character'),
-  id: positiveSafeIntegerSchema,
+  publicId: z.string().transform(parseCatalogPublicId),
   name: z.string().trim().min(1),
   nativeName: nullableTextSchema,
   imageUrl: nullableHttpsUrlSchema,
@@ -120,14 +124,14 @@ const characterDetailSchema = z.object({
   voiceActorScope: z.literal('all-languages'),
   voiceActors: z.array(catalogVoiceActorSchema)
     .refine(
-      (actors) => new Set(actors.map((actor) => actor.id)).size === actors.length,
+      (actors) => new Set(actors.map((actor) => actor.publicId)).size === actors.length,
       { error: 'Character voice actors must have unique IDs.' },
     ),
 }).strict()
 
 const staffDetailSchema = z.object({
   kind: z.literal('staff'),
-  id: positiveSafeIntegerSchema,
+  publicId: z.string().transform(parseCatalogPublicId),
   name: z.string().trim().min(1),
   nativeName: nullableTextSchema,
   imageUrl: nullableHttpsUrlSchema,
@@ -157,7 +161,7 @@ export const catalogPersonWorkPageSchema: z.ZodType<CatalogPersonWorkPage> = z.o
 
 const catalogPersonSearchRowSchema: z.ZodType<CatalogPersonSearchRow> = z.object({
   kind: catalogPersonKindSchema,
-  id: positiveSafeIntegerSchema,
+  publicId: z.string().transform(parseCatalogPublicId),
   name: z.string().trim().min(1),
   nativeName: nullableTextSchema,
   imageUrl: nullableHttpsUrlSchema,
@@ -170,19 +174,6 @@ export const catalogPersonSearchPageSchema: z.ZodType<CatalogPersonSearchPage> =
   hasNextPage: z.boolean(),
   perPage: z.literal(CATALOG_PERSON_PAGE_SIZE),
 }).strict()
-
-/** Parses positive provider-neutral identity. */
-export const parseCatalogPersonId = (value: unknown): number => {
-  const candidate = typeof value === 'string' && /^[1-9]\d*$/.test(value)
-    ? Number(value)
-    : value
-  const result = positiveSafeIntegerSchema.safeParse(candidate)
-  if (!result.success) {
-    throw new RangeError(`CATALOG_PERSON_ID_INVALID: ${result.error.message}`)
-  }
-
-  return result.data
-}
 
 /** Creates a canonical display-only slug. */
 export const slugifyCatalogPerson = (name: string): string => {
@@ -203,10 +194,10 @@ export const slugifyCatalogPerson = (name: string): string => {
 /** Creates a canonical Character or Staff path. */
 export const createCatalogPersonPath = (
   kind: CatalogPersonKind,
-  id: number,
+  publicId: CatalogPublicId,
   name: string,
 ): string => {
-  const parsedId = parseCatalogPersonId(id)
+  const parsedId = parseCatalogPublicId(publicId)
   const segment = kind === 'character' ? 'characters' : 'staff'
   return `/${segment}/${parsedId}/${encodeURIComponent(slugifyCatalogPerson(name))}`
 }

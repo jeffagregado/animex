@@ -1,5 +1,10 @@
 import { z } from 'zod'
 
+import {
+  parseCatalogPublicId,
+  type CatalogPublicId,
+} from '../../catalog-identity/shared/catalog-identity-contracts'
+
 export const animeFormatSchema = z.enum(['TV', 'TV_SHORT', 'MOVIE', 'SPECIAL', 'OVA', 'ONA', 'MUSIC'])
 export const animeSeasonSchema = z.enum(['WINTER', 'SPRING', 'SUMMER', 'FALL'])
 export const discoverSectionKeySchema = z.enum(['trending', 'seasonal', 'recommendations', 'upcoming'])
@@ -38,7 +43,7 @@ export interface AnimeTitles {
 }
 
 export interface AnimeSummary {
-  anilistId: number
+  publicId: CatalogPublicId
   slug: string
   titles: AnimeTitles
   coverImageUrl: string | null
@@ -54,6 +59,46 @@ export interface AnimeSummary {
   startDate: AnimeDate | null
   nextAiringAt: number | null
 }
+
+const catalogPublicIdSchema = z.string().transform((value, context) => {
+  try {
+    return parseCatalogPublicId(value)
+  } catch {
+    context.addIssue({ code: 'custom', message: 'CATALOG_PUBLIC_ID_INVALID' })
+    return z.NEVER
+  }
+})
+
+const animeDateSchema: z.ZodType<AnimeDate> = z.object({
+  year: z.number().int().nullable(),
+  month: z.number().int().min(1).max(12).nullable(),
+  day: z.number().int().min(1).max(31).nullable(),
+}).strict()
+
+const animeTitlesSchema: z.ZodType<AnimeTitles> = z.object({
+  display: z.string().trim().min(1),
+  english: z.string().trim().min(1).nullable(),
+  romaji: z.string().trim().min(1).nullable(),
+  native: z.string().trim().min(1).nullable(),
+}).strict()
+
+export const animeSummarySchema: z.ZodType<AnimeSummary> = z.object({
+  publicId: catalogPublicIdSchema,
+  slug: z.string().trim().min(1),
+  titles: animeTitlesSchema,
+  coverImageUrl: z.url().nullable(),
+  bannerImageUrl: z.url().nullable(),
+  format: animeFormatSchema.nullable(),
+  season: animeSeasonSchema.nullable(),
+  seasonYear: z.number().int().nullable(),
+  episodes: z.number().int().nonnegative().nullable(),
+  genres: z.array(z.string().trim().min(1)),
+  popularity: z.number().int().nonnegative(),
+  averageScore: z.number().int().min(0).max(100).nullable(),
+  trending: z.number().int().nonnegative().nullable(),
+  startDate: animeDateSchema.nullable(),
+  nextAiringAt: z.number().int().nonnegative().nullable(),
+}).strict()
 
 export interface DiscoverSection {
   key: DiscoverSectionKey

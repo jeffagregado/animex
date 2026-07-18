@@ -7,7 +7,6 @@ import {
   catalogPersonSearchPageSchema,
   catalogPersonWorkPageSchema,
   createCatalogPersonPath,
-  parseCatalogPersonId,
   parseCatalogPersonTab,
   slugifyCatalogPerson,
   type CatalogPersonDetail,
@@ -15,7 +14,7 @@ import {
 
 const character: CatalogPersonDetail = {
   kind: 'character',
-  id: 12,
+  publicId: 'character_12',
   name: 'Frieren',
   nativeName: 'フリーレン',
   imageUrl: 'https://img.example/frieren.webp',
@@ -26,7 +25,7 @@ const character: CatalogPersonDetail = {
   bloodType: null,
   voiceActorScope: 'all-languages',
   voiceActors: [{
-    id: 21,
+    publicId: 'staff_21',
     name: 'Atsumi Tanezaki',
     imageUrl: 'https://img.example/atsumi.webp',
     language: 'Japanese',
@@ -34,7 +33,7 @@ const character: CatalogPersonDetail = {
 }
 
 const anime = {
-  id: 52991,
+  publicId: 'anime_52991',
   slug: 'frieren-beyond-journeys-end',
   title: "Frieren: Beyond Journey's End",
   coverImageUrl: 'https://img.example/anime.webp',
@@ -48,26 +47,12 @@ describe('catalog person contracts', () => {
     expect(CATALOG_PERSON_CACHE_TTL_MS).toBe(24 * 60 * 60 * 1000)
   })
 
-  test.each([1, 12, Number.MAX_SAFE_INTEGER])(
-    'accepts positive provider-neutral ID %s',
-    (value) => {
-      expect(parseCatalogPersonId(value)).toBe(value)
-      expect(parseCatalogPersonId(String(value))).toBe(value)
-    },
-  )
-
-  test.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '', '12.5', 'abc'])(
-    'rejects unsafe ID %s',
-    (value) => {
-      expect(() => parseCatalogPersonId(value)).toThrow('CATALOG_PERSON_ID_INVALID')
-    },
-  )
-
   test('creates Unicode-safe canonical destinations', () => {
     expect(slugifyCatalogPerson('Frieren')).toBe('frieren')
     expect(slugifyCatalogPerson('  葬送 の フリーレン  ')).toBe('葬送-の-フリーレン')
-    expect(createCatalogPersonPath('character', 12, 'Frieren')).toBe('/characters/12/frieren')
-    expect(createCatalogPersonPath('staff', 21, 'Atsumi Tanezaki')).toBe('/staff/21/atsumi-tanezaki')
+    expect(createCatalogPersonPath('character', 'character_12', 'Frieren')).toBe('/characters/character_12/frieren')
+    expect(createCatalogPersonPath('staff', 'staff_21', 'Atsumi Tanezaki')).toBe('/staff/staff_21/atsumi-tanezaki')
+    expect(() => createCatalogPersonPath('staff', '21', 'Atsumi Tanezaki')).toThrow('CATALOG_PUBLIC_ID_INVALID')
     expect(() => slugifyCatalogPerson(' !!! ')).toThrow('CATALOG_PERSON_SLUG_INVALID')
   })
 
@@ -91,6 +76,10 @@ describe('catalog person contracts', () => {
     expect(() => catalogPersonDetailSchema.parse({
       ...character,
       providerSiteUrl: 'https://provider.example/character/12',
+    })).toThrow()
+    expect(() => catalogPersonDetailSchema.parse({
+      ...character,
+      id: 12,
     })).toThrow()
     expect(() => catalogPersonDetailSchema.parse({
       ...character,
@@ -153,11 +142,11 @@ describe('catalog person contracts', () => {
   test('validates strict 20-row search pages', () => {
     const row = {
       kind: 'character',
-      id: 12,
+      publicId: 'character_12',
       name: 'Frieren',
       nativeName: null,
       imageUrl: null,
-      destination: '/characters/12/frieren',
+      destination: '/characters/character_12/frieren',
     }
     const page = {
       items: [row],
@@ -173,7 +162,11 @@ describe('catalog person contracts', () => {
     })).toThrow()
     expect(() => catalogPersonSearchPageSchema.parse({
       ...page,
-      items: [{ ...row, providerId: 12 }],
+      items: [{ ...row, id: 12 }],
+    })).toThrow()
+    expect(() => catalogPersonSearchPageSchema.parse({
+      ...page,
+      items: [{ ...row, publicId: '12' }],
     })).toThrow()
   })
 })

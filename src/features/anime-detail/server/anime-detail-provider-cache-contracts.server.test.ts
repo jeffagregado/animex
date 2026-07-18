@@ -21,11 +21,10 @@ describe('anime detail provider and cache contracts', () => {
     )
   })
 
-  test('keeps provider and cache modules independent from browser-public DTOs', async () => {
+  test('keeps provider normalization contracts independent from browser-public DTOs', async () => {
     const sources = await Promise.all([
       serverSource('anime-detail-provider-cache-contracts.server.ts'),
       serverSource('anilist-detail.server.ts'),
-      serverSource('anime-detail-cache.server.ts'),
     ])
 
     for (const source of sources) {

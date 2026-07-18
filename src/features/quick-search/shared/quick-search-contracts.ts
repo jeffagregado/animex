@@ -1,8 +1,11 @@
 import { z } from 'zod'
 
 import {
-  createCatalogPersonPath,
-  parseCatalogPersonId,
+  parseCatalogPublicId,
+  type CatalogPublicId,
+} from '../../catalog-identity/shared/catalog-identity-contracts'
+import {
+  slugifyCatalogPerson,
 } from '../../catalog-person/shared/catalog-person-contracts'
 
 export const QUICK_SEARCH_MIN_LENGTH = 2 as const
@@ -14,14 +17,15 @@ export const SEARCH_RESULTS_PAGE_SIZE = 20 as const
 export type QuickSearchGroup = 'anime' | 'characters' | 'staff' | 'users'
 
 export type QuickSearchDestinationInput =
-  | { kind: 'anime'; id: number; slug: string }
-  | { kind: 'character'; id: number; label: string }
-  | { kind: 'staff'; id: number; label: string }
+  | { kind: 'anime'; publicId: CatalogPublicId; slug: string }
+  | { kind: 'character'; publicId: CatalogPublicId; label: string }
+  | { kind: 'staff'; publicId: CatalogPublicId; label: string }
   | { kind: 'user'; username: string }
   | { kind: 'results'; group: QuickSearchGroup; query: string }
 
 export interface QuickSearchRow {
   id: string
+  publicId: CatalogPublicId
   label: string
   imageUrl: string | null
   metadata: string | null
@@ -35,25 +39,32 @@ export interface QuickSearchGroups {
   users: QuickSearchRow[]
 }
 
-const positiveSafeIntegerSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
 const querySchema = z.string()
   .transform((value) => value.trim())
   .pipe(z.string().min(QUICK_SEARCH_MIN_LENGTH).max(QUICK_SEARCH_MAX_LENGTH))
 const pathSegmentSchema = z.string().trim().min(1)
+const catalogPublicIdSchema = z.string().transform((value, context) => {
+  try {
+    return parseCatalogPublicId(value)
+  } catch {
+    context.addIssue({ code: 'custom', message: 'CATALOG_PUBLIC_ID_INVALID' })
+    return z.NEVER
+  }
+})
 const destinationInputSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('anime'),
-    id: positiveSafeIntegerSchema,
+    publicId: catalogPublicIdSchema,
     slug: pathSegmentSchema,
   }).strict(),
   z.object({
     kind: z.literal('character'),
-    id: positiveSafeIntegerSchema,
+    publicId: catalogPublicIdSchema,
     label: z.string().trim().min(1),
   }).strict(),
   z.object({
     kind: z.literal('staff'),
-    id: positiveSafeIntegerSchema,
+    publicId: catalogPublicIdSchema,
     label: z.string().trim().min(1),
   }).strict(),
   z.object({
@@ -68,12 +79,15 @@ const destinationInputSchema = z.discriminatedUnion('kind', [
 ])
 
 const quickSearchRowSchema: z.ZodType<QuickSearchRow> = z.object({
-  id: z.string().trim().min(1),
+  id: catalogPublicIdSchema,
+  publicId: catalogPublicIdSchema,
   label: z.string().trim().min(1),
   imageUrl: z.url({ protocol: /^https$/ }).nullable(),
   metadata: z.string().trim().min(1).nullable(),
   destination: z.string().startsWith('/'),
-}).strict()
+}).strict().refine((row) => row.id === row.publicId, {
+  message: 'Quick Search row ID must equal its public ID.',
+})
 
 const quickSearchRowsSchema = z.array(quickSearchRowSchema).max(QUICK_SEARCH_GROUP_LIMIT)
 
@@ -105,11 +119,11 @@ export const createQuickSearchDestination = (
 
   const input = result.data
   if (input.kind === 'anime') {
-    const id = parseCatalogPersonId(input.id)
-    return `/anime/${id}/${encodeURIComponent(input.slug)}`
+    return `/anime/${input.publicId}/${encodeURIComponent(input.slug)}`
   }
   if (input.kind === 'character' || input.kind === 'staff') {
-    return createCatalogPersonPath(input.kind, input.id, input.label)
+    const segment = input.kind === 'character' ? 'characters' : 'staff'
+    return `/${segment}/${input.publicId}/${encodeURIComponent(slugifyCatalogPerson(input.label))}`
   }
   if (input.kind === 'user') {
     return `/users/${encodeURIComponent(input.username)}`

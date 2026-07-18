@@ -1,13 +1,6 @@
 import { Fragment, type ReactNode } from 'react'
-import { Link } from '@tanstack/react-router'
 
-import { parseAnilistId } from '../../anime-detail/shared/anime-detail-contracts'
-import { slugifyAnimeTitle } from '../../discover/shared/discover-contracts'
-import {
-  parseCatalogPersonId,
-  slugifyCatalogPerson,
-  type CatalogPersonKind,
-} from '../shared/catalog-person-contracts'
+import { parseCatalogPublicId } from '../../catalog-identity/shared/catalog-identity-contracts'
 
 type CatalogPersonDescriptionProps = {
   description: string
@@ -18,12 +11,10 @@ type DescriptionPart =
   | { kind: 'strong'; start: number; value: string }
   | { kind: 'text'; start: number; value: string }
 
-type DescriptionLink =
-  | { kind: 'anime'; id: number; slug: string }
-  | { kind: 'external'; href: string }
-  | { kind: CatalogPersonKind; id: number; slug: string }
+type DescriptionLink = { kind: 'external' | 'internal'; href: string }
 
 const DESCRIPTION_TOKEN = /\*\*([^*\n]+)\*\*|__([^_\n]+)__|\[([^\]\n]+)\]\(([^)\s]+)\)/g
+const INTERNAL_LINK = /^\/(?:anime|characters|staff)\/([^/?#]+)\/[^/?#]+$/
 const LINK_CLASS = 'break-words font-medium text-cyan-300 underline decoration-cyan-300/50 underline-offset-2 hover:decoration-cyan-300 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300'
 
 /** Renders supported biography formatting without injecting provider HTML. */
@@ -75,26 +66,28 @@ function renderPart(part: DescriptionPart): ReactNode {
   if (link.kind === 'external') {
     return <a className={LINK_CLASS} href={link.href} rel="noopener noreferrer" target="_blank">{part.label}</a>
   }
-  if (link.kind === 'anime') {
-    return <Link className={LINK_CLASS} params={{ anilistId: String(link.id), slug: link.slug }} preload={false} to="/anime/$anilistId/$slug">{part.label}</Link>
-  }
-  if (link.kind === 'character') {
-    return <Link className={LINK_CLASS} params={{ id: String(link.id), slug: link.slug }} preload={false} to="/characters/$id/$slug">{part.label}</Link>
-  }
-  return <Link className={LINK_CLASS} params={{ id: String(link.id), slug: link.slug }} preload={false} to="/staff/$id/$slug">{part.label}</Link>
+  return <a className={LINK_CLASS} href={link.href}>{part.label}</a>
 }
 
-/** Converts supported AniList entity URLs to typed app destinations. */
-function resolveDescriptionLink(label: string, target: string): DescriptionLink | null {
-  const url = parseDescriptionUrl(target)
+/** Accepts only canonical internal paths and safe external URLs. */
+function resolveDescriptionLink(_label: string, target: string): DescriptionLink | null {
+  const internal = INTERNAL_LINK.exec(target)
+  if (internal) {
+    try {
+      parseCatalogPublicId(internal[1])
+      return { kind: 'internal', href: target }
+    } catch (error) {
+      if (error instanceof RangeError) return null
+      throw error
+    }
+  }
+  const url = parseExternalUrl(target)
   if (url === null) return null
-  const hostname = url.hostname.toLowerCase().replace(/^www\./, '')
-  if (hostname !== 'anilist.co') return { kind: 'external', href: target }
-  return resolveAniListEntityLink(label, url)
+  return { kind: 'external', href: target }
 }
 
-/** Accepts only parseable HTTP and HTTPS biography URLs. */
-function parseDescriptionUrl(target: string): URL | null {
+/** Accepts only absolute HTTP and HTTPS biography URLs. */
+function parseExternalUrl(target: string): URL | null {
   let url: URL
   try {
     url = new URL(target)
@@ -104,36 +97,4 @@ function parseDescriptionUrl(target: string): URL | null {
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
   return url
-}
-
-/** Resolves one supported AniList entity URL. */
-function resolveAniListEntityLink(label: string, url: URL): DescriptionLink | null {
-  const segments = url.pathname.split('/').filter(Boolean)
-  if (segments.length < 2 || segments.length > 3) return null
-  const [entity, idText] = segments
-  const id = Number(idText)
-
-  if (entity === 'anime') return resolveAnimeLink(label, id)
-  if (entity === 'character' || entity === 'staff') return resolveCatalogPersonLink(entity, label, id)
-  return null
-}
-
-/** Builds one validated internal anime link. */
-function resolveAnimeLink(label: string, id: number): DescriptionLink | null {
-  try {
-    return { kind: 'anime', id: parseAnilistId(id), slug: slugifyAnimeTitle(label) }
-  } catch (error) {
-    if (error instanceof RangeError || error instanceof TypeError) return null
-    throw error
-  }
-}
-
-/** Builds one validated internal Character or Staff link. */
-function resolveCatalogPersonLink(kind: CatalogPersonKind, label: string, id: number): DescriptionLink | null {
-  try {
-    return { kind, id: parseCatalogPersonId(id), slug: slugifyCatalogPerson(label) }
-  } catch (error) {
-    if (error instanceof RangeError || error instanceof TypeError) return null
-    throw error
-  }
 }

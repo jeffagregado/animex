@@ -2,7 +2,12 @@ import { ConvexHttpClient } from 'convex/browser'
 
 import { api } from '../../../../convex/_generated/api'
 import {
+  ensurePublicIds,
+  type CatalogIdentityGateway,
+} from '../../catalog-identity/server/catalog-identity.server'
+import {
   DISCOVER_PROVIDER_SECTION_KEYS,
+  createAnimeProviderRefs,
   type AnimeSummaryProvider,
   type DiscoverCacheReadProvider,
   type DiscoverPageDataProvider,
@@ -32,6 +37,7 @@ export interface DiscoverCacheDependencies {
   createLeaseId: () => string
   delay: (milliseconds: number) => Promise<void>
   fetchSection: (key: DiscoverSectionKeyProvider) => Promise<AnimeSummaryProvider[]>
+  ensurePublicIds: CatalogIdentityGateway['ensurePublicIds']
 }
 
 /** Requires a non-empty server environment value. */
@@ -65,6 +71,7 @@ export const createDiscoverCacheDependencies = (): DiscoverCacheDependencies => 
   createLeaseId: () => crypto.randomUUID(),
   delay: async (milliseconds) => await new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds)),
   fetchSection: async (key) => await fetchDiscoverSectionFromAniList(key, createAniListDependencies()),
+  ensurePublicIds,
 })
 
 const cacheError = (key: DiscoverSectionKeyProvider): DiscoverSectionStateProvider => ({
@@ -153,6 +160,13 @@ export const refreshDiscoverSectionServer = async (
   } catch (error) {
     await releaseOwnedLease(client, key, leaseId, dependencies.writeToken)
     return requestError(key, error)
+  }
+  try {
+    const refs = createAnimeProviderRefs(summaries)
+    if (refs.length > 0) await dependencies.ensurePublicIds(refs)
+  } catch (error) {
+    await releaseOwnedLease(client, key, leaseId, dependencies.writeToken)
+    throw error
   }
   try {
     await client.commitSection(key, leaseId, summaries, dependencies.writeToken)
