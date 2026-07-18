@@ -897,6 +897,24 @@ Status: COMPLETE. Implemented on `jeff-cx/phase-7-user-profile-quick-search`; ap
 - [ ] Verify injected provider/storage failure lanes.
 - [ ] Verify deep pagination Load more browser flow.
 
+# Phase 7 Feedback Fixes
+
+Status: IMPLEMENTATION APPROVED. User feedback is locked in `docs/superpowers/specs/2026-07-18-phase-7-feedback-fixes-design.md`.
+
+- [x] Lock avatar reuse, Profile containment, server-auth-first routing, and Character/Staff layout direction.
+- [ ] Reuse `UserAvatar` in Quick Search and `/search/users`; scale Profile fallback geometry.
+- [ ] Replace complete-account header Sign out button with a shared-avatar shadcn dropdown containing Profile and Sign out.
+- [ ] Repair Profile phone/tablet/desktop overflow, wrapping, and non-deforming media.
+- [ ] Replace full-document Profile tab changes with router navigation that preserves the shell.
+- [ ] Resolve Profile auth on the server before DOM/query mount; remove `Checking authentication…`.
+- [ ] Reproduce and fix invalid-hook, QueryClientProvider, root not-found, hydration, and unauthenticated-query logs by exact source.
+- [ ] Reuse Anime Detail shell geometry for Character/Staff with only Overview and Anime tabs.
+- [ ] Canonicalize legacy Staff `?tab=works` to `?tab=anime` without changing provider/cache identities.
+- [ ] Use both repo QA accounts for private-viewer, avatar, auth, tab, and responsive browser checks.
+- [ ] Run focused/full tests, TypeScript, build, React Doctor, Fallow, Convex deploy when applicable, review, and browser QA.
+- [x] Write and independently review the implementation plan.
+- [x] Approve the implementation plan for execution.
+
 # Phase 8 Notifications, Privacy, Moderation
 
 Status: SCOPE ADJUSTED. Detailed planning has not started.
