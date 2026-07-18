@@ -1,15 +1,9 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { ComponentProps, ComponentType } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { UserAvatar } from './user-avatar'
-
-type FeedbackAvatarProps = Omit<ComponentProps<typeof UserAvatar>, 'size'> & {
-  size: ComponentProps<typeof UserAvatar>['size'] | 'search' | 'profile'
-}
-const FeedbackUserAvatar = UserAvatar as ComponentType<FeedbackAvatarProps>
 
 afterEach(cleanup)
 
@@ -60,7 +54,7 @@ describe('UserAvatar', () => {
     ['profile', ['size-24', 'sm:size-32'], ['text-4xl', 'sm:text-5xl']],
   ] as const)('uses locked %s fallback geometry', (size, boxClasses, glyphClasses) => {
     render(
-      <FeedbackUserAvatar
+      <UserAvatar
         avatarUrl={null}
         displayName="Mika"
         label={`${size} avatar`}

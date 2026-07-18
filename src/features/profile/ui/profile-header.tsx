@@ -34,29 +34,29 @@ export function ProfileHeader({
         />
       )}
       <div className="absolute inset-0 bg-linear-to-t from-slate-950 via-slate-950/45 to-transparent" />
-      <div className="relative flex min-h-72 flex-col justify-end gap-5 p-5 sm:min-h-80 sm:flex-row sm:items-end sm:p-8">
-        <div className="rounded-full border-2 border-cyan-300 bg-slate-950 p-1 shadow-xl [&>img]:size-24 [&>[role=img]]:size-24 sm:[&>img]:size-32 sm:[&>[role=img]]:size-32">
+      <div className="relative flex min-h-72 min-w-0 flex-col justify-end gap-5 p-5 sm:min-h-80 sm:flex-row sm:flex-wrap sm:items-end sm:p-8 lg:flex-nowrap">
+        <div className="aspect-square shrink-0 overflow-hidden rounded-full border-2 border-cyan-300 bg-slate-950 p-1 shadow-xl">
           <UserAvatar
             avatarUrl={profile.avatarUrl}
             displayName={profile.name}
             label={`${profile.name} avatar`}
-            size="lg"
+            size="profile"
           />
         </div>
         <div className="min-w-0 flex-1 pb-1">
-          <h1 className="truncate text-3xl font-black text-white sm:text-4xl">
+          <h1 className="min-w-0 break-words text-3xl font-black text-white sm:text-4xl">
             {profile.name}
           </h1>
-          <p className="mt-1 text-slate-300">@{profile.username}</p>
+          <p className="mt-1 min-w-0 break-all text-slate-300">@{profile.username}</p>
           {profile.bio === '' ? null : (
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">
+            <p className="mt-3 min-w-0 max-w-2xl break-words text-sm leading-6 text-slate-200 sm:text-base">
               {profile.bio}
             </p>
           )}
         </div>
         {owner ? (
           <Button
-            className="min-h-11 bg-coral-500 px-5 font-black text-white hover:bg-coral-400"
+            className="min-h-11 w-full shrink-0 bg-coral-500 px-5 font-black text-white hover:bg-coral-400 sm:w-auto"
             onClick={(event) => onEditProfile(event.currentTarget)}
             type="button"
           >

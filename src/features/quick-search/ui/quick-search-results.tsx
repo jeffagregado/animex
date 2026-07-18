@@ -1,6 +1,7 @@
 import { useEffect, useState, type MouseEvent, type RefObject } from 'react'
 import { ChevronRightIcon, ImageOffIcon, SearchIcon } from 'lucide-react'
 
+import { UserAvatar } from '#/components/user-avatar'
 import {
   createQuickSearchDestination,
   type QuickSearchGroup,
@@ -140,7 +141,16 @@ function ResultGroup({
                 tabIndex={-1}
                 type="button"
               >
-                <ResultImage label={row.label} url={row.imageUrl} />
+                {group === 'users' ? (
+                  <UserAvatar
+                    avatarUrl={row.imageUrl}
+                    displayName={row.label}
+                    label={`${row.label} avatar`}
+                    size="md"
+                  />
+                ) : (
+                  <ResultImage label={row.label} url={row.imageUrl} />
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-bold group-hover:text-cyan-200">{row.label}</span>
                   {row.metadata === null ? null : <span className="block truncate text-xs text-muted-foreground">{row.metadata}</span>}

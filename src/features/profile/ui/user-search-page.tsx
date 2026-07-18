@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 
+import { UserAvatar } from '#/components/user-avatar'
 import {
   createQuickSearchDestination,
   normalizeSearchQuery,
@@ -109,7 +110,7 @@ function UserSearchFooter({
 }
 
 function UserCard({ user }: { user: UserSearchRow }) {
-  return <a className="flex min-h-24 min-w-0 items-center gap-4 overflow-hidden rounded-xl border border-border bg-card/70 p-3 outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-cyan-300 motion-reduce:transition-none" href={createQuickSearchDestination({ kind: 'user', username: user.username })}><div className="size-16 shrink-0 overflow-hidden rounded-full bg-muted">{user.avatarUrl ? <img alt="" className="size-full object-cover" src={user.avatarUrl} /> : null}</div><div className="min-w-0"><h2 className="truncate font-black">{user.name}</h2><p className="truncate text-sm text-muted-foreground">@{user.username}</p></div></a>
+  return <a className="flex min-h-24 min-w-0 items-center gap-4 overflow-hidden rounded-xl border border-border bg-card/70 p-3 outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-cyan-300 motion-reduce:transition-none" href={createQuickSearchDestination({ kind: 'user', username: user.username })}><UserAvatar avatarUrl={user.avatarUrl} displayName={user.name} label={`${user.name} avatar`} size="search" /><div className="min-w-0"><h2 className="truncate font-black">{user.name}</h2><p className="truncate text-sm text-muted-foreground">@{user.username}</p></div></a>
 }
 
 function SearchError({ message, onRetry }: { message: string; onRetry: () => void }) {
