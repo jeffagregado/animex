@@ -112,7 +112,7 @@ function PersonVoiceActors({ actors }: { actors: CatalogVoiceActor[] }) {
   return <section aria-labelledby="catalog-person-voice-actors">
     <h2 className="text-xl font-black" id="catalog-person-voice-actors">Voice Actors</h2>
     {actors.length > 0
-      ? <ul className="mt-3 space-y-2">{actors.map((actor) => <li key={actor.id}><VoiceActorLink actor={actor} /></li>)}</ul>
+      ? <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">{actors.map((actor) => <li key={actor.id}><VoiceActorLink actor={actor} /></li>)}</ul>
       : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No voice actors available.</p>}
   </section>
 }
