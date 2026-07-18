@@ -90,7 +90,7 @@ describe('CatalogPersonPage', () => {
     expect(screen.queryByTestId('work-grid')).toBeNull()
     expect(screen.getByRole('tab', { name: 'Anime' })).toBeTruthy()
     expect(screen.queryByRole('tab', { name: 'Works' })).toBeNull()
-    view.rerender(<CatalogPersonPage id={8} kind="staff" onRetry={() => undefined} onTabChange={() => undefined} state={staffState()} tab={'anime' as never} />)
+    view.rerender(<CatalogPersonPage id={8} kind="staff" onRetry={() => undefined} onTabChange={() => undefined} state={staffState()} tab="anime" />)
     expect(screen.getByTestId('work-grid').textContent).toContain('staff')
   })
 

@@ -52,7 +52,7 @@ describe('catalog person routes', () => {
   it('uses push navigation without scroll reset for tab clicks', () => {
     expect(getCatalogPersonTabNavigation('character', 'overview')).toEqual({ search: {}, resetScroll: false })
     expect(getCatalogPersonTabNavigation('character', 'anime')).toEqual({ search: { tab: 'anime' }, resetScroll: false })
-    expect(getCatalogPersonTabNavigation('staff', 'anime' as never)).toEqual({ search: { tab: 'anime' }, resetScroll: false })
+    expect(getCatalogPersonTabNavigation('staff', 'anime')).toEqual({ search: { tab: 'anime' }, resetScroll: false })
   })
 
   it('ensures child detail data with an initially empty query cache', async () => {
