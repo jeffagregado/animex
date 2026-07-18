@@ -88,6 +88,11 @@ const aggregateTargetResultValidator = v.object({
   continueCursor: v.string(),
   isDone: v.boolean(),
 })
+const aggregateResetResultValidator = v.object({
+  statsId: v.id('animeReviewStats'),
+  checkpointDeleted: v.boolean(),
+  receiptDeleted: v.boolean(),
+})
 
 const tableName = (lane: DurableAnimeLane): string => {
   if (lane === 'user-anime-entries') return 'userAnimeEntries'
@@ -393,6 +398,37 @@ export const listReviewAggregateTargets = internalMutation({
   },
 })
 
+/** Clears one aggregate verification attempt without changing domain data. */
+export const resetReviewAggregateVerification = internalMutation({
+  args: { statsId: v.id('animeReviewStats') },
+  returns: aggregateResetResultValidator,
+  handler: async (ctx, args) => {
+    const [checkpoints, receipts, laneReceipt] = await Promise.all([
+      ctx.db.query('catalogAnimeAggregateVerificationState')
+        .withIndex('by_stats_id', (q) => q.eq('statsId', args.statsId))
+        .collect(),
+      ctx.db.query('catalogAnimeAggregateVerificationReceipts')
+        .withIndex('by_stats_id', (q) => q.eq('statsId', args.statsId))
+        .collect(),
+      ctx.db.query('catalogAnimeDataVerificationReceipts')
+        .withIndex('by_lane', (q) => q.eq('lane', 'anime-review-stats'))
+        .unique(),
+    ])
+    for (const checkpoint of checkpoints) {
+      await ctx.db.delete('catalogAnimeAggregateVerificationState', checkpoint._id)
+    }
+    for (const receipt of receipts) {
+      await ctx.db.delete('catalogAnimeAggregateVerificationReceipts', receipt._id)
+    }
+    if (laneReceipt) await ctx.db.delete('catalogAnimeDataVerificationReceipts', laneReceipt._id)
+    return {
+      statsId: args.statsId,
+      checkpointDeleted: checkpoints.length > 0,
+      receiptDeleted: receipts.length > 0,
+    }
+  },
+})
+
 /** Verifies one Review aggregate through a database-owned bounded checkpoint. */
 export const verifyReviewAggregate = internalMutation({
   args: {
@@ -403,13 +439,15 @@ export const verifyReviewAggregate = internalMutation({
   handler: async (ctx, args) => {
     const aggregate = await ctx.db.get('animeReviewStats', args.statsId)
     if (!aggregate?.animeId) throw new Error(`animeReviewStats ${args.statsId} is missing animeId.`)
-    const [checkpoint, receipt] = await Promise.all([
+    const [checkpoint, receipt, laneReceipt] = await Promise.all([
       ctx.db.query('catalogAnimeAggregateVerificationState').withIndex('by_stats_id', (q) => q.eq('statsId', args.statsId)).unique(),
       ctx.db.query('catalogAnimeAggregateVerificationReceipts').withIndex('by_stats_id', (q) => q.eq('statsId', args.statsId)).unique(),
+      ctx.db.query('catalogAnimeDataVerificationReceipts').withIndex('by_lane', (q) => q.eq('lane', 'anime-review-stats')).unique(),
     ])
     if (args.paginationOpts.cursor === null) {
       if (checkpoint) throw new Error(`Aggregate verification checkpoint for ${args.statsId} already exists.`)
       if (receipt) await ctx.db.delete('catalogAnimeAggregateVerificationReceipts', receipt._id)
+      if (laneReceipt) await ctx.db.delete('catalogAnimeDataVerificationReceipts', laneReceipt._id)
     } else if (!checkpoint || checkpoint.nextCursor !== args.paginationOpts.cursor) {
       throw new Error(`Aggregate verification cursor for ${args.statsId} does not match durable checkpoint.`)
     }

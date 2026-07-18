@@ -68,6 +68,11 @@ const verifyReviewAggregate = makeFunctionReference<
   { statsId: string; paginationOpts: { numItems: number; cursor: string | null } },
   AggregateResult
 >('catalogAnimeDataMigration:verifyReviewAggregate')
+const resetReviewAggregateVerification = makeFunctionReference<
+  'mutation',
+  { statsId: string },
+  { statsId: string; checkpointDeleted: boolean; receiptDeleted: boolean }
+>('catalogAnimeDataMigration:resetReviewAggregateVerification')
 const listReviewAggregateTargets = makeFunctionReference<
   'mutation',
   { paginationOpts: { numItems: number; cursor: string | null } },
@@ -405,6 +410,83 @@ describe('catalog Anime durable data migration', () => {
       lane: 'reviews',
       paginationOpts,
     })).resolves.toMatchObject({ aggregateMismatch: 1 })
+  })
+
+  test('resets changed and lost aggregate checkpoints before restarting from null', async () => {
+    const t = createHarness()
+    const ids = await seedLegacyGraph(t)
+    await t.mutation(backfillAnimeRefs, { lane: 'reviews', paginationOpts })
+    await t.mutation(backfillAnimeRefs, { lane: 'anime-review-stats', paginationOpts })
+    const changedReviewId = await t.run(async (ctx) => {
+      const reviewId = await ctx.db.insert('reviews', {
+        userId: ids.userId,
+        anilistId: 101,
+        animeId: ids.animeId,
+        requestId: 'checkpoint-change',
+        state: 'published',
+        rating: 71,
+        summary: 'Checkpoint change',
+        containsSpoiler: false,
+        bodyJson: '{}',
+        visibility: 'public',
+        publishedAt: 101,
+        updatedAt: 101,
+        activityState: 'active',
+        newestOrderKey: 'checkpoint-change',
+        highRatingOrderKey: 'checkpoint-change',
+        lowRatingOrderKey: 'checkpoint-change',
+        searchText: 'checkpoint change',
+        ratingBand: '70-79',
+      })
+      await ctx.db.patch('animeReviewStats', ids.statsId, {
+        count: 2,
+        ratingSum: 162,
+        bands: [1, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+        updatedAt: 101,
+      })
+      return reviewId
+    })
+    const first = await t.mutation(verifyReviewAggregate, {
+      statsId: ids.statsId,
+      paginationOpts: { numItems: 1, cursor: null },
+    })
+    expect(first.isDone).toBe(false)
+    await t.run(async (ctx) => {
+      await ctx.db.patch('reviews', changedReviewId, { rating: 70, updatedAt: 102 })
+      await ctx.db.patch('animeReviewStats', ids.statsId, { ratingSum: 161, updatedAt: 102 })
+    })
+    await expect(t.mutation(verifyReviewAggregate, {
+      statsId: ids.statsId,
+      paginationOpts: { numItems: 1, cursor: first.continueCursor },
+    })).rejects.toThrow('changed after')
+    await expect(t.mutation(resetReviewAggregateVerification, {
+      statsId: ids.statsId,
+    })).resolves.toEqual({ statsId: ids.statsId, checkpointDeleted: true, receiptDeleted: false })
+    const restarted = await t.mutation(verifyReviewAggregate, {
+      statsId: ids.statsId,
+      paginationOpts: { numItems: 20, cursor: null },
+    })
+    expect(restarted).toMatchObject({ isDone: true, count: 2, ratingSum: 161, aggregateMismatch: 0 })
+
+    const lostCursor = await t.mutation(verifyReviewAggregate, {
+      statsId: ids.statsId,
+      paginationOpts: { numItems: 1, cursor: null },
+    })
+    expect(lostCursor.isDone).toBe(false)
+    await expect(t.mutation(resetReviewAggregateVerification, {
+      statsId: ids.statsId,
+    })).resolves.toEqual({ statsId: ids.statsId, checkpointDeleted: true, receiptDeleted: false })
+    await expect(t.mutation(verifyReviewAggregate, {
+      statsId: ids.statsId,
+      paginationOpts: { numItems: 20, cursor: null },
+    })).resolves.toMatchObject({ isDone: true, aggregateMismatch: 0 })
+    await expect(t.mutation(resetReviewAggregateVerification, {
+      statsId: ids.statsId,
+    })).resolves.toEqual({ statsId: ids.statsId, checkpointDeleted: false, receiptDeleted: true })
+    await expect(t.mutation(verifyReviewAggregate, {
+      statsId: ids.statsId,
+      paginationOpts: { numItems: 20, cursor: null },
+    })).resolves.toMatchObject({ isDone: true, aggregateMismatch: 0 })
   })
 
   test('fails with table and document evidence when provider mapping is missing', async () => {

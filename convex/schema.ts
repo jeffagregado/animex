@@ -18,6 +18,15 @@ const profileMediaKindValidator = v.union(
   v.literal('banner'),
 )
 
+const durableAnimeLaneValidator = v.union(
+  v.literal('user-anime-entries'),
+  v.literal('anime-rewatches'),
+  v.literal('anime-milestones'),
+  v.literal('reviews'),
+  v.literal('feed-cards'),
+  v.literal('anime-review-stats'),
+)
+
 const catalogPersonKindValidator = v.union(
   v.literal('character'),
   v.literal('staff'),
@@ -341,7 +350,7 @@ export default defineSchema({
     .index('by_anilist_id', ['anilistId'])
     .index('by_anime_entity', ['animeId']),
   catalogAnimeDataVerificationState: defineTable({
-    lane: v.string(),
+    lane: durableAnimeLaneValidator,
     nextCursor: v.string(),
     missingAnimeId: v.number(),
     mismatchedProviderRef: v.number(),
@@ -353,7 +362,7 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index('by_lane', ['lane']),
   catalogAnimeDataVerificationReceipts: defineTable({
-    lane: v.string(),
+    lane: durableAnimeLaneValidator,
     verifiedAt: v.number(),
   }).index('by_lane', ['lane']),
   catalogAnimeAggregateVerificationState: defineTable({
