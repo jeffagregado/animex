@@ -401,8 +401,8 @@ Remaining P3 only: 514.27 kB client chunk; Resend sandbox only with no verified 
 - [x] Lock Anime Detail Visual Direction to `docs/visual/anime-details/anime-details-desktop-frieren.png` and `docs/visual/anime-details/anime-details-mobile-frieren.png`, with Overview metadata only, Reviews/Characters/Staff in their own tabs, no duplicate My Anime card, and no top/right-column character lists.
 - [x] Lock User Profile final-state Visual Direction to `docs/visual/user-profile/user-profile-desktop-mobile.png`; Phase 7 keeps its non-social cover/avatar, tabs, stats, favorites, and viewer-allowed Activity.
 - [x] Lock Quick Search Visual Direction to `docs/visual/quick-search/quick-search-modal.png` for desktop and `docs/visual/quick-search/quick-search-mobile-drawer.png` for mobile, with dimmed overlays, compact grouped results, no category selector, and a bottom-pinned mobile search field.
-- [x] Lock AniList Metadata Flow: search returns candidates, selected AniList `id` is stored as canonical external anime ID, and metadata is fetched by AniList `id`.
-- [x] Lock Discover Anime Population MVP: Discover uses AnimeX-managed AniList list caches, stores lightweight anime summaries by AniList `id`, and hydrates full anime metadata only when an anime detail page opens.
+- [x] Lock AniList Metadata Flow: search returns candidates, selected AniList `id` remains the canonical external provider ID, and metadata is fetched server-side by that provider ID behind AnimeX public identity.
+- [x] Lock Discover Anime Population MVP: Discover uses AnimeX-managed AniList list caches, stores lightweight anime summaries by server-only provider `id`, materializes opaque `publicId` for browser rows, and hydrates full anime metadata only when an anime detail page opens.
 - [x] Decide desktop header navigation does not show `Community` in MVP.
 - [x] Decide desktop header navigation does not show `Stats` in MVP.
 - [x] Note future Manga lists for Discover design.
@@ -875,7 +875,7 @@ Status: COMPLETE AND CLOSED. Implemented, validated, and merged locally into `de
 - [x] Add separate Public/Private Profile Visibility; Private shows header identity/bio and a privacy notice to non-owners.
 - [x] Exclude Favorite Genres, Anime List, and every social control/count from Phase 7.
 - [x] Plan guided 1:1 avatar and 4:1 banner crop with `react-easy-crop`, Convex Storage validation, replacement, removal, and cleanup.
-- [x] Add Character `/characters/:id/:slug` and Staff `/staff/:id/:slug` destinations before Quick Search.
+- [x] Add Character `/characters/$publicId/$slug` and Staff `/staff/$publicId/$slug` destinations before Quick Search.
 - [x] Assign locked desktop modal and mobile drawer Quick Search implementation to Phase 7.
 - [x] Open Quick Search from desktop header Search for signed-out and signed-in visitors.
 - [x] Open the locked Base UI-backed mobile Search drawer from the bottom Search tab, with scrollable results and the search field pinned at the bottom.
@@ -967,25 +967,31 @@ Validation: initial red run failed 14/52 focused tests; final focused run passes
 
 # Post-Phase 7 Public Catalog Identity
 
-Status: IN PROGRESS. Detailed plan saved at `docs/superpowers/plans/2026-07-18-post-phase-7-public-catalog-identity.md`. Safe staged rollout approved: additive Tasks 1-4, dev backfill/verification, then public cutover. Phase 8 stays blocked until this phase closes.
+Status: IMPLEMENTATION COMPLETE; AUTHENTICATED QA BLOCKED. Additive registry, dev backfill/verification, durable entity refs, and publicId cutover are implemented on `jeff-cx/public-catalog-identity`. Automated gates and signed-out responsive browser QA pass. Both configured dev QA logins are rejected, so authenticated browser checks remain open. Safe staged rollout remains active; Phase 8 stays blocked.
 
 - [x] Lock `catalogEntities._id` as client-facing `publicId`; keep provider mappings separate and server-only.
 - [x] Lock cache-preserving architecture: existing cache rows, AniList keys, TTLs, leases, and image URLs remain unchanged.
 - [x] Write and self-review detailed implementation, migration, rollback, validation, and browser QA plan.
-- [ ] Add catalog identity schema, indexed registry, strict contracts, and integration tests.
-- [ ] Register identities during bounded cache commits without changing cache storage contracts.
-- [ ] Add resumable internal identity backfill and independent verification for every existing provider-ID source.
-- [ ] Add additive Anime entity references to user Anime, rewatch, milestone, Review, feed, and Review-stat records.
-- [ ] Backfill and verify durable references and milestone source keys before schema tightening.
-- [ ] Split provider/cache models from strict public browser contracts.
-- [ ] Materialize public identities for Discover, Quick Search, Character search, and Staff search.
-- [ ] Replace Anime, Character, Staff, Review, feed, Profile, and user Anime client surfaces with `publicId`.
-- [ ] Rename canonical route params to `$publicId`; preserve one-way redirects from legacy numeric URLs.
-- [ ] Push additive Convex dev schema, run bounded backfills to completion, and require zero mismatches before public cutover.
-- [ ] Retain migration tooling and legacy durable fields until separately approved production migration and final schema tightening.
-- [ ] Update current-state data-flow docs after implementation; keep Metadata Image Proxy untouched and unscheduled.
-- [ ] Run full tests, TypeScript, build, client AniList-ID/endpoint scans, Fallow, React Doctor, integrated review, and browser QA at 390/768/1280.
+- [x] Add catalog identity schema, indexed registry, strict contracts, and integration tests.
+- [x] Register identities during bounded cache commits without changing cache storage contracts.
+- [x] Add resumable internal identity backfill and independent verification for every existing provider-ID source.
+- [x] Add additive Anime entity references to user Anime, rewatch, milestone, Review, feed, and Review-stat records.
+- [x] Backfill and verify durable references and milestone source keys before schema tightening.
+- [x] Split provider/cache models from strict public browser contracts.
+- [x] Materialize public identities for Discover, Quick Search, Character search, and Staff search.
+- [x] Replace Anime, Character, Staff, Review, feed, Profile, and user Anime client surfaces with `publicId`.
+- [x] Rename canonical route params to `$publicId`; legacy positive decimal route IDs resolve server-side before provider-backed reads. Signed-out browser QA proves one-way Anime and Character redirects to opaque canonical URLs.
+- [x] Push additive Convex dev schema, run bounded backfills to completion, and verify zero migration mismatches before public cutover.
+- [x] Retain migration tooling and legacy durable fields; production migration and final schema tightening remain deferred pending separate approval.
+- [x] Update current-state data-flow docs; Metadata Image Proxy stays untouched and unscheduled.
+- [x] Run full tests, TypeScript, build, client AniList-ID/endpoint scans, Fallow, React Doctor no-regression comparison, and integrated review.
+- [x] Run signed-out browser QA at 390/768/1280 for Discover, Quick Search, Anime, Character, Staff, Home, Reviews, legacy redirects, overflow, and console errors.
+- [ ] Re-run authenticated Status, Score, Favorite, Rewatch, Review creation/detail, Feed, and Profile browser QA when valid dev QA credentials are available.
 - [ ] Close phase and request approval before Phase 8.
+
+Dev migration receipt: identity lanes covered 199 Anime summaries, 64 Anime details, 4 Anime people pages, 49 Catalog Person details, 13 Catalog Person work pages, 5 user Anime rows, 0 rewatches, 4 milestones, 2 Reviews, 6 feed cards, and 1 Review-stat row. Two full identity verification cycles reached terminal cursors across 140 pages with zero missing/conflicting mappings. A bounded 49-row Catalog Person repair then materialized 24 provider references embedded in biographies and independently verified zero missing/conflicting mappings. Durable first pass patched `5/0/4/2/7/1` rows for user Anime/rewatches/milestones/Reviews/feed/stats; reruns patched zero. One authorized stale derived milestone feed card was deleted after projection-only verification; no Review, Post, or authoritative milestone source row was deleted. Final durable verification and aggregate checks returned zero issues; production migration and required-field tightening remain deferred.
+
+Validation receipt: 152 test files pass / 2 skipped; 1030 tests pass / 3 skipped. Root and Convex TypeScript checks, client + SSR build, route generation, client-bundle/source-boundary scans, and `git diff --check` pass. Fallow reports zero introduced findings; React Doctor remains at the inherited 63/100 baseline with the unchanged Discover render-time ref finding outside this phase. Signed-out browser QA has no overflow or console errors and proves opaque public links plus real Anime/Character legacy redirects. Staff work links pass after the biography repair. Authenticated QA remains blocked only by rejected configured dev credentials.
 
 # Phase 8 Notifications, Privacy, Moderation
 

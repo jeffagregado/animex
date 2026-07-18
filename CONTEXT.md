@@ -709,7 +709,7 @@ The locked visual direction for the AnimeX Discover page. Desktop follows `docs/
 _Avoid_: Feed page, post composer, active Manga lists, profile utility stats, Quick Search clone
 
 **Discover Anime Population**:
-The MVP Discover page uses AnimeX-managed list caches populated from the AniList GraphQL API. When a user opens Discover, AnimeX reads cached Discover sections such as Trending Anime, Seasonal Anime, Recommendations, and the local Genres list from Convex; Manga remains a muted future placeholder. If a list cache is missing or expired, a server-side fetch calls AniList list queries, normalizes lightweight anime summaries by AniList `id`, stores the section anime IDs with `fetchedAt` and `expiresAt`, and renders Discover from AnimeX cache rather than directly from the AniList response. Discover cards do not hydrate full anime details for every anime; they use summary fields such as AniList `id`, titles, format, season year, cover image, optional banner image, genres, popularity, average score for external ranking, and trending value. Full description, studio, staff, characters, relations, trailer, and external links load later when the user opens the anime detail page, which follows AniList Metadata Flow by fetching canonical metadata by selected AniList `id`. MVP refresh cadence is a few hours for Trending Anime, daily for Seasonal Anime, daily for Recommendations, and local/static for Genres. If AniList refresh fails for a missing or expired section, the section shows a clear metadata loading error instead of fake data or silent substitution.
+The MVP Discover page uses AnimeX-managed list caches populated from the AniList GraphQL API. When a user opens Discover, AnimeX reads cached Discover sections such as Trending Anime, Seasonal Anime, Recommendations, and the local Genres list from Convex; Manga remains a muted future placeholder. If a list cache is missing or expired, a server-side fetch calls AniList list queries, normalizes lightweight anime summaries by provider `id`, ensures AnimeX catalog identity, stores the section anime IDs with `fetchedAt` and `expiresAt`, and returns opaque `publicId` rows to the browser. Discover cards do not hydrate full anime details for every anime; they use public display fields while server cache rows retain provider IDs. Full description, studio, staff, characters, relations, trailer, and external links load later when the user opens the publicId anime detail route. MVP refresh cadence is a few hours for Trending Anime, daily for Seasonal Anime, daily for Recommendations, and local/static for Genres. If AniList refresh fails for a missing or expired section, the section shows a clear metadata loading error instead of fake data or silent substitution.
 _Avoid_: Full detail hydration for every Discover card, rendering raw AniList responses directly, fake Discover data after API failure, active Manga lists in MVP
 
 **Anime Detail Visual Direction**:
@@ -725,7 +725,7 @@ The locked Quick Search visual direction follows `docs/visual/quick-search/quick
 _Avoid_: Discover page clone, AniList column clone, active Manga results in MVP, full search page as default interaction
 
 **AniList Metadata Flow**:
-The MVP anime metadata flow uses the AniList GraphQL API. Search requests return candidate anime results for Quick Search, Discover linking, and anime detail entry points; AnimeX must let the user or app select the exact anime candidate, store the AniList `id` as the canonical external anime identifier, and fetch canonical anime metadata by AniList `id` after selection. Search rank is not treated as source of truth because queries can return specials, shorts, or related entries before the main series. Stored metadata may include AniList `id`, MAL `idMal` when available, titles, format, status, season, season year, episodes, duration, genres, description, studio, cover image, banner image, and AniList URL. AniList API errors should fail clearly at the metadata operation boundary rather than silently substituting another anime.
+The MVP anime metadata flow uses the AniList GraphQL API behind server-only provider/cache modules. Search requests return candidate anime results for Quick Search, Discover linking, and anime detail entry points; AnimeX ensures a catalog entity and returns opaque `publicId` to browser contracts. AniList numeric `id` remains canonical external provider identity and cache key, never public route or durable client identity. Search rank is not treated as source of truth because queries can return specials, shorts, or related entries before the main series. Stored cache metadata may include provider `id`, MAL `idMal` when available, titles, format, status, season, season year, episodes, duration, genres, description, studio, cover image, banner image, and AniList URL. AniList API errors should fail clearly at the metadata operation boundary rather than silently substituting another anime.
 _Avoid_: Search-first match as canonical anime, title-only anime records, silent metadata fallback, wrong related special as main anime
 
 **Metadata Image Proxy**:
@@ -2024,10 +2024,10 @@ Developer: Which Quick Search visual direction is locked?
 Domain Expert: Desktop Quick Search uses the locked modal shell at `docs/visual/quick-search/quick-search-modal.png`; Phase 7 removes its category selector and uses capped Anime, Character, Staff, and eligible User groups. Mobile uses `docs/visual/quick-search/quick-search-mobile-drawer.png`, with a dimmed-page Base UI-backed drawer, scrollable groups, and a bottom-pinned search field. Manga remains future-only.
 
 Developer: How does AnimeX get anime metadata?
-Domain Expert: AnimeX uses the AniList GraphQL API. Search returns candidates, then AnimeX stores the selected AniList `id` and fetches metadata by that ID so specials or related entries from search ranking do not become the canonical anime by accident.
+Domain Expert: Server-only AniList GraphQL returns candidates. AnimeX stores provider `id` in cache/provider rows, ensures a catalog entity, and returns opaque `publicId` to browser contracts. Provider ID selects metadata; it is not public route or durable client identity.
 
 Developer: How does Discover populate anime cards in MVP?
-Domain Expert: Discover reads AnimeX-managed list caches for Trending Anime, Seasonal Anime, Recommendations, and local Genres. Missing or expired list caches refresh server-side from AniList, store lightweight anime summaries by AniList `id`, and render from AnimeX cache. Full anime details hydrate only when the user opens an anime detail page.
+Domain Expert: Discover reads AnimeX-managed list caches for Trending Anime, Seasonal Anime, Recommendations, and local Genres. Missing or expired caches refresh server-side from AniList, retain provider IDs in cache, ensure catalog identities, and render lightweight summaries with opaque `publicId`. Full details hydrate only when user opens publicId Anime Detail.
 
 Developer: How should favorite anime appear on profiles?
 Domain Expert: Profiles preview up to 10 latest favorited anime and include a see more option for the full favorite anime list. This is not a curated top 10.
@@ -2054,3 +2054,23 @@ Domain Expert: Character and Staff use the neutral Anime Detail geometry and exp
 
 Developer: Which Phase 7 browser fixtures remain?
 Domain Expert: None remain open. Second-account private-profile, real media lifecycle, and Storage failure/retry checks have recorded browser evidence. User confirmed Phase 7 closure for deep pagination; Codex did not independently exercise that fixture. Phase 7 is merged locally into `dev`; no production push or deploy is claimed.
+
+## Post-Phase 7 Public Catalog Identity current state
+
+Developer: What is public catalog identity?
+Domain Expert: `catalogEntities._id` is serialized as opaque `publicId`. `catalogProviderRefs` maps `(provider, kind, providerId)` to one entity. AniList numeric IDs stay server-only provider/cache keys; Character and Staff IDs remain separate kind namespaces.
+
+Developer: Which catalog routes are canonical?
+Domain Expert: `/anime/$publicId/$slug`, `/characters/$publicId/$slug`, and `/staff/$publicId/$slug`; Review editor uses `/anime/$publicId/$slug/reviews/new`. Route identity server function validates opaque IDs, resolves legacy positive decimal provider IDs before provider-backed reads, and returns safe route state. Signed-out browser QA proves real Anime and Character provider-ID URLs redirect one way to opaque canonical publicId URLs.
+
+Developer: How do cache and provider flows work?
+Domain Expert: AniList GraphQL calls stay in server-only modules. Existing AniList-keyed summary/detail/people/person/work rows, ordered section IDs, image URLs, TTLs, and lease keys remain unchanged. Cache commits ensure bounded catalog identities; reads reverse-resolve `publicId` to provider IDs server-side. Missing or conflicting mappings fail explicitly; no provider-ID fallback.
+
+Developer: Which durable records carry Anime entity refs?
+Domain Expert: Additive optional `animeId` refs cover user Anime, rewatches, milestones, Reviews, feed cards, and Review aggregates. Entity indexes drive public reads/writes; legacy `anilistId` fields/indexes remain for migration and provider consistency until separately approved production backfill and schema tightening. Milestone feed source keys use entity IDs after receipt-gated migration.
+
+Developer: What dev migration evidence exists?
+Domain Expert: Identity lanes covered 199 summaries, 64 details, 4 Anime people pages, 49 person details, 13 work pages, 5 user Anime rows, 0 rewatches, 4 milestones, 2 Reviews, 6 feed cards, and 1 Review-stat row. Two identity verification cycles reached terminal cursors across 140 pages with zero missing/conflicting mappings. A bounded repair of 49 person-detail rows materialized 24 identities referenced by biography links and independently verified zero missing/conflicting mappings. Durable first pass patched `5/0/4/2/7/1`; reruns patched zero. One explicitly authorized stale derived milestone feed card was deleted after projection-only verification; no Review, Post, or authoritative milestone source row was deleted. Final durable/aggregate checks returned zero issues.
+
+Developer: What remains open?
+Domain Expert: Automated gates, integrated review, and signed-out responsive browser QA pass. Authenticated Status, Score, Favorite, Rewatch, Review creation/detail, Feed, and Profile browser checks remain open because both configured dev QA logins are rejected. Production migration, migration-tool removal, legacy-field removal, and required-field schema tightening require separate approval. Metadata Image Proxy remains untouched and unscheduled. Phase 8 remains blocked.

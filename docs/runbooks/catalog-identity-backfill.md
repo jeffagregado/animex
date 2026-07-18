@@ -1,5 +1,9 @@
 # Catalog Identity Backfill
 
+## Current rollout state
+
+Additive catalog identity and durable-reference migration is verified on Convex `dev`. PublicId server/UI cutover is staged on `jeff-cx/public-catalog-identity`; automated gates and signed-out responsive browser QA pass. Authenticated browser QA is blocked by rejected configured dev credentials. Production backfill, migration-tool removal, legacy-field removal, and required-field schema tightening are deferred until separate explicit approval. Metadata Image Proxy is untouched and remains unscheduled.
+
 ## Gate
 
 Deploy additive identity schema and internal migration functions first. Stop on deploy error.
@@ -171,12 +175,13 @@ Development deployment verification completed on 2026-07-18:
 - Additive schema and functions synced successfully.
 - Final identity source rows: summaries `199`, details `64`, Anime people pages `4`, person details `49`, person work pages `13`, user Anime `5`, rewatches `0`, milestones `4`, Reviews `2`, feed cards `6`, Review stats `1`.
 - Both full identity verification cycles reached terminal cursors across `140` pages with zero missing mappings and zero conflicts.
+- A later Catalog Person biography repair processed `49` person-detail rows with page size `25`, created `24` previously omitted Anime/Character/Staff mappings, and independently verified zero missing mappings and zero conflicts.
 - Durable first pass patched user Anime/rewatches/milestones/Reviews/feed/stats as `5/0/4/2/7/1`; full reruns patched zero.
-- One mismatched derived milestone feed card was explicitly purged after approval. No Review, post, or authoritative milestone row was deleted. Repair rerun deleted zero.
+- One stale derived milestone feed card was explicitly deleted after deployment-specific approval and projection-only verification. No Review, Post, or authoritative milestone source row was deleted. Repair rerun deleted zero.
 - Final durable verification processed `5/0/4/2/6` rows across the first five lanes with every counter zero.
 - One aggregate target and one public Review verified with zero mismatch; the stats lane verified one row with every counter zero.
 - Milestone source-key migration patched `4` of `6` feed cards; both required reruns patched zero.
-- Local validation passed `140` test files and `972` tests, with `2` files and `3` tests skipped; root and Convex TypeScript checks passed.
+- Final local validation passed `152` test files and `1030` tests, with `2` files and `3` tests skipped; root and Convex TypeScript, client + SSR build, client-boundary scans, Fallow new-only audit, and signed-out responsive browser QA passed. Authenticated browser QA remains open because both configured dev QA logins were rejected.
 
 ## Production
 

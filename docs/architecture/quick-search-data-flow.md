@@ -1,38 +1,26 @@
 # Quick Search data flow
 
-## Entry and surface ownership
+## Surface and request
 
-`PublicShell` and `LandingPage` mount the shared public auth-state provider and `QuickSearchProvider`; `AuthPageShell` mounts the guest provider. Desktop header Search and the mobile bottom Search tab pass their trigger to the same search surface. Signed-out and incomplete sessions can search Anime, Characters, and Staff. Only a complete authenticated profile enables User results.
+Desktop header Search and mobile bottom Search tab share `QuickSearchProvider`. Signed-out/incomplete sessions search Anime, Characters, and Staff. Complete authenticated profiles also search Users. Manga remains future-only.
 
-## Request contract
-
-| Field | Current contract |
+| Field | Current state |
 | --- | --- |
-| Entry | Shared desktop header Search or mobile Search tab. |
-| Input | One searchbox value normalized to 2–100 characters; 300 ms debounce. |
-| Validation | `normalizeSearchQuery`, strict server-function schemas, strict provider response schemas, and complete-profile auth gate for Users. |
-| Transform | `searchQuickCatalog` makes one server AniList request for Anime, Character, and Staff. `searchUsersPreview` makes an authenticated server read and returns identity-only User rows. |
-| Storage | Catalog results are client-only TanStack Query data with 60-second stale time. User previews read `userSearchDocuments`; no Quick Search provider rows persist in Convex. |
-| External calls | Server GET → `searchQuickCatalogFromAniList` → AniList; optional authenticated TanStack Start server function → `userSearch:searchPreview` through `getAuthProxy`. Browser never calls AniList directly. |
-| Retry | Shared AniList transport uses bounded timeout/three-attempt retry with short `Retry-After`; TanStack retries are disabled. Catalog and User lanes expose separate Retry actions. |
-| Error | Invalid input, strict parse failure, provider failure, User auth/provider failure, empty, and partial-success states remain explicit. A failed User lane does not erase successful catalog rows. |
-| Output | Up to five rows each for Anime, Characters, Staff, and eligible Users, grouped with provider-neutral View all links. Destination navigation starts only after the overlay closes. |
-| Owner | `src/features/quick-search/{server,shared,ui}`, `src/features/profile/server/user-search.functions.ts`, and shell/landing/auth route consumers. |
+| Entry | Desktop Base UI Dialog or mobile Base UI Drawer; one shared searchbox. |
+| Input | Normalized 2–100 character query with 300 ms debounce. |
+| Validation | `normalizeSearchQuery`, strict server Zod schemas, strict provider response schemas, and complete-profile auth gate for User results. |
+| Transform | `searchQuickCatalog` makes one server AniList request for Anime/Character/Staff, ensures bounded catalog identities, and maps rows/destinations to opaque `publicId`. `searchUsersPreview` uses an authenticated server facade. |
+| Storage | Catalog results stay client-only TanStack Query data with 60-second stale time. User previews read `userSearchDocuments`; no provider rows persist in Quick Search. |
+| External calls | Server GET → AniList transport for catalog lanes; authenticated TanStack Start facade → Convex User Search. Browser never calls AniList or Convex directly for catalog search. |
+| Retry | Bounded AniList timeout/three-attempt/short Retry-After policy. TanStack retries disabled; each lane exposes explicit Retry and preserves successful sibling lanes. |
+| Error | Invalid/short query, strict parse, identity mapping, provider/auth, empty, and partial-success states remain explicit. No fabricated or stale provider fallback. |
+| Output | Up to five Anime, Character, Staff, and eligible User rows. Catalog rows contain `publicId`, labels, media URL, slug/destination; User rows contain identity-only fields. |
+| Owner | Server/contracts/UI: `src/features/quick-search`; User facade: `src/features/profile/server/user-search.functions.ts`; identity: `src/features/catalog-identity`; surface consumers: shell, landing, and auth routes. |
 
-`useQuickSearch` scopes request state by normalized query and complete profile ID. A response renders only when its stored query still matches the current query, so rapid edits cannot display stale rows. Manga is not a group and remains future-only.
+## Navigation and privacy
 
-## User identity rendering
+Request state is scoped by normalized query and complete profile ID; stale responses cannot render after rapid edits. On selection, `useCloseNavigation` closes the surface, clears query state, then navigates. View all remains provider-neutral: `/discover?q=`, `/search/characters?q=`, `/search/staff?q=`, `/search/users?q=`. Catalog rows use rectangular media; User rows use shared `UserAvatar`. No provider ID appears in UI props, hrefs, or client logs.
 
-User rows use the shared circular `UserAvatar` instead of catalog media. Quick Search User rows use a 44×44 box (`md`); `/search/users` uses a 64×64 box (`search`). Missing and broken URLs use the same circular fallback geometry and one uppercase initial. Anime, Character, and Staff rows keep their existing rectangular media renderer.
+## Validation state
 
-## UI state and navigation
-
-`useSearchSurface` selects Base UI Dialog at the existing `48rem` breakpoint and a Base UI-backed Drawer below it. Desktop keeps the input above an independently scrollable result region. Mobile keeps the result region scrollable and the search field pinned at the bottom above the safe-area inset; there is no full-height scroll trap.
-
-The input owns ArrowUp/ArrowDown/Enter selection. Dialog/Drawer owns title/description, Escape, backdrop/close behavior, visible focus, and trigger restoration. Prompt, loading, partial success, empty, lane error, retry, and rapid-query status are announced by the existing model status/live region.
-
-`useCloseNavigation` stores the selected destination, closes the active surface, waits for `onOpenChangeComplete(false)`, resets query state, then navigates. View all routes remain provider-neutral: Anime `/discover?q=`, Characters `/search/characters?q=`, Staff `/search/staff?q=`, Users `/search/users?q=`.
-
-## Phase 7 closure
-
-No browser fixture remains open. Second-account private-profile, Profile media lifecycle, and the Phase 7 failure fixture have recorded browser evidence. User confirmed closure for deep result-page pagination; Codex did not independently exercise that fixture. Failure injection used Storage HTTP 503; provider/User variants were not separately injected.
+Identity materialization and cache-preserving server boundaries are implemented. Full tests, client scans, Fallow, React Doctor, integrated review, and responsive browser QA remain pending for this cutover.

@@ -1,34 +1,30 @@
 # Anime Detail data flow
 
-## Entry and route
+## Route and boundary
 
-The canonical public route is `/anime/$anilistId/$slug`. The parent parses a positive safe AniList ID and hydrates `['anime-detail', anilistId]` through `getAnimeDetail` with a 15-minute browser stale time. Missing or stale slugs redirect only after a ready detail is loaded. `tab=overview|reviews|characters|staff` is normalized; Overview omits the query and tab changes preserve browser history while swapping only the main panel.
+Canonical route: `/anime/$publicId/$slug`. The parent route resolves `publicId` through `getCatalogRouteIdentity` before any provider-backed query. Opaque IDs use `catalogEntities._id`; positive decimal legacy route IDs resolve through the server-only AniList mapping. Browser proof of one-way legacy canonical redirect remains a pending gate.
 
-## Shared page geometry
+`tab=overview|reviews|characters|staff` stays URL state. Missing or stale slugs replace only after ready metadata. Overview omits its default query; tab navigation preserves history and scroll position.
 
-Anime Detail now renders the neutral required-slot `DetailPageLayout` shared with Character and Staff. It owns only responsive geometry: `max-w-[1480px]`, current gutters/bottom spacing, one main column below `lg`, `minmax(0,3fr)` main plus `minmax(17rem,1fr)` aside at `lg`, and `min-w-0` containment. Anime-specific hero, controls, tab rail, content panels, sidebar ordering, loading, empty, and error behavior remain owned by `src/features/anime-detail/ui` and are unchanged.
+## Flow contract
 
-## Public detail flow
+| Field | Current state |
+| --- | --- |
+| Entry | TanStack file routes under `src/routes/_public/anime/$publicId`; review editor under `_protected/anime/$publicId/$slug/reviews/new`. |
+| Input | Route `publicId`, display slug, normalized tab, or one positive page number for Character/Staff people. |
+| Validation | Strict Zod server functions parse opaque public IDs and page/kind. Catalog identity gateway validates kind, mapping cardinality, and server token. Convex validators remain final authority. |
+| Transform | Server reverse-resolves `publicId` to AniList provider ID, reads provider/cache DTOs, then maps root Anime, related Anime, recommendations, Characters, Staff, and voice actors back to opaque `publicId` fields. UI receives no provider ID. |
+| Storage | `animeSummaries`, `animeDetails`, `animeDetailPeoplePages`, and leases retain AniList-keyed rows, ordered data, image URLs, and 24-hour TTL. Additive durable `animeId` entity refs back user Anime state; legacy provider fields stay during migration. |
+| External calls | Server-only `anilist-detail.server.ts` and shared AniList transport. Browser and Convex actions never call AniList. Metadata Image Proxy is not involved. |
+| Retry | Cache miss/expiry acquires existing detail or people lease, fetches, validates, commits, releases, rereads. Lease contention waits bounded times; no stale or fabricated fallback. |
+| Error | Invalid/missing identity, missing provider mapping, cache corruption, not-found, upstream, rate-limit, lease, commit, and reread failures surface explicit safe status. Provider IDs are not included in browser errors. |
+| Output | Ready public detail/people state, not-found, or retryable error. Anime detail UI keeps existing hero, controls, tabs, sidebar, loading, empty, and error geometry. |
+| Owner | Routes/UI: `src/routes/_public/anime` and `src/features/anime-detail`; identity: `src/features/catalog-identity` and `convex/catalogIdentity*`; cache: `src/features/anime-detail/server` and `convex/animeDetailCache*`; durable state: `convex/userAnime.ts`, `convex/reviews.ts`, `convex/feed.ts`. |
 
-1. Route loader calls validated TanStack Start `getAnimeDetail` (`GET`) in `src/features/anime-detail/server/anime-detail.functions.ts`.
-2. `anime-detail-cache.server.ts` reads `animeDetailCache.readDetail` from Convex; a fresh entry returns the validated 24-hour detail payload.
-3. Missing or expired detail acquires `detail:<id>` with the existing `DISCOVER_CACHE_WRITE_TOKEN`, fetches AniList server-side, validates/normalizes detail and summary, atomically commits both, then rereads. Lease contention rereads up to six times at 500 ms and fails explicitly when exhausted.
-4. Convex stores `animeDetails`, normalized `animeSummaries`, `animeDetailPeoplePages`, and `animeDetailCacheLeases`. Convex owns validation and lease ownership; browser never calls AniList and no Convex action is used.
+## Cache and durable identity
 
-Detail cache TTL remains 24 hours. Not-found, upstream, rate-limit, malformed payload, missing environment, lease contention, and commit/reread failures remain explicit; expired data is never served.
+Cache refresh ensures bounded `(anilist, kind, providerId)` mappings in the same Convex write boundary, but does not change cache schema, TTL, lease keys, or image URLs. Cache reads reverse-resolve public identity server-side. Durable status, score, favorite, rewatch, and milestone operations accept AnimeX entity IDs; server checks entity/provider agreement and cached summary before writes. Missing mappings fail explicitly.
 
-## AniList and people pages
+## Validation state
 
-`anilist-detail.server.ts` remains server-only and reuses shared AniList transport. Full detail is capped at five related and five recommendations. Initial Characters and Staff pages contain 24 items. `AnimePeopleGrid` requests one explicit next page, deduplicates by AniList person ID, retains successful cards when a later page fails, and exposes Retry/Load more/end states. People pages use independent 24-hour leases and never fall back to expired pages.
-
-## Private user state
-
-After public auth state and Convex auth are complete, `AnimeUserControls` reads `userAnime.getMine` and owner-only rewatch data. Signed-out/incomplete users receive the existing validated auth destination with encoded `returnTo`. Convex `userAnime.ts` requires a verified profile and cached Anime summary for every read/mutation. Status, one-decimal score save/clear, favorite timestamp, rewatch record, and remove-latest operations remain atomic and owner-scoped. No private user state enters public detail cache records.
-
-## UI boundaries and output
-
-`AnimeDetailPage` renders loading, empty, not-found, and error states with stable shell dimensions. Ready detail renders one shared hero, controls, tab bar, and sidebar; only tab content swaps. Characters, Staff, Overview, and truthful empty Reviews stay in the main panel. Related Anime, Recommendations, Trailer, and External Links keep stable sidebar order. Owners: public transport/cache under `src/features/anime-detail/server` and `convex/animeDetailCache*`; private persistence/auth in `convex/userAnime.ts`, `convex/users.ts`, and `convex/schema.ts`; UI/routes in `src/features/anime-detail` and `src/routes/_public/anime`.
-
-## Phase 7 closure
-
-No browser fixture remains open. Second-account private-profile, real Profile media lifecycle, and the Phase 7 failure fixture have recorded browser evidence. User confirmed closure for deep people/work pagination; Codex did not independently exercise that fixture. Failure injection used Storage HTTP 503; provider variants were not separately injected.
+Dev additive sync and migration receipts are recorded in `docs/runbooks/catalog-identity-backfill.md`. Full automated gates, integrated review, and responsive browser QA are not yet claimed for this cutover.
