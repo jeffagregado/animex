@@ -45,8 +45,30 @@ export const getRootHead = () => ({
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   head: getRootHead,
+  notFoundComponent: RootNotFound,
   shellComponent: RootDocument,
 })
+
+/** Renders the root AnimeX missing-route boundary. */
+function RootNotFound() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-16 text-foreground">
+      <section className="w-full max-w-xl rounded-2xl border border-border bg-card p-8 text-center shadow-sm sm:p-12">
+        <p className="text-sm font-semibold tracking-[0.24em] text-cyan-400 uppercase">AnimeX</p>
+        <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Page not found</h1>
+        <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-muted-foreground sm:text-base">
+          The page you requested does not exist or may have moved.
+        </p>
+        <a
+          href="/home"
+          className="mt-8 inline-flex h-11 items-center justify-center rounded-lg bg-cyan-400 px-5 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-300 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-cyan-300/50"
+        >
+          Home
+        </a>
+      </section>
+    </main>
+  )
+}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
