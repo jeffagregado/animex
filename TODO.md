@@ -952,6 +952,19 @@ Status: COMPLETE. Direct TanStack versions are pinned, generated biography links
 
 Validation: preload test failed before implementation and passes 5/5 after it; full suite passes 131 files + 2 skipped / 927 tests + 3 skipped. TypeScript, client + SSR build, frozen offline install, Fallow, diff check, route-tree hash, and independent review pass. React Doctor reports the existing Discover ref-mutation error outside this patch. After the required hard reload for the rebuilt optimizer cache, 30 rapid Chrome hover transitions across 10 internal biography links caused no route preloads, new console/server errors, page hang, or unresponsive dialog. Chrome and the QA server were closed; port 3000 is free.
 
+# Catalog Person Voice Actor Tab
+
+Status: COMPLETE. Character has an all-language Voice Actors tab; Character and Staff render Facts above About in a full-width layout.
+
+- [x] Lock all-language actor pagination and cache completeness with red-green tests.
+- [x] Add Character-only `?tab=voice-actors` route and keyboard contracts.
+- [x] Move Facts above About and remove the Catalog Person right column.
+- [x] Reuse linked portrait cards in the Voice Actors tab.
+- [x] Run Convex sync, automated gates, review, responsive browser QA, and clean server shutdown.
+- [x] Update Catalog Person current-state documentation.
+
+Validation: initial red run failed 14/52 focused tests; final focused run passes 52/52. Convex sync, TypeScript, client + SSR build, Fallow, diff check, and the full suite pass: 131 files + 2 skipped / 929 tests + 3 skipped. React Doctor reports only the inherited Discover ref-mutation error outside this patch. Live Albedo and Staff QA passes at 390, 768, and 1280 px with all seven returned languages, working Staff links, keyboard navigation, canonical Staff tab handling, Facts-before-About order, no right column, no overflow, and clean browser/application logs. Browser tabs and worktree server are closed; port 3000 is free.
+
 # Phase 8 Notifications, Privacy, Moderation
 
 Status: SCOPE ADJUSTED. Detailed planning has not started.

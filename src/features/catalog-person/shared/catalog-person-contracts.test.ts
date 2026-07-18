@@ -24,6 +24,13 @@ const character: CatalogPersonDetail = {
   gender: 'Female',
   birthday: null,
   bloodType: null,
+  voiceActorScope: 'all-languages',
+  voiceActors: [{
+    id: 21,
+    name: 'Atsumi Tanezaki',
+    imageUrl: 'https://img.example/atsumi.webp',
+    language: 'Japanese',
+  }],
 }
 
 const anime = {
@@ -67,8 +74,10 @@ describe('catalog person contracts', () => {
   test('accepts only kind-specific tabs', () => {
     expect(parseCatalogPersonTab('character', undefined)).toBe('overview')
     expect(parseCatalogPersonTab('character', 'anime')).toBe('anime')
+    expect(parseCatalogPersonTab('character', 'voice-actors')).toBe('voice-actors')
     expect(parseCatalogPersonTab('staff', undefined)).toBe('overview')
     expect(parseCatalogPersonTab('staff', 'anime')).toBe('anime')
+    expect(() => parseCatalogPersonTab('staff', 'voice-actors')).toThrow('CATALOG_PERSON_TAB_INVALID')
     expect(() => parseCatalogPersonTab('character', 'works')).toThrow('CATALOG_PERSON_TAB_INVALID')
     expect(() => parseCatalogPersonTab('staff', 'works')).toThrow('CATALOG_PERSON_TAB_INVALID')
   })
@@ -86,6 +95,30 @@ describe('catalog person contracts', () => {
     expect(() => catalogPersonDetailSchema.parse({
       ...character,
       kind: 'staff',
+    })).toThrow()
+    const dubbedCharacter = catalogPersonDetailSchema.parse({
+      ...character,
+      voiceActors: [{ ...character.voiceActors[0], language: 'English' }],
+    })
+    expect(dubbedCharacter.kind).toBe('character')
+    if (dubbedCharacter.kind !== 'character') throw new TypeError('Expected Character detail.')
+    expect(dubbedCharacter.voiceActors[0]?.language).toBe('English')
+    expect(() => catalogPersonDetailSchema.parse({
+      ...character,
+      voiceActors: [{ ...character.voiceActors[0], language: ' ' }],
+    })).toThrow()
+    expect(() => catalogPersonDetailSchema.parse({
+      ...character,
+      voiceActors: [
+        character.voiceActors[0],
+        { ...character.voiceActors[0], language: 'English' },
+      ],
+    })).toThrow()
+    const { voiceActorScope: _voiceActorScope, ...legacyCharacter } = character
+    expect(() => catalogPersonDetailSchema.parse(legacyCharacter)).toThrow()
+    expect(() => catalogPersonDetailSchema.parse({
+      ...character,
+      voiceActors: [{ ...character.voiceActors[0], imageUrl: 'http://img.example/atsumi.webp' }],
     })).toThrow()
   })
 

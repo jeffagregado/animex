@@ -9,7 +9,7 @@ export const CATALOG_PERSON_PAGE_SIZE = 20 as const
 export const CATALOG_PERSON_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 export const catalogPersonKindSchema = z.enum(['character', 'staff'])
-const catalogPersonTabSchema = z.enum(['overview', 'anime'])
+const catalogPersonTabSchema = z.enum(['overview', 'anime', 'voice-actors'])
 
 export type CatalogPersonKind = z.infer<typeof catalogPersonKindSchema>
 export type CatalogPersonTab = z.infer<typeof catalogPersonTabSchema>
@@ -27,6 +27,13 @@ export interface CatalogAnimeSummary {
   seasonYear: number | null
 }
 
+export interface CatalogVoiceActor {
+  id: number
+  name: string
+  imageUrl: string | null
+  language: string
+}
+
 export type CatalogPersonDetail =
   | {
     kind: 'character'
@@ -39,6 +46,8 @@ export type CatalogPersonDetail =
     gender: string | null
     birthday: string | null
     bloodType: string | null
+    voiceActorScope: 'all-languages'
+    voiceActors: CatalogVoiceActor[]
   }
   | {
     kind: 'staff'
@@ -90,6 +99,13 @@ const catalogAnimeSummarySchema: z.ZodType<CatalogAnimeSummary> = z.object({
   seasonYear: z.number().int().positive().nullable(),
 }).strict()
 
+const catalogVoiceActorSchema: z.ZodType<CatalogVoiceActor> = z.object({
+  id: positiveSafeIntegerSchema,
+  name: z.string().trim().min(1),
+  imageUrl: nullableHttpsUrlSchema,
+  language: z.string().trim().min(1),
+}).strict()
+
 const characterDetailSchema = z.object({
   kind: z.literal('character'),
   id: positiveSafeIntegerSchema,
@@ -101,6 +117,12 @@ const characterDetailSchema = z.object({
   gender: nullableTextSchema,
   birthday: nullableTextSchema,
   bloodType: nullableTextSchema,
+  voiceActorScope: z.literal('all-languages'),
+  voiceActors: z.array(catalogVoiceActorSchema)
+    .refine(
+      (actors) => new Set(actors.map((actor) => actor.id)).size === actors.length,
+      { error: 'Character voice actors must have unique IDs.' },
+    ),
 }).strict()
 
 const staffDetailSchema = z.object({
@@ -196,6 +218,7 @@ export const parseCatalogPersonTab = (
 ): CatalogPersonTab => {
   if (value === undefined || value === 'overview') return 'overview'
   if ((kind === 'character' || kind === 'staff') && value === 'anime') return 'anime'
+  if (kind === 'character' && value === 'voice-actors') return 'voice-actors'
 
   throw new TypeError('CATALOG_PERSON_TAB_INVALID')
 }

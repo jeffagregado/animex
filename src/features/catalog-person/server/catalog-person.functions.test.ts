@@ -25,7 +25,7 @@ describe('catalog person server functions', () => {
 
   test('returns serialized states without provider fields', async () => {
     const ready = await runCatalogPersonGet({ kind: 'character', id: 12 }, async () => ({
-      status: 'ready', entry: { detail: { kind: 'character', id: 12, name: 'Frieren', nativeName: null, imageUrl: null, description: null, age: null, gender: null, birthday: null, bloodType: null }, refreshedAt: 1, expiresAt: 2 },
+      status: 'ready', entry: { detail: { kind: 'character', id: 12, name: 'Frieren', nativeName: null, imageUrl: null, description: null, age: null, gender: null, birthday: null, bloodType: null, voiceActorScope: 'all-languages', voiceActors: [] }, refreshedAt: 1, expiresAt: 2 },
     }))
     const search = await runCatalogPersonSearch({ kind: 'character', query: 'frieren', page: 1 }, async () => ({
       items: [], currentPage: 1, hasNextPage: false, perPage: 20,

@@ -23,6 +23,13 @@ const catalogPersonKindValidator = v.union(
   v.literal('staff'),
 )
 
+const catalogVoiceActorValidator = v.object({
+  id: v.number(),
+  name: v.string(),
+  imageUrl: v.union(v.string(), v.null()),
+  language: v.string(),
+})
+
 const catalogPersonDetailValidator = v.union(
   v.object({
     kind: v.literal('character'),
@@ -35,6 +42,8 @@ const catalogPersonDetailValidator = v.union(
     gender: v.union(v.string(), v.null()),
     birthday: v.union(v.string(), v.null()),
     bloodType: v.union(v.string(), v.null()),
+    voiceActorScope: v.optional(v.literal('all-languages')),
+    voiceActors: v.optional(v.array(catalogVoiceActorValidator)),
   }),
   v.object({
     kind: v.literal('staff'),

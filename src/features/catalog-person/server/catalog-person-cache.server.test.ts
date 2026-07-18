@@ -7,7 +7,20 @@ import {
   type CatalogPersonCacheDependencies,
 } from './catalog-person-cache.server'
 
-const detail = { kind: 'character' as const, id: 12, name: 'Frieren', nativeName: null, imageUrl: null, description: null, age: null, gender: null, birthday: null, bloodType: null }
+const detail = {
+  kind: 'character' as const,
+  id: 12,
+  name: 'Frieren',
+  nativeName: null,
+  imageUrl: null,
+  description: null,
+  age: null,
+  gender: null,
+  birthday: null,
+  bloodType: null,
+  voiceActorScope: 'all-languages' as const,
+  voiceActors: [],
+}
 const page = { items: [], currentPage: 1, hasNextPage: false, perPage: 20 as const }
 const deps = (): CatalogPersonCacheDependencies => ({
   client: {

@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 
 import { type Doc } from './_generated/dataModel'
 import { mutation, query, type MutationCtx } from './_generated/server'
+import { type CatalogPersonDetail } from '../src/features/catalog-person/shared/catalog-person-contracts'
 import { requireCacheWriteToken } from './animeCache'
 import {
   CATALOG_PERSON_LEASE_MS,
@@ -19,8 +20,9 @@ import {
 
 const kindValidator = v.union(v.literal('character'), v.literal('staff'))
 const formatValidator = v.union(v.literal('TV'), v.literal('TV_SHORT'), v.literal('MOVIE'), v.literal('SPECIAL'), v.literal('OVA'), v.literal('ONA'), v.literal('MUSIC'), v.null())
+const voiceActorValidator = v.object({ id: v.number(), name: v.string(), imageUrl: v.union(v.string(), v.null()), language: v.string() })
 const detailValidator = v.union(
-  v.object({ kind: v.literal('character'), id: v.number(), name: v.string(), nativeName: v.union(v.string(), v.null()), imageUrl: v.union(v.string(), v.null()), description: v.union(v.string(), v.null()), age: v.union(v.string(), v.null()), gender: v.union(v.string(), v.null()), birthday: v.union(v.string(), v.null()), bloodType: v.union(v.string(), v.null()) }),
+  v.object({ kind: v.literal('character'), id: v.number(), name: v.string(), nativeName: v.union(v.string(), v.null()), imageUrl: v.union(v.string(), v.null()), description: v.union(v.string(), v.null()), age: v.union(v.string(), v.null()), gender: v.union(v.string(), v.null()), birthday: v.union(v.string(), v.null()), bloodType: v.union(v.string(), v.null()), voiceActorScope: v.literal('all-languages'), voiceActors: v.array(voiceActorValidator) }),
   v.object({ kind: v.literal('staff'), id: v.number(), name: v.string(), nativeName: v.union(v.string(), v.null()), imageUrl: v.union(v.string(), v.null()), description: v.union(v.string(), v.null()), occupations: v.array(v.string()), language: v.union(v.string(), v.null()), hometown: v.union(v.string(), v.null()), activeYears: v.union(v.string(), v.null()) }),
 )
 const summaryValidator = v.object({
@@ -65,6 +67,15 @@ const requireLease = async (ctx: MutationCtx, key: string, leaseId: string, now:
   return lease
 }
 
+/** Expires Character rows written before the all-language actor contract. */
+const currentDetail = (detail: Doc<'catalogPersonDetails'>['detail']): CatalogPersonDetail | null => {
+  if (detail.kind === 'character') {
+    if (detail.voiceActorScope !== 'all-languages' || detail.voiceActors === undefined) return null
+    return { ...detail, voiceActorScope: detail.voiceActorScope, voiceActors: detail.voiceActors }
+  }
+  return detail
+}
+
 /** Reads one person detail without expired fallback. */
 export const readDetail = query({
   args: { kind: kindValidator, personId: v.number() },
@@ -72,7 +83,10 @@ export const readDetail = query({
   handler: async (ctx, args) => {
     try { personDetailKey(args.kind, args.personId) } catch (error) { failPolicy(error) }
     const record = await ctx.db.query('catalogPersonDetails').withIndex('by_kind_person', (q) => q.eq('kind', args.kind).eq('personId', args.personId)).unique()
-    return resolveCatalogPersonRead(record ? { payload: record.detail, refreshedAt: record.refreshedAt, expiresAt: record.expiresAt } : null, Date.now())
+    if (!record) return resolveCatalogPersonRead<CatalogPersonDetail>(null, Date.now())
+    const detail = currentDetail(record.detail)
+    if (!detail) return { status: 'expired' as const, entry: null }
+    return resolveCatalogPersonRead({ payload: detail, refreshedAt: record.refreshedAt, expiresAt: record.expiresAt }, Date.now())
   },
 })
 

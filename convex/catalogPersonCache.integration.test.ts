@@ -18,6 +18,13 @@ type Detail = {
   gender: null
   birthday: null
   bloodType: null
+  voiceActorScope: 'all-languages'
+  voiceActors: Array<{
+    id: number
+    name: string
+    imageUrl: string | null
+    language: string
+  }>
 }
 const modules = import.meta.glob(['./_generated/**/*.*', './{animeCache,catalogPersonCache}.ts'])
 const readDetail = makeFunctionReference<'query', { kind: Kind; personId: number }, unknown>('catalogPersonCache:readDetail')
@@ -40,6 +47,11 @@ const token = 'catalog-person-test-token'
 const detail: Detail = {
   kind: 'character', id: 12, name: 'Frieren', nativeName: null, imageUrl: null,
   description: null, age: null, gender: null, birthday: null, bloodType: null,
+  voiceActorScope: 'all-languages',
+  voiceActors: [
+    { id: 21, name: 'Atsumi Tanezaki', imageUrl: null, language: 'Japanese' },
+    { id: 22, name: 'English Actor', imageUrl: null, language: 'English' },
+  ],
 }
 const summary = {
   anilistId: 1, slug: 'one', titles: { display: 'One', english: 'One', romaji: null, native: null },
@@ -131,6 +143,22 @@ describe('catalog person Convex cache', () => {
       kind: 'character', personId: 12, detail, leaseId: 'owner', token,
     })
     vi.setSystemTime(new Date('2026-07-18T00:00:00.000Z'))
+    await expect(t.query(readDetail, { kind: 'character', personId: 12 }))
+      .resolves.toEqual({ status: 'expired', entry: null })
+  })
+
+  test('expires legacy Character detail without all-language completeness before serving it', async () => {
+    const t = createHarness()
+    const { voiceActorScope: _voiceActorScope, ...legacyDetail } = detail
+    const now = Date.now()
+    await t.run(async (ctx) => await ctx.db.insert('catalogPersonDetails', {
+      kind: 'character',
+      personId: 12,
+      detail: legacyDetail,
+      refreshedAt: now,
+      expiresAt: now + 86_400_000,
+    }))
+
     await expect(t.query(readDetail, { kind: 'character', personId: 12 }))
       .resolves.toEqual({ status: 'expired', entry: null })
   })

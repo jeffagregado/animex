@@ -11,8 +11,6 @@ import {
 import { getCatalogPerson } from '../server/catalog-person.functions'
 import type { CatalogPersonState } from '../server/catalog-person-cache.server'
 
-export type CharacterPersonTab = CatalogPersonTab
-export type StaffPersonTab = CatalogPersonTab
 export type CatalogPersonPageState = CatalogPersonState | { status: 'loading' }
 export type CatalogPersonRouteSearch = {
   tab: CatalogPersonTab
@@ -44,14 +42,6 @@ export const parseCatalogPersonRouteSearch = (
 }
 
 /** Keeps user tab history scroll-stable. */
-export function getCatalogPersonTabNavigation(
-  kind: 'character',
-  tab: CharacterPersonTab,
-): { search: Record<string, string>; resetScroll: false }
-export function getCatalogPersonTabNavigation(
-  kind: 'staff',
-  tab: StaffPersonTab,
-): { search: Record<string, string>; resetScroll: false }
 export function getCatalogPersonTabNavigation(
   kind: CatalogPersonKind,
   tab: CatalogPersonTab,

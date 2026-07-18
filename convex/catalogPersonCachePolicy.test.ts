@@ -39,7 +39,33 @@ describe('catalog person cache policy', () => {
   })
 
   test('validates strict details and bounded ordered work rows', () => {
-    const detail = { kind: 'character', id: 12, name: 'Frieren', nativeName: null, imageUrl: null, description: null, age: null, gender: null, birthday: null, bloodType: null }
+    const detail = {
+      kind: 'character',
+      id: 12,
+      name: 'Frieren',
+      nativeName: null,
+      imageUrl: null,
+      description: null,
+      age: null,
+      gender: null,
+      birthday: null,
+      bloodType: null,
+      voiceActorScope: 'all-languages',
+      voiceActors: [
+        {
+          id: 21,
+          name: 'Atsumi Tanezaki',
+          imageUrl: null,
+          language: 'Japanese',
+        },
+        {
+          id: 22,
+          name: 'English Actor',
+          imageUrl: null,
+          language: 'English',
+        },
+      ],
+    }
     expect(() => validateCatalogPersonDetail('character', 12, detail)).not.toThrow()
     expect(() => validateCatalogPersonDetail('staff', 12, detail)).toThrow()
     expect(() => validateCatalogPersonWorkPage('character', 12, 1, Array.from({ length: 21 }, () => ({ animeId: 1, role: null })))).toThrow()

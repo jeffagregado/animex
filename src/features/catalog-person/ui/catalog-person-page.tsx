@@ -1,8 +1,14 @@
 import type { KeyboardEvent } from 'react'
+import { Link } from '@tanstack/react-router'
 
-import { DetailPageLayout } from '#/components/detail-page-layout'
 import { AnimeImage } from '#/features/anime-detail/ui/anime-image'
-import type { CatalogPersonDetail, CatalogPersonKind, CatalogPersonTab } from '../shared/catalog-person-contracts'
+import {
+  slugifyCatalogPerson,
+  type CatalogPersonDetail,
+  type CatalogPersonKind,
+  type CatalogPersonTab,
+  type CatalogVoiceActor,
+} from '../shared/catalog-person-contracts'
 import { CatalogPersonDescription } from './catalog-person-description'
 import type { CatalogPersonPageState } from './catalog-person-route'
 import { CatalogPersonWorkGrid } from './catalog-person-work-grid'
@@ -17,9 +23,13 @@ type CatalogPersonPageProps = {
 }
 type Fact = { label: string; value: string }
 
-const PERSON_TABS = [
+const STAFF_TABS = [
   { label: 'Overview', value: 'overview' },
   { label: 'Anime', value: 'anime' },
+] as const
+const CHARACTER_TABS = [
+  ...STAFF_TABS,
+  { label: 'Voice Actors', value: 'voice-actors' },
 ] as const
 
 /** Renders explicit detail states and one kind-safe Character or Staff page. */
@@ -43,10 +53,13 @@ export function CatalogPersonPage(props: CatalogPersonPageProps) {
   const content = <>
     <PersonTabs kind={props.kind} onTabChange={props.onTabChange} tab={props.tab} />
     <section aria-labelledby={`catalog-person-tab-${props.tab}`} className="py-6" id={`catalog-person-panel-${props.tab}`} role="tabpanel" tabIndex={0}>
-      {props.tab === 'overview' ? <PersonOverview detail={detail} /> : <CatalogPersonWorkGrid kind={props.kind} personId={props.id} />}
+      <PersonTabPanel detail={detail} personId={props.id} tab={props.tab} />
     </section>
   </>
-  return <DetailPageLayout hero={<PersonHeader detail={detail} />} content={content} aside={<PersonFacts detail={detail} />} />
+  return <main className="mx-auto max-w-[1480px] px-4 pb-24 md:px-7 md:pb-12">
+    <PersonHeader detail={detail} />
+    {content}
+  </main>
 }
 
 function PersonHeader({ detail }: { detail: CatalogPersonDetail }) {
@@ -62,26 +75,53 @@ function PersonHeader({ detail }: { detail: CatalogPersonDetail }) {
 }
 
 function PersonTabs({ kind, onTabChange, tab }: { kind: CatalogPersonKind; onTabChange: (tab: CatalogPersonTab) => void; tab: CatalogPersonTab }) {
+  const tabs = kind === 'character' ? CHARACTER_TABS : STAFF_TABS
   const select = (value: CatalogPersonTab): void => onTabChange(value)
   const move = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
-    const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, Home: -index, End: PERSON_TABS.length - 1 - index }
+    const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, Home: -index, End: tabs.length - 1 - index }
     const offset = offsets[event.key]
     if (offset === undefined) return
     event.preventDefault()
-    const next = (index + offset + PERSON_TABS.length) % PERSON_TABS.length
-    select(PERSON_TABS[next].value)
-    document.getElementById(`catalog-person-tab-${PERSON_TABS[next].value}`)?.focus()
+    const next = (index + offset + tabs.length) % tabs.length
+    select(tabs[next].value)
+    document.getElementById(`catalog-person-tab-${tabs[next].value}`)?.focus()
   }
-  return <nav aria-label={`${kind} detail tabs`} className="mt-6 grid grid-cols-2 border-b border-border" role="tablist">{PERSON_TABS.map((item, index) => <button aria-controls={`catalog-person-panel-${item.value}`} aria-selected={tab === item.value} className={`min-h-11 border-b-2 px-4 py-3 font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${tab === item.value ? 'border-cyan-300 text-cyan-300' : 'border-transparent text-muted-foreground'}`} id={`catalog-person-tab-${item.value}`} key={item.value} onClick={() => select(item.value)} onKeyDown={(event) => move(event, index)} role="tab" tabIndex={tab === item.value ? 0 : -1} type="button">{item.label}</button>)}</nav>
+  return <nav aria-label={`${kind} detail tabs`} className={`mt-6 grid border-b border-border ${kind === 'character' ? 'grid-cols-3' : 'grid-cols-2'}`} role="tablist">{tabs.map((item, index) => <button aria-controls={`catalog-person-panel-${item.value}`} aria-selected={tab === item.value} className={`min-h-11 border-b-2 px-2 py-3 font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 sm:px-4 ${tab === item.value ? 'border-cyan-300 text-cyan-300' : 'border-transparent text-muted-foreground'}`} id={`catalog-person-tab-${item.value}`} key={item.value} onClick={() => select(item.value)} onKeyDown={(event) => move(event, index)} role="tab" tabIndex={tab === item.value ? 0 : -1} type="button">{item.label}</button>)}</nav>
 }
 
 function PersonOverview({ detail }: { detail: CatalogPersonDetail }) {
-  return <section aria-labelledby="catalog-person-about"><h2 className="text-xl font-black" id="catalog-person-about">About</h2>{detail.description ? <CatalogPersonDescription description={detail.description} /> : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No biography available.</p>}</section>
+  return <div className="space-y-8">
+    <PersonFacts detail={detail} />
+    <section aria-labelledby="catalog-person-about"><h2 className="text-xl font-black" id="catalog-person-about">About</h2>{detail.description ? <CatalogPersonDescription description={detail.description} /> : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No biography available.</p>}</section>
+  </div>
+}
+
+function PersonTabPanel({ detail, personId, tab }: { detail: CatalogPersonDetail; personId: number; tab: CatalogPersonTab }) {
+  if (tab === 'overview') return <PersonOverview detail={detail} />
+  if (tab === 'anime') return <CatalogPersonWorkGrid kind={detail.kind} personId={personId} />
+  if (detail.kind === 'character') return <PersonVoiceActors actors={detail.voiceActors} />
+  throw new TypeError('CATALOG_PERSON_TAB_INVALID')
 }
 
 function PersonFacts({ detail }: { detail: CatalogPersonDetail }) {
   const facts = getFacts(detail)
-  return <aside aria-labelledby="catalog-person-facts" className="py-6"><h2 className="text-xl font-black" id="catalog-person-facts">Facts</h2>{facts.length > 0 ? <dl className="mt-3">{facts.map((fact) => <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 border-b border-border py-3" key={fact.label}><dt className="text-muted-foreground">{fact.label}</dt><dd className="break-words">{fact.value}</dd></div>)}</dl> : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No {detail.kind} facts available.</p>}</aside>
+  return <section aria-labelledby="catalog-person-facts"><h2 className="text-xl font-black" id="catalog-person-facts">Facts</h2>{facts.length > 0 ? <dl className="mt-3">{facts.map((fact) => <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 border-b border-border py-3" key={fact.label}><dt className="text-muted-foreground">{fact.label}</dt><dd className="break-words">{fact.value}</dd></div>)}</dl> : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No {detail.kind} facts available.</p>}</section>
+}
+
+function PersonVoiceActors({ actors }: { actors: CatalogVoiceActor[] }) {
+  return <section aria-labelledby="catalog-person-voice-actors">
+    <h2 className="text-xl font-black" id="catalog-person-voice-actors">Voice Actors</h2>
+    {actors.length > 0
+      ? <ul className="mt-3 space-y-2">{actors.map((actor) => <li key={actor.id}><VoiceActorLink actor={actor} /></li>)}</ul>
+      : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No voice actors available.</p>}
+  </section>
+}
+
+function VoiceActorLink({ actor }: { actor: CatalogVoiceActor }) {
+  return <Link className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card/60 p-2 transition-colors hover:border-cyan-300/60 hover:bg-cyan-300/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 motion-reduce:transition-none" params={{ id: String(actor.id), slug: slugifyCatalogPerson(actor.name) }} preload={false} to="/staff/$id/$slug">
+    <AnimeImage alt={`${actor.name} portrait`} className="h-20 w-14 shrink-0 rounded-lg object-cover" src={actor.imageUrl} />
+    <span className="min-w-0"><span className="block break-words font-black">{actor.name}</span><span className="mt-1 block text-xs text-muted-foreground">{actor.language}</span></span>
+  </Link>
 }
 
 /** Returns only provider-present facts in stable display order. */

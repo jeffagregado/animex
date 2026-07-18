@@ -36,18 +36,83 @@ const staff = (yearsActive: number[] | null) => ({
   primaryOccupations: [' Voice Actor ', 'Voice Actor', 'Singer'], languageV2: 'Japanese',
   homeTown: 'Oita', yearsActive,
 })
+const voiceActor = (id: number, name: string, languageV2: string) => ({
+  id,
+  name: { full: name },
+  image: { large: `https://img.example/staff-${id}.jpg` },
+  languageV2,
+})
 
 describe('AniList catalog person adapter', () => {
   test('normalizes character detail, description, and full birthday', async () => {
-    const fixture = deps([response({ data: { Character: {
+    const fixture = deps([
+      response({ data: { Character: {
       id: 12, name: { full: ' Frieren ', native: 'フリーレン' }, image: { large: 'https://img.example/f.jpg' },
       description: '<b>Elf</b> &amp; mage.', age: '1000+', gender: 'Female',
       dateOfBirth: { year: 1900, month: 2, day: 28 }, bloodType: null,
-    } } })])
+      media: { pageInfo: { currentPage: 1, hasNextPage: true }, edges: [
+        {
+          node: { isAdult: false },
+          voiceActorRoles: [
+            { voiceActor: voiceActor(21, ' Atsumi Tanezaki ', 'Japanese') },
+            { voiceActor: voiceActor(22, 'English Actor', 'English') },
+          ],
+        },
+        {
+          node: { isAdult: false },
+          voiceActorRoles: [{ voiceActor: voiceActor(21, 'Atsumi Tanezaki', 'Japanese') }],
+        },
+        {
+          node: { isAdult: true },
+          voiceActorRoles: [{ voiceActor: voiceActor(23, 'Adult Title Actor', 'Japanese') }],
+        },
+      ] },
+      } } }),
+      response({ data: { Character: {
+        id: 12,
+        media: {
+          pageInfo: { currentPage: 2, hasNextPage: false },
+          edges: [{
+            node: { isAdult: false },
+            voiceActorRoles: [
+              { voiceActor: voiceActor(24, 'French Actor', 'French') },
+              { voiceActor: voiceActor(22, 'English Actor', 'English') },
+            ],
+          }],
+        },
+      } } }),
+    ])
     await expect(fetchCatalogPersonFromAniList('character', 12, fixture.dependencies)).resolves.toMatchObject({
       kind: 'character', id: 12, name: 'Frieren', description: 'Elf & mage.', birthday: 'February 28, 1900',
+      voiceActorScope: 'all-languages',
+      voiceActors: [
+        {
+          id: 21,
+          name: 'Atsumi Tanezaki',
+          imageUrl: 'https://img.example/staff-21.jpg',
+          language: 'Japanese',
+        },
+        {
+          id: 22,
+          name: 'English Actor',
+          imageUrl: 'https://img.example/staff-22.jpg',
+          language: 'English',
+        },
+        {
+          id: 24,
+          name: 'French Actor',
+          imageUrl: 'https://img.example/staff-24.jpg',
+          language: 'French',
+        },
+      ],
     })
     expect(fixture.requests[0]?.query).toContain('query CharacterDetail')
+    expect(fixture.requests[0]?.query).toContain('media(type: ANIME')
+    expect(fixture.requests[0]?.query).toContain('voiceActorRoles')
+    expect(fixture.requests.map((request) => request.variables)).toEqual([
+      { id: 12, page: 1, perPage: 25 },
+      { id: 12, page: 2, perPage: 25 },
+    ])
   })
 
   test.each([
@@ -163,7 +228,8 @@ describe('AniList catalog person adapter', () => {
     await expect(fetchCatalogPersonFromAniList('character', 99, missing.dependencies)).resolves.toBeNull()
     const extra = deps([response({ data: { Character: {
       id: 12, name: { full: 'Frieren', native: null }, image: { large: 'http://bad.example/f.jpg' },
-      description: null, age: null, gender: null, dateOfBirth: null, bloodType: null, raw: true,
+      description: null, age: null, gender: null, dateOfBirth: null, bloodType: null,
+      media: { pageInfo: { currentPage: 1, hasNextPage: false }, edges: [] }, raw: true,
     } } })])
     await expect(fetchCatalogPersonFromAniList('character', 12, extra.dependencies)).rejects.toMatchObject({ code: 'UPSTREAM' })
   })

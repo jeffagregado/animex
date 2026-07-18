@@ -5,6 +5,23 @@ import { animeFormatSchema, animeSeasonSchema } from '../../discover/shared/disc
 const httpsUrl = z.url({ protocol: /^https$/ })
 const nameSchema = z.object({ full: z.string(), native: z.string().nullable() }).strict()
 const imageSchema = z.object({ large: httpsUrl.nullable() }).strict().nullable()
+const voiceActorSchema = z.object({
+  id: z.number().int().positive(),
+  name: z.object({ full: z.string() }).strict(),
+  image: imageSchema,
+  languageV2: z.string().trim().min(1),
+}).strict()
+const pageInfoSchema = z.object({
+  currentPage: z.number().int().positive(),
+  hasNextPage: z.boolean(),
+}).strict()
+const characterVoiceActorMediaSchema = z.object({
+  pageInfo: pageInfoSchema,
+  edges: z.array(z.object({
+    node: z.object({ isAdult: z.boolean() }).strict(),
+    voiceActorRoles: z.array(z.object({ voiceActor: voiceActorSchema }).strict()),
+  }).strict()),
+}).strict()
 const dateSchema = z.object({
   year: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
   month: z.number().int().min(1).max(12).nullable(),
@@ -22,6 +39,16 @@ export const characterDetailResponseSchema = z.object({
       gender: z.string().nullable(),
       dateOfBirth: dateSchema,
       bloodType: z.string().nullable(),
+      media: characterVoiceActorMediaSchema,
+    }).strict().nullable(),
+  }).strict(),
+}).strict()
+
+export const characterVoiceActorsResponseSchema = z.object({
+  data: z.object({
+    Character: z.object({
+      id: z.number().int().positive(),
+      media: characterVoiceActorMediaSchema,
     }).strict().nullable(),
   }).strict(),
 }).strict()
@@ -68,11 +95,6 @@ const mediaSchema = z.object({
   trending: z.number().int().nonnegative().nullable(),
   startDate: mediaDateSchema,
   nextAiringEpisode: z.object({ airingAt: z.number().int().nonnegative() }).strict().nullable(),
-}).strict()
-
-const pageInfoSchema = z.object({
-  currentPage: z.number().int().positive(),
-  hasNextPage: z.boolean(),
 }).strict()
 
 export const characterWorksResponseSchema = z.object({

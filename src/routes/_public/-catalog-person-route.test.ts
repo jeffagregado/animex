@@ -13,7 +13,7 @@ const ready = (kind: 'character' | 'staff', name: string): CatalogPersonState =>
   status: 'ready',
   entry: {
     detail: kind === 'character'
-      ? { kind, id: 7, name, nativeName: null, imageUrl: null, description: null, age: null, gender: null, birthday: null, bloodType: null }
+      ? { kind, id: 7, name, nativeName: null, imageUrl: null, description: null, age: null, gender: null, birthday: null, bloodType: null, voiceActorScope: 'all-languages', voiceActors: [] }
       : { kind, id: 7, name, nativeName: null, imageUrl: null, description: null, occupations: [], language: null, hometown: null, activeYears: null },
     refreshedAt: 1,
     expiresAt: 2,
@@ -31,14 +31,17 @@ describe('catalog person routes', () => {
   it('normalizes tabs by person kind and marks explicit or invalid overview for replacement', () => {
     expect(parseCatalogPersonRouteSearch('character', undefined)).toEqual({ tab: 'overview', replace: false })
     expect(parseCatalogPersonRouteSearch('character', 'anime')).toEqual({ tab: 'anime', replace: false })
+    expect(parseCatalogPersonRouteSearch('character', 'voice-actors')).toEqual({ tab: 'voice-actors', replace: false })
     expect(parseCatalogPersonRouteSearch('character', 'works')).toEqual({ tab: 'overview', replace: true })
     expect(parseCatalogPersonRouteSearch('staff', 'works')).toEqual({ tab: 'anime', replace: true })
     expect(parseCatalogPersonRouteSearch('staff', 'anime')).toEqual({ tab: 'anime', replace: false })
+    expect(parseCatalogPersonRouteSearch('staff', 'voice-actors')).toEqual({ tab: 'overview', replace: true })
     expect(parseCatalogPersonRouteSearch('staff', 'overview')).toEqual({ tab: 'overview', replace: true })
   })
 
   it('replaces missing or stale slugs, preserves valid tabs, and encodes Unicode once', () => {
     expect(getCatalogPersonRedirectHref(ready('character', 'Frieren'), 'character', 7, null, 'anime')).toBe('/characters/7/frieren?tab=anime')
+    expect(getCatalogPersonRedirectHref(ready('character', 'Frieren'), 'character', 7, null, 'voice-actors')).toBe('/characters/7/frieren?tab=voice-actors')
     expect(getCatalogPersonRedirectHref(ready('staff', '山田 太郎'), 'staff', 7, 'old', 'works')).toBe('/staff/7/%E5%B1%B1%E7%94%B0-%E5%A4%AA%E9%83%8E?tab=anime')
     expect(getCatalogPersonRedirectHref(ready('staff', '山田 太郎'), 'staff', 7, '山田-太郎', 'works')).toBe('/staff/7/%E5%B1%B1%E7%94%B0-%E5%A4%AA%E9%83%8E?tab=anime')
   })
@@ -52,7 +55,9 @@ describe('catalog person routes', () => {
   it('uses push navigation without scroll reset for tab clicks', () => {
     expect(getCatalogPersonTabNavigation('character', 'overview')).toEqual({ search: {}, resetScroll: false })
     expect(getCatalogPersonTabNavigation('character', 'anime')).toEqual({ search: { tab: 'anime' }, resetScroll: false })
+    expect(getCatalogPersonTabNavigation('character', 'voice-actors')).toEqual({ search: { tab: 'voice-actors' }, resetScroll: false })
     expect(getCatalogPersonTabNavigation('staff', 'anime')).toEqual({ search: { tab: 'anime' }, resetScroll: false })
+    expect(() => getCatalogPersonTabNavigation('staff', 'voice-actors')).toThrow('CATALOG_PERSON_TAB_INVALID')
   })
 
   it('ensures child detail data with an initially empty query cache', async () => {

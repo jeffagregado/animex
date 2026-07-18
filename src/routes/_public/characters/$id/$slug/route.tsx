@@ -12,9 +12,10 @@ import {
 } from '#/features/catalog-person/ui/catalog-person-route'
 
 const rawTab = (search: string): string | undefined => new URLSearchParams(search).get('tab') ?? undefined
-const validateSearch = (search: Record<string, unknown>): { tab?: 'anime' } => (
-  parseCatalogPersonRouteSearch('character', search.tab).tab === 'anime' ? { tab: 'anime' } : {}
-)
+const validateSearch = (search: Record<string, unknown>): { tab?: 'anime' | 'voice-actors' } => {
+  const tab = parseCatalogPersonRouteSearch('character', search.tab).tab
+  return tab === 'overview' ? {} : { tab }
+}
 
 export const Route = createFileRoute('/_public/characters/$id/$slug')({
   validateSearch,

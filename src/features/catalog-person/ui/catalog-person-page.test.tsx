@@ -35,6 +35,21 @@ const characterState = (overrides: Record<string, unknown> = {}): CatalogPersonS
       gender: 'Female',
       birthday: null,
       bloodType: null,
+      voiceActorScope: 'all-languages',
+      voiceActors: [
+        {
+          id: 8,
+          name: 'Atsumi Tanezaki',
+          imageUrl: 'https://example.com/atsumi.jpg',
+          language: 'Japanese',
+        },
+        {
+          id: 9,
+          name: 'English Actor',
+          imageUrl: null,
+          language: 'English',
+        },
+      ],
       ...overrides,
     },
     refreshedAt: 1,
@@ -78,19 +93,35 @@ describe('CatalogPersonPage', () => {
     expect(retry).toHaveBeenCalledOnce()
   })
 
-  it('renders Character identity, available facts, and empty whole sections', () => {
+  it('renders full-width Character Overview with Facts before About', () => {
     const view = render(<CatalogPersonPage id={7} kind="character" onRetry={() => undefined} onTabChange={() => undefined} state={characterState()} tab="overview" />)
     expect(screen.getByRole('main').className).toContain('max-w-[1480px]')
-    expect(screen.getByRole('main').className).toContain('grid-cols-[minmax(0,1fr)]')
-    expect(screen.getByRole('main').className).toContain('lg:grid-cols-[minmax(0,3fr)_minmax(17rem,1fr)]')
+    expect(screen.getByRole('main').className).not.toContain('lg:grid-cols')
     expect(screen.getByRole('heading', { level: 1, name: 'Frieren' })).toBeTruthy()
     expect(screen.getByText('フリーレン')).toBeTruthy()
     expect(screen.getByText('An elven mage.')).toBeTruthy()
     expect(screen.getByText('Over 1,000')).toBeTruthy()
     expect(screen.queryByText('Birthday')).toBeNull()
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Facts', 'About'])
+    expect(screen.getByRole('tab', { name: 'Voice Actors' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /Atsumi Tanezaki/ })).toBeNull()
     view.rerender(<CatalogPersonPage id={7} kind="character" onRetry={() => undefined} onTabChange={() => undefined} state={characterState({ description: null, age: null, gender: null })} tab="overview" />)
     expect(screen.getByText('No biography available.')).toBeTruthy()
     expect(screen.getByText('No character facts available.')).toBeTruthy()
+  })
+
+  it('reuses linked portrait cards for every language in the Character Voice Actors tab', () => {
+    const view = render(<CatalogPersonPage id={7} kind="character" onRetry={() => undefined} onTabChange={() => undefined} state={characterState()} tab="voice-actors" />)
+    expect(screen.getByRole('heading', { level: 2, name: 'Voice Actors' })).toBeTruthy()
+    const actor = screen.getByRole('link', { name: /Atsumi Tanezaki/ })
+    expect(actor.dataset.to).toBe('/staff/$id/$slug')
+    expect(actor.dataset.preload).toBe('false')
+    expect(actor.getAttribute('href')).toBe('/staff/8/atsumi-tanezaki')
+    expect(screen.getByRole('link', { name: /English Actor/ }).getAttribute('href')).toBe('/staff/9/english-actor')
+    expect(screen.getByText('Japanese')).toBeTruthy()
+    expect(screen.getByText('English')).toBeTruthy()
+    view.rerender(<CatalogPersonPage id={7} kind="character" onRetry={() => undefined} onTabChange={() => undefined} state={characterState({ voiceActors: [] })} tab="voice-actors" />)
+    expect(screen.getByText('No voice actors available.')).toBeTruthy()
   })
 
   it('renders Staff metadata and exposes the shared Anime tab', () => {
@@ -98,9 +129,12 @@ describe('CatalogPersonPage', () => {
     expect(screen.getByText('Voice Actor')).toBeTruthy()
     expect(screen.getByText('Japanese')).toBeTruthy()
     expect(screen.getByText('2012–present')).toBeTruthy()
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Facts', 'About'])
     expect(screen.queryByTestId('work-grid')).toBeNull()
     expect(screen.getByRole('tab', { name: 'Anime' })).toBeTruthy()
     expect(screen.queryByRole('tab', { name: 'Works' })).toBeNull()
+    expect(screen.queryByRole('tab', { name: 'Voice Actors' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Voice Actors' })).toBeNull()
     view.rerender(<CatalogPersonPage id={8} kind="staff" onRetry={() => undefined} onTabChange={() => undefined} state={staffState()} tab="anime" />)
     expect(screen.getByTestId('work-grid').textContent).toContain('staff')
   })
@@ -159,8 +193,13 @@ describe('CatalogPersonPage', () => {
     fireEvent.keyDown(overview, { key: 'ArrowRight' })
     expect(onTabChange).toHaveBeenLastCalledWith('anime')
     fireEvent.keyDown(overview, { key: 'End' })
-    expect(onTabChange).toHaveBeenLastCalledWith('anime')
+    expect(onTabChange).toHaveBeenLastCalledWith('voice-actors')
     const anime = screen.getByRole('tab', { name: 'Anime' })
+    fireEvent.keyDown(anime, { key: 'ArrowRight' })
+    expect(onTabChange).toHaveBeenLastCalledWith('voice-actors')
+    const voiceActors = screen.getByRole('tab', { name: 'Voice Actors' })
+    fireEvent.keyDown(voiceActors, { key: 'ArrowRight' })
+    expect(onTabChange).toHaveBeenLastCalledWith('overview')
     fireEvent.keyDown(anime, { key: 'Home' })
     expect(onTabChange).toHaveBeenLastCalledWith('overview')
   })
