@@ -31,4 +31,4 @@ After public auth state and Convex auth are complete, `AnimeUserControls` reads 
 
 ## Remaining browser-fixture gaps
 
-Deep people/work pagination beyond the exercised page remains unverified. Injected provider/Storage failure testing remains a shared Phase 7 gap; real Profile media upload/crop/remove remains unverified. The second-account private-profile scenario is closed and verified.
+Deep people/work pagination beyond the exercised page remains unverified. Second-account private-profile, real Profile media lifecycle, and the Phase 7 failure fixture are verified. Failure injection used Storage HTTP 503; provider variants were not separately injected.

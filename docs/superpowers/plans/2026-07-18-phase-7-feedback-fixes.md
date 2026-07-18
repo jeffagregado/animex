@@ -17,7 +17,7 @@ Implementation tasks 1–7 are complete. The current result includes shared User
 - Full suite: 131 test files passed / 2 skipped; 925 tests passed / 3 skipped (928 total). Two initial 10-second timeouts cleared after the QA server stopped; the final full run is green.
 - TypeScript, client + SSR build, Fallow, reviewer, and browser gates pass. React Doctor score is 53, equal to baseline; existing >500 kB chunk warning remains.
 - Protected route-tree SHA-256 remains `14A6932D22316BF69AF6EA6C1E343EE0C4704DE66039C8A674888D11ABA92DDD`. No Convex source changed, so no Convex deploy was required.
-- Exactly three browser fixtures remain: real media upload/crop/remove, injected provider or Storage failure, and deep pagination. Second-account private-profile verification is closed.
+- One browser fixture remains: deep pagination. Second-account private-profile, real media lifecycle, and injected Storage failure/retry verification are closed.
 
 ## Worktree And Scope
 

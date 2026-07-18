@@ -33,7 +33,6 @@ Character and Staff render a full-width `max-w-[1480px]` Catalog Person shell wi
 
 ## Remaining browser-fixture gaps
 
-- Injected AniList/provider or Storage failure flow.
 - Deep work/search pagination beyond the exercised page.
 
-The second-account private-profile scenario is closed and verified. Real media upload/crop/remove remains a Profile gap.
+Second-account private-profile, Profile media lifecycle, and the Phase 7 failure fixture are closed. Failure injection used Storage HTTP 503; AniList/provider variants were not separately injected.

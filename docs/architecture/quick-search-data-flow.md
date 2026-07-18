@@ -35,7 +35,6 @@ The input owns ArrowUp/ArrowDown/Enter selection. Dialog/Drawer owns title/descr
 
 ## Remaining browser-fixture gaps
 
-- Injected provider or User failure flow.
 - Deep result-page pagination beyond the exercised page.
 
-The second-account private-profile scenario is closed and verified. Real media upload/crop/remove remains a Profile gap.
+Second-account private-profile, Profile media lifecycle, and the Phase 7 failure fixture are closed. Failure injection used Storage HTTP 503; provider/User variants were not separately injected.

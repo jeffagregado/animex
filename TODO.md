@@ -869,7 +869,7 @@ Status: COMPLETE. Active social interaction UI and Followers-only choices are ab
 
 # Phase 7 User Profile, Catalog People, And Quick Search
 
-Status: COMPLETE. Implemented on `jeff-cx/phase-7-user-profile-quick-search`; feedback fixes, final reviewer PASS, automated gates, and responsive browser QA are complete. The second-account private-profile scenario is verified. Three browser fixtures remain unexercised: real media upload/crop/remove, injected provider or Storage failure, and deep pagination. No production deploy, push, merge, or unexercised fixture is claimed.
+Status: COMPLETE. Implemented on `jeff-cx/phase-7-user-profile-quick-search`; feedback fixes, final reviewer PASS, automated gates, and responsive browser QA are complete. Second-account private-profile, real media lifecycle, and injected Storage failure/retry scenarios are verified. Deep pagination remains unexercised. No production deploy, push, merge, or unexercised fixture is claimed.
 
 - [x] Keep signed-in profile header, Activity/Reviews/Favorites tabs, latest 10 favorites, four list-progress stats, and viewer-allowed profile activity in Phase 7.
 - [x] Add separate Public/Private Profile Visibility; Private shows header identity/bio and a privacy notice to non-owners.
@@ -893,8 +893,8 @@ Status: COMPLETE. Implemented on `jeff-cx/phase-7-user-profile-quick-search`; fe
 - [x] Run desktop/tablet/mobile core browser QA; recheck landing and signed-out auth Search with one dialog/searchbox and zero console errors.
 - [x] Complete code review (PASS after `5178706`) and sync current-state docs/data-flow maps.
 - [x] Verify second-account private-profile browser fixture with both named QA accounts; restore visibility to Public after verification.
-- [ ] Verify real media upload/crop/remove browser flow.
-- [ ] Verify injected provider/storage failure lanes.
+- [x] Verify real avatar/banner upload, crop, replacement, and remove browser flow.
+- [x] Verify injected Storage upload HTTP 503 handling and successful retry.
 - [ ] Verify deep pagination Load more browser flow.
 
 # Phase 7 Feedback Fixes

@@ -10,9 +10,9 @@ Status: COMPLETE. Implemented and validated on `jeff-cx/phase-7-user-profile-qui
 
 Verification gaps, not implementation blockers:
 
-- [ ] Second-account private-profile browser fixture.
-- [ ] Real media upload/crop/remove browser flow.
-- [ ] Failure injection for provider/storage lanes.
+- [x] Second-account private-profile browser fixture.
+- [x] Real media upload/crop/remove browser flow.
+- [x] Failure injection through the Storage upload lane.
 - [ ] Deep pagination Load more browser flow.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

@@ -1,6 +1,6 @@
 # Phase 7 feedback fixes QA checkpoint
 
-Status: PASS. Final reviewer PASS after the keyboard Profile fix. This checkpoint records the integrated branch result; it does not claim a production deploy, push, merge, or unexercised browser fixture.
+Status: PASS. Final reviewer PASS after the keyboard Profile fix. Follow-up browser QA closed real Profile media and Storage failure/retry fixtures. This checkpoint records the integrated branch result; it does not claim a production deploy, push, merge, or deep-pagination verification.
 
 ## Automated gates
 
@@ -21,6 +21,8 @@ Both named QA accounts from `AGENTS.md` were used without recording credentials.
 - Quick Search and `/search/users` circular avatars; Profile Activity/Reviews/Favorites tabs, back/forward/reload, and no auth-loader DOM;
 - Character/Staff shared neutral layout, Overview/Anime tabs, and Staff `?tab=works` → `?tab=anime` canonicalization;
 - second-account private-profile view verified, then visibility restored to Public;
+- real avatar/banner upload, keyboard crop pan, zoom, replacement with changed Storage URLs, removal, and fallback restoration;
+- controlled Storage upload HTTP 503 produced actionable editor feedback and a successful retry;
 - signed-out server redirect with validated return target and AnimeX root not-found UI;
 - final browser console contained 100 entries with zero problem signatures; server logs contained zero invalid-hook, QueryClientProvider, notFound, hydration, Unauthenticated, or error-warning signatures.
 
@@ -28,10 +30,8 @@ QA server stopped, port 3000 freed, viewport reset, and account signed out.
 
 ## Remaining browser-fixture gaps
 
-Exactly three gaps remain:
+One gap remains:
 
-1. Real media upload, crop, replacement, and remove has not been exercised in a browser.
-2. Provider or Storage failure injection has not been exercised in a browser.
-3. Deep pagination beyond the exercised page has not been exercised in a browser.
+1. Deep pagination beyond the exercised page has not been exercised in a browser.
 
-The second-account private-profile scenario is closed and verified.
+Second-account private-profile, real media lifecycle, and Storage failure/retry scenarios are closed and verified. Provider failure variants were not separately injected because the Phase 7 failure fixture required provider or Storage coverage.

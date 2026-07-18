@@ -31,7 +31,7 @@ Username completion and profile edits refresh `userSearchDocuments` in the same 
 
 Edit Profile validates display name, bio, and `public|private` visibility with Zod, then calls the owner mutation through client Convex synchronization. Client Convex identity gates edit/media mutations only; it is not required for server Profile reads. A successful edit or media finalize/remove refreshes the Profile server query; cancellation or failure leaves current data unchanged and reports the error.
 
-Profile media keeps the existing crop/upload contract: JPEG/PNG/WebP input up to 10 MiB, `react-easy-crop`, avatar 512×512 or banner 1600×400 WebP capped at 2 MiB, owner upload URL, pending registration, bounded Storage validation, finalize, replacement cleanup, and remove. Browser QA did not exercise the real upload/crop/remove flow.
+Profile media keeps the existing crop/upload contract: JPEG/PNG/WebP input up to 10 MiB, `react-easy-crop`, avatar 512×512 or banner 1600×400 WebP capped at 2 MiB, owner upload URL, pending registration, bounded Storage validation, finalize, replacement cleanup, and remove. Browser QA verified real avatar/banner upload, crop, replacement with changed Storage URLs, removal, fallback restoration, injected upload HTTP 503 feedback, and successful retry.
 
 ## Avatar and containment
 
@@ -39,8 +39,6 @@ Profile media keeps the existing crop/upload contract: JPEG/PNG/WebP input up to
 
 ## Remaining browser-fixture gaps
 
-- Real media upload, crop, replacement, and remove flow.
-- Injected provider or Storage failure flow.
 - Deep pagination beyond the exercised page.
 
-The second-account private-profile scenario is closed and verified.
+Second-account private-profile, real media lifecycle, and Storage failure/retry scenarios are closed and verified. Provider failure variants were not separately injected because the Phase 7 failure fixture required provider or Storage coverage.
