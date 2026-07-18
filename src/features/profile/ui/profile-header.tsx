@@ -1,15 +1,7 @@
 import { UserAvatar } from '#/components/user-avatar'
 import { Button } from '#/components/ui/button'
 
-export interface ProfileHeaderData {
-  id: string
-  username: string
-  name: string
-  bio: string
-  avatarUrl: string | null
-  bannerUrl: string | null
-  profileVisibility: 'public' | 'private'
-}
+import type { ProfileHeaderData } from '../shared/profile-contracts'
 
 interface ProfileHeaderProps {
   profile: ProfileHeaderData

@@ -63,21 +63,57 @@ export const profileFavoriteSchema = z.object({
   anime: profileFavoriteAnimeSchema,
   favoriteAt: z.number().finite().nonnegative(),
 }).strict()
+export const profileActivityPageSchema = feedPageSchema
+export const profileReviewPageSchema = z.object({
+  ...cursorPageFields,
+  items: z.array(reviewListItemSchema).max(PROFILE_CONTENT_PAGE_SIZE),
+}).strict()
+export const profileFavoritePageSchema = z.object({
+  ...cursorPageFields,
+  items: z.array(profileFavoriteSchema).max(PROFILE_CONTENT_PAGE_SIZE),
+}).strict()
 export const profileContentPageSchema = z.union([
-  feedPageSchema,
-  z.object({
-    ...cursorPageFields,
-    items: z.array(reviewListItemSchema).max(PROFILE_CONTENT_PAGE_SIZE),
-  }).strict(),
-  z.object({
-    ...cursorPageFields,
-    items: z.array(profileFavoriteSchema).max(PROFILE_CONTENT_PAGE_SIZE),
-  }).strict(),
+  profileActivityPageSchema,
+  profileReviewPageSchema,
+  profileFavoritePageSchema,
 ])
 
 export type ProfileHeaderData = z.infer<typeof profileHeaderSchema>
 export type ProfileResult = z.infer<typeof profileResultSchema>
-export type ProfileContentPage = z.infer<typeof profileContentPageSchema>
+export type ProfileActivityPage = z.infer<typeof profileActivityPageSchema>
+export type ProfileReviewPage = z.infer<typeof profileReviewPageSchema>
+export type ProfileFavoritePage = z.infer<typeof profileFavoritePageSchema>
+export type ProfileFavorite = z.infer<typeof profileFavoriteSchema>
+export type ProfileContentPage =
+  | ProfileActivityPage
+  | ProfileReviewPage
+  | ProfileFavoritePage
+
+export function parseProfileContentPage(
+  tab: 'activity',
+  value: unknown,
+): ProfileActivityPage
+export function parseProfileContentPage(
+  tab: 'reviews',
+  value: unknown,
+): ProfileReviewPage
+export function parseProfileContentPage(
+  tab: 'favorites',
+  value: unknown,
+): ProfileFavoritePage
+export function parseProfileContentPage(
+  tab: ProfileTab,
+  value: unknown,
+): ProfileContentPage
+/** Parses one Profile content page against its requested lane. */
+export function parseProfileContentPage(
+  tab: ProfileTab,
+  value: unknown,
+): ProfileContentPage {
+  if (tab === 'activity') return profileActivityPageSchema.parse(value)
+  if (tab === 'reviews') return profileReviewPageSchema.parse(value)
+  return profileFavoritePageSchema.parse(value)
+}
 
 export const profileEditInputSchema = z.object({
   name: z.string().trim().min(1).max(PROFILE_NAME_MAX_LENGTH),

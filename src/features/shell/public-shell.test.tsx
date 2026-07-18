@@ -13,7 +13,20 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { HomePage } from '../home/home-page'
+import { runHeaderSignOut } from './header-auth-controls'
 import { PublicShell } from './public-shell'
+
+const account = vi.hoisted(() => ({
+  signOut: vi.fn(),
+  toastError: vi.fn(),
+}))
+
+vi.mock('../../lib/auth-client', () => ({
+  authClient: { signOut: account.signOut },
+}))
+vi.mock('sonner', () => ({
+  toast: { error: account.toastError },
+}))
 
 vi.mock('../auth/auth-state.functions', () => ({
   getAuthState: async () => {
@@ -80,7 +93,28 @@ afterEach(() => {
   vi.unstubAllGlobals()
   convex.authenticated = true
   convex.query.mockClear()
+  account.signOut.mockReset()
+  account.toastError.mockReset()
 })
+
+const completeAuthState = {
+  status: 'complete' as const,
+  email: 'mika@example.com',
+  profile: {
+    id: 'profile-1',
+    username: 'mika',
+    name: 'Mika',
+    avatarUrl: null,
+    visibility: 'private' as const,
+  },
+}
+
+const stubCompleteAuth = (): void => {
+  vi.stubGlobal('fetch', vi.fn(async () => ({
+    ok: true,
+    json: async () => completeAuthState,
+  }) as Response))
+}
 
 describe('PublicShell', () => {
   it('keeps primary links and opens signed-out desktop Quick Search without navigation', async () => {
@@ -185,8 +219,114 @@ describe('PublicShell', () => {
     expect(within(trigger).getByRole('img', { name: 'Mika avatar' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
     fireEvent.click(trigger)
-    expect(screen.getAllByRole('menuitem', { name: 'Profile' })).toHaveLength(1)
-    expect(screen.getAllByRole('menuitem', { name: 'Sign out' })).toHaveLength(1)
+    const profileItem = screen.getByRole('menuitem', { name: 'Profile' })
+    const signOutItem = screen.getByRole('menuitem', { name: 'Sign out' })
+    expect(profileItem.className).toContain('min-h-11')
+    expect(signOutItem.className).toContain('min-h-11')
+  })
+
+  it('opens and navigates the account menu by keyboard, then restores trigger focus on Escape', async () => {
+    setViewport(true)
+    vi.stubGlobal('scrollTo', vi.fn())
+    stubCompleteAuth()
+    const { history, router } = createPublicTestRouter('/home')
+    render(<RouterProvider router={router} />)
+
+    const trigger = await screen.findByRole('button', {
+      name: 'Mika account menu',
+    })
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    const profileItem = await screen.findByRole('menuitem', {
+      name: 'Profile',
+    })
+    await waitFor(() => expect(document.activeElement).toBe(profileItem))
+    fireEvent.keyDown(profileItem, { key: 'ArrowDown' })
+    const signOutItem = screen.getByRole('menuitem', { name: 'Sign out' })
+    await waitFor(() => expect(document.activeElement).toBe(signOutItem))
+    fireEvent.keyDown(signOutItem, { key: 'Escape' })
+    await waitFor(() => {
+      expect(screen.queryByRole('menuitem')).toBeNull()
+      expect(document.activeElement).toBe(trigger)
+    })
+
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    const profileAgain = await screen.findByRole('menuitem', {
+      name: 'Profile',
+    })
+    await waitFor(() => expect(document.activeElement).toBe(profileAgain))
+    fireEvent.keyDown(profileAgain, { key: 'Enter' })
+    fireEvent.keyUp(profileAgain, { key: 'Enter' })
+    // jsdom does not synthesize the browser's keyboard link activation.
+    profileAgain.click()
+    await waitFor(() => expect(history.location.pathname).toBe('/users/mika'))
+  })
+
+  it('closes the account menu on outside interaction', async () => {
+    setViewport(true)
+    vi.stubGlobal('scrollTo', vi.fn())
+    stubCompleteAuth()
+    const { router } = createPublicTestRouter('/home')
+    render(<RouterProvider router={router} />)
+
+    fireEvent.click(await screen.findByRole('button', {
+      name: 'Mika account menu',
+    }))
+    expect(await screen.findByRole('menuitem', { name: 'Profile' })).toBeTruthy()
+    fireEvent.pointerDown(document.body)
+    fireEvent.click(document.body)
+    await waitFor(() => expect(screen.queryByRole('menuitem')).toBeNull())
+  })
+
+  it('awaits sign out before navigating to Home', async () => {
+    const request = vi.fn(async () => undefined)
+    const navigate = vi.fn()
+
+    await runHeaderSignOut(request, navigate)
+
+    expect(request).toHaveBeenCalledOnce()
+    expect(navigate).toHaveBeenCalledWith('/home')
+  })
+
+  it('prevents duplicate sign out while pending and re-enables after failure', async () => {
+    setViewport(true)
+    vi.stubGlobal('scrollTo', vi.fn())
+    stubCompleteAuth()
+    let reject!: (error: Error) => void
+    account.signOut.mockReturnValue(new Promise((_resolve, fail) => {
+      reject = fail
+    }))
+    const { router } = createPublicTestRouter('/home')
+    render(<RouterProvider router={router} />)
+
+    const trigger = await screen.findByRole('button', {
+      name: 'Mika account menu',
+    })
+    fireEvent.click(trigger)
+    const signOut = await screen.findByRole('menuitem', { name: 'Sign out' })
+    fireEvent.click(signOut)
+    fireEvent.click(signOut)
+    expect(account.signOut).toHaveBeenCalledOnce()
+
+    fireEvent.click(trigger)
+    const pending = await screen.findByRole('menuitem', {
+      name: 'Signing out…',
+    })
+    expect(pending.getAttribute('aria-disabled')).toBe('true')
+    reject(new Error('Session service unavailable.'))
+    await waitFor(() => expect(account.toastError).toHaveBeenCalledWith(
+      'Session service unavailable.',
+    ))
+    expect(screen.getByRole('button', {
+      name: 'Mika account menu',
+    })).toBeTruthy()
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: 'Escape',
+    })
+    fireEvent.click(trigger)
+    const retry = await screen.findByRole('menuitem', { name: 'Sign out' })
+    expect(retry.getAttribute('aria-disabled')).not.toBe('true')
   })
 
   it('renders only Home, Discover, and Search while complete auth is not Convex-ready', async () => {

@@ -36,6 +36,25 @@ describe('authenticated Profile reads', () => {
     })
   })
 
+  it('rejects content shaped for a different Profile lane', async () => {
+    await expect(runProfileContentRead(
+      { username: 'mika', tab: 'reviews', cursor: null },
+      async () => ({
+        cursor: null,
+        hasMore: false,
+        items: [{
+          anime: {
+            anilistId: 1,
+            coverImageUrl: null,
+            slug: 'frieren',
+            title: 'Frieren',
+          },
+          favoriteAt: 1,
+        }],
+      }),
+    )).rejects.toThrow()
+  })
+
   it('preserves explicit authorization errors', async () => {
     await expect(runProfileRead(
       { username: 'mika' },

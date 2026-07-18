@@ -10,6 +10,7 @@ import {
   PROFILE_MEDIA_SOURCE_MAX_BYTES,
   PROFILE_NAME_MAX_LENGTH,
   normalizeProfileEdit,
+  parseProfileContentPage,
   parseProfileMediaSource,
   parseProfileTab,
   profileEditInputSchema,
@@ -33,6 +34,25 @@ it('rejects raw user fields from Profile server output', () => {
 })
 
 describe('profile contracts', () => {
+  test('parses Profile content against its requested lane schema', () => {
+    const favorites = {
+      cursor: null,
+      hasMore: false,
+      items: [{
+        anime: {
+          anilistId: 1,
+          coverImageUrl: null,
+          slug: 'frieren',
+          title: 'Frieren',
+        },
+        favoriteAt: 1,
+      }],
+    }
+
+    expect(parseProfileContentPage('favorites', favorites)).toEqual(favorites)
+    expect(() => parseProfileContentPage('reviews', favorites)).toThrow()
+  })
+
   test('locks profile limits', () => {
     expect(PROFILE_NAME_MAX_LENGTH).toBe(50)
     expect(PROFILE_BIO_MAX_LENGTH).toBe(300)

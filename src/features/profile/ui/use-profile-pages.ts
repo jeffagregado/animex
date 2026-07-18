@@ -1,21 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import type { ProfileTab } from '../shared/profile-contracts'
+import {
+  parseProfileContentPage,
+  type ProfileFavorite,
+  type ProfileTab,
+} from '../shared/profile-contracts'
 import { getProfileContentPage } from '../server/profile-read.functions'
 import {
   type FeedCard,
   type ReviewListItem,
 } from '../../social/shared/social-contracts'
-
-export interface ProfileFavorite {
-  favoriteAt: number
-  anime: {
-    anilistId: number
-    slug: string
-    title: string
-    coverImageUrl: string | null
-  }
-}
 
 interface CursorPage<T> {
   items: T[]
@@ -116,9 +110,12 @@ export function useProfilePages(
   const queryPage = useCallback(async (
     cursor: string | null,
   ): Promise<CursorPage<ProfilePageItem>> => {
-    return await getProfileContentPage({
+    const page = await getProfileContentPage({
       data: { username, cursor, tab },
-    }) as CursorPage<ProfilePageItem>
+    })
+    if (tab === 'activity') return parseProfileContentPage('activity', page)
+    if (tab === 'reviews') return parseProfileContentPage('reviews', page)
+    return parseProfileContentPage('favorites', page)
   }, [tab, username])
 
   const load = useCallback((

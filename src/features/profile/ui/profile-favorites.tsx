@@ -1,10 +1,11 @@
 import { ImageOffIcon } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 
 import { Skeleton } from '#/components/ui/skeleton'
+import type { ProfileFavorite } from '../shared/profile-contracts'
 import { ProfilePagination, ProfileState } from './profile-page-state'
 import {
   useProfileAutoLoad,
-  type ProfileFavorite,
   type ProfilePageState,
 } from './use-profile-pages'
 
@@ -62,12 +63,15 @@ export function ProfileFavoritesPreview({
         <h2 id="latest-favorites-heading" className="font-black">
           Latest Favorites
         </h2>
-        <a
+        <Link
           className="text-sm font-bold text-cyan-300 hover:underline"
-          href={`/users/${username}?tab=favorites`}
+          params={{ username }}
+          resetScroll={false}
+          search={{ tab: 'favorites' }}
+          to="/users/$username"
         >
           See all
-        </a>
+        </Link>
       </div>
       {favorites.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">No favorites yet.</p>

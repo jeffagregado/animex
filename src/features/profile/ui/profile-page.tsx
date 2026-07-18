@@ -53,6 +53,9 @@ export function ProfilePage({
   const canMutate = result.owner
     && convexAuth.isAuthenticated
     && !convexAuth.isLoading
+  const mutationUnavailable = result.owner
+    && !convexAuth.isLoading
+    && !convexAuth.isAuthenticated
   if (result.access === 'header') {
     return (
       <main className="mx-auto min-h-[70dvh] min-w-0 w-full max-w-[1480px] px-4 pt-5 pb-28 sm:px-6 lg:px-10 lg:pb-12">
@@ -70,7 +73,7 @@ export function ProfilePage({
             profile={result.profile}
           />
         ) : null}
-        {result.owner && !canMutate ? <ProfileMutationUnavailable /> : null}
+        {mutationUnavailable ? <ProfileMutationUnavailable /> : null}
         <section className="mt-6 min-w-0 rounded-xl border border-cyan-300/25 bg-cyan-300/5 p-8 text-center">
           <h2 className="text-xl font-black">This profile is private</h2>
           <p className="mt-2 text-muted-foreground">
@@ -96,7 +99,7 @@ export function ProfilePage({
           profile={result.profile}
         />
       ) : null}
-      {result.owner && !canMutate ? <ProfileMutationUnavailable /> : null}
+      {mutationUnavailable ? <ProfileMutationUnavailable /> : null}
       <ProfileTabs tab={tab} username={result.profile.username} />
       <div className="mt-6 grid min-w-0 grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(20rem,0.8fr)]">
         <div className="min-w-0">
@@ -200,6 +203,74 @@ function ProfileLoading() {
     >
       <div className="h-80 animate-pulse rounded-2xl bg-card/50 motion-reduce:animate-none" />
       <div className="mt-5 h-12 animate-pulse rounded-lg bg-card/40 motion-reduce:animate-none" />
+    </main>
+  )
+}
+
+interface ProfileErrorContent {
+  title: string
+  message: string
+}
+
+/** Maps Profile read failures to clear user-facing recovery copy. */
+const getProfileErrorContent = (error: Error): ProfileErrorContent => {
+  const cause = error.cause instanceof Error
+    ? `${error.cause.name} ${error.cause.message}`
+    : ''
+  const details = `${error.name} ${error.message} ${cause}`
+  if (details.includes('PROFILE_NOT_FOUND')) {
+    return {
+      title: 'Profile not found',
+      message: 'This profile does not exist or is no longer available.',
+    }
+  }
+  if (
+    details.includes('Unauthenticated')
+    || details.includes('UNAUTHENTICATED')
+    || details.includes('PROFILE_NOT_AUTHORIZED')
+  ) {
+    return {
+      title: 'Profile authentication required',
+      message: 'Your Profile session is unavailable. Sign in again, then retry.',
+    }
+  }
+  if (
+    details.includes('ZodError')
+    || details.includes('PROFILE_RESPONSE_INVALID')
+  ) {
+    return {
+      title: 'Profile data unavailable',
+      message: 'Profile data could not be verified. Retry the request.',
+    }
+  }
+  return {
+    title: 'Profile unavailable',
+    message: 'The Profile service could not load this profile. Retry the request.',
+  }
+}
+
+/** Contains child Profile loader failures without replacing the auth boundary. */
+export function ProfileRouteError({
+  error,
+  reset,
+}: {
+  error: Error
+  reset: () => void
+}) {
+  const content = getProfileErrorContent(error)
+  return (
+    <main className="mx-auto grid min-h-[55dvh] max-w-3xl place-items-center px-4 py-10 text-center">
+      <section role="alert">
+        <h1 className="text-2xl font-black">{content.title}</h1>
+        <p className="mt-2 text-muted-foreground">{content.message}</p>
+        <button
+          className="mt-5 min-h-11 rounded-lg border border-border px-5 font-bold"
+          onClick={reset}
+          type="button"
+        >
+          Retry Profile
+        </button>
+      </section>
     </main>
   )
 }

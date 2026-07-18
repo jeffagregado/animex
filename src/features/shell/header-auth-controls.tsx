@@ -23,6 +23,17 @@ import { isCompleteAuthState } from '../auth/use-auth-state'
 import { usePublicAuthState } from './public-auth-context'
 
 type HeaderAuthView = 'loading' | 'signedOut' | 'pending' | 'complete' | 'error'
+type SignOutRequest = () => Promise<void>
+type NavigateAfterSignOut = (path: string) => void
+
+/** Completes one sign-out request before full-document Home navigation. */
+export const runHeaderSignOut = async (
+  request: SignOutRequest,
+  navigate: NavigateAfterSignOut,
+): Promise<void> => {
+  await request()
+  navigate('/home')
+}
 
 const getHeaderAuthView = (
   state: ReturnType<typeof usePublicAuthState>,
@@ -44,8 +55,12 @@ export function HeaderAuthControls() {
     signingOutRef.current = true
     setIsSigningOut(true)
     try {
-      await assertAuthResponse(await authClient.signOut(), 'Sign out failed.')
-      window.location.assign('/home')
+      await runHeaderSignOut(
+        async () => {
+          await assertAuthResponse(await authClient.signOut(), 'Sign out failed.')
+        },
+        (path) => window.location.assign(path),
+      )
     } catch (error: unknown) {
       signingOutRef.current = false
       setIsSigningOut(false)
@@ -121,6 +136,7 @@ export function HeaderAuthControls() {
       <DropdownMenuContent align="end" className="w-48" sideOffset={6}>
         <DropdownMenuGroup>
           <DropdownMenuItem
+            className="min-h-11"
             render={(
               <Link
                 params={{ username: profile.username }}
@@ -133,6 +149,7 @@ export function HeaderAuthControls() {
             Profile
           </DropdownMenuItem>
           <DropdownMenuItem
+            className="min-h-11"
             disabled={isSigningOut}
             onClick={() => void handleSignOut()}
           >

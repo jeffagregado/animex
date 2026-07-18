@@ -1,7 +1,10 @@
 import { useEffect } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 
-import { ProfilePage } from '#/features/profile/ui/profile-page'
+import {
+  ProfilePage,
+  ProfileRouteError,
+} from '#/features/profile/ui/profile-page'
 import { profileQueryOptions } from '#/features/profile/ui/profile-route'
 import { profileTabSchema } from '#/features/profile/shared/profile-contracts'
 
@@ -22,6 +25,7 @@ export const Route = createFileRoute('/_public/_profile/users/$username')({
   loader: async ({ context, params }) => await context.queryClient
     .ensureQueryData(profileQueryOptions(params.username)),
   component: ProfileRoute,
+  errorComponent: ProfileRouteError,
 })
 
 function ProfileRoute() {

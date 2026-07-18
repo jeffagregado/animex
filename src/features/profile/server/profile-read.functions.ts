@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { api } from '../../../../convex/_generated/api'
 import { getAuthProxy } from '../../../lib/server-auth-proxy'
 import {
-  profileContentPageSchema,
+  parseProfileContentPage,
   profileResultSchema,
   type ProfileContentPage,
   type ProfileResult,
@@ -43,7 +43,7 @@ export const runProfileContentRead = async (
     username: parsed.username,
     cursor: parsed.cursor,
   })
-  return profileContentPageSchema.parse(result)
+  return parseProfileContentPage(parsed.tab, result)
 }
 
 export const getProfileByUsername = createServerFn({ method: 'GET' })

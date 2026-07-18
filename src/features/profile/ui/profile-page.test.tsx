@@ -6,13 +6,21 @@ import type { FeedCard } from '#/features/social/shared/social-contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ProfileActivity } from './profile-activity'
-import { ProfileFavorites } from './profile-favorites'
+import {
+  ProfileFavorites,
+  ProfileFavoritesPreview,
+} from './profile-favorites'
 import { ProfileHeader } from './profile-header'
-import { ProfilePage, type ProfileResult } from './profile-page'
+import {
+  ProfilePage,
+  ProfileRouteError,
+  type ProfileResult,
+} from './profile-page'
 import { ProfileReviews } from './profile-reviews'
 import { useProfilePages } from './use-profile-pages'
 import {
   ProfileRouteContent,
+  Route as ProfileUserRoute,
 } from '../../../routes/_public/_profile/users/$username'
 import {
   getProfileAuthDestination,
@@ -20,6 +28,7 @@ import {
 } from '../../../routes/_public/_profile/route'
 
 const mocks = vi.hoisted(() => ({
+  auth: { isAuthenticated: true, isLoading: false },
   profile: undefined as ProfileResult | undefined,
   query: vi.fn(),
   update: vi.fn(),
@@ -30,7 +39,7 @@ vi.mock('convex/react', () => ({
   useConvex: () => mocks.client,
   useMutation: () => mocks.update,
   useQuery: () => mocks.profile,
-  useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
+  useConvexAuth: () => mocks.auth,
 }))
 vi.mock('../server/profile-read.functions', () => ({
   getProfileByUsername: async () => mocks.profile,
@@ -59,13 +68,16 @@ vi.mock('@tanstack/react-router', async () => {
     Link: ({
       children,
       params,
+      resetScroll,
       search,
     }: {
       children: React.ReactNode
       params: { username: string }
+      resetScroll?: boolean
       search: { tab: string | undefined }
     }) => (
       <a
+        data-reset-scroll={String(resetScroll)}
         href={`/users/${params.username}${
           search.tab === undefined ? '' : `?tab=${search.tab}`
         }`}
@@ -163,6 +175,7 @@ const renderProfile = (tab: 'activity' | 'reviews' | 'favorites') => {
 }
 
 beforeEach(() => {
+  mocks.auth = { isAuthenticated: true, isLoading: false }
   mocks.profile = fullProfile
   mocks.query.mockReset()
   mocks.update.mockReset()
@@ -178,6 +191,39 @@ afterEach(() => {
 })
 
 describe('Profile auth and route contract', () => {
+  it('owns a retryable child boundary with clear Profile error copy', () => {
+    const errorComponent = (
+      ProfileUserRoute as unknown as {
+        errorComponent?: React.ComponentType<{
+          error: Error
+          reset: () => void
+        }>
+      }
+    ).errorComponent
+
+    expect(errorComponent).toBeTypeOf('function')
+    if (errorComponent === undefined) {
+      throw new Error('Profile child error component is required.')
+    }
+    const cases = [
+      ['PROFILE_NOT_FOUND', 'Profile not found'],
+      ['Unauthenticated', 'Profile authentication required'],
+      ['ZodError', 'Profile data unavailable'],
+      ['PROFILE_SERVICE_UNAVAILABLE', 'Profile unavailable'],
+    ] as const
+    const reset = vi.fn()
+    for (const [name, title] of cases) {
+      const error = new Error(name)
+      error.name = name
+      const view = render(<ProfileRouteError error={error} reset={reset} />)
+      expect(screen.getByRole('alert').textContent).toContain(title)
+      fireEvent.click(screen.getByRole('button', { name: 'Retry Profile' }))
+      expect(reset).toHaveBeenCalled()
+      view.unmount()
+      reset.mockClear()
+    }
+  })
+
   it('awaits server auth before protected children and preserves auth errors', async () => {
     const signedOut = {
       ensureQueryData: vi.fn(async () => ({ status: 'signedOut' as const })),
@@ -247,6 +293,34 @@ describe('Profile auth and route contract', () => {
 })
 
 describe('Profile responsive content contract', () => {
+  it('hides owner mutations without an auth disagreement alert while Convex auth loads', async () => {
+    mocks.auth = { isAuthenticated: false, isLoading: true }
+    renderProfile('activity')
+
+    expect(await screen.findByRole('heading', { name: 'Rinko' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Edit Profile' })).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('shows an auth disagreement alert after Convex auth settles unauthenticated', async () => {
+    mocks.auth = { isAuthenticated: false, isLoading: false }
+    renderProfile('activity')
+
+    expect(await screen.findByRole('heading', { name: 'Rinko' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Edit Profile' })).toBeNull()
+    expect(screen.getByRole('alert').textContent).toContain(
+      'Profile changes are unavailable.',
+    )
+  })
+
+  it('opens all favorites through typed Profile navigation without resetting scroll', () => {
+    render(<ProfileFavoritesPreview favorites={[]} username="rinko" />)
+
+    const link = screen.getByRole('link', { name: 'See all' })
+    expect(link.getAttribute('href')).toBe('/users/rinko?tab=favorites')
+    expect(link.getAttribute('data-reset-scroll')).toBe('false')
+  })
+
   it('renders owner identity, edit callback, four stats, and ten latest favorites', async () => {
     const onEditProfile = vi.fn()
     render(<ProfileHeader owner profile={header} onEditProfile={onEditProfile} />)
