@@ -49,12 +49,12 @@ describe('social policy', () => {
   })
 
   test('binds opaque Review cursors to viewer, anime, and sort', () => {
-    const cursor = encodeReviewCursor({ viewerId: 'viewer', anilistId: 1, sort: 'newest', publicAnchor: 'p12', ownPending: true })
-    expect(decodeReviewCursor(cursor, 'viewer', 1, 'newest')).toEqual({ publicAnchor: 'p12', ownPending: true })
-    expect(() => decodeReviewCursor(cursor, 'other', 1, 'newest')).toThrow('viewer')
-    expect(() => decodeReviewCursor(cursor, 'viewer', 2, 'newest')).toThrow('anime')
-    expect(() => decodeReviewCursor(cursor, 'viewer', 1, 'rating-high')).toThrow('sort')
-    expect(() => decodeReviewCursor('forged', 'viewer', 1, 'newest')).toThrow('cursor')
+    const cursor = encodeReviewCursor({ viewerId: 'viewer', animeId: 'anime-entity-1', sort: 'newest', publicAnchor: 'p12', ownPending: true })
+    expect(decodeReviewCursor(cursor, 'viewer', 'anime-entity-1', 'newest')).toEqual({ publicAnchor: 'p12', ownPending: true })
+    expect(() => decodeReviewCursor(cursor, 'other', 'anime-entity-1', 'newest')).toThrow('viewer')
+    expect(() => decodeReviewCursor(cursor, 'viewer', 'anime-entity-2', 'newest')).toThrow('anime')
+    expect(() => decodeReviewCursor(cursor, 'viewer', 'anime-entity-1', 'rating-high')).toThrow('sort')
+    expect(() => decodeReviewCursor('forged', 'viewer', 'anime-entity-1', 'newest')).toThrow('cursor')
   })
 
   test('paginates one pending private Review exactly once at sort boundaries', () => {

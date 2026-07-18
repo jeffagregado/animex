@@ -85,7 +85,7 @@ const insertAnime = async (
   await ctx.db.insert('catalogProviderRefs', {
     entityId: animeId, provider: 'anilist', kind: 'anime', providerId: anilistId, createdAt: now, updatedAt: now,
   })
-  return await ctx.db.insert('animeSummaries', {
+  await ctx.db.insert('animeSummaries', {
     anilistId,
     slug: `anime-${anilistId}`,
     titles: { display: `Anime ${anilistId}`, english: null, romaji: null, native: null },
@@ -103,6 +103,7 @@ const insertAnime = async (
     nextAiringAt: null,
     updatedAt: anilistId,
   })
+  return animeId
 })
 
 const insertReview = async (
@@ -113,9 +114,14 @@ const insertReview = async (
   visibility: 'followers' | 'private' | 'public',
 ) => await t.run(async (ctx) => {
   const seed = `${userId}:${anilistId}:${visibility}:${publishedAt}`
+  const providerRef = await ctx.db.query('catalogProviderRefs')
+    .withIndex('by_provider_kind_id', (q) => q.eq('provider', 'anilist').eq('kind', 'anime').eq('providerId', anilistId))
+    .unique()
+  if (!providerRef) throw new Error(`Missing Anime entity fixture for ${anilistId}.`)
   return await ctx.db.insert('reviews', {
     userId,
     anilistId,
+    animeId: providerRef.entityId,
     requestId: seed,
     state: 'published',
     rating: 90,
@@ -268,17 +274,67 @@ describe('profile content Convex integration', () => {
     })).rejects.toThrow('PROFILE_VISIBILITY_CORRUPT')
   })
 
+  test('hydrates favorite previews by entity and rejects missing entity links', async () => {
+    const t = createHarness()
+    const owner = await createAuthUser(t, 'preview-owner')
+    const viewer = await createAuthUser(t, 'preview-viewer')
+    const ownerId = await insertProfile(t, owner.authId, 'PreviewOwner', 'public')
+    await insertProfile(t, viewer.authId, 'PreviewViewer', 'public')
+    const animeId = await insertAnime(t, 1)
+    const entryId = await t.run(async (ctx) => await ctx.db.insert('userAnimeEntries', {
+      userId: ownerId,
+      anilistId: 1,
+      animeId,
+      status: null,
+      score: null,
+      favoriteAt: 1,
+      rewatchCount: 0,
+      lastRewatchSequence: 0,
+      createdAt: 1,
+      updatedAt: 1,
+    }))
+
+    const profile = await viewer.client.query(profileApi.profiles.getByUsername, {
+      username: 'previewowner',
+    })
+    expect(profile.profile.favorites).toEqual([{
+      publicId: animeId,
+      slug: 'anime-1',
+      title: 'Anime 1',
+      coverImageUrl: null,
+    }])
+    expect(JSON.stringify(profile.profile.favorites)).not.toContain('anilistId')
+
+    await t.run(async (ctx) => await ctx.db.patch('userAnimeEntries', entryId, {
+      animeId: undefined,
+    }))
+    await expect(viewer.client.query(profileApi.profiles.getByUsername, {
+      username: 'previewowner',
+    })).rejects.toThrow('CATALOG_PROVIDER_REF_MISSING')
+
+    const conflictingAnimeId = await insertAnime(t, 2)
+    await t.run(async (ctx) => await ctx.db.patch('userAnimeEntries', entryId, {
+      animeId: conflictingAnimeId,
+    }))
+    await expect(viewer.client.query(profileApi.profiles.getByUsername, {
+      username: 'previewowner',
+    })).rejects.toThrow('CATALOG_PROVIDER_REF_CONFLICT')
+  })
+
   test('previews and pages newest Favorites exactly once with scoped cursors', async () => {
     const t = createHarness()
     const owner = await createAuthUser(t, 'favorite-owner')
     const viewer = await createAuthUser(t, 'favorite-viewer')
     const ownerId = await insertProfile(t, owner.authId, 'FavoriteOwner', 'public')
     await insertProfile(t, viewer.authId, 'FavoriteViewer', 'public')
+    const animeIds: Array<Id<'catalogEntities'>> = []
     for (let index = 1; index <= 22; index += 1) {
-      await insertAnime(t, index)
+      const animeId = await insertAnime(t, index)
+      animeIds.push(animeId)
       await t.run(async (ctx) => await ctx.db.insert('userAnimeEntries', {
         userId: ownerId,
         anilistId: index,
+        animeId,
         status: null,
         score: null,
         favoriteAt: index,
@@ -291,8 +347,8 @@ describe('profile content Convex integration', () => {
     const profile = await viewer.client.query(profileApi.profiles.getByUsername, {
       username: 'favoriteowner',
     })
-    expect(profile.profile.favorites.map((anime: { anilistId: number }) => anime.anilistId))
-      .toEqual([22, 21, 20, 19, 18, 17, 16, 15, 14, 13])
+    expect(profile.profile.favorites.map((anime: { publicId: string }) => anime.publicId))
+      .toEqual(animeIds.slice(12).reverse())
     const first = await viewer.client.query(profileApi.userAnime.listProfileFavorites, {
       username: 'FavoriteOwner',
       cursor: null,
@@ -301,8 +357,8 @@ describe('profile content Convex integration', () => {
       username: 'favoriteowner',
       cursor: first.cursor,
     })
-    const ids = [...first.items, ...second.items].map((item) => item.anime.anilistId)
-    expect(ids).toEqual(Array.from({ length: 22 }, (_, index) => 22 - index))
+    const ids = [...first.items, ...second.items].map((item) => item.anime.publicId)
+    expect(ids).toEqual([...animeIds].reverse())
     expect(new Set(ids)).toHaveLength(22)
     await expect(owner.client.query(profileApi.userAnime.listProfileFavorites, {
       username: 'FavoriteOwner',
@@ -365,7 +421,7 @@ describe('profile content Convex integration', () => {
     const viewer = await createAuthUser(t, 'activity-viewer')
     const ownerId = await insertProfile(t, owner.authId, 'ActivityOwner', 'public')
     await insertProfile(t, viewer.authId, 'ActivityViewer', 'public')
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     const deletedReviewId = await insertReview(t, ownerId, 1, 49, 'public')
     await t.run(async (ctx) => {
       for (let index = 100; index > 55; index -= 1) {
@@ -440,19 +496,21 @@ describe('profile content Convex integration', () => {
       await ctx.db.insert('animeMilestones', {
         userId: ownerId,
         anilistId: 1,
+        animeId,
         kind: 'completed',
         visibility: 'public',
         occurredAt: 47,
         updatedAt: 47,
       })
       await ctx.db.insert('feedCards', {
-        sourceKey: `completed:${ownerId}:1`,
+        sourceKey: `completed:${ownerId}:${animeId}`,
         kind: 'completed',
         userId: ownerId,
         anilistId: 1,
+        animeId,
         visibility: 'public',
         active: true,
-        orderKey: makeOrderKey(47, `completed:${ownerId}:1`),
+        orderKey: makeOrderKey(47, `completed:${ownerId}:${animeId}`),
         occurredAt: 47,
         updatedAt: 47,
       })
@@ -473,6 +531,8 @@ describe('profile content Convex integration', () => {
       cursor: second.cursor,
     })
     expect(third.items.map((item: FeedCard) => item.kind)).toEqual(['post', 'completed'])
+    expect(third.items[1]).toMatchObject({ anime: { publicId: animeId } })
+    expect(JSON.stringify(third.items[1])).not.toContain('anilistId')
     expect(JSON.stringify(third)).not.toContain(deletedReviewId)
     expect(JSON.stringify(third)).not.toContain(owner.authId)
     expect(third.hasMore).toBe(false)

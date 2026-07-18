@@ -10,7 +10,7 @@ export type AggregateDelta = {
 
 type ReviewCursorPayload = {
   viewerId: string | null
-  anilistId: number
+  animeId: string
   sort: ReviewSort
   publicAnchor: string | null
   ownPending: boolean
@@ -32,7 +32,7 @@ export const encodeReviewCursor = (payload: ReviewCursorPayload): string => {
 export const decodeReviewCursor = (
   cursor: string | null,
   viewerId: string | null,
-  anilistId: number,
+  animeId: string,
   sort: ReviewSort,
 ): Pick<ReviewCursorPayload, 'publicAnchor' | 'ownPending'> => {
   if (cursor === null) return { publicAnchor: null, ownPending: true }
@@ -44,7 +44,7 @@ export const decodeReviewCursor = (
     if (separator < 1 || checksum !== cursorChecksum(json)) throw new TypeError('Invalid Review cursor checksum.')
     const payload = JSON.parse(json) as ReviewCursorPayload
     if (payload.viewerId !== viewerId) throw new TypeError('Review cursor belongs to another viewer.')
-    if (payload.anilistId !== anilistId) throw new TypeError('Review cursor belongs to another anime.')
+    if (payload.animeId !== animeId) throw new TypeError('Review cursor belongs to another anime.')
     if (payload.sort !== sort) throw new TypeError('Review cursor belongs to another sort.')
     if ((payload.publicAnchor !== null && typeof payload.publicAnchor !== 'string') || typeof payload.ownPending !== 'boolean') throw new TypeError('Invalid Review cursor state.')
     return { publicAnchor: payload.publicAnchor, ownPending: payload.ownPending }

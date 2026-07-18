@@ -12,12 +12,13 @@ import {
   toUsernameKey,
   upsertUserSearchDocument,
 } from './users'
+import { resolveProviderByCatalogPublicId } from './catalogIdentityModel'
 
 const PROFILE_BIO_MAX_LENGTH = 300
 const PROFILE_NAME_MAX_LENGTH = 50
 const profileVisibilityValidator = v.union(v.literal('public'), v.literal('private'))
 const animeValidator = v.object({
-  anilistId: v.number(),
+  publicId: v.id('catalogEntities'),
   slug: v.string(),
   title: v.string(),
   coverImageUrl: v.union(v.string(), v.null()),
@@ -179,8 +180,8 @@ export const resolveProfileAccess = async (
   }
 }
 
-const toAnime = (anime: Doc<'animeSummaries'>) => ({
-  anilistId: anime.anilistId,
+const toAnime = (anime: Doc<'animeSummaries'>, publicId: Id<'catalogEntities'>) => ({
+  publicId,
   slug: anime.slug,
   title: anime.titles.display,
   coverImageUrl: anime.coverImageUrl,
@@ -206,12 +207,19 @@ const getFavoritePreview = async (
     .order('desc')
     .take(10)
   return await Promise.all(entries.map(async (entry) => {
+    if (!entry.animeId) {
+      return fail('CATALOG_PROVIDER_REF_MISSING', 'Favorite Anime entity is missing.')
+    }
+    const providerRef = await resolveProviderByCatalogPublicId(ctx, entry.animeId, 'anime')
+    if (providerRef.providerId !== entry.anilistId) {
+      return fail('CATALOG_PROVIDER_REF_CONFLICT', 'Favorite Anime entity conflicts with its provider reference.')
+    }
     const anime = await ctx.db
       .query('animeSummaries')
-      .withIndex('by_anilist_id', (q) => q.eq('anilistId', entry.anilistId))
+      .withIndex('by_anilist_id', (q) => q.eq('anilistId', providerRef.providerId))
       .unique()
     if (!anime) return fail('PROFILE_ANIME_MISSING', 'Favorite Anime summary is missing.')
-    return toAnime(anime)
+    return toAnime(anime, entry.animeId)
   }))
 }
 

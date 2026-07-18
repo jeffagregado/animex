@@ -29,12 +29,13 @@ const insertAnime = async (t: ReturnType<typeof createHarness>, anilistId: numbe
     coverImageUrl: null, bannerImageUrl: null, format: 'TV', season: null, seasonYear: 2024, episodes: 12,
     genres: ['Fantasy'], popularity: 1, averageScore: 80, trending: 1, startDate: null, nextAiringAt: null, updatedAt: now,
   })
+  return animeId
 })
 
 describe('feed milestone source integrity', () => {
   test('hydrates milestone fields from the authoritative source', async () => {
     const t = createHarness()
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     const cardId = await t.run(async (ctx) => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
@@ -42,11 +43,11 @@ describe('feed milestone source integrity', () => {
         profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
       await ctx.db.insert('animeMilestones', {
-        userId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: 200, updatedAt: 200,
+        userId, anilistId: 1, animeId, kind: 'completed', visibility: 'public', occurredAt: 200, updatedAt: 200,
       })
-      const sourceKey = `completed:${userId}:1`
+      const sourceKey = `completed:${userId}:${animeId}`
       return await ctx.db.insert('feedCards', {
-        sourceKey, kind: 'completed', userId, anilistId: 1, visibility: 'public', active: true,
+        sourceKey, kind: 'completed', userId, anilistId: 1, animeId, visibility: 'public', active: true,
         orderKey: makeOrderKey(100, sourceKey), occurredAt: 100, updatedAt: 100,
       })
     })
@@ -58,13 +59,14 @@ describe('feed milestone source integrity', () => {
       kind: 'completed',
       settledAt: 200,
       visibility: 'public',
-      anime: { anilistId: 1, seasonYear: 2024, format: 'TV' },
+      anime: { publicId: animeId, seasonYear: 2024, format: 'TV' },
     })
+    expect(JSON.stringify(card)).not.toContain('anilistId')
   })
 
   test('suppresses a milestone projection after its source is deleted', async () => {
     const t = createHarness()
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     const cardId = await t.run(async (ctx) => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
@@ -72,11 +74,11 @@ describe('feed milestone source integrity', () => {
         profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
       const milestoneId = await ctx.db.insert('animeMilestones', {
-        userId, anilistId: 1, kind: 'rewatched', visibility: 'public', occurredAt: now, updatedAt: now,
+        userId, anilistId: 1, animeId, kind: 'rewatched', visibility: 'public', occurredAt: now, updatedAt: now,
       })
-      const sourceKey = `rewatched:${userId}:1`
+      const sourceKey = `rewatched:${userId}:${animeId}`
       const id = await ctx.db.insert('feedCards', {
-        sourceKey, kind: 'rewatched', userId, anilistId: 1, visibility: 'public', active: true,
+        sourceKey, kind: 'rewatched', userId, anilistId: 1, animeId, visibility: 'public', active: true,
         orderKey: makeOrderKey(now, sourceKey), occurredAt: now, updatedAt: now,
       })
       await ctx.db.delete('animeMilestones', milestoneId)
@@ -89,7 +91,7 @@ describe('feed milestone source integrity', () => {
 
   test('does not expose a private source through a stale public projection', async () => {
     const t = createHarness()
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     const cardId = await t.run(async (ctx) => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
@@ -97,11 +99,11 @@ describe('feed milestone source integrity', () => {
         profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
       await ctx.db.insert('animeMilestones', {
-        userId, anilistId: 1, kind: 'completed', visibility: 'private', occurredAt: now, updatedAt: now,
+        userId, anilistId: 1, animeId, kind: 'completed', visibility: 'private', occurredAt: now, updatedAt: now,
       })
-      const sourceKey = `completed:${userId}:1`
+      const sourceKey = `completed:${userId}:${animeId}`
       return await ctx.db.insert('feedCards', {
-        sourceKey, kind: 'completed', userId, anilistId: 1, visibility: 'public', active: true,
+        sourceKey, kind: 'completed', userId, anilistId: 1, animeId, visibility: 'public', active: true,
         orderKey: makeOrderKey(now, sourceKey), occurredAt: now, updatedAt: now,
       })
     })
@@ -112,7 +114,7 @@ describe('feed milestone source integrity', () => {
 
   test('suppresses a stale private projection for a public milestone source', async () => {
     const t = createHarness()
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     const cardId = await t.run(async (ctx) => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
@@ -120,11 +122,11 @@ describe('feed milestone source integrity', () => {
         profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
       await ctx.db.insert('animeMilestones', {
-        userId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now,
+        userId, anilistId: 1, animeId, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now,
       })
-      const sourceKey = `completed:${userId}:1`
+      const sourceKey = `completed:${userId}:${animeId}`
       return await ctx.db.insert('feedCards', {
-        sourceKey, kind: 'completed', userId, anilistId: 1, visibility: 'private', active: true,
+        sourceKey, kind: 'completed', userId, anilistId: 1, animeId, visibility: 'private', active: true,
         orderKey: makeOrderKey(now, sourceKey), occurredAt: now, updatedAt: now,
       })
     })
@@ -135,7 +137,7 @@ describe('feed milestone source integrity', () => {
 
   test('suppresses a projection whose source key does not match its milestone identity', async () => {
     const t = createHarness()
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     const cardId = await t.run(async (ctx) => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
@@ -143,10 +145,10 @@ describe('feed milestone source integrity', () => {
         profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
       await ctx.db.insert('animeMilestones', {
-        userId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now,
+        userId, anilistId: 1, animeId, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now,
       })
       return await ctx.db.insert('feedCards', {
-        sourceKey: `completed:${userId}:999`, kind: 'completed', userId, anilistId: 1, visibility: 'public', active: true,
+        sourceKey: `completed:${userId}:wrong`, kind: 'completed', userId, anilistId: 1, animeId, visibility: 'public', active: true,
         orderKey: makeOrderKey(now, `completed:${userId}:999`), occurredAt: now, updatedAt: now,
       })
     })
@@ -154,17 +156,144 @@ describe('feed milestone source integrity', () => {
     expect(await t.query(feedApi.feed.getById, { cardId })).toBeNull()
   })
 
-  test('reports exact source counts while backfilling repeated cursor pages', async () => {
+  test('rejects missing and conflicting milestone entity links without repairing rows', async () => {
     const t = createHarness()
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
+    const conflictingAnimeId = await insertAnime(t, 2)
+    const rows = await t.run(async (ctx) => {
+      const now = Date.now()
+      const userId = await ctx.db.insert('users', {
+        authId: 'identity-owner', username: 'IdentityOwner', usernameKey: 'identityowner', name: 'Identity Owner',
+        profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
+      })
+      const missingMilestoneId = await ctx.db.insert('animeMilestones', {
+        userId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now,
+      })
+      const missingKey = `completed:${userId}:${animeId}`
+      const missingCardId = await ctx.db.insert('feedCards', {
+        sourceKey: missingKey, kind: 'completed', userId, anilistId: 1, visibility: 'public', active: true,
+        orderKey: makeOrderKey(now, missingKey), occurredAt: now, updatedAt: now,
+      })
+      const conflictMilestoneId = await ctx.db.insert('animeMilestones', {
+        userId, anilistId: 1, animeId: conflictingAnimeId, kind: 'rewatched', visibility: 'public', occurredAt: now + 1, updatedAt: now + 1,
+      })
+      const conflictKey = `rewatched:${userId}:${conflictingAnimeId}`
+      const conflictCardId = await ctx.db.insert('feedCards', {
+        sourceKey: conflictKey, kind: 'rewatched', userId, anilistId: 1, animeId: conflictingAnimeId, visibility: 'public', active: true,
+        orderKey: makeOrderKey(now + 1, conflictKey), occurredAt: now + 1, updatedAt: now + 1,
+      })
+      return { missingMilestoneId, missingCardId, conflictMilestoneId, conflictCardId }
+    })
+
+    await expect(t.query(feedApi.feed.getById, { cardId: rows.missingCardId }))
+      .rejects.toThrow('CATALOG_PROVIDER_REF_MISSING')
+    await expect(t.query(feedApi.feed.getById, { cardId: rows.conflictCardId }))
+      .rejects.toThrow('CATALOG_PROVIDER_REF_CONFLICT')
+    await expect(t.mutation(feedInternal.feed.projectMilestones, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })).rejects.toThrow('CATALOG_PROVIDER_REF_MISSING')
+    const stored = await t.run(async (ctx) => ({
+      milestone: await ctx.db.get('animeMilestones', rows.missingMilestoneId),
+      card: await ctx.db.get('feedCards', rows.missingCardId),
+    }))
+    expect(stored.milestone?.animeId).toBeUndefined()
+    expect(stored.card?.animeId).toBeUndefined()
+  })
+
+  test('rejects legacy milestone source keys without inserting or patching projections', async () => {
+    const t = createHarness()
+    const animeId = await insertAnime(t, 1)
+    const rows = await t.run(async (ctx) => {
+      const now = Date.now()
+      const userId = await ctx.db.insert('users', {
+        authId: 'legacy-owner', username: 'LegacyOwner', usernameKey: 'legacyowner', name: 'Legacy Owner',
+        profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
+      })
+      const milestoneId = await ctx.db.insert('animeMilestones', {
+        userId, anilistId: 1, animeId, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now,
+      })
+      const legacyKey = `completed:${userId}:1`
+      const cardId = await ctx.db.insert('feedCards', {
+        sourceKey: legacyKey, kind: 'completed', userId, anilistId: 1, visibility: 'public', active: true,
+        orderKey: makeOrderKey(now - 1, legacyKey), occurredAt: now - 1, updatedAt: now - 1,
+      })
+      return { milestoneId, cardId, userId, legacyKey, entityKey: `completed:${userId}:${animeId}` }
+    })
+
+    await expect(t.mutation(feedInternal.feed.projectMilestones, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })).rejects.toThrow('MILESTONE_SOURCE_CONFLICT')
+    const stored = await t.run(async (ctx) => ({
+      milestone: await ctx.db.get('animeMilestones', rows.milestoneId),
+      legacyCard: await ctx.db.get('feedCards', rows.cardId),
+      entityCard: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', rows.entityKey)).unique(),
+    }))
+    expect(stored.milestone).toMatchObject({ animeId })
+    expect(stored.legacyCard).toMatchObject({
+      sourceKey: rows.legacyKey,
+      active: true,
+    })
+    expect(stored.legacyCard).not.toHaveProperty('animeId')
+    expect(stored.entityCard).toBeNull()
+  })
+
+  test('rejects dual milestone source keys without patching either projection', async () => {
+    const t = createHarness()
+    const animeId = await insertAnime(t, 1)
+    const rows = await t.run(async (ctx) => {
+      const userId = await ctx.db.insert('users', {
+        authId: 'dual-owner', username: 'DualOwner', usernameKey: 'dualowner', name: 'Dual Owner',
+        profileVisibility: 'public', visibility: 'public', createdAt: 1, updatedAt: 1,
+      })
+      await ctx.db.insert('animeMilestones', {
+        userId, anilistId: 1, animeId, kind: 'rewatched', visibility: 'public', occurredAt: 500, updatedAt: 500,
+      })
+      const entityKey = `rewatched:${userId}:${animeId}`
+      const legacyKey = `rewatched:${userId}:1`
+      const entityCardId = await ctx.db.insert('feedCards', {
+        sourceKey: entityKey, kind: 'rewatched', userId, anilistId: 1, animeId, visibility: 'private', active: false,
+        orderKey: makeOrderKey(100, entityKey), occurredAt: 100, updatedAt: 100,
+      })
+      const legacyCardId = await ctx.db.insert('feedCards', {
+        sourceKey: legacyKey, kind: 'rewatched', userId, anilistId: 1, visibility: 'public', active: true,
+        orderKey: makeOrderKey(200, legacyKey), occurredAt: 200, updatedAt: 200,
+      })
+      return { entityCardId, legacyCardId }
+    })
+
+    await expect(t.mutation(feedInternal.feed.projectMilestones, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })).rejects.toThrow('MILESTONE_SOURCE_CONFLICT')
+    const stored = await t.run(async (ctx) => ({
+      entityCard: await ctx.db.get('feedCards', rows.entityCardId),
+      legacyCard: await ctx.db.get('feedCards', rows.legacyCardId),
+    }))
+    expect(stored.entityCard).toMatchObject({
+      visibility: 'private',
+      active: false,
+      occurredAt: 100,
+      updatedAt: 100,
+    })
+    expect(stored.legacyCard).toMatchObject({
+      visibility: 'public',
+      active: true,
+      occurredAt: 200,
+      updatedAt: 200,
+    })
+    expect(stored.legacyCard).not.toHaveProperty('animeId')
+  })
+
+  test('reports exact source counts while projecting repeated cursor pages', async () => {
+    const t = createHarness()
+    const animeId = await insertAnime(t, 1)
     await t.run(async (ctx) => {
       const now = Date.now()
       const userId = await ctx.db.insert('users', {
         authId: 'backfill-owner', username: 'BackfillOwner', usernameKey: 'backfillowner', name: 'Backfill Owner',
         profileVisibility: 'public', visibility: 'public', createdAt: now, updatedAt: now,
       })
-      await ctx.db.insert('animeMilestones', { userId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now })
-      await ctx.db.insert('animeMilestones', { userId, anilistId: 1, kind: 'rewatched', visibility: 'public', occurredAt: now + 1, updatedAt: now + 1 })
+      await ctx.db.insert('animeMilestones', { userId, anilistId: 1, animeId, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now })
+      await ctx.db.insert('animeMilestones', { userId, anilistId: 1, animeId, kind: 'rewatched', visibility: 'public', occurredAt: now + 1, updatedAt: now + 1 })
     })
 
     const first = await t.mutation(feedInternal.feed.projectMilestones, { paginationOpts: { numItems: 1, cursor: null } })
