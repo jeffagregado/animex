@@ -69,6 +69,9 @@ describe('CatalogPersonPage', () => {
 
   it('renders Character identity, available facts, and empty whole sections', () => {
     const view = render(<CatalogPersonPage id={7} kind="character" onRetry={() => undefined} onTabChange={() => undefined} state={characterState()} tab="overview" />)
+    expect(screen.getByRole('main').className).toContain('max-w-[1480px]')
+    expect(screen.getByRole('main').className).toContain('grid-cols-[minmax(0,1fr)]')
+    expect(screen.getByRole('main').className).toContain('lg:grid-cols-[minmax(0,3fr)_minmax(17rem,1fr)]')
     expect(screen.getByRole('heading', { level: 1, name: 'Frieren' })).toBeTruthy()
     expect(screen.getByText('フリーレン')).toBeTruthy()
     expect(screen.getByText('An elven mage.')).toBeTruthy()

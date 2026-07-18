@@ -9,7 +9,7 @@ export const CATALOG_PERSON_PAGE_SIZE = 20 as const
 export const CATALOG_PERSON_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 export const catalogPersonKindSchema = z.enum(['character', 'staff'])
-const catalogPersonTabSchema = z.enum(['overview', 'anime', 'works'])
+const catalogPersonTabSchema = z.enum(['overview', 'anime'])
 
 export type CatalogPersonKind = z.infer<typeof catalogPersonKindSchema>
 export type CatalogPersonTab = z.infer<typeof catalogPersonTabSchema>
@@ -189,14 +189,13 @@ export const createCatalogPersonPath = (
   return `/${segment}/${parsedId}/${encodeURIComponent(slugifyCatalogPerson(name))}`
 }
 
-/** Parses only tabs supported by one person kind. */
+/** Parses the shared canonical Character and Staff tabs. */
 export const parseCatalogPersonTab = (
   kind: CatalogPersonKind,
   value: unknown,
 ): CatalogPersonTab => {
   if (value === undefined || value === 'overview') return 'overview'
-  if (kind === 'character' && value === 'anime') return 'anime'
-  if (kind === 'staff' && value === 'works') return 'works'
+  if ((kind === 'character' || kind === 'staff') && value === 'anime') return 'anime'
 
   throw new TypeError('CATALOG_PERSON_TAB_INVALID')
 }

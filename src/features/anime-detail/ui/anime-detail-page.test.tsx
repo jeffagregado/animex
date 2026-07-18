@@ -44,7 +44,9 @@ describe('AnimeDetailPage', () => {
   it('renders one shell, explicit missing artwork, and changes tabs through public intent', () => {
     const onTabChange = vi.fn()
     render(<AnimeDetailPage state={state} tab="overview" onTabChange={onTabChange} />)
+    expect(screen.getByRole('main').className).toContain('max-w-[1480px]')
     expect(screen.getByRole('main').className).toContain('grid-cols-[minmax(0,1fr)]')
+    expect(screen.getByRole('main').className).toContain('lg:grid-cols-[minmax(0,3fr)_minmax(17rem,1fr)]')
     expect(screen.getByRole('heading', { name: 'Frieren' })).toBeTruthy()
     expect(screen.getAllByText('Image unavailable').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('tab', { name: 'Staff' }))

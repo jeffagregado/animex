@@ -11,8 +11,8 @@ import {
 } from '#/features/catalog-person/ui/catalog-person-route'
 
 const rawTab = (search: string): string | undefined => new URLSearchParams(search).get('tab') ?? undefined
-const validateSearch = (search: Record<string, unknown>): { tab?: 'works' } => (
-  parseCatalogPersonRouteSearch('staff', search.tab).tab === 'works' ? { tab: 'works' } : {}
+const validateSearch = (search: Record<string, unknown>): { tab?: 'anime' } => (
+  parseCatalogPersonRouteSearch('staff', search.tab).tab === 'anime' ? { tab: 'anime' } : {}
 )
 
 export const Route = createFileRoute('/_public/staff/$id/')({

@@ -151,7 +151,7 @@ describe('CatalogPersonWorkGrid', () => {
   it('shows final empty only after provider pagination is exhausted', async () => {
     server.getCatalogPersonWorks.mockResolvedValueOnce(ready(page([], 1, false)))
     renderGrid('staff')
-    expect(await screen.findByText('No works available.')).toBeTruthy()
+    expect(await screen.findByText('No anime available.')).toBeTruthy()
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull())
   })
 })

@@ -11,8 +11,8 @@ import {
 import { getCatalogPerson } from '../server/catalog-person.functions'
 import type { CatalogPersonState } from '../server/catalog-person-cache.server'
 
-export type CharacterPersonTab = 'overview' | 'anime'
-export type StaffPersonTab = 'overview' | 'works'
+export type CharacterPersonTab = CatalogPersonTab
+export type StaffPersonTab = CatalogPersonTab
 export type CatalogPersonPageState = CatalogPersonState | { status: 'loading' }
 export type CatalogPersonRouteSearch = {
   tab: CatalogPersonTab
@@ -32,6 +32,9 @@ export const parseCatalogPersonRouteSearch = (
   kind: CatalogPersonKind,
   value: unknown,
 ): CatalogPersonRouteSearch => {
+  if (kind === 'staff' && value === 'works') {
+    return { tab: 'anime', replace: true }
+  }
   try {
     const tab = parseCatalogPersonTab(kind, value)
     return { tab, replace: value === 'overview' }

@@ -1,32 +1,24 @@
 import type { KeyboardEvent } from 'react'
 
+import { DetailPageLayout } from '#/components/detail-page-layout'
 import { AnimeImage } from '#/features/anime-detail/ui/anime-image'
-import type { CatalogPersonDetail } from '../shared/catalog-person-contracts'
-import type {
-  CatalogPersonPageState,
-  CharacterPersonTab,
-  StaffPersonTab,
-} from './catalog-person-route'
+import type { CatalogPersonDetail, CatalogPersonKind, CatalogPersonTab } from '../shared/catalog-person-contracts'
+import type { CatalogPersonPageState } from './catalog-person-route'
 import { CatalogPersonWorkGrid } from './catalog-person-work-grid'
 
-type CommonProps = {
+type CatalogPersonPageProps = {
   id: number
+  kind: CatalogPersonKind
   state: CatalogPersonPageState
+  tab: CatalogPersonTab
   onRetry: () => void
+  onTabChange: (tab: CatalogPersonTab) => void
 }
-type CatalogPersonPageProps = CommonProps & (
-  | { kind: 'character'; tab: CharacterPersonTab; onTabChange: (tab: CharacterPersonTab) => void }
-  | { kind: 'staff'; tab: StaffPersonTab; onTabChange: (tab: StaffPersonTab) => void }
-)
 type Fact = { label: string; value: string }
 
-const CHARACTER_TABS = [
+const PERSON_TABS = [
   { label: 'Overview', value: 'overview' },
   { label: 'Anime', value: 'anime' },
-] as const
-const STAFF_TABS = [
-  { label: 'Overview', value: 'overview' },
-  { label: 'Works', value: 'works' },
 ] as const
 
 /** Renders explicit detail states and one kind-safe Character or Staff page. */
@@ -47,13 +39,13 @@ export function CatalogPersonPage(props: CatalogPersonPageProps) {
     return <main className="mx-auto max-w-7xl px-4 py-16"><div className="rounded-xl border border-red-400/40 bg-red-400/10 p-6" role="alert"><p>Catalog person type did not match this destination.</p><button className="mt-5 min-h-11 rounded-lg border border-border px-5 font-bold" onClick={props.onRetry} type="button">Retry</button></div></main>
   }
 
-  return <main className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-6 sm:px-6 lg:px-8">
-    <PersonHeader detail={detail} />
-    <PersonTabs props={props} />
+  const content = <>
+    <PersonTabs kind={props.kind} onTabChange={props.onTabChange} tab={props.tab} />
     <section aria-labelledby={`catalog-person-tab-${props.tab}`} className="py-6" id={`catalog-person-panel-${props.tab}`} role="tabpanel" tabIndex={0}>
-      {props.tab === 'overview' ? <Overview detail={detail} /> : <CatalogPersonWorkGrid kind={props.kind} personId={props.id} />}
+      {props.tab === 'overview' ? <PersonOverview detail={detail} /> : <CatalogPersonWorkGrid kind={props.kind} personId={props.id} />}
     </section>
-  </main>
+  </>
+  return <DetailPageLayout hero={<PersonHeader detail={detail} />} content={content} aside={<PersonFacts detail={detail} />} />
 }
 
 function PersonHeader({ detail }: { detail: CatalogPersonDetail }) {
@@ -68,30 +60,27 @@ function PersonHeader({ detail }: { detail: CatalogPersonDetail }) {
   </header>
 }
 
-function PersonTabs({ props }: { props: CatalogPersonPageProps }) {
-  const tabs = props.kind === 'character' ? CHARACTER_TABS : STAFF_TABS
-  const select = (value: 'overview' | 'anime' | 'works'): void => {
-    if (props.kind === 'character') props.onTabChange(value as CharacterPersonTab)
-    else props.onTabChange(value as StaffPersonTab)
-  }
+function PersonTabs({ kind, onTabChange, tab }: { kind: CatalogPersonKind; onTabChange: (tab: CatalogPersonTab) => void; tab: CatalogPersonTab }) {
+  const select = (value: CatalogPersonTab): void => onTabChange(value)
   const move = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
-    const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, Home: -index, End: tabs.length - 1 - index }
+    const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, Home: -index, End: PERSON_TABS.length - 1 - index }
     const offset = offsets[event.key]
     if (offset === undefined) return
     event.preventDefault()
-    const next = (index + offset + tabs.length) % tabs.length
-    select(tabs[next].value)
-    document.getElementById(`catalog-person-tab-${tabs[next].value}`)?.focus()
+    const next = (index + offset + PERSON_TABS.length) % PERSON_TABS.length
+    select(PERSON_TABS[next].value)
+    document.getElementById(`catalog-person-tab-${PERSON_TABS[next].value}`)?.focus()
   }
-  return <nav aria-label={`${props.kind} detail tabs`} className="mt-6 grid grid-cols-2 border-b border-border" role="tablist">{tabs.map((item, index) => <button aria-controls={`catalog-person-panel-${item.value}`} aria-selected={props.tab === item.value} className={`min-h-11 border-b-2 px-4 py-3 font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${props.tab === item.value ? 'border-cyan-300 text-cyan-300' : 'border-transparent text-muted-foreground'}`} id={`catalog-person-tab-${item.value}`} key={item.value} onClick={() => select(item.value)} onKeyDown={(event) => move(event, index)} role="tab" tabIndex={props.tab === item.value ? 0 : -1} type="button">{item.label}</button>)}</nav>
+  return <nav aria-label={`${kind} detail tabs`} className="mt-6 grid grid-cols-2 border-b border-border" role="tablist">{PERSON_TABS.map((item, index) => <button aria-controls={`catalog-person-panel-${item.value}`} aria-selected={tab === item.value} className={`min-h-11 border-b-2 px-4 py-3 font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${tab === item.value ? 'border-cyan-300 text-cyan-300' : 'border-transparent text-muted-foreground'}`} id={`catalog-person-tab-${item.value}`} key={item.value} onClick={() => select(item.value)} onKeyDown={(event) => move(event, index)} role="tab" tabIndex={tab === item.value ? 0 : -1} type="button">{item.label}</button>)}</nav>
 }
 
-function Overview({ detail }: { detail: CatalogPersonDetail }) {
+function PersonOverview({ detail }: { detail: CatalogPersonDetail }) {
+  return <section aria-labelledby="catalog-person-about"><h2 className="text-xl font-black" id="catalog-person-about">About</h2>{detail.description ? <p className="mt-4 whitespace-pre-line leading-7 text-muted-foreground">{detail.description}</p> : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No biography available.</p>}</section>
+}
+
+function PersonFacts({ detail }: { detail: CatalogPersonDetail }) {
   const facts = getFacts(detail)
-  return <div className="grid gap-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
-    <section aria-labelledby="catalog-person-about"><h2 className="text-xl font-black" id="catalog-person-about">About</h2>{detail.description ? <p className="mt-4 whitespace-pre-line leading-7 text-muted-foreground">{detail.description}</p> : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No biography available.</p>}</section>
-    <section aria-labelledby="catalog-person-facts"><h2 className="text-xl font-black" id="catalog-person-facts">Facts</h2>{facts.length > 0 ? <dl className="mt-3">{facts.map((fact) => <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 border-b border-border py-3" key={fact.label}><dt className="text-muted-foreground">{fact.label}</dt><dd className="break-words">{fact.value}</dd></div>)}</dl> : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No {detail.kind} facts available.</p>}</section>
-  </div>
+  return <aside aria-labelledby="catalog-person-facts" className="py-6"><h2 className="text-xl font-black" id="catalog-person-facts">Facts</h2>{facts.length > 0 ? <dl className="mt-3">{facts.map((fact) => <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 border-b border-border py-3" key={fact.label}><dt className="text-muted-foreground">{fact.label}</dt><dd className="break-words">{fact.value}</dd></div>)}</dl> : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No {detail.kind} facts available.</p>}</aside>
 }
 
 /** Returns only provider-present facts in stable display order. */

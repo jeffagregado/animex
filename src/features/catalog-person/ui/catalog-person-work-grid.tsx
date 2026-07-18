@@ -30,7 +30,6 @@ export function CatalogPersonWorkGrid({ kind, personId }: CatalogPersonWorkGridP
   })
   return (
     <WorkGridContent
-      kind={kind}
       loadNextPage={loadNextPage}
       pages={pages}
       query={query}
@@ -113,20 +112,18 @@ function useWorkAutoLoad({
 }
 
 function WorkGridContent({
-  kind,
   loadNextPage,
   pages,
   query,
   sentinelRef,
 }: {
-  kind: CatalogPersonKind
   loadNextPage: () => Promise<void>
   pages: CatalogPersonWorkPage[]
   query: ReturnType<typeof useCatalogPersonWorkQuery>
   sentinelRef: React.RefObject<HTMLDivElement | null>
 }) {
   const items = uniqueWorks(pages)
-  const section = kind === 'character' ? 'anime' : 'works'
+  const section = 'anime'
   if (query.isPending) {
     return <div aria-busy="true" className="rounded-xl border border-border bg-card/60 p-8 text-center text-muted-foreground">Loading {section}…</div>
   }
