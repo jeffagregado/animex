@@ -2,96 +2,98 @@
 
 Status: DONE_WITH_CONCERNS
 
-## RED
+## Scope
 
-Migration:
+- Added signed-in `/users/$username` Profile gate and tab route.
+- Added locked responsive Profile header, stats, Favorites, Reviews, Activity.
+- Added typed Task 3 function references. No generated API edit.
+- Added scope epoch, cursor in-flight dedupe, ID merge dedupe, auto paging, visible Load more.
+- Social controls/counts/footer, Anime List, Favorite Genres absent.
 
-```text
-pnpm test -- convex/catalogAnimeDataMigration.integration.test.ts
-Test Files 1 failed
-Tests 3 failed
-Cause: Could not find module for "catalogAnimeDataMigration".
-```
+## TDD
 
-User Anime dual write:
-
-```text
-pnpm test -- convex/userAnime.integration.test.ts -t "dual-writes one existing Anime entity"
-Test Files 1 failed
-Tests 1 failed
-Cause: entry animeId was undefined.
-```
-
-Review dual write:
+RED:
 
 ```text
-pnpm test -- convex/social.integration.test.ts -t "dual-writes one existing Anime entity to Review"
-Test Files 1 failed
-Tests 1 failed
-Cause: Review animeId was undefined.
+pnpm test -- src/features/profile/ui/profile-page.test.tsx
+FAIL: Failed to resolve import "./use-profile-pages"
+Expected cause: Profile UI and page hook did not exist.
 ```
 
-## Changed Files
+GREEN:
 
-- `convex/schema.ts`
-- `convex/catalogAnimeDataMigration.ts`
-- `convex/catalogAnimeDataMigration.integration.test.ts`
-- `convex/userAnime.ts`
-- `convex/userAnime.integration.test.ts`
-- `convex/reviews.ts`
-- `convex/feed.ts`
-- `convex/social.integration.test.ts`
-- `docs/runbooks/catalog-identity-backfill.md`
+```text
+pnpm test -- src/features/profile/ui/profile-page.test.tsx
+Test Files 1 passed
+Tests 10 passed
+```
 
-`reviewDiscovery.ts`, `reviewDiscoveryPolicy.ts`, `profileReviewPolicy.ts`, and their tests stayed unchanged. They contain no provider Anime equality, source key, or Anime cursor field requiring transitional identity logic.
-
-## Result
-
-- Added optional `animeId` fields and parallel entity indexes. Kept every `anilistId` field and legacy index.
-- Existing provider-ID writes resolve existing mapping only. Missing/conflicting mappings fail explicitly. No client path creates identity mappings.
-- User entries, rewatches, milestones, Reviews, feed cards, and Review stats dual-write entity and provider IDs.
-- Milestone reads accept legacy and entity source keys. New cards use entity source keys.
-- Added bounded internal reference backfill, milestone source-key migration, and zero-counter verification.
-- Backfill patches only missing refs. Rerun patches zero. Source-key migration refuses duplicate targets.
-- Migration preserves bodies, visibility, timestamps, counts, bands, activity state, cursors, ordering fields, and legacy provider data.
+Cases cover auth destinations/readiness, invalid-tab pre-query replace, owner Edit
+callback, Public/Private projections, four stats, 10 latest Favorites, truthful tab
+states, social embargo, visible/manual and automatic paging, cursor in-flight dedupe,
+ID merge dedupe, and stale-scope rejection.
 
 ## Validation
 
-```text
-pnpm test -- convex/catalogAnimeDataMigration.integration.test.ts convex/userAnime.integration.test.ts convex/reviewDiscoveryPolicy.test.ts convex/feedPolicy.test.ts
-Test Files 4 passed
-Tests 20 passed
-```
+- Focused suite: PASS, 10/10.
+- Line counts: PASS, 67-358.
+- `git diff --check`: PASS.
+- Typecheck/codegen: not run. Task 15 owns integrated route generation and TypeScript.
+- Browser/React Doctor/Fallow: controller integration gates.
+- shadcn docs CLI unavailable in installed project; reused existing Base UI-backed
+  Button/Card-era primitives without dependency or registry changes.
+
+Commit: `79dd199` (`feat: add user profile destination`).
+
+## Changed Files
+
+- `src/routes/_public/_profile/route.tsx`
+- `src/routes/_public/_profile/users/$username.tsx`
+- `src/features/profile/ui/profile-page.tsx`
+- `src/features/profile/ui/profile-header.tsx`
+- `src/features/profile/ui/profile-stats.tsx`
+- `src/features/profile/ui/profile-favorites.tsx`
+- `src/features/profile/ui/profile-reviews.tsx`
+- `src/features/profile/ui/profile-activity.tsx`
+- `src/features/profile/ui/use-profile-pages.ts`
+- `src/features/profile/ui/profile-page.test.tsx`
+- `.superpowers/sdd/task-4-report.md` (ignored)
+
+## Self-review And Concerns
+
+- Exact owned source only. Tooling dirtied locked `src/routeTree.gen.ts`; left
+  untouched and unstaged per brief.
+- Private non-owner projection never mounts content query hook.
+- Invalid tab never mounts Profile query hook.
+- `FeedCard` receives `owner={false}`. `FeedList` unused.
+- `PublishedReviewCard` reused directly.
+- Header owner button uses explicit `onEditProfile` callback. `profile-page.tsx`
+  currently supplies intentional no-op until Task 5 integrates real dialog; no fake
+  dialog or success state added.
+- Favorites backend projection has no document ID. Merge dedupe uses canonical
+  AniList ID; Reviews and Activity use returned document IDs.
+
+## Review Follow-up
+
+Legal empty continuation page RED:
 
 ```text
-pnpm test -- convex/social.integration.test.ts
+pnpm test -- src/features/profile/ui/profile-page.test.tsx
+Test Files 1 failed
+Tests 1 failed, 10 passed
+Expected cause: Activity rendered "No activity yet" while `hasMore` was true.
+```
+
+GREEN:
+
+```text
+pnpm test -- src/features/profile/ui/profile-page.test.tsx
 Test Files 1 passed
-Tests 26 passed
+Tests 11 passed
 ```
 
-Final affected retest:
+Activity, Reviews, and Favorites now render terminal empty state only when
+`items.length === 0 && !hasMore`. Empty continuation pages keep visible Load more
+and observer continuation.
 
-```text
-pnpm test -- convex/social.integration.test.ts -t "backfills milestone cards idempotently|dual-writes one existing Anime entity to Review"
-Test Files 1 passed
-Tests 2 passed
-```
-
-```text
-pnpm exec tsc --noEmit
-PASS
-
-git diff --check
-PASS
-```
-
-No remote Convex command ran.
-
-## Commit
-
-`feat(catalog): migrate durable anime references` (this commit)
-
-## Concerns
-
-- Aggregate verification is bounded to 1,000 Public Reviews per Anime. It fails explicitly above that bound. Runbook requires a resumable aggregate verifier before data reaches that size.
-- Production backfill and verification remain blocked pending separate explicit approval.
+Follow-up commit: `6164e82` (`fix: preserve profile pagination progress`).

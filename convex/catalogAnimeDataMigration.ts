@@ -46,8 +46,6 @@ type VerificationCounts = {
   projectionMismatch: number
 }
 
-const AGGREGATE_REVIEW_VERIFY_MAX = 1_000
-
 const backfillResultValidator = v.object({
   lane: laneValidator,
   continueCursor: v.string(),
@@ -75,6 +73,18 @@ const verificationResultValidator = v.object({
   duplicateMilestoneSourceKey: v.number(),
   aggregateMismatch: v.number(),
   projectionMismatch: v.number(),
+})
+const aggregateStateValidator = v.object({
+  count: v.number(),
+  ratingSum: v.number(),
+  bands: v.array(v.number()),
+})
+const aggregateResultValidator = v.object({
+  continueCursor: v.string(),
+  isDone: v.boolean(),
+  processedCount: v.number(),
+  state: aggregateStateValidator,
+  aggregateMismatch: v.number(),
 })
 
 const tableName = (lane: DurableAnimeLane): string => {
@@ -148,31 +158,6 @@ const emptyCounts = (): VerificationCounts => ({
   projectionMismatch: 0,
 })
 
-/** Compares one Review aggregate with entity-indexed public Review truth. */
-const aggregateMatches = async (
-  ctx: MutationCtx,
-  aggregate: Doc<'animeReviewStats'>,
-): Promise<boolean> => {
-  if (!aggregate.animeId) return false
-  const reviews = await ctx.db.query('reviews').withIndex('by_anime_entity_state_visibility_newest', (q) => q
-    .eq('animeId', aggregate.animeId)
-    .eq('state', 'published')
-    .eq('visibility', 'public')).take(AGGREGATE_REVIEW_VERIFY_MAX + 1)
-  if (reviews.length > AGGREGATE_REVIEW_VERIFY_MAX) {
-    throw new Error(`animeReviewStats ${aggregate._id} verification exceeds ${AGGREGATE_REVIEW_VERIFY_MAX} public Reviews`)
-  }
-  const ratings = reviews.flatMap((review) => review.rating === null ? [] : [review.rating])
-  const bands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-  for (const rating of ratings) {
-    const band = 9 - Math.min(9, Math.floor(rating / 10))
-    bands[band] = (bands[band] ?? 0) + 1
-  }
-  return aggregate.count === ratings.length
-    && aggregate.ratingSum === ratings.reduce((sum, rating) => sum + rating, 0)
-    && aggregate.bands.length === bands.length
-    && aggregate.bands.every((value, index) => value === bands[index])
-}
-
 /** Compares one Anime-backed feed card with its authoritative source. */
 const projectionMatches = async (
   ctx: MutationCtx,
@@ -227,6 +212,10 @@ export const backfillAnimeRefs = internalMutation({
         patchedCount += 1
       }
     }
+    if (patchedCount > 0) {
+      const receipt = await ctx.db.query('catalogAnimeDataVerificationReceipts').withIndex('by_lane', (q) => q.eq('lane', args.lane)).unique()
+      if (receipt) await ctx.db.delete('catalogAnimeDataVerificationReceipts', receipt._id)
+    }
     return {
       lane: args.lane,
       continueCursor: page.continueCursor,
@@ -242,6 +231,12 @@ export const backfillMilestoneSourceKeys = internalMutation({
   args: { paginationOpts: paginationOptsValidator },
   returns: sourceKeyResultValidator,
   handler: async (ctx, args) => {
+    for (const lane of [
+      'user-anime-entries', 'anime-rewatches', 'anime-milestones', 'reviews', 'feed-cards', 'anime-review-stats',
+    ] as DurableAnimeLane[]) {
+      const receipt = await ctx.db.query('catalogAnimeDataVerificationReceipts').withIndex('by_lane', (q) => q.eq('lane', lane)).unique()
+      if (!receipt) throw new Error(`Milestone source-key migration requires terminal zero-issue verification receipts; missing ${lane}.`)
+    }
     const page = await ctx.db.query('feedCards').paginate(args.paginationOpts)
     let patchedCount = 0
     for (const card of page.page) {
@@ -270,6 +265,17 @@ export const verifyAnimeRefs = internalMutation({
   args: { lane: laneValidator, paginationOpts: paginationOptsValidator },
   returns: verificationResultValidator,
   handler: async (ctx, args) => {
+    const [storedState, storedReceipt] = await Promise.all([
+      ctx.db.query('catalogAnimeDataVerificationState').withIndex('by_lane', (q) => q.eq('lane', args.lane)).unique(),
+      ctx.db.query('catalogAnimeDataVerificationReceipts').withIndex('by_lane', (q) => q.eq('lane', args.lane)).unique(),
+    ])
+    const activeState = args.paginationOpts.cursor === null ? null : storedState
+    if (args.paginationOpts.cursor === null) {
+      if (storedState) await ctx.db.delete('catalogAnimeDataVerificationState', storedState._id)
+      if (storedReceipt) await ctx.db.delete('catalogAnimeDataVerificationReceipts', storedReceipt._id)
+    } else if (!storedState || storedState.nextCursor !== args.paginationOpts.cursor) {
+      throw new Error(`Verification cursor for ${args.lane} does not match durable checkpoint.`)
+    }
     const page = await paginateLane(ctx, args.lane, args.paginationOpts)
     const counts = emptyCounts()
     for (const row of page.rows) {
@@ -296,9 +302,25 @@ export const verifyAnimeRefs = internalMutation({
       if (args.lane === 'feed-cards' && 'sourceKey' in row && !await projectionMatches(ctx, row)) {
         counts.projectionMismatch += 1
       }
-      if (args.lane === 'anime-review-stats' && 'bands' in row && !await aggregateMatches(ctx, row)) {
-        counts.aggregateMismatch += 1
-      }
+    }
+    const previous = activeState ?? emptyCounts()
+    const totals = {
+      missingAnimeId: previous.missingAnimeId + counts.missingAnimeId,
+      mismatchedProviderRef: previous.mismatchedProviderRef + counts.mismatchedProviderRef,
+      duplicateUserAnime: previous.duplicateUserAnime + counts.duplicateUserAnime,
+      duplicateReview: previous.duplicateReview + counts.duplicateReview,
+      duplicateMilestoneSourceKey: previous.duplicateMilestoneSourceKey + counts.duplicateMilestoneSourceKey,
+      aggregateMismatch: previous.aggregateMismatch + counts.aggregateMismatch,
+      projectionMismatch: previous.projectionMismatch + counts.projectionMismatch,
+    }
+    const now = Date.now()
+    if (page.isDone && Object.values(totals).every((value) => value === 0)) {
+      if (activeState) await ctx.db.delete('catalogAnimeDataVerificationState', activeState._id)
+      await ctx.db.insert('catalogAnimeDataVerificationReceipts', { lane: args.lane, verifiedAt: now })
+    } else {
+      const fields = { lane: args.lane, nextCursor: page.continueCursor, ...totals, updatedAt: now }
+      if (activeState) await ctx.db.patch('catalogAnimeDataVerificationState', activeState._id, fields)
+      else await ctx.db.insert('catalogAnimeDataVerificationState', fields)
     }
     return {
       lane: args.lane,
@@ -306,6 +328,46 @@ export const verifyAnimeRefs = internalMutation({
       isDone: page.isDone,
       processedCount: page.rows.length,
       ...counts,
+    }
+  },
+})
+
+/** Verifies one Review aggregate through caller-carried bounded page state. */
+export const verifyReviewAggregate = internalMutation({
+  args: {
+    statsId: v.id('animeReviewStats'),
+    paginationOpts: paginationOptsValidator,
+    state: aggregateStateValidator,
+  },
+  returns: aggregateResultValidator,
+  handler: async (ctx, args) => {
+    if (args.state.bands.length !== 10) throw new Error('Aggregate verification state must contain 10 bands.')
+    const aggregate = await ctx.db.get('animeReviewStats', args.statsId)
+    if (!aggregate?.animeId) throw new Error(`animeReviewStats ${args.statsId} is missing animeId.`)
+    const page = await ctx.db.query('reviews').withIndex('by_anime_entity_state_visibility_newest', (q) => q
+      .eq('animeId', aggregate.animeId)
+      .eq('state', 'published')
+      .eq('visibility', 'public')).paginate(args.paginationOpts)
+    const state = { count: args.state.count, ratingSum: args.state.ratingSum, bands: [...args.state.bands] }
+    for (const review of page.page) {
+      if (review.rating === null) continue
+      state.count += 1
+      state.ratingSum += review.rating
+      const band = 9 - Math.min(9, Math.floor(review.rating / 10))
+      state.bands[band] = (state.bands[band] ?? 0) + 1
+    }
+    const aggregateMismatch = page.isDone && (
+      aggregate.count !== state.count
+      || aggregate.ratingSum !== state.ratingSum
+      || aggregate.bands.length !== state.bands.length
+      || aggregate.bands.some((value, index) => value !== state.bands[index])
+    ) ? 1 : 0
+    return {
+      continueCursor: page.continueCursor,
+      isDone: page.isDone,
+      processedCount: page.page.length,
+      state,
+      aggregateMismatch,
     }
   },
 })

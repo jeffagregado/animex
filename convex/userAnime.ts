@@ -446,7 +446,7 @@ export const removeLatestRewatch = mutation({
     await applyProgress(ctx, profile._id, entry.status as AnimeStatus | null, rollback.nextStatus)
     const storedMilestone = await readMilestone(ctx, profile._id, args.anilistId, 'rewatched')
     const milestone = storedMilestone ? await linkMilestone(ctx, storedMilestone, animeId) : null
-    if (milestone && rollback.milestoneAt === null) { await ctx.db.delete(milestone._id); await removeMilestoneCard(ctx, profile._id, args.anilistId, animeId, 'rewatched') }
+    if (milestone && rollback.milestoneAt === null) { await ctx.db.delete(milestone._id); await removeMilestoneCard(ctx, profile._id, args.anilistId, 'rewatched') }
     else if (milestone && rollback.milestoneAt !== null) {
       await ctx.db.patch(milestone._id, { ...createMilestoneTimestampPatch(now), occurredAt: rollback.milestoneAt })
       const updated = await ctx.db.get('animeMilestones', milestone._id); if (updated) await upsertMilestoneCard(ctx, updated, false)

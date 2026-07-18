@@ -340,6 +340,22 @@ export default defineSchema({
   })
     .index('by_anilist_id', ['anilistId'])
     .index('by_anime_entity', ['animeId']),
+  catalogAnimeDataVerificationState: defineTable({
+    lane: v.string(),
+    nextCursor: v.string(),
+    missingAnimeId: v.number(),
+    mismatchedProviderRef: v.number(),
+    duplicateUserAnime: v.number(),
+    duplicateReview: v.number(),
+    duplicateMilestoneSourceKey: v.number(),
+    aggregateMismatch: v.number(),
+    projectionMismatch: v.number(),
+    updatedAt: v.number(),
+  }).index('by_lane', ['lane']),
+  catalogAnimeDataVerificationReceipts: defineTable({
+    lane: v.string(),
+    verifiedAt: v.number(),
+  }).index('by_lane', ['lane']),
   discoverSectionCache: defineTable({
     key: v.union(
       v.literal('trending'),

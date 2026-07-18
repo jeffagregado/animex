@@ -86,21 +86,13 @@ Continue with returned cursor until `isDone: true`. Require no error. `patchedCo
 
 Missing mapping or conflicting stored `animeId` blocks rollout. Error includes table and document ID. Fix identity data; retry same cursor.
 
-After all six lanes finish, migrate milestone feed keys:
-
-```powershell
-pnpm exec convex run --deployment dev catalogAnimeDataMigration:backfillMilestoneSourceKeys '{"paginationOpts":{"numItems":50,"cursor":null}}'
-```
-
-Continue to completion. Duplicate target key blocks rollout. Fix duplicate; retry same cursor. Full rerun must report `patchedCount: 0`.
-
 Verify every durable lane:
 
 ```powershell
 pnpm exec convex run --deployment dev catalogAnimeDataMigration:verifyAnimeRefs '{"lane":"user-anime-entries","paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
-Continue each lane to completion. Accept only exact zero counters on every page:
+Start each lane with null cursor. Continue with exactly returned cursor; durable checkpoint rejects skipped pages. Terminal zero issues records lane receipt. Accept only exact zero counters:
 
 ```text
 missingAnimeId = 0
@@ -113,7 +105,22 @@ projectionMismatch = 0
 ```
 
 Any nonzero counter blocks public cutover. Keep legacy `anilistId` fields and indexes in this rollout.
-Aggregate verification fails explicitly above 1,000 Public Reviews for one Anime. Do not bypass this bound; add a resumable aggregate verifier before such data exists.
+
+Verify each `animeReviewStats` row through bounded Review pages:
+
+```powershell
+pnpm exec convex run --deployment dev catalogAnimeDataMigration:verifyReviewAggregate '{"statsId":"STATS_ID","paginationOpts":{"numItems":50,"cursor":null},"state":{"count":0,"ratingSum":0,"bands":[0,0,0,0,0,0,0,0,0,0]}}'
+```
+
+Pass returned cursor and `state` into next page. Require terminal `aggregateMismatch: 0`.
+
+Only after all six lane receipts and aggregate checks pass, migrate milestone feed keys:
+
+```powershell
+pnpm exec convex run --deployment dev catalogAnimeDataMigration:backfillMilestoneSourceKeys '{"paginationOpts":{"numItems":50,"cursor":null}}'
+```
+
+Missing receipt or duplicate target blocks rollout. Fix cause, rerun verification from null cursor, then retry source migration. Full source-key rerun must report `patchedCount: 0`.
 
 ## Production
 

@@ -96,6 +96,14 @@ describe('user anime Convex integration', () => {
     expect(rows.milestones.every((row) => row.animeId === animeId)).toBe(true)
     expect(rows.cards).toHaveLength(2)
     expect(rows.cards.every((row) => row.animeId === animeId)).toBe(true)
+    const rewatchCard = rows.cards.find((row) => row.kind === 'rewatched')
+    if (!rewatchCard) throw new Error('Expected rewatch card.')
+    await t.run(async (ctx) => await ctx.db.patch('feedCards', rewatchCard._id, { animeId: undefined }))
+    await owner.client.mutation(api.userAnime.removeLatestRewatch, { anilistId: 501 })
+    expect(await t.run(async (ctx) => await ctx.db.get('feedCards', rewatchCard._id))).toMatchObject({
+      animeId,
+      active: false,
+    })
   })
 
   test('returns authenticated zero progress without creating an aggregate row', async () => {

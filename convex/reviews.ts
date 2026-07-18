@@ -98,9 +98,10 @@ const nextAggregateFields = (current: Doc<'animeReviewStats'> | null, delta: Ret
 
 const applyAggregate = async (ctx: MutationCtx, anilistId: number, animeId: Id<'catalogEntities'>, previous: Doc<'reviews'> | null, next: Doc<'reviews'> | null): Promise<void> => {
   const delta = transitionReviewAggregate(publicRating(previous), publicRating(next))
-  if (!hasAggregateChange(delta)) return
   const current = await ctx.db.query('animeReviewStats').withIndex('by_anilist_id', (q) => q.eq('anilistId', anilistId)).unique()
   if (current?.animeId && current.animeId !== animeId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Review aggregate ${current._id} conflicts with provider mapping ${animeId}.`)
+  if (current && !current.animeId) await ctx.db.patch('animeReviewStats', current._id, { animeId })
+  if (!hasAggregateChange(delta)) return
   const fields = nextAggregateFields(current, delta)
   if (fields.count < 0 || fields.bands.some((value) => value < 0)) return fail('REVIEW_STATS_CORRUPT', 'Review aggregate transition would become negative.')
   if (current) await ctx.db.patch('animeReviewStats', current._id, { animeId, ...fields })

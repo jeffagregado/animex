@@ -58,6 +58,98 @@ const body = {
 const bodyJson = JSON.stringify(body)
 
 describe('social Convex integration', () => {
+  test('links zero-delta Review aggregates and rejects conflicting entity refs', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'aggregate-identity')
+    const animeId = await insertAnime(t, 701)
+    const reviewId = await owner.client.mutation(socialApi.reviews.publish, {
+      anilistId: 701, requestId: 'aggregate-identity', rating: 90,
+      summary: 'Aggregate identity', containsSpoiler: false, bodyJson, visibility: 'public',
+    })
+    const ids = await t.run(async (ctx) => {
+      const stats = await ctx.db.query('animeReviewStats').withIndex('by_anilist_id', (q) => q.eq('anilistId', 701)).unique()
+      if (!stats) throw new Error('Expected Review aggregate.')
+      await ctx.db.patch('animeReviewStats', stats._id, { animeId: undefined })
+      const conflictId = await ctx.db.insert('catalogEntities', { kind: 'anime', createdAt: 1, updatedAt: 1 })
+      return { statsId: stats._id, conflictId }
+    })
+    await owner.client.mutation(socialApi.reviews.setVisibility, { reviewId, visibility: 'public' })
+    expect((await t.run(async (ctx) => await ctx.db.get('animeReviewStats', ids.statsId)))?.animeId).toBe(animeId)
+    await t.run(async (ctx) => await ctx.db.patch('animeReviewStats', ids.statsId, { animeId: ids.conflictId }))
+    await expect(owner.client.mutation(socialApi.reviews.setVisibility, {
+      reviewId,
+      visibility: 'private',
+    })).rejects.toThrow('conflicts with provider mapping')
+  })
+
+  test('links legacy milestone and card refs before visibility and removal updates', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'legacy-milestone-update')
+    const animeId = await insertAnime(t, 702)
+    const cardId = await t.run(async (ctx) => {
+      const milestoneId = await ctx.db.insert('animeMilestones', {
+        userId: owner.profileId, anilistId: 702, kind: 'completed',
+        visibility: 'public', occurredAt: 10, updatedAt: 10,
+      })
+      const sourceKey = `completed:${owner.profileId}:702`
+      const cardId = await ctx.db.insert('feedCards', {
+        sourceKey, kind: 'completed', userId: owner.profileId, anilistId: 702,
+        visibility: 'public', active: true, orderKey: makeOrderKey(10, sourceKey),
+        occurredAt: 10, updatedAt: 10,
+      })
+      return { milestoneId, cardId }
+    })
+    await owner.client.mutation(socialApi.feed.setActivityVisibility, {
+      cardId: cardId.cardId,
+      visibility: 'private',
+    })
+    let rows = await t.run(async (ctx) => ({
+      milestone: await ctx.db.get('animeMilestones', cardId.milestoneId),
+      card: await ctx.db.get('feedCards', cardId.cardId),
+    }))
+    expect(rows.milestone).toMatchObject({ animeId, visibility: 'private' })
+    expect(rows.card).toMatchObject({ animeId, visibility: 'private' })
+    await t.run(async (ctx) => {
+      await ctx.db.patch('animeMilestones', cardId.milestoneId, { animeId: undefined })
+      await ctx.db.patch('feedCards', cardId.cardId, { animeId: undefined })
+    })
+    await owner.client.mutation(socialApi.feed.removeActivity, { cardId: cardId.cardId })
+    rows = await t.run(async (ctx) => ({
+      milestone: await ctx.db.get('animeMilestones', cardId.milestoneId),
+      card: await ctx.db.get('feedCards', cardId.cardId),
+    }))
+    expect(rows.milestone?.animeId).toBe(animeId)
+    expect(rows.card).toMatchObject({ animeId, active: false })
+  })
+
+  test('rejects conflicting milestone cards and preserves stable order keys', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'milestone-card-conflict')
+    const animeId = await insertAnime(t, 703)
+    const rows = await t.run(async (ctx) => {
+      const otherAnimeId = await ctx.db.insert('catalogEntities', { kind: 'anime', createdAt: 1, updatedAt: 1 })
+      const milestoneId = await ctx.db.insert('animeMilestones', {
+        userId: owner.profileId, anilistId: 703, animeId, kind: 'completed',
+        visibility: 'public', occurredAt: 20, updatedAt: 20,
+      })
+      const sourceKey = `completed:${owner.profileId}:703`
+      const cardId = await ctx.db.insert('feedCards', {
+        sourceKey, kind: 'completed', userId: owner.profileId, anilistId: 703,
+        animeId: otherAnimeId, visibility: 'public', active: true,
+        orderKey: 'preserved-order', occurredAt: 20, updatedAt: 20,
+      })
+      return { milestoneId, cardId, otherAnimeId }
+    })
+    await expect(t.mutation(socialInternal.feed.projectMilestones, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })).rejects.toThrow('conflicts with milestone')
+    await t.run(async (ctx) => await ctx.db.patch('feedCards', rows.cardId, { animeId: undefined }))
+    await t.mutation(socialInternal.feed.projectMilestones, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect((await t.run(async (ctx) => await ctx.db.get('feedCards', rows.cardId)))?.orderKey).toBe('preserved-order')
+  })
+
   test('dual-writes one existing Anime entity to Review, aggregate, and Review feed card', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'review-entity-write')
