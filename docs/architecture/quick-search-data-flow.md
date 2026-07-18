@@ -33,8 +33,6 @@ The input owns ArrowUp/ArrowDown/Enter selection. Dialog/Drawer owns title/descr
 
 `useCloseNavigation` stores the selected destination, closes the active surface, waits for `onOpenChangeComplete(false)`, resets query state, then navigates. View all routes remain provider-neutral: Anime `/discover?q=`, Characters `/search/characters?q=`, Staff `/search/staff?q=`, Users `/search/users?q=`.
 
-## Remaining browser-fixture gaps
+## Phase 7 closure
 
-- Deep result-page pagination beyond the exercised page.
-
-Second-account private-profile, Profile media lifecycle, and the Phase 7 failure fixture are closed. Failure injection used Storage HTTP 503; provider/User variants were not separately injected.
+No browser fixture remains open. Second-account private-profile, Profile media lifecycle, and the Phase 7 failure fixture have recorded browser evidence. User confirmed closure for deep result-page pagination; Codex did not independently exercise that fixture. Failure injection used Storage HTTP 503; provider/User variants were not separately injected.

@@ -37,8 +37,6 @@ Profile media keeps the existing crop/upload contract: JPEG/PNG/WebP input up to
 
 `UserAvatar` is the shared user-identity renderer used by the header account trigger, Quick Search Users, `/search/users`, feed, and Profile. User sizes are 44×44 for header/Quick Search (`md`), 64×64 for `/search/users` (`search`), 96×96 on Profile phone, and 128×128 on Profile tablet/desktop (`profile`); Profile fallback glyphs scale to 36 px and 48 px respectively. Every box is square, circular, non-shrinking, clipped, and `object-cover`; broken URLs switch to one uppercase initial without layout shift. Profile identity text wraps safely, grid children use `min-width: 0`, support content follows the main column below desktop, and only the tab rail may scroll horizontally on narrow screens.
 
-## Remaining browser-fixture gaps
+## Phase 7 closure
 
-- Deep pagination beyond the exercised page.
-
-Second-account private-profile, real media lifecycle, and Storage failure/retry scenarios are closed and verified. Provider failure variants were not separately injected because the Phase 7 failure fixture required provider or Storage coverage.
+No browser fixture remains open. Second-account private-profile, real media lifecycle, and Storage failure/retry scenarios have recorded browser evidence. User confirmed closure for deep pagination; Codex did not independently exercise that fixture. Provider failure variants were not separately injected because the Phase 7 failure fixture required provider or Storage coverage.

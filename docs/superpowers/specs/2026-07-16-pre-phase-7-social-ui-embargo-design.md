@@ -1,6 +1,6 @@
 # Pre-Phase 7 Social UI Embargo Design
 
-Status: IMPLEMENTED AND VALIDATED. The approved embargo is active; Phase 7 is next and unstarted.
+Status: IMPLEMENTED, VALIDATED, AND ARCHIVED. The approved embargo remains active through Phase 8. Phase 7 later completed; Phase 8 is next.
 
 ## Goal
 
@@ -262,4 +262,4 @@ No ADR. No separate data-flow document.
 
 ## Planning Boundary
 
-The embargo implementation and validation are complete. Phase 7 User Profile and desktop Quick Search are next and unstarted; Phase 9 retains social UI activation.
+The embargo implementation and validation are complete. Phase 7 User Profile and responsive Quick Search later completed under their own approved spec and plan. Phase 8 is next; Phase 9 retains social UI activation.

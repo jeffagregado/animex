@@ -152,11 +152,11 @@ Status: COMPLETE. Implementation, review, responsive browser QA, cleanup, and Co
 - Legacy Followers Posts and Reviews stay owner-readable. Unrelated edits preserve Followers; explicit Public/Private selection migrates the record.
 - Social controls, counts, labels, Followers choices, and phase placeholders are absent from active UI.
 - Backend schemas, stored Followers data, authorization, and Phase 9 social contracts remain intact. No migration ran.
-- Stop after validation and wait for approval before Phase 7.
+- Historical boundary satisfied: Phase 7 started only after validation and explicit approval.
 
 ### Phase 7: User Profile, Catalog People, And Quick Search
 
-Status: COMPLETE. Implemented and validated on `jeff-cx/phase-7-user-profile-quick-search`; approved visual contract shipped, final feedback reviewer PASS, and current-state docs synced. Second-account private-profile, real media lifecycle, and injected Storage failure/retry verification are closed. Deep pagination remains explicitly unexercised. No production deploy, push, merge, or unexercised fixture is claimed.
+Status: COMPLETE AND CLOSED. Implemented, validated, and merged locally into `dev` at `9fdfc6b`; approved visual contract shipped, final feedback reviewer PASS, and current-state docs synced. Second-account private-profile, real media lifecycle, and injected Storage failure/retry verification are closed. User confirmed closure for deep pagination; Codex did not independently exercise that fixture. No production push or deploy is claimed.
 
 - Build User Profile from locked design.
 - Use signed-in routes at `/users/:username` with Activity default plus Reviews and Favorites `tab` query states.
@@ -175,7 +175,7 @@ Status: COMPLETE. Implemented and validated on `jeff-cx/phase-7-user-profile-qui
 - Treat social elements in the locked profile reference as Phase 9 final-state elements.
 - Use `docs/superpowers/specs/2026-07-17-phase-7-user-profile-quick-search-design.md` as the approved design source.
 - Review `docs/superpowers/plans/2026-07-17-phase-7-user-profile-catalog-people-quick-search.md` before implementation.
-- Keep verification gaps explicit: deep pagination Load more remains unexercised; second-account private-profile viewing, real media lifecycle, and injected Storage failure/retry are verified.
+- Record closure evidence accurately: second-account private-profile viewing, real media lifecycle, and injected Storage failure/retry are Codex-verified; deep pagination is closed by user confirmation without Codex-run evidence.
 
 ### Phase 7 Feedback Fixes
 
@@ -187,7 +187,7 @@ Status: COMPLETE. Final reviewer PASS after the keyboard Profile fix. Shared hea
 - Character and Staff use shared neutral detail geometry and Overview/Anime only. Staff `?tab=works` replaces to `?tab=anime`; work provider/cache semantics are unchanged. Anime behavior remains Anime-specific inside shared geometry.
 - Final QA: 131 test files passed / 2 skipped; 925 tests passed / 3 skipped (928 total); TypeScript and client + SSR build passed with the existing >500 kB warning; Fallow against `3fdda5c` passed with one pre-existing non-error finding, 0 complexity, and 0 duplication; React Doctor score 53, equal to baseline. Route-tree protected SHA-256 remained `14A6932D22316BF69AF6EA6C1E343EE0C4704DE66039C8A674888D11ABA92DDD`. No Convex source changed, so no `convex dev --once` was required.
 - Browser QA passed with both named QA accounts at 390×844, 768×1024, and 1280×800: no horizontal overflow; avatar geometry; owner menu pointer/keyboard behavior including Profile Enter, Escape focus return, and outside close; Quick Search/User Search avatars; Profile tabs/back/forward/reload; Character/Staff Overview/Anime and Staff migration; private-profile cross-account visibility; signed-out server redirect; root not-found; clean final console/server logs. QA server stopped, port 3000 freed, viewport reset, and account signed out.
-- Remaining browser gap: deep pagination. It is not marked complete.
+- No Phase 7 browser fixture remains open. Deep pagination closed by user confirmation without Codex-run evidence.
 
 ### Phase 8: Notifications, Privacy, Moderation
 

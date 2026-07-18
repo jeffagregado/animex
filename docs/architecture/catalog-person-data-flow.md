@@ -31,8 +31,6 @@ Character and Staff render a full-width `max-w-[1480px]` Catalog Person shell wi
 
 `searchCatalogPeople` validates `kind`, trimmed 2–100 character query, and positive page, then issues one uncached AniList query per page with `perPage=20`. Rows contain provider-neutral identity fields and canonical destinations. Infinite query state is keyed by kind + query, deduplicates by person ID, auto-requests when new rows exist, and still exposes a visible Load more button. Whitespace, short/overlong input, initial/next-page failure, retry, empty, and end states are explicit.
 
-## Remaining browser-fixture gaps
+## Phase 7 closure
 
-- Deep work/search pagination beyond the exercised page.
-
-Second-account private-profile, Profile media lifecycle, and the Phase 7 failure fixture are closed. Failure injection used Storage HTTP 503; AniList/provider variants were not separately injected.
+No browser fixture remains open. Second-account private-profile, Profile media lifecycle, and the Phase 7 failure fixture have recorded browser evidence. User confirmed closure for deep work/search pagination; Codex did not independently exercise that fixture. Failure injection used Storage HTTP 503; AniList/provider variants were not separately injected.

@@ -29,6 +29,6 @@ After public auth state and Convex auth are complete, `AnimeUserControls` reads 
 
 `AnimeDetailPage` renders loading, empty, not-found, and error states with stable shell dimensions. Ready detail renders one shared hero, controls, tab bar, and sidebar; only tab content swaps. Characters, Staff, Overview, and truthful empty Reviews stay in the main panel. Related Anime, Recommendations, Trailer, and External Links keep stable sidebar order. Owners: public transport/cache under `src/features/anime-detail/server` and `convex/animeDetailCache*`; private persistence/auth in `convex/userAnime.ts`, `convex/users.ts`, and `convex/schema.ts`; UI/routes in `src/features/anime-detail` and `src/routes/_public/anime`.
 
-## Remaining browser-fixture gaps
+## Phase 7 closure
 
-Deep people/work pagination beyond the exercised page remains unverified. Second-account private-profile, real Profile media lifecycle, and the Phase 7 failure fixture are verified. Failure injection used Storage HTTP 503; provider variants were not separately injected.
+No browser fixture remains open. Second-account private-profile, real Profile media lifecycle, and the Phase 7 failure fixture have recorded browser evidence. User confirmed closure for deep people/work pagination; Codex did not independently exercise that fixture. Failure injection used Storage HTTP 503; provider variants were not separately injected.

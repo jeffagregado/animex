@@ -1,6 +1,6 @@
 # Pre-Phase 7 Social UI Embargo Implementation Plan
 
-Status: COMPLETE. Implementation, review, automated gates, responsive browser QA, cleanup, and Convex dev redeploy pass. Phase 7 is next and unstarted.
+Status: COMPLETE AND ARCHIVED. Implementation, review, automated gates, responsive browser QA, cleanup, and Convex dev redeploy pass. Phase 7 later completed; Phase 8 is next.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use the repo-local `$orchestrating-coding-work` custom role agents from `.codex/agents/`; do not use generic bootstrap agents.
 
@@ -1266,7 +1266,7 @@ Status: COMPLETE. Social interaction UI and Followers-only active choices are re
 - [x] Complete focused/full tests, TypeScript, route generation, build, React Doctor, Fallow, review, and browser QA.
 ```
 
-`PLAN.md`: mark pre-Phase 7 cleanup complete and keep Phase 7 as the next unstarted phase. Do not change Phase 7 feature scope.
+At embargo closure, `PLAN.md` marked pre-Phase 7 cleanup complete and held Phase 7 until explicit approval. Phase 7 later completed under its own approved scope.
 
 `CONTEXT.md`: add a short current implementation-state note near the top:
 
@@ -1299,9 +1299,9 @@ git diff dev...HEAD --check
 
 Expected: clean worktree; planned commits visible; no diff-check errors.
 
-## Handoff Boundaries
+## Archived Handoff Boundaries
 
-- Do not start Phase 7 User Profile or Quick Search automatically.
+- This plan did not authorize automatic Phase 7 work; Phase 7 was later approved, implemented, and closed separately.
 - Do not expose or implement Phase 9 social behavior.
 - Do not delete preserved backend social code because it appears unused by the embargoed client.
 - Do not push, deploy, or merge without explicit user request.

@@ -1,6 +1,6 @@
 # Phase 7-9 Feature Sequencing
 
-Status: ACTIVE. Pre-Phase 7 embargo is complete. Phase 7 design is approved; its independently reviewed implementation plan awaits user approval.
+Status: ACTIVE. Pre-Phase 7 embargo and Phase 7 are complete. Phase 8 is next; Phase 9 remains the final MVP phase.
 
 ## Phase Map
 
@@ -63,7 +63,7 @@ Locked profile visual reference remains final-state direction. Phase 7 implement
 Phase 7 Catalog People includes:
 
 - Public `/characters/:id/:slug` destinations with Overview and Anime.
-- Public `/staff/:id/:slug` destinations with Overview and Works.
+- Public `/staff/:id/:slug` destinations with Overview and Anime; legacy `?tab=works` canonicalizes to `?tab=anime`.
 - Canonical numeric identity with display-only slugs and redirect correction.
 - Provider-neutral normalized detail/work contracts and 24-hour caches.
 - Character/Staff destinations completed before Quick Search entry points ship.
@@ -121,6 +121,6 @@ Phase 9 acceptance requires every approved social control to be visible and func
 
 - This document locks scheduling and visibility only.
 - Pre-Phase 7 cleanup is complete under its approved design and implementation plan.
-- Phase 7 receives one approved design/spec and implementation plan covering User Profile, Catalog People, and Quick Search.
+- Phase 7 completed under one approved design/spec and implementation plan covering User Profile, Catalog People, and Quick Search.
 - Phase 8 and Phase 9 each receive separate approved design/spec and implementation plans.
-- Phase 7 design is approved under `2026-07-17-phase-7-user-profile-quick-search-design.md`; its implementation plan is written under `../plans/2026-07-17-phase-7-user-profile-catalog-people-quick-search.md`, passed independent review, and awaits user approval. Implementation remains unstarted. Phase 9 retains social UI reactivation ownership.
+- Phase 7 design is implemented under `2026-07-17-phase-7-user-profile-quick-search-design.md`; its implementation plan is `../plans/2026-07-17-phase-7-user-profile-catalog-people-quick-search.md`. Implementation, review, local merge into `dev`, and user-confirmed closure are complete. Phase 9 retains social UI reactivation ownership.
