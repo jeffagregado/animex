@@ -129,13 +129,14 @@ function ResultGroup({
       </div>
       <ul aria-labelledby={titleId} className="space-y-1" role="listbox">
         {rows.map((row) => {
-          const index = model.items.findIndex((item) => item.optionId === `quick-search-${group}-${row.id}`)
+          const optionId = `quick-search-${group}-${row.publicId}`
+          const index = model.items.findIndex((item) => item.optionId === optionId)
           return (
-            <li key={row.id} role="none">
+            <li key={row.publicId} role="none">
               <button
                 aria-selected={model.activeIndex === index}
                 className="group flex min-h-14 w-full items-center gap-3 rounded-lg p-2 text-left outline-none transition-colors hover:bg-cyan-300/10 focus-visible:bg-cyan-300/10 focus-visible:ring-2 focus-visible:ring-cyan-300 aria-selected:bg-cyan-300/15 motion-reduce:duration-0"
-                id={`quick-search-${group}-${row.id}`}
+                id={optionId}
                 onClick={() => model.select(row.destination)}
                 role="option"
                 tabIndex={-1}

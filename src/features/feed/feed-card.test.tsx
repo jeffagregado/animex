@@ -8,7 +8,7 @@ import { FeedCard } from './feed-card'
 
 vi.mock('convex/react', () => ({ useMutation: () => vi.fn() }))
 const author = { id: 'owner', username: 'mika', displayName: 'Mika', avatarUrl: null }
-const anime = { anilistId: 154587, slug: 'frieren', title: 'Frieren', coverImageUrl: null, format: null, seasonYear: null }
+const anime = { publicId: 'anime_frieren', slug: 'frieren', title: 'Frieren', coverImageUrl: null, format: null, seasonYear: null }
 const common = { id: 'card', author }
 
 beforeEach(() => vi.setSystemTime(new Date('2026-07-14T04:00:00.000Z')))
@@ -81,7 +81,7 @@ describe('FeedCard Post media', () => {
     expect(screen.getByRole('article').className).toContain('border-l-cyan-300')
     expect(screen.getByText(kind === 'completed' ? 'Mika completed Frieren' : 'Mika rewatched Frieren')).toBeTruthy()
     const detailLink = screen.getByRole('link', { name: /Frieren/ })
-    expect(detailLink.getAttribute('href')).toBe('/anime/154587/frieren')
+    expect(detailLink.getAttribute('href')).toBe('/anime/anime_frieren/frieren')
     expect(detailLink.textContent).toContain('2024 · TV')
     expect(screen.getByText(kind === 'completed' ? 'Completed' : 'Rewatched')).toBeTruthy()
     expect(screen.queryByText(/score/i)).toBeNull()

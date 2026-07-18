@@ -93,6 +93,67 @@ const personRef = (
   providerId,
 })
 
+const DESCRIPTION_LINK = /\[[^\]\n]+\]\(([^)\s]+)\)/g
+const BIOGRAPHY_KIND: Readonly<Record<string, CatalogProviderRef['kind']>> = {
+  anime: 'anime',
+  character: 'character',
+  staff: 'staff',
+}
+
+/** Parses one absolute URL without hiding unexpected runtime errors. */
+const parseBiographyUrl = (target: string): URL | null => {
+  try {
+    return new URL(target)
+  } catch (error) {
+    if (error instanceof TypeError) return null
+    throw error
+  }
+}
+
+/** Checks whether a biography URL belongs to AniList over HTTP. */
+const isSupportedBiographyUrl = (url: URL): boolean => {
+  const host = url.hostname.toLowerCase().replace(/^www\./, '')
+  const isHttp = url.protocol === 'http:' || url.protocol === 'https:'
+  return isHttp && host === 'anilist.co'
+}
+
+/** Parses one positive safe provider identifier from a route segment. */
+const parseBiographyProviderId = (idText: string | undefined): number | null => {
+  if (!idText || !/^[1-9]\d*$/.test(idText)) return null
+  const providerId = Number(idText)
+  return Number.isSafeInteger(providerId) ? providerId : null
+}
+
+/** Converts supported AniList path segments to one provider reference. */
+const biographyRefFromSegments = (
+  segments: string[],
+): CatalogProviderRef | null => {
+  if (segments.length < 2 || segments.length > 3) return null
+  const [entity, idText] = segments
+  const kind = entity ? BIOGRAPHY_KIND[entity] : undefined
+  const providerId = parseBiographyProviderId(idText)
+  if (!kind || providerId === null) return null
+  return { provider: 'anilist', kind, providerId }
+}
+
+/** Converts one supported AniList biography target to a provider reference. */
+const biographyRef = (target: string): CatalogProviderRef | null => {
+  const url = parseBiographyUrl(target)
+  if (!url || !isSupportedBiographyUrl(url)) return null
+  const segments = url.pathname.split('/').filter(Boolean)
+  return biographyRefFromSegments(segments)
+}
+
+/** Extracts supported provider identities embedded in one biography. */
+const biographyRefs = (description: string | null): CatalogProviderRef[] => {
+  if (description === null) return []
+  return [...description.matchAll(DESCRIPTION_LINK)].flatMap((match) => {
+    const target = match[1]
+    const ref = target ? biographyRef(target) : null
+    return ref ? [ref] : []
+  })
+}
+
 /** Removes repeated tuples without merging Character and Staff namespaces. */
 const uniqueRefs = (refs: CatalogProviderRef[]): CatalogProviderRef[] => {
   const unique = new Map<string, CatalogProviderRef>()
@@ -161,6 +222,7 @@ const personDetailRefs = (
   row: Doc<'catalogPersonDetails'>,
 ): CatalogProviderRef[] => boundedRefs([
   personRef(row.kind, row.personId),
+  ...biographyRefs(row.detail.description),
   ...(row.detail.kind === 'character'
     ? (row.detail.voiceActors ?? []).map((actor) => personRef('staff', actor.id))
     : []),

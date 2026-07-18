@@ -3,6 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 
 import { AnimeImage } from '#/features/anime-detail/ui/anime-image'
 import { createCanonicalAnimePath } from '#/features/anime-detail/shared/anime-detail-contracts'
+import type { CatalogPublicId } from '#/features/catalog-identity/shared/catalog-identity-contracts'
 import { getCatalogPersonWorks } from '../server/catalog-person.functions'
 import type {
   CatalogPersonKind,
@@ -12,21 +13,21 @@ import type {
 
 type CatalogPersonWorkGridProps = {
   kind: CatalogPersonKind
-  personId: number
+  personPublicId: CatalogPublicId
 }
 
 /** Loads ordered provider pages while retaining first-seen Anime identities. */
-export function CatalogPersonWorkGrid({ kind, personId }: CatalogPersonWorkGridProps) {
-  const query = useCatalogPersonWorkQuery(kind, personId)
+export function CatalogPersonWorkGrid({ kind, personPublicId }: CatalogPersonWorkGridProps) {
+  const query = useCatalogPersonWorkQuery(kind, personPublicId)
   const pages = query.data?.pages ?? []
-  const loadNextPage = useNextWorkPage(query, `${kind}:${personId}`)
+  const loadNextPage = useNextWorkPage(query, `${kind}:${personPublicId}`)
   const sentinelRef = useWorkAutoLoad({
     hasNextPage: query.hasNextPage,
     isFetchNextPageError: query.isFetchNextPageError,
     kind,
     loadNextPage,
     pages,
-    personId,
+    personPublicId,
   })
   return (
     <WorkGridContent
@@ -38,12 +39,12 @@ export function CatalogPersonWorkGrid({ kind, personId }: CatalogPersonWorkGridP
   )
 }
 
-function useCatalogPersonWorkQuery(kind: CatalogPersonKind, personId: number) {
+function useCatalogPersonWorkQuery(kind: CatalogPersonKind, personPublicId: CatalogPublicId) {
   return useInfiniteQuery({
-    queryKey: ['catalog-person-works', kind, personId],
+    queryKey: ['catalog-person-works', kind, personPublicId],
     initialPageParam: 1,
     queryFn: async ({ pageParam }): Promise<CatalogPersonWorkPage> => {
-      const state = await getCatalogPersonWorks({ data: { kind, id: personId, page: pageParam } })
+      const state = await getCatalogPersonWorks({ data: { kind, publicId: personPublicId, page: pageParam } })
       if (state.status === 'ready') return state.page
       if (state.status === 'error') throw new Error(state.message)
       throw new Error('Catalog person works were not found.')
@@ -75,29 +76,29 @@ function useWorkAutoLoad({
   kind,
   loadNextPage,
   pages,
-  personId,
+  personPublicId,
 }: {
   hasNextPage: boolean
   isFetchNextPageError: boolean
   kind: CatalogPersonKind
   loadNextPage: () => Promise<void>
   pages: CatalogPersonWorkPage[]
-  personId: number
+  personPublicId: CatalogPublicId
 }): React.RefObject<HTMLDivElement | null> {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const continuedPageRef = useRef<string | null>(null)
   useEffect(() => {
     continuedPageRef.current = null
-  }, [kind, personId])
+  }, [kind, personPublicId])
 
   useEffect(() => {
     const last = pages.at(-1)
     if (!last || !hasNextPage || isFetchNextPageError || countNewLastPage(pages) > 0) return
-    const key = `${kind}:${personId}:${last.currentPage}`
+    const key = `${kind}:${personPublicId}:${last.currentPage}`
     if (continuedPageRef.current === key) return
     continuedPageRef.current = key
     void loadNextPage()
-  }, [hasNextPage, isFetchNextPageError, kind, loadNextPage, pages, personId])
+  }, [hasNextPage, isFetchNextPageError, kind, loadNextPage, pages, personPublicId])
 
   useEffect(() => {
     const target = sentinelRef.current
@@ -155,7 +156,7 @@ function WorkGridResults({
   sentinelRef: React.RefObject<HTMLDivElement | null>
 }) {
   return <div>
-    {items.length > 0 ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{items.map((item) => <WorkCard item={item} key={item.anime.id} />)}</div> : null}
+    {items.length > 0 ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{items.map((item) => <WorkCard item={item} key={item.anime.publicId} />)}</div> : null}
     <WorkGridFooter
       itemCount={items.length}
       loadNextPage={loadNextPage}
@@ -194,7 +195,7 @@ function WorkGridFooter({
 function WorkCard({ item }: { item: CatalogPersonWork }) {
   const metadata = [item.role, item.anime.format?.replace('_', ' '), item.anime.seasonYear?.toString()].filter((value): value is string => Boolean(value))
   return <article className="min-w-0 overflow-hidden rounded-xl border border-border bg-card/70">
-    <a className="group block min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300" href={createCanonicalAnimePath(item.anime.id, item.anime.title, 'overview')}>
+    <a className="group block min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300" href={createCanonicalAnimePath(item.anime.publicId, item.anime.title, 'overview')}>
       <AnimeImage alt={`${item.anime.title} poster`} className="aspect-[2/3] w-full object-cover transition-transform duration-200 group-hover:scale-[1.02] motion-reduce:transition-none" src={item.anime.coverImageUrl} />
       <div className="p-3"><h3 className="line-clamp-2 font-black">{item.anime.title}</h3>{metadata.length > 0 ? <p className="mt-1 text-xs text-muted-foreground">{metadata.join(' · ')}</p> : null}</div>
     </a>
@@ -207,10 +208,10 @@ function WorkError({ message, onRetry }: { message: string; onRetry: () => void 
 
 /** Keeps first provider occurrence across every fetched page. */
 function uniqueWorks(pages: CatalogPersonWorkPage[]): CatalogPersonWork[] {
-  const ids = new Set<number>()
+  const ids = new Set<CatalogPublicId>()
   return pages.flatMap((page) => page.items.filter((item) => {
-    if (ids.has(item.anime.id)) return false
-    ids.add(item.anime.id)
+    if (ids.has(item.anime.publicId)) return false
+    ids.add(item.anime.publicId)
     return true
   }))
 }
@@ -219,6 +220,6 @@ function uniqueWorks(pages: CatalogPersonWorkPage[]): CatalogPersonWork[] {
 function countNewLastPage(pages: CatalogPersonWorkPage[]): number {
   const last = pages.at(-1)
   if (!last) return 0
-  const priorIds = new Set(pages.slice(0, -1).flatMap((page) => page.items.map((item) => item.anime.id)))
-  return last.items.filter((item, index) => !priorIds.has(item.anime.id) && last.items.findIndex((candidate) => candidate.anime.id === item.anime.id) === index).length
+  const priorIds = new Set(pages.slice(0, -1).flatMap((page) => page.items.map((item) => item.anime.publicId)))
+  return last.items.filter((item, index) => !priorIds.has(item.anime.publicId) && last.items.findIndex((candidate) => candidate.anime.publicId === item.anime.publicId) === index).length
 }

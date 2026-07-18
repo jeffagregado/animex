@@ -8,6 +8,7 @@ import {
   createPostInputSchema,
   feedPageSchema,
   reviewDetailSchema,
+  reviewDraftInputSchema,
   reviewListItemSchema,
   reviewPublishInputSchema,
   reviewRatingSchema,

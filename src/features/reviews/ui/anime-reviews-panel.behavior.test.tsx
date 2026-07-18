@@ -18,7 +18,7 @@ vi.mock('#/components/ui/select', () => ({
 }))
 vi.mock('./published-review-card', () => ({ PublishedReviewCard: ({ review }: { review: { id: string } }) => <div>Published Review {review.id}</div> }))
 
-const item = (id: string) => ({ id, author: { id: `author-${id}`, username: `user-${id}`, displayName: `User ${id}`, avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: `Summary ${id}`, containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 })
+const item = (id: string) => ({ id, author: { id: `author-${id}`, username: `user-${id}`, displayName: `User ${id}`, avatarUrl: null }, anime: { publicId: 'anime_frieren', slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: `Summary ${id}`, containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 })
 const stats = { count: 2, average: 90, bands: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
 const firstPage = { items: [item('a')], cursor: 'next', hasMore: true }
 const nextPage = { items: [item('b')], cursor: null, hasMore: false }
@@ -35,7 +35,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('AnimeReviewsPanel behavior', () => {
   it('sorts, paginates, and hides private write actions when signed out', async () => {
-    render(<AnimeReviewsContent anilistId={1} slug="frieren" />)
+    render(<AnimeReviewsContent publicId="anime_frieren" slug="frieren" />)
     expect(await screen.findByText('Published Review a')).toBeTruthy()
     expect(screen.queryByText('Write a review')).toBeNull()
     fireEvent.change(screen.getByLabelText('Sort reviews'), { target: { value: 'rating-high' } })
@@ -46,7 +46,7 @@ describe('AnimeReviewsPanel behavior', () => {
 
   it('shows an actionable Retry after query failure', async () => {
     mocks.query.mockImplementation(() => { throw new Error('Reviews offline') })
-    render(<AnimeReviewsPanel anilistId={1} slug="frieren" />)
+    render(<AnimeReviewsPanel publicId="anime_frieren" slug="frieren" />)
     expect((await screen.findByRole('alert')).textContent).toContain('Reviews offline')
     mocks.query.mockImplementation((_query, args: { sort?: string }) => args.sort ? emptyPage : emptyStats)
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))

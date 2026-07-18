@@ -158,6 +158,7 @@ function useUserSearch(
         query: requestQuery,
         value: rows.map((user) => ({
           id: user.id,
+          publicId: user.id,
           label: user.name,
           imageUrl: user.avatarUrl,
           metadata: `@${user.username}`,
@@ -179,7 +180,7 @@ function createItems(groups: QuickSearchGroups): QuickSearchItem[] {
     .flatMap(([group, rows]) => rows.map((row) => ({
       ...row,
       group,
-      optionId: `quick-search-${group}-${row.id}`,
+      optionId: `quick-search-${group}-${row.publicId}`,
     })))
 }
 

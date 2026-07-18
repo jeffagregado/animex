@@ -22,18 +22,18 @@ vi.mock('convex/react', () => ({
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, to, params, className }: { children: React.ReactNode; to: string; params?: Record<string, string>; className?: string }) => {
-    const href = params ? to.replace('$anilistId', params.anilistId).replace('$slug', params.slug) : to
+    const href = params ? to.replace('$publicId', params.publicId).replace('$slug', params.slug) : to
     return <a className={className} href={href}>{children}</a>
   },
 }))
 
 const anime: AnimeSummary = {
-  anilistId: 1, slug: 'loader-anime', titles: { display: 'Loader Anime', english: null, romaji: null, native: null }, coverImageUrl: 'https://example.test/loader.jpg', bannerImageUrl: null, format: 'TV', season: 'SUMMER', seasonYear: 2026, episodes: 12, genres: ['Action'], popularity: 100, averageScore: 80, trending: 90, startDate: null, nextAiringAt: null,
+  publicId: 'anime_loader', slug: 'loader-anime', titles: { display: 'Loader Anime', english: null, romaji: null, native: null }, coverImageUrl: 'https://example.test/loader.jpg', bannerImageUrl: null, format: 'TV', season: 'SUMMER', seasonYear: 2026, episodes: 12, genres: ['Action'], popularity: 100, averageScore: 80, trending: 90, startDate: null, nextAiringAt: null,
 }
 const ready = (key: 'trending' | 'upcoming') => ({ status: 'ready' as const, section: { key, items: [anime], refreshedAt: 1, expiresAt: 2 } })
 const retryProps = { onRetry: vi.fn(), isRetrying: false, retryError: null }
 const review: ReviewListItem = {
-  id: 'review-1', author: { id: 'author-1', username: 'mika', displayName: 'Mika', avatarUrl: null }, anime: { anilistId: 1, slug: 'loader-anime', title: 'Loader Anime', coverImageUrl: 'https://example.test/loader.jpg' }, state: 'published', rating: 91, summary: 'A patient and thoughtful journey.', containsSpoiler: false, visibility: 'public', publishedAt: Date.now() - 120_000, updatedAt: Date.now() - 120_000,
+  id: 'review-1', author: { id: 'author-1', username: 'mika', displayName: 'Mika', avatarUrl: null }, anime: { publicId: 'anime_loader', slug: 'loader-anime', title: 'Loader Anime', coverImageUrl: 'https://example.test/loader.jpg' }, state: 'published', rating: 91, summary: 'A patient and thoughtful journey.', containsSpoiler: false, visibility: 'public', publishedAt: Date.now() - 120_000, updatedAt: Date.now() - 120_000,
 }
 
 afterEach(() => {

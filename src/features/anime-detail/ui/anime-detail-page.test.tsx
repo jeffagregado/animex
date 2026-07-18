@@ -12,7 +12,7 @@ vi.mock('../server/anime-detail.functions', () => ({ getAnimePeoplePage: vi.fn()
 
 const page = { items: [], currentPage: 1, hasNextPage: false, perPage: 24 as const }
 const detail: AnimeDetail = {
-  anilistId: 1,
+  publicId: 'anime_frieren',
   slug: 'frieren',
   titles: { display: 'Frieren', english: 'Frieren', romaji: 'Sousou no Frieren', native: '葬送のフリーレン' },
   coverImageUrl: null,
@@ -29,8 +29,8 @@ const detail: AnimeDetail = {
   endDate: null,
   genres: ['Adventure'],
   mainStudio: { name: 'Madhouse', siteUrl: null },
-  related: [{ anilistId: 2, slug: 'fern', title: 'Fern', coverImageUrl: null, format: 'TV', seasonYear: 2024 }],
-  recommendations: [{ anilistId: 3, slug: 'apothecary-diaries', title: 'The Apothecary Diaries', coverImageUrl: null, format: 'TV', seasonYear: 2023 }],
+  related: [{ publicId: 'anime_fern', slug: 'fern', title: 'Fern', coverImageUrl: null, format: 'TV', seasonYear: 2024 }],
+  recommendations: [{ publicId: 'anime_apothecary', slug: 'apothecary-diaries', title: 'The Apothecary Diaries', coverImageUrl: null, format: 'TV', seasonYear: 2023 }],
   trailer: { youtubeId: 'abc123', thumbnailUrl: null },
   externalLinks: [{ site: 'Crunchyroll', url: 'https://www.crunchyroll.com/series/abc' }],
   charactersPage: page,

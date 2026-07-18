@@ -88,10 +88,10 @@ export function useCatalogPersonSearchPages(
 
 /** Keeps first provider occurrence across all pages. */
 const dedupePeople = (pages: CatalogPersonSearchPage[]): CatalogPersonSearchRow[] => {
-  const ids = new Set<number>()
+  const ids = new Set<string>()
   return pages.flatMap((page) => page.items.filter((item) => {
-    if (ids.has(item.id)) return false
-    ids.add(item.id)
+    if (ids.has(item.publicId)) return false
+    ids.add(item.publicId)
     return true
   }))
 }
@@ -100,9 +100,9 @@ const dedupePeople = (pages: CatalogPersonSearchPage[]): CatalogPersonSearchRow[
 const countNewPeople = (pages: CatalogPersonSearchPage[]): number => {
   const lastPage = pages.at(-1)
   if (!lastPage) return 0
-  const known = new Set(pages.slice(0, -1).flatMap((page) => page.items.map((item) => item.id)))
+  const known = new Set(pages.slice(0, -1).flatMap((page) => page.items.map((item) => item.publicId)))
   return lastPage.items.filter((item, index) => (
-    !known.has(item.id)
-    && lastPage.items.findIndex((candidate) => candidate.id === item.id) === index
+    !known.has(item.publicId)
+    && lastPage.items.findIndex((candidate) => candidate.publicId === item.publicId) === index
   )).length
 }

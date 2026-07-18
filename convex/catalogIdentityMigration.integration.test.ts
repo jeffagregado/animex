@@ -159,7 +159,12 @@ const seedAllLanes = async (t: ReturnType<typeof createHarness>) => {
         name: 'Person',
         nativeName: null,
         imageUrl: null,
-        description: null,
+        description: [
+          '[Story](https://anilist.co/anime/120)',
+          '[Friend](https://anilist.co/character/220)',
+          '[Colleague](https://anilist.co/staff/320)',
+          '[External](https://example.com/anime/999)',
+        ].join(' '),
         age: null,
         gender: null,
         birthday: null,
@@ -252,7 +257,7 @@ describe('catalog identity migration', () => {
       'anime:101', 'anime:102', 'anime:103', 'character:201', 'staff:301',
       'staff:302', 'anime:104', 'character:203', 'staff:304', 'staff:305',
       'anime:105', 'anime:106', 'anime:107', 'anime:108', 'anime:109',
-      'anime:110', 'anime:111',
+      'anime:110', 'anime:111', 'anime:120', 'character:220', 'staff:320',
     ]))
     expect(keys.filter((key) => key === 'anime:103')).toHaveLength(1)
     expect(refs).toHaveLength(new Set(keys).size)

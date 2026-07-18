@@ -52,6 +52,7 @@ const row = (
   imageUrl: null,
   label,
   metadata: null,
+  publicId: id,
 })
 
 function OpenButton() {
@@ -119,7 +120,7 @@ beforeEach(() => {
   mocks.convexAuth = { isAuthenticated: false, isLoading: false }
   mocks.navigate.mockReset()
   mocks.provider.mockReset().mockResolvedValue({
-    anime: [row('1', 'Frieren', '/anime/1/frieren')],
+    anime: [row('anime_frieren', 'Frieren', '/anime/anime_frieren/frieren')],
     characters: [],
     staff: [],
   })
@@ -284,7 +285,7 @@ describe('QuickSearchProvider', () => {
     expect(screen.getByText('Frieren')).toBeTruthy()
     const input = screen.getByRole('searchbox')
     fireEvent.keyDown(input, { key: 'ArrowDown' })
-    expect(input.getAttribute('aria-activedescendant')).toContain('anime-1')
+    expect(input.getAttribute('aria-activedescendant')).toContain('anime-anime_frieren')
 
     fireEvent.change(input, { target: { value: 'fern' } })
     expect(screen.queryByText('Frieren')).toBeNull()
@@ -296,7 +297,7 @@ describe('QuickSearchProvider', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(mocks.navigate).not.toHaveBeenCalled()
     await act(async () => { await vi.runAllTimersAsync() })
-    expect(mocks.navigate).toHaveBeenCalledWith({ to: '/anime/1/frieren' })
+    expect(mocks.navigate).toHaveBeenCalledWith({ to: '/anime/anime_frieren/frieren' })
   })
 
   it('leaves Enter inactive and closes before click navigation', async () => {
@@ -365,7 +366,7 @@ describe('QuickSearchProvider', () => {
     setViewport(true)
     mocks.provider.mockResolvedValue({
       anime: Array.from({ length: 6 }, (_, index) => (
-        row(String(index), `Anime ${index}`, `/anime/${index}/anime`)
+        row(`anime_${index}`, `Anime ${index}`, `/anime/anime_${index}/anime`)
       )),
       characters: [],
       staff: [],
@@ -391,7 +392,7 @@ describe('QuickSearchProvider', () => {
         return new Promise((resolve) => { oldRequest.resolve = resolve })
       }
       return Promise.resolve({
-        anime: [row('2', 'New result', '/anime/2/new')],
+        anime: [row('anime_new', 'New result', '/anime/anime_new/new')],
         characters: [],
         staff: [],
       })
@@ -405,7 +406,7 @@ describe('QuickSearchProvider', () => {
 
     if (!oldRequest.resolve) throw new Error('Old request was not started.')
     oldRequest.resolve({
-      anime: [row('1', 'Old result', '/anime/1/old')],
+      anime: [row('anime_old', 'Old result', '/anime/anime_old/old')],
       characters: [],
       staff: [],
     })
@@ -422,9 +423,9 @@ describe('QuickSearchProvider', () => {
   it('wraps keyboard selection across actual groups only', async () => {
     setViewport(true)
     mocks.provider.mockResolvedValue({
-      anime: [row('1', 'Anime result', '/anime/1/a')],
+      anime: [row('anime_result', 'Anime result', '/anime/anime_result/a')],
       characters: [],
-      staff: [row('2', 'Staff result', '/staff/2/staff')],
+      staff: [row('staff_result', 'Staff result', '/staff/staff_result/staff')],
     })
     renderSearch()
     fireEvent.click(screen.getByRole('button', { name: 'Open search' }))
@@ -433,9 +434,9 @@ describe('QuickSearchProvider', () => {
     const input = screen.getByRole('searchbox')
 
     fireEvent.keyDown(input, { key: 'ArrowUp' })
-    expect(input.getAttribute('aria-activedescendant')).toContain('staff-2')
+    expect(input.getAttribute('aria-activedescendant')).toContain('staff-staff_result')
     fireEvent.keyDown(input, { key: 'ArrowDown' })
-    expect(input.getAttribute('aria-activedescendant')).toContain('anime-1')
+    expect(input.getAttribute('aria-activedescendant')).toContain('anime-anime_result')
     expect(screen.getAllByRole('option')).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: /View all/ })).toHaveLength(2)
   })

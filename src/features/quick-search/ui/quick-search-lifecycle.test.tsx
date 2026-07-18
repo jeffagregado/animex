@@ -81,11 +81,12 @@ beforeEach(() => {
   mocks.navigate.mockReset()
   mocks.provider.mockReset().mockResolvedValue({
     anime: [{
-      destination: '/anime/1/frieren',
-      id: '1',
+      destination: '/anime/anime_frieren/frieren',
+      id: 'anime_frieren',
       imageUrl: null,
       label: 'Frieren',
       metadata: null,
+      publicId: 'anime_frieren',
     }],
     characters: [],
     staff: [],
@@ -131,6 +132,6 @@ describe('Quick Search close lifecycle', () => {
     expect(screen.queryByRole('button', { name: 'Frieren' })).toBeNull()
     expect(mocks.navigate).not.toHaveBeenCalled()
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
-    expect(mocks.navigate).toHaveBeenCalledWith({ to: '/anime/1/frieren' })
+    expect(mocks.navigate).toHaveBeenCalledWith({ to: '/anime/anime_frieren/frieren' })
   })
 })

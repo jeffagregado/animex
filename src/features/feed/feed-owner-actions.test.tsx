@@ -15,7 +15,7 @@ vi.mock('convex/react', async () => {
 vi.mock('sonner', () => ({ toast: { success: mocks.success, error: mocks.error } }))
 
 const author = { id: 'owner', username: 'owner', displayName: 'Owner', avatarUrl: null }
-const anime = { anilistId: 1, slug: 'anime', title: 'Anime', coverImageUrl: null, format: null, seasonYear: null }
+const anime = { publicId: 'anime_public', slug: 'anime', title: 'Anime', coverImageUrl: null, format: null, seasonYear: null }
 
 beforeEach(() => { mocks.mutationNames.length = 0; mocks.postVisibility.mockResolvedValue(null); mocks.removePost.mockResolvedValue(null); mocks.activityVisibility.mockResolvedValue(null); mocks.removeActivity.mockResolvedValue(null); mocks.reviewVisibility.mockResolvedValue(null); mocks.removeReviewActivity.mockResolvedValue(null); mocks.removeReview.mockResolvedValue(null) })
 afterEach(() => { cleanup(); Object.values(mocks).forEach((value) => { if (typeof value === 'function' && 'mockClear' in value) value.mockClear() }) })

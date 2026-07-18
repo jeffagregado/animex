@@ -1,13 +1,21 @@
-import { queryOptions, useQuery } from '@tanstack/react-query'
+import { queryOptions } from '@tanstack/react-query'
 
 import {
   createCatalogPersonPath,
-  parseCatalogPersonId,
   parseCatalogPersonTab,
   slugifyCatalogPerson,
   type CatalogPersonKind,
   type CatalogPersonTab,
 } from '../shared/catalog-person-contracts'
+import {
+  parseCatalogPublicId,
+  type CatalogPublicId,
+} from '../../catalog-identity/shared/catalog-identity-contracts'
+import {
+  ensureCatalogRouteIdentity,
+  getCatalogStateStaleTime,
+  type CatalogRouteIdentityClient,
+} from '../../catalog-identity/ui/catalog-route'
 import { getCatalogPerson } from '../server/catalog-person.functions'
 import type { CatalogPersonState } from '../server/catalog-person-cache.server'
 
@@ -19,11 +27,8 @@ export type CatalogPersonRouteSearch = {
 
 const STALE_TIME_MS = 15 * 60 * 1000
 
-/** Rejects leading zeroes, partial numbers, and unsafe identities. */
-export const parseCatalogPersonRouteId = (value: string): number => {
-  if (!/^[1-9]\d*$/.test(value)) throw new RangeError('CATALOG_PERSON_ID_INVALID')
-  return parseCatalogPersonId(Number(value))
-}
+/** Parses one opaque public catalog route identity. */
+export const parseCatalogPersonRouteId = (value: string): CatalogPublicId => parseCatalogPublicId(value)
 
 /** Normalizes raw search while retaining whether URL replacement is required. */
 export const parseCatalogPersonRouteSearch = (
@@ -51,50 +56,52 @@ export function getCatalogPersonTabNavigation(
 }
 
 /** Builds detail query shared by parent loader and child rendering. */
-export const catalogPersonQueryOptions = (kind: CatalogPersonKind, id: number) => queryOptions({
-  queryKey: ['catalog-person', kind, id],
-  queryFn: async (): Promise<CatalogPersonState> => await getCatalogPerson({ data: { kind, id } }),
-  staleTime: STALE_TIME_MS,
+const catalogPersonQueryOptions = (kind: CatalogPersonKind, publicId: CatalogPublicId) => queryOptions({
+  queryKey: ['catalog-person', kind, publicId],
+  queryFn: async (): Promise<CatalogPersonState> => await getCatalogPerson({ data: { kind, publicId } }),
+  staleTime: (query) => getCatalogStateStaleTime(
+    query.state.data?.status,
+    STALE_TIME_MS,
+  ),
 })
 
-type EnsureClient = {
-  ensureQueryData: (options: ReturnType<typeof catalogPersonQueryOptions>) => Promise<CatalogPersonState>
-}
+type EnsureClient = CatalogRouteIdentityClient
 
 /** Awaits parent-equivalent data when child loader starts from an empty cache. */
 export const ensureCatalogPersonChildData = async (
   queryClient: EnsureClient,
   kind: CatalogPersonKind,
   idParam: string,
-): Promise<CatalogPersonState> => await queryClient.ensureQueryData(
-  catalogPersonQueryOptions(kind, parseCatalogPersonRouteId(idParam)),
-)
+): Promise<CatalogPersonState> => {
+  const identity = await ensureCatalogRouteIdentity(queryClient, kind, idParam)
+  if (identity.status === 'resolved') {
+    return await queryClient.fetchQuery(
+      catalogPersonQueryOptions(kind, identity.publicId),
+    )
+  }
+  if (identity.status === 'not-found') return { status: 'not-found' }
+  return {
+    status: 'error',
+    code: 'CATALOG_IDENTITY_MISSING',
+    message: 'Catalog identity is temporarily unavailable.',
+    retryAfterSeconds: null,
+  }
+}
 
 /** Returns canonical replacement only after detail reaches ready state. */
 export const getCatalogPersonRedirectHref = (
   state: CatalogPersonState,
   kind: CatalogPersonKind,
-  id: number,
+  routeId: string,
   currentSlug: string | null,
   rawTab: unknown,
 ): string | null => {
   if (state.status !== 'ready') return null
   const search = parseCatalogPersonRouteSearch(kind, rawTab)
   const detail = state.entry.detail
-  if (detail.kind !== kind || detail.id !== id) return null
+  if (detail.kind !== kind) return null
   const slug = slugifyCatalogPerson(detail.name)
-  if (currentSlug === slug && !search.replace) return null
-  const path = createCatalogPersonPath(kind, id, detail.name)
+  if (routeId === detail.publicId && currentSlug === slug && !search.replace) return null
+  const path = createCatalogPersonPath(kind, detail.publicId, detail.name)
   return search.tab === 'overview' ? path : `${path}?tab=${search.tab}`
-}
-
-/** Exposes explicit loading/errors and a stable retry action to route views. */
-export const useCatalogPersonRouteState = (kind: CatalogPersonKind, id: number) => {
-  const query = useQuery(catalogPersonQueryOptions(kind, id))
-  const state: CatalogPersonPageState = query.isPending
-    ? { status: 'loading' }
-    : query.isError
-      ? { status: 'error', code: 'UPSTREAM', message: query.error.message, retryAfterSeconds: null }
-      : query.data
-  return { state, retry: query.refetch }
 }

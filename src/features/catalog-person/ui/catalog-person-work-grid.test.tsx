@@ -10,8 +10,8 @@ import { CatalogPersonWorkGrid } from './catalog-person-work-grid'
 const server = vi.hoisted(() => ({ getCatalogPersonWorks: vi.fn() }))
 vi.mock('../server/catalog-person.functions', () => ({ getCatalogPersonWorks: server.getCatalogPersonWorks }))
 
-const work = (id: number, title: string, role: string | null = null): CatalogPersonWork => ({
-  anime: { id, slug: title.toLowerCase().replaceAll(' ', '-'), title, coverImageUrl: null, format: 'TV', seasonYear: 2024 },
+const work = (publicId: string, title: string, role: string | null = null): CatalogPersonWork => ({
+  anime: { publicId, slug: title.toLowerCase().replaceAll(' ', '-'), title, coverImageUrl: null, format: 'TV', seasonYear: 2024 },
   role,
 })
 const page = (items: CatalogPersonWork[], currentPage: number, hasNextPage: boolean): CatalogPersonWorkPage => ({
@@ -22,9 +22,9 @@ const page = (items: CatalogPersonWork[], currentPage: number, hasNextPage: bool
 })
 const ready = (value: CatalogPersonWorkPage) => ({ status: 'ready' as const, page: value })
 
-const renderGrid = (kind: 'character' | 'staff' = 'character', personId = 7) => {
+const renderGrid = (kind: 'character' | 'staff' = 'character', personPublicId = 'character_frieren') => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
-  return render(<QueryClientProvider client={client}><CatalogPersonWorkGrid kind={kind} personId={personId} /></QueryClientProvider>)
+  return render(<QueryClientProvider client={client}><CatalogPersonWorkGrid kind={kind} personPublicId={personPublicId} /></QueryClientProvider>)
 }
 
 afterEach(() => {
@@ -36,18 +36,18 @@ afterEach(() => {
 describe('CatalogPersonWorkGrid', () => {
   it('shows initial loading and retryable explicit server errors', async () => {
     server.getCatalogPersonWorks.mockResolvedValueOnce({ status: 'error', code: 'UPSTREAM', message: 'Works unavailable.', retryAfterSeconds: null })
-      .mockResolvedValueOnce(ready(page([work(1, 'Frieren')], 1, false)))
+      .mockResolvedValueOnce(ready(page([work('anime_frieren', 'Frieren')], 1, false)))
     renderGrid()
     expect(screen.getByText('Loading anime…').closest('[aria-busy="true"]')).toBeTruthy()
     expect((await screen.findByRole('alert')).textContent).toContain('Works unavailable.')
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    expect((await screen.findByRole('link', { name: /Frieren/ })).getAttribute('href')).toBe('/anime/1/frieren')
+    expect((await screen.findByRole('link', { name: /Frieren/ })).getAttribute('href')).toBe('/anime/anime_frieren/frieren')
   })
 
   it('preserves provider order and globally deduplicates first Anime identity', async () => {
     server.getCatalogPersonWorks
-      .mockResolvedValueOnce(ready(page([work(2, 'Second', 'Supporting'), work(1, 'First')], 1, true)))
-      .mockResolvedValueOnce(ready(page([work(2, 'Duplicate'), work(3, 'Third', 'Main')], 2, false)))
+      .mockResolvedValueOnce(ready(page([work('anime_second', 'Second', 'Supporting'), work('anime_first', 'First')], 1, true)))
+      .mockResolvedValueOnce(ready(page([work('anime_second', 'Duplicate'), work('anime_third', 'Third', 'Main')], 2, false)))
     renderGrid()
     await screen.findByText('Second')
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
@@ -61,9 +61,9 @@ describe('CatalogPersonWorkGrid', () => {
   it('continues empty and duplicate-only provider pages before terminal content', async () => {
     server.getCatalogPersonWorks
       .mockResolvedValueOnce(ready(page([], 1, true)))
-      .mockResolvedValueOnce(ready(page([work(1, 'First')], 2, true)))
-      .mockResolvedValueOnce(ready(page([work(1, 'Duplicate')], 3, true)))
-      .mockResolvedValueOnce(ready(page([work(2, 'Second')], 4, false)))
+      .mockResolvedValueOnce(ready(page([work('anime_first', 'First')], 2, true)))
+      .mockResolvedValueOnce(ready(page([work('anime_first', 'Duplicate')], 3, true)))
+      .mockResolvedValueOnce(ready(page([work('anime_second', 'Second')], 4, false)))
     renderGrid()
     await screen.findByText('First')
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
@@ -74,9 +74,9 @@ describe('CatalogPersonWorkGrid', () => {
 
   it('retains cards after next-page failure and retries same provider page', async () => {
     server.getCatalogPersonWorks
-      .mockResolvedValueOnce(ready(page([work(1, 'First')], 1, true)))
+      .mockResolvedValueOnce(ready(page([work('anime_first', 'First')], 1, true)))
       .mockRejectedValueOnce(new Error('Connection failed.'))
-      .mockResolvedValueOnce(ready(page([work(2, 'Second')], 2, false)))
+      .mockResolvedValueOnce(ready(page([work('anime_second', 'Second')], 2, false)))
     renderGrid()
     await screen.findByText('First')
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
@@ -100,14 +100,14 @@ describe('CatalogPersonWorkGrid', () => {
     }
     vi.stubGlobal('IntersectionObserver', Observer)
     server.getCatalogPersonWorks
-      .mockResolvedValueOnce(ready(page([work(1, 'First')], 1, true)))
-      .mockResolvedValueOnce(ready(page([work(2, 'Second')], 2, false)))
-    renderGrid('staff', 8)
+      .mockResolvedValueOnce(ready(page([work('anime_first', 'First')], 1, true)))
+      .mockResolvedValueOnce(ready(page([work('anime_second', 'Second')], 2, false)))
+    renderGrid('staff', 'staff_atsumi')
     await screen.findByText('First')
     expect(screen.getByRole('button', { name: 'Load more' })).toBeTruthy()
     intersect([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver)
     expect(await screen.findByText('Second')).toBeTruthy()
-    expect(server.getCatalogPersonWorks).toHaveBeenLastCalledWith({ data: { kind: 'staff', id: 8, page: 2 } })
+    expect(server.getCatalogPersonWorks).toHaveBeenLastCalledWith({ data: { kind: 'staff', publicId: 'staff_atsumi', page: 2 } })
   })
 
   it('serializes observer and manual triggers while the same next page is pending', async () => {
@@ -126,7 +126,7 @@ describe('CatalogPersonWorkGrid', () => {
     }
     vi.stubGlobal('IntersectionObserver', Observer)
     server.getCatalogPersonWorks
-      .mockResolvedValueOnce(ready(page([work(1, 'First')], 1, true)))
+      .mockResolvedValueOnce(ready(page([work('anime_first', 'First')], 1, true)))
       .mockReturnValueOnce(deferredPage)
     renderGrid()
     await screen.findByText('First')
@@ -140,7 +140,7 @@ describe('CatalogPersonWorkGrid', () => {
       expect(pageTwoCalls).toHaveLength(1)
     })
     await act(async () => {
-      resolvePage(ready(page([work(2, 'Second')], 2, false)))
+      resolvePage(ready(page([work('anime_second', 'Second')], 2, false)))
       await deferredPage
     })
     expect(await screen.findByText('Second')).toBeTruthy()

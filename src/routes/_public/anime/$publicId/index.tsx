@@ -6,13 +6,13 @@ import { ensureAnimeDetailChildData } from './route'
 
 /** Returns canonical missing-slug replacement only after detail is ready. */
 export const getMissingSlugRedirectHref = (state: PublicAnimeDetailState, search: string): string | null => state.status === 'ready'
-  ? createCanonicalAnimePath(state.entry.detail.anilistId, state.entry.detail.titles.display, normalizeAnimeDetailTab(new URLSearchParams(search).get('tab')))
+  ? createCanonicalAnimePath(state.entry.detail.publicId, state.entry.detail.titles.display, normalizeAnimeDetailTab(new URLSearchParams(search).get('tab')))
   : null
 
-export const Route = createFileRoute('/_public/anime/$anilistId/')({
+export const Route = createFileRoute('/_public/anime/$publicId/')({
   validateSearch: (search) => ({ tab: normalizeAnimeDetailTab(search.tab) }),
   loader: async ({ params, location, context }) => {
-    const state = await ensureAnimeDetailChildData(context.queryClient, params.anilistId)
+    const state = await ensureAnimeDetailChildData(context.queryClient, params.publicId)
     const href = getMissingSlugRedirectHref(state, location.searchStr)
     if (href) throw redirect({ href, replace: true })
     return null

@@ -13,13 +13,13 @@ import {
 const server = vi.hoisted(() => ({ searchCatalogPeople: vi.fn() }))
 vi.mock('../server/catalog-person.functions', () => ({ searchCatalogPeople: server.searchCatalogPeople }))
 
-const row = (id: number, name: string) => ({
+const row = (publicId: string, name: string) => ({
   kind: 'character' as const,
-  id,
+  publicId,
   name,
   nativeName: null,
   imageUrl: null,
-  destination: `/characters/${id}/${name.toLowerCase()}`,
+  destination: `/characters/${publicId}/${name.toLowerCase()}`,
 })
 const page = (items: ReturnType<typeof row>[], currentPage: number, hasNextPage: boolean): SearchPage => ({
   items,
@@ -82,8 +82,8 @@ describe('CatalogPersonSearchPage', () => {
 
   it('requests ordered pages and globally deduplicates canonical IDs', async () => {
     server.searchCatalogPeople
-      .mockResolvedValueOnce(page([row(2, 'Second'), row(1, 'First')], 1, true))
-      .mockResolvedValueOnce(page([row(2, 'Duplicate'), row(3, 'Third')], 2, false))
+      .mockResolvedValueOnce(page([row('character_second', 'Second'), row('character_first', 'First')], 1, true))
+      .mockResolvedValueOnce(page([row('character_second', 'Duplicate'), row('character_third', 'Third')], 2, false))
     renderPage('Frieren')
     await screen.findByText('Second')
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
@@ -106,7 +106,7 @@ describe('CatalogPersonSearchPage', () => {
       disconnect() {}
     }
     vi.stubGlobal('IntersectionObserver', Observer)
-    server.searchCatalogPeople.mockResolvedValueOnce(page([row(1, 'First')], 1, true)).mockReturnValueOnce(deferred)
+    server.searchCatalogPeople.mockResolvedValueOnce(page([row('character_first', 'First')], 1, true)).mockReturnValueOnce(deferred)
     renderPage('ab')
     await screen.findByText('First')
     act(() => {
@@ -114,17 +114,17 @@ describe('CatalogPersonSearchPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
     })
     await waitFor(() => expect(server.searchCatalogPeople).toHaveBeenCalledTimes(2))
-    resolveNext(page([row(2, 'Second')], 2, false))
+    resolveNext(page([row('character_second', 'Second')], 2, false))
     expect(await screen.findByText('Second')).toBeTruthy()
   })
 
   it('auto-continues empty and duplicate-only pages, then retains rows on retry', async () => {
     server.searchCatalogPeople
       .mockResolvedValueOnce(page([], 1, true))
-      .mockResolvedValueOnce(page([row(1, 'First')], 2, true))
-      .mockResolvedValueOnce(page([row(1, 'Duplicate')], 3, true))
+      .mockResolvedValueOnce(page([row('character_first', 'First')], 2, true))
+      .mockResolvedValueOnce(page([row('character_first', 'Duplicate')], 3, true))
       .mockRejectedValueOnce(new Error('Provider unavailable.'))
-      .mockResolvedValueOnce(page([row(2, 'Second')], 4, false))
+      .mockResolvedValueOnce(page([row('character_second', 'Second')], 4, false))
     renderPage('ab')
     await screen.findByText('First')
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
@@ -138,7 +138,7 @@ describe('CatalogPersonSearchPage', () => {
     server.searchCatalogPeople
       .mockResolvedValueOnce(page([], 1, true))
       .mockRejectedValueOnce(new Error('Page unavailable.'))
-      .mockResolvedValueOnce(page([row(1, 'First')], 2, false))
+      .mockResolvedValueOnce(page([row('character_first', 'First')], 2, false))
     renderPage('ab')
     expect((await screen.findByRole('alert')).textContent).toContain('Page unavailable.')
     expect(screen.queryByText('No characters found.')).toBeNull()
@@ -157,13 +157,13 @@ describe('CatalogPersonSearchPage', () => {
     const deferredA = new Promise<SearchPage>((resolve) => { resolveA = resolve })
     server.searchCatalogPeople
       .mockReturnValueOnce(deferredA)
-      .mockResolvedValueOnce(page([row(2, 'Beta')], 1, false))
+      .mockResolvedValueOnce(page([row('character_beta', 'Beta')], 1, false))
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const view = render(<QueryClientProvider client={client}><CatalogPersonSearchPage kind="character" onQuerySubmit={vi.fn()} query="Alpha" /></QueryClientProvider>)
     view.rerender(<QueryClientProvider client={client}><CatalogPersonSearchPage kind="character" onQuerySubmit={vi.fn()} query="Beta" /></QueryClientProvider>)
     expect(await screen.findByText('Beta')).toBeTruthy()
     await act(async () => {
-      resolveA(page([row(1, 'Alpha')], 1, false))
+      resolveA(page([row('character_alpha', 'Alpha')], 1, false))
       await deferredA
     })
     expect(screen.queryByText('Alpha')).toBeNull()

@@ -15,16 +15,29 @@ export const serializeAnimeTab = (value: unknown): AnimeDetailSearch => {
 /** Keeps tab history scroll-stable for browser back and forward. */
 export const getAnimeTabNavigationOptions = (tab: AnimeDetailTab) => ({ search: serializeAnimeTab(tab), resetScroll: false as const })
 
-/** Returns canonical replacement target only when loaded slug is stale. */
-export const getStaleSlugRedirectHref = (state: PublicAnimeDetailState, slug: string, search: string): string | null => state.status === 'ready' && slug !== state.entry.detail.slug
-  ? createCanonicalAnimePath(state.entry.detail.anilistId, state.entry.detail.titles.display, normalizeAnimeDetailTab(new URLSearchParams(search).get('tab')))
+/** Replaces legacy identities, stale slugs, and noncanonical tab search. */
+export const getStaleSlugRedirectHref = (
+  state: PublicAnimeDetailState,
+  routeId: string,
+  slug: string,
+  search: string,
+): string | null => state.status === 'ready' && (
+  routeId !== state.entry.detail.publicId
+  || slug !== state.entry.detail.slug
+)
+  ? createCanonicalAnimePath(state.entry.detail.publicId, state.entry.detail.titles.display, normalizeAnimeDetailTab(new URLSearchParams(search).get('tab')))
   : null
 
-export const Route = createFileRoute('/_public/anime/$anilistId/$slug')({
+export const Route = createFileRoute('/_public/anime/$publicId/$slug')({
   validateSearch: (search) => serializeAnimeTab(search.tab),
   loader: async ({ params, location, context }) => {
-    const state = await ensureAnimeDetailChildData(context.queryClient, params.anilistId)
-    const href = getStaleSlugRedirectHref(state, params.slug, location.searchStr)
+    const state = await ensureAnimeDetailChildData(context.queryClient, params.publicId)
+    const href = getStaleSlugRedirectHref(
+      state,
+      params.publicId,
+      params.slug,
+      location.searchStr,
+    )
     if (href) throw redirect({ href, replace: true })
     return null
   },

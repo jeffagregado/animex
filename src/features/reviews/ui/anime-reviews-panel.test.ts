@@ -6,7 +6,7 @@ import { getRatingBandLabel, getReviewWriteHref, reconcileReviewItems } from './
 const item = (id: string): ReviewListItem => ({
   id,
   author: { id: `author-${id}`, username: `user-${id}`, displayName: `User ${id}`, avatarUrl: null },
-  anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null },
+  anime: { publicId: 'anime_frieren', slug: 'frieren', title: 'Frieren', coverImageUrl: null },
   state: 'published', rating: 90, summary: 'Summary', containsSpoiler: false,
   visibility: 'public', publishedAt: 1, updatedAt: 1,
 })
@@ -18,9 +18,9 @@ describe('Anime Reviews panel helpers', () => {
   })
 
   it('resumes Drafts and opens published Review Detail', () => {
-    expect(getReviewWriteHref(null, 1, 'frieren')).toBe('/anime/1/frieren/reviews/new')
-    expect(getReviewWriteHref(item('review-1'), 1, 'frieren')).toBe('/reviews/review-1')
-    expect(getReviewWriteHref({ ...item('draft-1'), state: 'draft', rating: null, summary: '', publishedAt: null }, 1, 'frieren')).toBe('/anime/1/frieren/reviews/new')
+    expect(getReviewWriteHref(null, 'anime_frieren', 'frieren')).toBe('/anime/anime_frieren/frieren/reviews/new')
+    expect(getReviewWriteHref(item('review-1'), 'anime_frieren', 'frieren')).toBe('/reviews/review-1')
+    expect(getReviewWriteHref({ ...item('draft-1'), state: 'draft', rating: null, summary: '', publishedAt: null }, 'anime_frieren', 'frieren')).toBe('/anime/anime_frieren/frieren/reviews/new')
   })
 
   it('labels rating bands as exact non-overlapping intervals', () => {

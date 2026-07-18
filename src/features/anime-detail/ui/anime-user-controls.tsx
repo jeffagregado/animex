@@ -5,6 +5,7 @@ import { ChevronDownIcon, ChevronUpIcon, HeartIcon, HistoryIcon, StarIcon } from
 import { toast } from 'sonner'
 
 import { api } from '../../../../convex/_generated/api'
+import type { Id } from '../../../../convex/_generated/dataModel'
 import { Dialog, DialogContent, DialogTrigger } from '#/components/ui/dialog'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select'
 import { usePublicAuthState } from '#/features/shell/public-auth-context'
@@ -12,7 +13,7 @@ import type { ClientAuthState } from '#/features/auth/use-auth-state'
 import type { AnimeRewatchEntry, AnimeStatus, UserAnimeEntry } from '../shared/anime-detail-contracts'
 import { useAnimeAutosave, useScoreAnimeAutosave } from './use-anime-autosave'
 
-type AnimeUserControlsProps = { anilistId: number; canonicalPath: string }
+type AnimeUserControlsProps = { publicId: string; canonicalPath: string }
 type AnimeMutation = (key: SaveKey, action: () => Promise<unknown>) => void
 type ControlEntry = UserAnimeEntry | null | undefined
 type AuthFacadeKind = 'favorite' | 'score' | 'status'
@@ -32,7 +33,7 @@ const controlShellClass = 'min-h-14 rounded-lg border border-border bg-card px-3
 const autosaveDelayMs = 750
 
 /** Shows public facades until both client auth sources confirm a complete user. */
-export function AnimeUserControls({ anilistId, canonicalPath }: AnimeUserControlsProps) {
+export function AnimeUserControls({ publicId, canonicalPath }: AnimeUserControlsProps) {
   const auth = usePublicAuthState()
   const convexAuth = useConvexAuth()
   const complete = canQueryUserAnime(auth, convexAuth.isAuthenticated)
@@ -42,7 +43,7 @@ export function AnimeUserControls({ anilistId, canonicalPath }: AnimeUserControl
     return <AuthControlFacades auth={auth} canonicalPath={canonicalPath} error={authError} />
   }
 
-  return <CompleteAnimeUserControls anilistId={anilistId} />
+  return <CompleteAnimeUserControls publicId={publicId} />
 }
 
 /** Renders auth links without mounting private data hooks. */
@@ -71,8 +72,9 @@ function AuthFacadeContent({ kind }: { kind: AuthFacadeKind }) {
 }
 
 /** Owns authenticated controls, private query, and mutations. */
-function CompleteAnimeUserControls({ anilistId }: { anilistId: number }) {
-  const entry = useQuery(api.userAnime.getMine, { anilistId }) as ControlEntry
+function CompleteAnimeUserControls({ publicId }: { publicId: string }) {
+  const animeId = publicId as Id<'catalogEntities'>
+  const entry = useQuery(api.userAnime.getMine, { animeId }) as ControlEntry
   const setStatus = useMutation(api.userAnime.setStatus)
   const setScore = useMutation(api.userAnime.setScore)
   const setFavorite = useMutation(api.userAnime.setFavorite)
@@ -87,10 +89,10 @@ function CompleteAnimeUserControls({ anilistId }: { anilistId: number }) {
   return (
     <div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.15fr_1.15fr_auto_auto]">
-        <StatusControl anilistId={anilistId} entry={entry} loading={loading} mutate={mutate} pending={pending} setStatus={setStatus} />
-        <ScoreControl anilistId={anilistId} entry={entry} loading={loading} mutate={mutate} pending={pending} setScore={setScore} />
-        <FavoriteControl anilistId={anilistId} entry={entry} loading={loading} mutate={mutate} pending={pending} setFavorite={setFavorite} />
-        <RewatchDialog anilistId={anilistId} loading={loading} />
+        <StatusControl animeId={animeId} entry={entry} loading={loading} mutate={mutate} pending={pending} setStatus={setStatus} />
+        <ScoreControl animeId={animeId} entry={entry} loading={loading} mutate={mutate} pending={pending} setScore={setScore} />
+        <FavoriteControl animeId={animeId} entry={entry} loading={loading} mutate={mutate} pending={pending} setFavorite={setFavorite} />
+        <RewatchDialog animeId={animeId} loading={loading} />
       </div>
       {error ? <p className="mt-2 text-sm text-red-300" role="alert">{error.message} <button className="min-h-11 rounded px-2 font-bold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={error.action} type="button">Retry</button></p> : null}
     </div>
@@ -98,14 +100,14 @@ function CompleteAnimeUserControls({ anilistId }: { anilistId: number }) {
 }
 
 /** Autosaves status after trailing inactivity. */
-function StatusControl({ anilistId, entry, loading, mutate, pending, setStatus }: { anilistId: number; entry: ControlEntry; loading: boolean; mutate: AnimeMutation; pending: SaveKey | null; setStatus: ReturnType<typeof useMutation> }) {
+function StatusControl({ animeId, entry, loading, mutate, pending, setStatus }: { animeId: Id<'catalogEntities'>; entry: ControlEntry; loading: boolean; mutate: AnimeMutation; pending: SaveKey | null; setStatus: ReturnType<typeof useMutation> }) {
   const autosave = useAnimeAutosave<AnimeStatus | null>({
     delayMs: autosaveDelayMs,
     isValid: (value) => value !== null,
     persist: (action) => mutate('status', action),
     save: async (value) => {
       if (value === null) throw new Error('Status is required.')
-      await setStatus({ anilistId, status: value })
+      await setStatus({ animeId, status: value })
     },
     serverValue: entry?.status ?? null,
   })
@@ -133,11 +135,11 @@ function StatusControl({ anilistId, entry, loading, mutate, pending, setStatus }
 }
 
 /** Autosaves valid scores and flushes committed values. */
-function ScoreControl({ anilistId, entry, loading, mutate, pending, setScore }: { anilistId: number; entry: ControlEntry; loading: boolean; mutate: AnimeMutation; pending: SaveKey | null; setScore: ReturnType<typeof useMutation> }) {
+function ScoreControl({ animeId, entry, loading, mutate, pending, setScore }: { animeId: Id<'catalogEntities'>; entry: ControlEntry; loading: boolean; mutate: AnimeMutation; pending: SaveKey | null; setScore: ReturnType<typeof useMutation> }) {
   const autosave = useScoreAnimeAutosave({
     delayMs: autosaveDelayMs,
     persist: (action) => mutate('score', action),
-    save: async (value) => await setScore({ anilistId, score: value }),
+    save: async (value) => await setScore({ animeId, score: value }),
     serverValue: entry?.score ?? null,
   })
   const saving = pending === 'score'
@@ -163,10 +165,10 @@ function ScoreValidationError({ message }: { message: string | null }) {
 }
 
 /** Persists favorite changes immediately. */
-function FavoriteControl({ anilistId, entry, loading, mutate, pending, setFavorite }: { anilistId: number; entry: ControlEntry; loading: boolean; mutate: AnimeMutation; pending: SaveKey | null; setFavorite: ReturnType<typeof useMutation> }) {
+function FavoriteControl({ animeId, entry, loading, mutate, pending, setFavorite }: { animeId: Id<'catalogEntities'>; entry: ControlEntry; loading: boolean; mutate: AnimeMutation; pending: SaveKey | null; setFavorite: ReturnType<typeof useMutation> }) {
   const favorite = entry?.isFavorite ?? false
 
-  return <button aria-pressed={favorite} className="flex min-h-14 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 font-bold transition hover:border-cyan-300 hover:bg-cyan-300/5 hover:text-cyan-300 focus-visible:border-cyan-300 focus-visible:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" disabled={loading || pending !== null} onClick={() => mutate('favorite', async () => await setFavorite({ anilistId, isFavorite: !favorite }))} type="button"><HeartIcon className={`size-5 ${favorite ? 'fill-coral-400 text-coral-400' : ''}`} />Favorite</button>
+  return <button aria-pressed={favorite} className="flex min-h-14 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 font-bold transition hover:border-cyan-300 hover:bg-cyan-300/5 hover:text-cyan-300 focus-visible:border-cyan-300 focus-visible:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" disabled={loading || pending !== null} onClick={() => mutate('favorite', async () => await setFavorite({ animeId, isFavorite: !favorite }))} type="button"><HeartIcon className={`size-5 ${favorite ? 'fill-coral-400 text-coral-400' : ''}`} />Favorite</button>
 }
 
 /** Runs one mutation and exposes its exact action for retry. */
@@ -192,17 +194,17 @@ function isKeyboardEnter(event: Event): boolean {
   return event instanceof KeyboardEvent && event.key === 'Enter'
 }
 
-function RewatchDialog({ anilistId, loading }: { anilistId: number; loading: boolean }) {
+function RewatchDialog({ animeId, loading }: { animeId: Id<'catalogEntities'>; loading: boolean }) {
   const [open, setOpen] = useState(false)
-  return <Dialog onOpenChange={setOpen} open={open}><DialogTrigger className="flex min-h-14 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 font-bold transition hover:border-cyan-300 hover:bg-cyan-300/5 hover:text-cyan-300 focus-visible:border-cyan-300 focus-visible:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" disabled={loading}><HistoryIcon className="size-5" />Rewatch history</DialogTrigger>{open ? <DialogContent title="Rewatch history"><RewatchHistory anilistId={anilistId} /></DialogContent> : null}</Dialog>
+  return <Dialog onOpenChange={setOpen} open={open}><DialogTrigger className="flex min-h-14 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 font-bold transition hover:border-cyan-300 hover:bg-cyan-300/5 hover:text-cyan-300 focus-visible:border-cyan-300 focus-visible:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" disabled={loading}><HistoryIcon className="size-5" />Rewatch history</DialogTrigger>{open ? <DialogContent title="Rewatch history"><RewatchHistory animeId={animeId} /></DialogContent> : null}</Dialog>
 }
 
-function RewatchHistory({ anilistId }: { anilistId: number }) {
+function RewatchHistory({ animeId }: { animeId: Id<'catalogEntities'> }) {
   const [cursor, setCursor] = useState<string | null>(null)
   const [items, setItems] = useState<AnimeRewatchEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
-  const history = useQuery(api.userAnime.listMyRewatches, { anilistId, paginationOpts: { cursor, numItems: 20 } })
+  const history = useQuery(api.userAnime.listMyRewatches, { animeId, paginationOpts: { cursor, numItems: 20 } })
   const record = useMutation(api.userAnime.recordRewatch)
   const remove = useMutation(api.userAnime.removeLatestRewatch)
 
@@ -222,7 +224,7 @@ function RewatchHistory({ anilistId }: { anilistId: number }) {
     }
   }
 
-  return <div className="mt-5"><div className="flex gap-2"><button className="min-h-11 rounded-lg bg-cyan-300 px-4 font-black text-primary-foreground" disabled={pending} onClick={() => void change(async () => await record({ anilistId }))} type="button">Record rewatch</button><button className="min-h-11 rounded-lg border border-border px-4 font-bold" disabled={pending || items.length === 0} onClick={() => void change(async () => await remove({ anilistId }))} type="button">Remove latest</button></div>{error ? <p className="mt-3 text-red-300" role="alert">{error}</p> : null}<ol className="mt-4 space-y-2">{items.map((item) => <li className="rounded-lg border border-border p-3" key={item.id}>{new Date(item.completedAt).toLocaleDateString()}</li>)}</ol>{history && !history.isDone ? <button className="mt-4 min-h-11 rounded-lg border border-border px-4" onClick={() => setCursor(history.continueCursor)} type="button">Load more history</button> : null}</div>
+  return <div className="mt-5"><div className="flex gap-2"><button className="min-h-11 rounded-lg bg-cyan-300 px-4 font-black text-primary-foreground" disabled={pending} onClick={() => void change(async () => await record({ animeId }))} type="button">Record rewatch</button><button className="min-h-11 rounded-lg border border-border px-4 font-bold" disabled={pending || items.length === 0} onClick={() => void change(async () => await remove({ animeId }))} type="button">Remove latest</button></div>{error ? <p className="mt-3 text-red-300" role="alert">{error}</p> : null}<ol className="mt-4 space-y-2">{items.map((item) => <li className="rounded-lg border border-border p-3" key={item.id}>{new Date(item.completedAt).toLocaleDateString()}</li>)}</ol>{history && !history.isDone ? <button className="mt-4 min-h-11 rounded-lg border border-border px-4" onClick={() => setCursor(history.continueCursor)} type="button">Load more history</button> : null}</div>
 }
 
 /** Resolves auth action without sending loading or complete users to a wrong step. */

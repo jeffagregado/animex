@@ -2,6 +2,7 @@ import type { KeyboardEvent } from 'react'
 import { Link } from '@tanstack/react-router'
 
 import { AnimeImage } from '#/features/anime-detail/ui/anime-image'
+import type { CatalogPublicId } from '#/features/catalog-identity/shared/catalog-identity-contracts'
 import {
   slugifyCatalogPerson,
   type CatalogPersonDetail,
@@ -14,7 +15,7 @@ import type { CatalogPersonPageState } from './catalog-person-route'
 import { CatalogPersonWorkGrid } from './catalog-person-work-grid'
 
 type CatalogPersonPageProps = {
-  id: number
+  publicId: CatalogPublicId
   kind: CatalogPersonKind
   state: CatalogPersonPageState
   tab: CatalogPersonTab
@@ -46,14 +47,14 @@ export function CatalogPersonPage(props: CatalogPersonPageProps) {
   }
 
   const detail = props.state.entry.detail
-  if (detail.kind !== props.kind || detail.id !== props.id) {
+  if (detail.kind !== props.kind || detail.publicId !== props.publicId) {
     return <main className="mx-auto max-w-7xl px-4 py-16"><div className="rounded-xl border border-red-400/40 bg-red-400/10 p-6" role="alert"><p>Catalog person type did not match this destination.</p><button className="mt-5 min-h-11 rounded-lg border border-border px-5 font-bold" onClick={props.onRetry} type="button">Retry</button></div></main>
   }
 
   const content = <>
     <PersonTabs kind={props.kind} onTabChange={props.onTabChange} tab={props.tab} />
     <section aria-labelledby={`catalog-person-tab-${props.tab}`} className="py-6" id={`catalog-person-panel-${props.tab}`} role="tabpanel" tabIndex={0}>
-      <PersonTabPanel detail={detail} personId={props.id} tab={props.tab} />
+      <PersonTabPanel detail={detail} personPublicId={props.publicId} tab={props.tab} />
     </section>
   </>
   return <main className="mx-auto max-w-[1480px] px-4 pb-24 md:px-7 md:pb-12">
@@ -96,9 +97,9 @@ function PersonOverview({ detail }: { detail: CatalogPersonDetail }) {
   </div>
 }
 
-function PersonTabPanel({ detail, personId, tab }: { detail: CatalogPersonDetail; personId: number; tab: CatalogPersonTab }) {
+function PersonTabPanel({ detail, personPublicId, tab }: { detail: CatalogPersonDetail; personPublicId: CatalogPublicId; tab: CatalogPersonTab }) {
   if (tab === 'overview') return <PersonOverview detail={detail} />
-  if (tab === 'anime') return <CatalogPersonWorkGrid kind={detail.kind} personId={personId} />
+  if (tab === 'anime') return <CatalogPersonWorkGrid kind={detail.kind} personPublicId={personPublicId} />
   if (detail.kind === 'character') return <PersonVoiceActors actors={detail.voiceActors} />
   throw new TypeError('CATALOG_PERSON_TAB_INVALID')
 }
@@ -112,13 +113,13 @@ function PersonVoiceActors({ actors }: { actors: CatalogVoiceActor[] }) {
   return <section aria-labelledby="catalog-person-voice-actors">
     <h2 className="text-xl font-black" id="catalog-person-voice-actors">Voice Actors</h2>
     {actors.length > 0
-      ? <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">{actors.map((actor) => <li key={actor.id}><VoiceActorLink actor={actor} /></li>)}</ul>
+      ? <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">{actors.map((actor) => <li key={actor.publicId}><VoiceActorLink actor={actor} /></li>)}</ul>
       : <p className="mt-4 rounded-xl border border-border bg-card/60 p-5 text-muted-foreground">No voice actors available.</p>}
   </section>
 }
 
 function VoiceActorLink({ actor }: { actor: CatalogVoiceActor }) {
-  return <Link className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card/60 p-2 transition-colors hover:border-cyan-300/60 hover:bg-cyan-300/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 motion-reduce:transition-none" params={{ id: String(actor.id), slug: slugifyCatalogPerson(actor.name) }} preload={false} to="/staff/$id/$slug">
+  return <Link className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card/60 p-2 transition-colors hover:border-cyan-300/60 hover:bg-cyan-300/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 motion-reduce:transition-none" params={{ publicId: actor.publicId, slug: slugifyCatalogPerson(actor.name) }} preload={false} to="/staff/$publicId/$slug">
     <AnimeImage alt={`${actor.name} portrait`} className="h-20 w-14 shrink-0 rounded-lg object-cover" src={actor.imageUrl} />
     <span className="min-w-0"><span className="block break-words font-black">{actor.name}</span><span className="mt-1 block text-xs text-muted-foreground">{actor.language}</span></span>
   </Link>

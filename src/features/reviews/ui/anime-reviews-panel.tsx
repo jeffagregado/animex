@@ -2,6 +2,7 @@ import { Component, useEffect, useState, type ReactNode } from 'react'
 import { useConvexAuth, useQuery } from 'convex/react'
 
 import { api } from '../../../../convex/_generated/api'
+import type { Id } from '../../../../convex/_generated/dataModel'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select'
 import { usePublicAuthState } from '#/features/shell/public-auth-context'
 import {
@@ -14,7 +15,7 @@ import {
 import { PublishedReviewCard } from './published-review-card'
 import { parseReviewWireDetail } from '../review-document-adapter'
 
-type AnimeReviewsPanelProps = { anilistId: number; slug: string }
+type AnimeReviewsPanelProps = { publicId: string; slug: string }
 type ReviewPage = { items: ReviewListItem[]; cursor: string | null; hasMore: boolean }
 const sortLabels: Record<ReviewSort, string> = { newest: 'Newest', 'rating-high': 'Highest Rating', 'rating-low': 'Lowest Rating' }
 const sorts: { label: string; value: ReviewSort }[] = [{ label: sortLabels.newest, value: 'newest' }, { label: sortLabels['rating-high'], value: 'rating-high' }, { label: sortLabels['rating-low'], value: 'rating-low' }]
@@ -24,12 +25,13 @@ export function AnimeReviewsPanel(props: AnimeReviewsPanelProps) {
   return <ReviewPanelBoundary><AnimeReviewsContent {...props} /></ReviewPanelBoundary>
 }
 
-export function AnimeReviewsContent({ anilistId, slug }: AnimeReviewsPanelProps) {
+export function AnimeReviewsContent({ publicId, slug }: AnimeReviewsPanelProps) {
+  const animeId = publicId as Id<'catalogEntities'>
   const [sort, setSort] = useState<ReviewSort>('newest')
   const [cursor, setCursor] = useState<string | null>(null)
   const [items, setItems] = useState<ReviewListItem[]>([])
-  const rawPage = useQuery(api.reviews.listForAnime, { anilistId, sort, cursor })
-  const rawStats = useQuery(api.reviews.getStats, { anilistId })
+  const rawPage = useQuery(api.reviews.listForAnime, { animeId, sort, cursor })
+  const rawStats = useQuery(api.reviews.getStats, { animeId })
   const signedIn = useSignedInReviewViewer()
   const page = rawPage === undefined ? undefined : parseReviewPage(rawPage)
   const stats = rawStats === undefined ? undefined : reviewStatsSchema.parse(rawStats)
@@ -37,7 +39,7 @@ export function AnimeReviewsContent({ anilistId, slug }: AnimeReviewsPanelProps)
   useEffect(() => { if (page) setItems((current) => reconcileReviewItems(current, page.items, cursor)) }, [cursor, rawPage])
   const changeSort = (value: string | null): void => { if (!value) return; setSort(value as ReviewSort); setCursor(null); setItems([]) }
 
-  return <div className="space-y-5"><ReviewPanelHeader anilistId={anilistId} signedIn={signedIn} slug={slug} sort={sort} stats={stats} onSortChange={changeSort} />{stats ? <RatingBands bands={stats.bands} count={stats.count} /> : <PanelSkeleton />}<ReviewResults items={items} loading={rawPage === undefined} page={page} onLoadMore={setCursor} /></div>
+  return <div className="space-y-5"><ReviewPanelHeader publicId={publicId} signedIn={signedIn} slug={slug} sort={sort} stats={stats} onSortChange={changeSort} />{stats ? <RatingBands bands={stats.bands} count={stats.count} /> : <PanelSkeleton />}<ReviewResults items={items} loading={rawPage === undefined} page={page} onLoadMore={setCursor} /></div>
 }
 
 /** Reads signed-in state only when public and Convex auth agree. */
@@ -47,8 +49,8 @@ function useSignedInReviewViewer(): boolean {
   return auth.status === 'ready' && auth.authState.status === 'complete' && convexAuth.isAuthenticated
 }
 
-function ReviewPanelHeader({ anilistId, signedIn, slug, sort, stats, onSortChange }: AnimeReviewsPanelProps & { signedIn: boolean; sort: ReviewSort; stats: ReviewStatsDto | undefined; onSortChange: (value: string | null) => void }) {
-  return <header className="flex flex-col gap-4 rounded-xl border border-border bg-card/40 p-5 sm:flex-row sm:items-end sm:justify-between"><ReviewStatsSummary stats={stats} /><div className="flex flex-wrap gap-3">{signedIn ? <PrivateWriteReview anilistId={anilistId} slug={slug} /> : null}<Select onValueChange={onSortChange} value={sort}><SelectTrigger aria-label="Sort reviews" className="min-w-44"><SelectValue>{sortLabels[sort]}</SelectValue></SelectTrigger><SelectContent>{sorts.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div></header>
+function ReviewPanelHeader({ publicId, signedIn, slug, sort, stats, onSortChange }: AnimeReviewsPanelProps & { signedIn: boolean; sort: ReviewSort; stats: ReviewStatsDto | undefined; onSortChange: (value: string | null) => void }) {
+  return <header className="flex flex-col gap-4 rounded-xl border border-border bg-card/40 p-5 sm:flex-row sm:items-end sm:justify-between"><ReviewStatsSummary stats={stats} /><div className="flex flex-wrap gap-3">{signedIn ? <PrivateWriteReview publicId={publicId} slug={slug} /> : null}<Select onValueChange={onSortChange} value={sort}><SelectTrigger aria-label="Sort reviews" className="min-w-44"><SelectValue>{sortLabels[sort]}</SelectValue></SelectTrigger><SelectContent>{sorts.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div></header>
 }
 
 function ReviewStatsSummary({ stats }: { stats: ReviewStatsDto | undefined }) {
@@ -73,11 +75,11 @@ function ReviewPagination({ items, loading, page, onLoadMore }: { items: ReviewL
   return items.length > 0 ? <p className="text-center text-sm text-muted-foreground">You reached the end.</p> : null
 }
 
-function PrivateWriteReview({ anilistId, slug }: AnimeReviewsPanelProps) {
-  const mine = useQuery(api.reviews.getMineForAnime, { anilistId })
+function PrivateWriteReview({ publicId, slug }: AnimeReviewsPanelProps) {
+  const mine = useQuery(api.reviews.getMineForAnime, { animeId: publicId as Id<'catalogEntities'> })
   if (mine === undefined) return <span className="min-h-10 min-w-32 animate-pulse rounded-lg bg-white/5" />
   const review = mine === null ? null : parseReviewWireDetail(mine)
-  return <a className="grid min-h-10 place-items-center rounded-lg bg-coral-400 px-4 font-black text-white hover:bg-coral-300" href={getReviewWriteHref(review, anilistId, slug)}>{review?.state === 'published' ? 'View your review' : review ? 'Resume draft' : 'Write a review'}</a>
+  return <a className="grid min-h-10 place-items-center rounded-lg bg-coral-400 px-4 font-black text-white hover:bg-coral-300" href={getReviewWriteHref(review, publicId, slug)}>{review?.state === 'published' ? 'View your review' : review ? 'Resume draft' : 'Write a review'}</a>
 }
 
 function RatingBands({ bands, count }: { bands: [number, number, number, number, number, number, number, number, number, number]; count: number }) {
@@ -97,5 +99,5 @@ class ReviewPanelBoundary extends Component<{ children: ReactNode }, { error: Er
 
 const parseReviewPage = (value: { items: unknown[]; cursor: string | null; hasMore: boolean }): ReviewPage => ({ items: value.items.map((item) => reviewListItemSchema.parse(item)), cursor: value.cursor, hasMore: value.hasMore })
 export const reconcileReviewItems = (current: ReviewListItem[], page: ReviewListItem[], cursor: string | null): ReviewListItem[] => cursor === null ? page : [...current, ...page.filter((item) => !current.some((existing) => existing.id === item.id))]
-export const getReviewWriteHref = (review: ReviewListItem | null, anilistId: number, slug: string): string => review?.state === 'published' ? `/reviews/${review.id}` : `/anime/${anilistId}/${slug}/reviews/new`
+export const getReviewWriteHref = (review: ReviewListItem | null, publicId: string, slug: string): string => review?.state === 'published' ? `/reviews/${review.id}` : `/anime/${publicId}/${slug}/reviews/new`
 export const getRatingBandLabel = (index: number): string => index === 0 ? '90–100' : `${90 - index * 10}–<${100 - index * 10}`

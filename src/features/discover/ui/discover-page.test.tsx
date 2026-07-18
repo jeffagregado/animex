@@ -28,7 +28,7 @@ vi.mock('@tanstack/react-router', () => ({
 
 const searchState: DiscoverUrlSearchState = { query: null, genre: null, format: null, season: null, year: null, sort: 'relevance' }
 const anime: AnimeSummary = {
-  anilistId: 1, slug: 'frieren', titles: { display: 'Frieren', english: 'Frieren', romaji: 'Sousou no Frieren', native: null }, coverImageUrl: 'https://example.test/frieren.jpg', bannerImageUrl: null, format: 'TV', season: 'FALL', seasonYear: 2023, episodes: 28, genres: ['Adventure'], popularity: 1, averageScore: 90, trending: 2, startDate: null, nextAiringAt: null,
+  publicId: 'anime_frieren', slug: 'frieren', titles: { display: 'Frieren', english: 'Frieren', romaji: 'Sousou no Frieren', native: null }, coverImageUrl: 'https://example.test/frieren.jpg', bannerImageUrl: null, format: 'TV', season: 'FALL', seasonYear: 2023, episodes: 28, genres: ['Adventure'], popularity: 1, averageScore: 90, trending: 2, startDate: null, nextAiringAt: null,
 }
 const ready = (key: 'trending' | 'seasonal' | 'recommendations' | 'upcoming') => ({ status: 'ready' as const, section: { key, items: [anime], refreshedAt: 1, expiresAt: 2 } })
 const data: DiscoverPageData = { sections: { trending: ready('trending'), seasonal: ready('seasonal'), recommendations: ready('recommendations'), upcoming: ready('upcoming') } }
@@ -82,8 +82,8 @@ describe('DiscoverPage', () => {
     expect(screen.getAllByText('Image unavailable').length).toBeGreaterThan(0)
     expect(card).toBeTruthy()
     const link = card?.closest('a')
-    expect(link?.dataset.to).toBe('/anime/$anilistId/$slug')
-    expect(link?.getAttribute('href')).toBe('/anime/1/frieren')
+    expect(link?.dataset.to).toBe('/anime/$publicId/$slug')
+    expect(link?.getAttribute('href')).toBe('/anime/anime_frieren/frieren')
     expect(link?.className).toContain('focus-visible:ring-2')
   })
 

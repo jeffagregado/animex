@@ -25,7 +25,7 @@ function UpcomingItem({ anime }: UpcomingItemProps) {
     setHasImageError(false)
   }, [imageUrl])
 
-  return <Link to="/anime/$anilistId/$slug" params={{ anilistId: String(anime.anilistId), slug: anime.slug }} className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"><article className="flex min-w-0 gap-3 rounded-lg border border-border bg-card p-2"><div className="h-16 w-12 shrink-0 overflow-hidden rounded bg-muted">{imageUrl !== null && !hasImageError ? <img className="size-full object-cover" src={imageUrl} alt={`${anime.titles.display} cover`} onError={() => setHasImageError(true)} /> : <span className="flex size-full items-center justify-center text-[10px] text-muted-foreground"><ImageOff aria-label="Image unavailable" className="size-4" /></span>}</div><div className="min-w-0"><h3 className="line-clamp-2 text-sm font-bold">{anime.titles.display}</h3><p className="mt-1 text-xs text-cyan-300">{anime.seasonYear ?? 'TBA'}</p></div></article></Link>
+  return <Link to="/anime/$publicId/$slug" params={{ publicId: anime.publicId, slug: anime.slug }} className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"><article className="flex min-w-0 gap-3 rounded-lg border border-border bg-card p-2"><div className="h-16 w-12 shrink-0 overflow-hidden rounded bg-muted">{imageUrl !== null && !hasImageError ? <img className="size-full object-cover" src={imageUrl} alt={`${anime.titles.display} cover`} onError={() => setHasImageError(true)} /> : <span className="flex size-full items-center justify-center text-[10px] text-muted-foreground"><ImageOff aria-label="Image unavailable" className="size-4" /></span>}</div><div className="min-w-0"><h3 className="line-clamp-2 text-sm font-bold">{anime.titles.display}</h3><p className="mt-1 text-xs text-cyan-300">{anime.seasonYear ?? 'TBA'}</p></div></article></Link>
 }
 
 /** Displays upcoming anime as a compact list instead of a reused poster rail. */
@@ -40,5 +40,5 @@ export function DiscoverUpcomingList({ state, onRetry, isRetrying, retryError, v
     return <section className="space-y-3"><h2 className="text-xl font-extrabold">Upcoming</h2><p className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">No upcoming anime is available.</p></section>
   }
   const layout = variant === 'mobile' ? 'flex gap-3 overflow-x-auto pb-2' : 'space-y-2'
-  return <section aria-labelledby={`upcoming-${variant}-heading`} className="space-y-3"><h2 id={`upcoming-${variant}-heading`} className="text-xl font-extrabold">Upcoming</h2><div className={layout}>{state.section.items.map((anime) => <div className={variant === 'mobile' ? 'w-48 shrink-0' : ''} key={anime.anilistId}><UpcomingItem anime={anime} /></div>)}</div></section>
+  return <section aria-labelledby={`upcoming-${variant}-heading`} className="space-y-3"><h2 id={`upcoming-${variant}-heading`} className="text-xl font-extrabold">Upcoming</h2><div className={layout}>{state.section.items.map((anime) => <div className={variant === 'mobile' ? 'w-48 shrink-0' : ''} key={anime.publicId}><UpcomingItem anime={anime} /></div>)}</div></section>
 }
