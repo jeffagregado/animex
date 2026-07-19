@@ -15,9 +15,9 @@ If any other production package is needed, pause and request approval first.
 - `/` public Quiet Signal landing page.
 - `/home` public/signed-in feed.
 - `/discover` cached AniList browse page.
-- `/anime/$anilistId/$slug` anime detail page.
-  - Example: `/anime/182255/Frieren-Beyond-Journeys-End-Season-2`
-  - `anilistId` is canonical.
+- `/anime/$publicId/$slug` anime detail page.
+  - Example: `/anime/<opaque-public-id>/Frieren-Beyond-Journeys-End-Season-2`
+  - `publicId` is AnimeX-owned and opaque; AniList IDs stay server-only.
   - `slug` is generated from AniList metadata title.
   - If slug is missing or stale, route redirects to canonical slug URL.
 - `/u/$username` user profile.
@@ -93,7 +93,7 @@ Convex env already available:
 ### Phase 3: AniList And Discover
 
 - Add server-only TanStack Start AniList GraphQL helpers. Never call AniList from browser or Convex actions.
-- Add metadata normalization, canonical numeric `anilistId`, and Unicode-safe title slugs.
+- Add metadata normalization, server-only canonical provider `anilistId`, opaque public identity, and Unicode-safe title slugs.
 - Store lightweight anime summaries and ordered Discover caches through Convex queries/mutations only.
 - Cache Trending for 3 hours, Upcoming for 6 hours, and Seasonal/Recommendations for 24 hours.
 - Add public `/discover` under shared `_public/route.tsx` layout.
@@ -107,7 +107,7 @@ Phase 3 status: COMPLETE on `dev`; final integrated review PASS with no findings
 
 ### Phase 4: Anime Detail
 
-- Build `/anime/$anilistId/$slug`.
+- Build `/anime/$publicId/$slug`.
 - Hydrate full anime metadata by AniList `id` through a server-only 24-hour Convex cache.
 - Redirect stale/missing slug to canonical slug.
 - Add Overview, Reviews, Characters, Staff tabs.
@@ -191,19 +191,21 @@ Status: COMPLETE. Final reviewer PASS after the keyboard Profile fix. Shared hea
 
 ### Post-Phase 7: Public Catalog Identity
 
-Status: PLANNED. Must complete and close before Phase 8 starts. Detailed implementation plan: `docs/superpowers/plans/2026-07-18-post-phase-7-public-catalog-identity.md`.
+Status: COMPLETE AND CLOSED. Additive identity registry, dev backfill/verification, durable entity refs, and publicId server/UI cutover are validated. Automated gates plus signed-out and authenticated responsive browser QA pass. Both configured AnimeX QA accounts work. Production migration and final schema tightening remain separately gated. Phase 8 stays blocked. Detailed implementation plan: `docs/superpowers/plans/2026-07-18-post-phase-7-public-catalog-identity.md`.
 
 - Add AnimeX-owned catalog entities for Anime, Character, and Staff. Expose serialized catalog entity IDs as opaque `publicId` values.
 - Store AniList numeric IDs as server-only provider references keyed by provider + entity kind + provider ID.
-- Replace canonical routes with `/anime/$publicId/$slug`, `/characters/$publicId/$slug`, and `/staff/$publicId/$slug`; redirect legacy numeric URLs once.
+- Use `/anime/$publicId/$slug`, `/characters/$publicId/$slug`, and `/staff/$publicId/$slug` as canonical routes. Route identity resolution accepts legacy positive decimal provider IDs and resolves them server-side before provider-backed reads; signed-out browser QA proves one-way Anime and Character redirects to opaque canonical URLs.
 - Remove AniList IDs from browser contracts, hydrated data, UI props, query keys, rendered URLs, and client logs.
 - Preserve existing AniList-keyed metadata cache rows, ordered sections, TTLs, lease keys, image URLs, and refresh behavior.
 - Materialize public identities for live Anime/Character/Staff search results before returning them to browser.
-- Migrate durable user Anime state, favorites, rewatches, milestones, Reviews, feed cards, and Review aggregates to AnimeX entity references through additive schema, bounded backfill, verification, cutover, and schema tightening.
+- Migrate durable user Anime state, favorites, rewatches, milestones, Reviews, feed cards, and Review aggregates through additive schema, bounded dev backfill, verification, then cutover.
+- Retain migration tooling and legacy durable fields until separately approved production backfill; final required-field tightening is not part of this execution.
 - Keep AniList GraphQL and provider IDs server-only; missing/conflicting mappings fail clearly without provider-ID fallback.
 - Keep Metadata Image Proxy optional, unscheduled, and outside this phase.
-- Run Convex dev sync, migration verification, full tests, TypeScript, build, client boundary scans, Fallow, React Doctor, integrated review, and responsive browser QA.
-- Stop after validation and wait for approval before Phase 8.
+- Convex dev sync and bounded migration verification are recorded in the catalog identity runbook. Full tests, TypeScript/build checks, client-boundary scans, Fallow, React Doctor no-regression comparison, and signed-out responsive browser QA pass.
+- Authenticated QA passes with both AnimeX QA accounts. Status, Score, Favorite, Rewatch rollback, Review draft/resume/publish/detail/discovery, Home feed, Profile activity/reviews/favorites, cross-account public visibility, and Discover sign-out were exercised. Checks at 390×844, 768×1024, and 1280×800 found no horizontal overflow, console warning/error, failed app request, hydration symptom, or captured client request containing `anilistId`. QA-created Review/feed data was deleted and modified list state was restored.
+- Post-Phase 7 is closed. Keep Phase 8 unstarted until its design/spec and implementation plan receive separate approval.
 
 ### Phase 8: Notifications, Privacy, Moderation
 
@@ -259,8 +261,8 @@ Each phase must run only relevant checks, then stop:
 
 ## Assumptions
 
-- AniList `id` is canonical anime identity.
-- Slug is display/SEO only and can be regenerated from AniList metadata.
+- AniList `id` is canonical external provider identity only; AnimeX `catalogEntities._id` serializes as opaque public identity.
+- Slug is display/SEO only and can be regenerated from cached provider metadata.
 - Local app env is stored in `.env.local`; Convex server env such as `SITE_URL`, Resend, and Google OAuth stays in Convex dashboard.
 - AniList image URLs may be stored as external URLs in MVP.
 - Metadata Image Proxy remains optional and unimplemented; direct external AniList image URLs remain current MVP behavior until it is scheduled.

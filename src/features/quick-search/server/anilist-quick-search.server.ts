@@ -5,6 +5,12 @@ import {
   requestAniList,
   type AniListDependencies,
 } from '../../../lib/anilist-client.server'
+import type {
+  CatalogIdentityGateway,
+  CatalogProviderRef,
+  CatalogPublicIdentity,
+} from '../../catalog-identity/server/catalog-identity.server'
+import type { CatalogPublicId } from '../../catalog-identity/shared/catalog-identity-contracts'
 import { slugifyAnimeTitle } from '../../discover/shared/discover-contracts'
 import {
   createQuickSearchDestination,
@@ -105,20 +111,24 @@ const animeMetadata = (anime: ParsedAnime): string | null => {
 }
 
 /** Converts strict Anime provider data into one public Quick Search row. */
-const normalizeAnimeRow = (anime: ParsedAnime): QuickSearchRow => {
+const normalizeAnimeRow = (
+  anime: ParsedAnime,
+  publicId: CatalogPublicId,
+): QuickSearchRow => {
   const label = text(anime.title.english)
     ?? text(anime.title.romaji)
     ?? text(anime.title.native)
   if (label === null) throw upstreamError()
 
   return {
-    id: String(anime.id),
+    id: publicId,
+    publicId,
     label,
     imageUrl: anime.coverImage?.large ?? null,
     metadata: animeMetadata(anime),
     destination: createQuickSearchDestination({
       kind: 'anime',
-      id: anime.id,
+      publicId,
       slug: slugifyAnimeTitle(label),
     }),
   }
@@ -128,18 +138,20 @@ const normalizeAnimeRow = (anime: ParsedAnime): QuickSearchRow => {
 const normalizePersonRow = (
   kind: PersonKind,
   person: ParsedPerson,
+  publicId: CatalogPublicId,
 ): QuickSearchRow => {
   const label = text(person.name.full)
   if (label === null) throw upstreamError()
 
   return {
-    id: String(person.id),
+    id: publicId,
+    publicId,
     label,
     imageUrl: person.image?.large ?? null,
     metadata: text(person.name.native),
     destination: createQuickSearchDestination({
       kind,
-      id: person.id,
+      publicId,
       label,
     }),
   }
@@ -151,10 +163,36 @@ export interface QuickCatalogSearchResult {
   staff: QuickSearchRow[]
 }
 
+export type QuickSearchIdentityDependencies = Pick<
+  CatalogIdentityGateway,
+  'ensurePublicIds'
+>
+
+const createProviderRefs = (
+  parsed: z.infer<typeof quickSearchResponseSchema>['data'],
+): CatalogProviderRef[] => [
+  ...parsed.anime.media.map((anime): CatalogProviderRef => ({
+    provider: 'anilist',
+    kind: 'anime',
+    providerId: anime.id,
+  })),
+  ...parsed.characters.characters.map((person): CatalogProviderRef => ({
+    provider: 'anilist',
+    kind: 'character',
+    providerId: person.id,
+  })),
+  ...parsed.staff.staff.map((person): CatalogProviderRef => ({
+    provider: 'anilist',
+    kind: 'staff',
+    providerId: person.id,
+  })),
+]
+
 /** Searches all public provider groups through one strict AniList operation. */
 export const searchQuickCatalogFromAniList = async (
   query: string,
   dependencies: AniListDependencies,
+  identityDependencies: QuickSearchIdentityDependencies,
 ): Promise<QuickCatalogSearchResult> => {
   try {
     const normalizedQuery = normalizeSearchQuery(query)
@@ -164,11 +202,25 @@ export const searchQuickCatalogFromAniList = async (
       dependencies,
     )
     const parsed = quickSearchResponseSchema.parse(body).data
+    const refs = createProviderRefs(parsed)
+    const identities: CatalogPublicIdentity[] = refs.length === 0
+      ? []
+      : await identityDependencies.ensurePublicIds(refs)
+    if (identities.length !== refs.length) throw upstreamError()
+    let identityIndex = 0
+    const nextPublicId = (kind: CatalogPublicIdentity['kind']): CatalogPublicId => {
+      const identity = identities[identityIndex]
+      identityIndex += 1
+      if (!identity || identity.kind !== kind) throw upstreamError()
+      return identity.publicId
+    }
     const groups = quickSearchGroupsSchema.parse({
-      anime: parsed.anime.media.map(normalizeAnimeRow),
+      anime: parsed.anime.media.map((anime) =>
+        normalizeAnimeRow(anime, nextPublicId('anime'))),
       characters: parsed.characters.characters.map((person) =>
-        normalizePersonRow('character', person)),
-      staff: parsed.staff.staff.map((person) => normalizePersonRow('staff', person)),
+        normalizePersonRow('character', person, nextPublicId('character'))),
+      staff: parsed.staff.staff.map((person) =>
+        normalizePersonRow('staff', person, nextPublicId('staff'))),
       users: [],
     })
 

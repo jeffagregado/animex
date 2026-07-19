@@ -18,6 +18,15 @@ const profileMediaKindValidator = v.union(
   v.literal('banner'),
 )
 
+const durableAnimeLaneValidator = v.union(
+  v.literal('user-anime-entries'),
+  v.literal('anime-rewatches'),
+  v.literal('anime-milestones'),
+  v.literal('reviews'),
+  v.literal('feed-cards'),
+  v.literal('anime-review-stats'),
+)
+
 const catalogPersonKindValidator = v.union(
   v.literal('character'),
   v.literal('staff'),
@@ -133,6 +142,21 @@ export default defineSchema({
   })
     .index('by_key', ['key'])
     .index('by_next_allowed_at', ['nextAllowedAt']),
+  catalogEntities: defineTable({
+    kind: v.union(v.literal('anime'), v.literal('character'), v.literal('staff')),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
+  catalogProviderRefs: defineTable({
+    entityId: v.id('catalogEntities'),
+    provider: v.literal('anilist'),
+    kind: v.union(v.literal('anime'), v.literal('character'), v.literal('staff')),
+    providerId: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_provider_kind_id', ['provider', 'kind', 'providerId'])
+    .index('by_entity_provider', ['entityId', 'provider']),
   animeSummaries: defineTable({
     anilistId: v.number(),
     slug: v.string(),
@@ -237,24 +261,29 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index('by_key', ['key']),
   userAnimeEntries: defineTable({
-    userId: v.id('users'), anilistId: v.number(),
+    userId: v.id('users'), anilistId: v.number(), animeId: v.optional(v.id('catalogEntities')),
     status: v.union(v.literal('watching'), v.literal('planned'), v.literal('dropped'), v.literal('completed'), v.literal('rewatched'), v.null()),
     score: v.union(v.number(), v.null()), favoriteAt: v.union(v.number(), v.null()), rewatchCount: v.number(), lastRewatchSequence: v.number(), createdAt: v.number(), updatedAt: v.number(),
   })
     .index('by_user_anime', ['userId', 'anilistId'])
+    .index('by_user_anime_entity', ['userId', 'animeId'])
     .index('by_user_status', ['userId', 'status'])
     .index('by_user_favorite_at', ['userId', 'favoriteAt']),
   userAnimeProgress: defineTable({
     userId: v.id('users'), watching: v.number(), completed: v.number(), planned: v.number(), dropped: v.number(),
   }).index('by_user', ['userId']),
   animeRewatchEntries: defineTable({
-    entryId: v.id('userAnimeEntries'), userId: v.id('users'), anilistId: v.number(), completedAt: v.number(), sequence: v.number(),
-  }).index('by_user_anime_sequence', ['userId', 'anilistId', 'sequence']),
+    entryId: v.id('userAnimeEntries'), userId: v.id('users'), anilistId: v.number(), animeId: v.optional(v.id('catalogEntities')), completedAt: v.number(), sequence: v.number(),
+  })
+    .index('by_user_anime_sequence', ['userId', 'anilistId', 'sequence'])
+    .index('by_user_anime_entity_sequence', ['userId', 'animeId', 'sequence']),
   animeMilestones: defineTable({
-    userId: v.id('users'), anilistId: v.number(), kind: v.union(v.literal('completed'), v.literal('rewatched')),
+    userId: v.id('users'), anilistId: v.number(), animeId: v.optional(v.id('catalogEntities')), kind: v.union(v.literal('completed'), v.literal('rewatched')),
     visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
     occurredAt: v.number(), updatedAt: v.number(),
-  }).index('by_user_anime_kind', ['userId', 'anilistId', 'kind']),
+  })
+    .index('by_user_anime_kind', ['userId', 'anilistId', 'kind'])
+    .index('by_user_anime_entity_kind', ['userId', 'animeId', 'kind']),
   posts: defineTable({
     userId: v.id('users'), requestId: v.string(), text: v.string(), hasSpoiler: v.boolean(),
     visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
@@ -264,7 +293,7 @@ export default defineSchema({
     .index('by_user_created_at', ['userId', 'createdAt'])
     .index('by_created_at', ['createdAt']),
   reviews: defineTable({
-    userId: v.id('users'), anilistId: v.number(), requestId: v.string(),
+    userId: v.id('users'), anilistId: v.number(), animeId: v.optional(v.id('catalogEntities')), requestId: v.string(),
     state: v.union(v.literal('draft'), v.literal('published')), rating: v.union(v.number(), v.null()),
     summary: v.string(), containsSpoiler: v.boolean(), bodyJson: v.string(),
     visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
@@ -273,10 +302,14 @@ export default defineSchema({
     searchText: v.string(), ratingBand: storedReviewRatingBandValidator,
   })
     .index('by_user_anime', ['userId', 'anilistId'])
+    .index('by_user_anime_entity', ['userId', 'animeId'])
     .index('by_user_request', ['userId', 'requestId'])
     .index('by_anime_state_visibility_newest', ['anilistId', 'state', 'visibility', 'newestOrderKey'])
     .index('by_anime_state_visibility_high_rating', ['anilistId', 'state', 'visibility', 'highRatingOrderKey'])
     .index('by_anime_state_visibility_low_rating', ['anilistId', 'state', 'visibility', 'lowRatingOrderKey'])
+    .index('by_anime_entity_state_visibility_newest', ['animeId', 'state', 'visibility', 'newestOrderKey'])
+    .index('by_anime_entity_state_visibility_high_rating', ['animeId', 'state', 'visibility', 'highRatingOrderKey'])
+    .index('by_anime_entity_state_visibility_low_rating', ['animeId', 'state', 'visibility', 'lowRatingOrderKey'])
     .index('by_discovery_public_newest', ['state', 'visibility', 'newestOrderKey'])
     .index('by_discovery_public_newest_band', ['state', 'visibility', 'ratingBand', 'newestOrderKey'])
     .index('by_discovery_owner_newest', ['userId', 'state', 'visibility', 'newestOrderKey'])
@@ -295,7 +328,7 @@ export default defineSchema({
     }),
   feedCards: defineTable({
     sourceKey: v.string(), kind: v.union(v.literal('post'), v.literal('review'), v.literal('completed'), v.literal('rewatched')),
-    userId: v.id('users'), sourceId: v.optional(v.string()), anilistId: v.optional(v.number()),
+    userId: v.id('users'), sourceId: v.optional(v.string()), anilistId: v.optional(v.number()), animeId: v.optional(v.id('catalogEntities')),
     visibility: v.union(v.literal('private'), v.literal('followers'), v.literal('public')),
     active: v.boolean(), orderKey: v.string(), occurredAt: v.number(), updatedAt: v.number(),
   })
@@ -303,16 +336,56 @@ export default defineSchema({
     .index('by_public_active_order', ['visibility', 'active', 'orderKey'])
     .index('by_user_active_order', ['userId', 'active', 'orderKey'])
     .index('by_user_source', ['userId', 'sourceKey'])
-    .index('by_kind_source', ['kind', 'sourceId']),
+    .index('by_kind_source', ['kind', 'sourceId'])
+    .index('by_anime_entity', ['animeId']),
   follows: defineTable({
     followerId: v.id('users'), followingId: v.id('users'), createdAt: v.number(),
   })
     .index('by_follower_following', ['followerId', 'followingId'])
     .index('by_following_follower', ['followingId', 'followerId']),
   animeReviewStats: defineTable({
-    anilistId: v.number(), count: v.number(), ratingSum: v.number(),
+    anilistId: v.number(), animeId: v.optional(v.id('catalogEntities')), count: v.number(), ratingSum: v.number(),
     bands: v.array(v.number()), updatedAt: v.number(),
-  }).index('by_anilist_id', ['anilistId']),
+  })
+    .index('by_anilist_id', ['anilistId'])
+    .index('by_anime_entity', ['animeId']),
+  catalogAnimeDataVerificationState: defineTable({
+    lane: durableAnimeLaneValidator,
+    nextCursor: v.string(),
+    isDone: v.boolean(),
+    repairCursor: v.optional(v.string()),
+    missingAnimeId: v.number(),
+    mismatchedProviderRef: v.number(),
+    duplicateUserAnime: v.number(),
+    duplicateReview: v.number(),
+    duplicateMilestoneSourceKey: v.number(),
+    aggregateMismatch: v.number(),
+    projectionMismatch: v.number(),
+    updatedAt: v.number(),
+  }).index('by_lane', ['lane']),
+  catalogAnimeDataVerificationReceipts: defineTable({
+    lane: durableAnimeLaneValidator,
+    verifiedAt: v.number(),
+  }).index('by_lane', ['lane']),
+  catalogAnimeAggregateVerificationState: defineTable({
+    statsId: v.id('animeReviewStats'),
+    animeId: v.id('catalogEntities'),
+    nextCursor: v.string(),
+    count: v.number(),
+    ratingSum: v.number(),
+    bands: v.array(v.number()),
+    statsUpdatedAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_stats_id', ['statsId']),
+  catalogAnimeAggregateVerificationReceipts: defineTable({
+    statsId: v.id('animeReviewStats'),
+    animeId: v.id('catalogEntities'),
+    count: v.number(),
+    ratingSum: v.number(),
+    bands: v.array(v.number()),
+    statsUpdatedAt: v.number(),
+    verifiedAt: v.number(),
+  }).index('by_stats_id', ['statsId']),
   discoverSectionCache: defineTable({
     key: v.union(
       v.literal('trending'),

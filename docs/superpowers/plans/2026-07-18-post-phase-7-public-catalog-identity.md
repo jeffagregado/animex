@@ -1,10 +1,12 @@
 # Post-Phase 7 Public Catalog Identity Implementation Plan
 
+Status: COMPLETE AND CLOSED. Dev migration verification, additive cutover, automated gates, integrated review, signed-out QA, and authenticated responsive QA pass. Production migration and final schema tightening remain separately gated. Phase 8 remains unstarted.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace client-visible AniList Anime, Character, and Staff IDs with stable AnimeX-owned `publicId` values while preserving existing metadata caches and stored user data.
 
-**Architecture:** Add `catalogEntities` plus provider-reference rows. Serialized `catalogEntities._id` becomes public `publicId`; AniList numeric IDs remain server-only provider/cache keys. Public server functions resolve or materialize identities before returning strict client contracts. Durable user Anime, Review, feed, milestone, rewatch, and aggregate records migrate to AnimeX entity references through additive schema, bounded internal backfills, verification, cutover, and final schema tightening.
+**Architecture:** Add `catalogEntities` plus provider-reference rows. Serialized `catalogEntities._id` becomes public `publicId`; AniList numeric IDs remain server-only provider/cache keys. Public server functions resolve or materialize identities before returning strict client contracts. Durable user Anime, Review, feed, milestone, rewatch, and aggregate records migrate to AnimeX entity references through additive schema, bounded internal backfills, verification, and cutover. Final schema tightening follows only after separately approved production migration.
 
 **Tech Stack:** TanStack Start server functions and file routes, React 19, TanStack Router/Query, Convex schema/indexes/internal migrations, Zod 4, Vitest, React Testing Library, Fallow, React Doctor.
 
@@ -24,7 +26,8 @@
 - Legacy numeric Anime/Character/Staff URLs must issue one canonical redirect to `publicId` URLs.
 - Missing or conflicting identity mappings fail with clear typed errors. No silent provider-ID fallback.
 - Use existing packages only. Ask before adding any production dependency.
-- Use additive schema, deploy, bounded backfill, verification, cutover, then schema tightening.
+- Use additive schema, dev deploy, bounded backfill, verification, then public cutover.
+- Retain migration functions and legacy durable fields until every target deployment, including production, is separately approved, backfilled, and verified. Required-field schema tightening is outside this execution.
 - Do not deploy production or run `npx convex deploy` without explicit approval.
 - Preserve unrelated dirty `README.md` work.
 
@@ -87,6 +90,21 @@ Existing AniList-keyed cache row
 | Controller-only integration | `convex/schema.ts`, `convex/_generated/*`, `src/routeTree.gen.ts`, migrations, `PLAN.md`, `TODO.md`, current-state docs |
 
 Shared schema, generated files, route tree, and migration execution stay serialized. No parallel writer may edit these surfaces.
+
+---
+
+## Safe Staged Execution Order
+
+Execute tasks in this order:
+
+```text
+Tasks 1-4 additive code
+  -> Task 7 additive Convex dev sync, backfill, and verification
+  -> Tasks 5-6 public contract and route cutover
+  -> Task 8 validation and documentation
+```
+
+Do not delete migration tooling or make migrated durable fields required during this execution. Production deployment, production backfill, and final schema tightening require separate explicit approval.
 
 ---
 
@@ -257,6 +275,8 @@ git commit -m "feat(catalog): add public identity registry"
 - Modify: `convex/catalogPersonCachePolicy.ts`
 - Modify: `convex/catalogPersonCachePolicy.test.ts`
 - Modify: `convex/catalogPersonCache.integration.test.ts`
+- Create: `convex/animeCache.integration.test.ts`
+- Create: `convex/animeDetailCache.integration.test.ts`
 
 **Interfaces:**
 
@@ -276,10 +296,12 @@ Prove:
 - duplicate provider IDs within one bounded payload create one mapping.
 - cache record fields, `refreshedAt`, `expiresAt`, ordered IDs, and lease deletion remain unchanged.
 
+Use real Convex integration harnesses for `commitSection`, `commitDetail`, and `commitPeoplePage`. Pure policy tests do not satisfy transaction, identity-row, or cache-preservation assertions.
+
 - [ ] **Step 2: Run focused cache tests and confirm RED**
 
 ```powershell
-pnpm test -- convex/animeCachePolicy.test.ts convex/animeDetailCachePolicy.test.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
+pnpm test -- convex/animeCachePolicy.test.ts convex/animeCache.integration.test.ts convex/animeDetailCachePolicy.test.ts convex/animeDetailCache.integration.test.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
 ```
 
 Expected: new identity assertions fail.
@@ -318,7 +340,7 @@ Reject payloads beyond current section/detail/person caps before identity writes
 - [ ] **Step 5: Run focused cache suite**
 
 ```powershell
-pnpm test -- convex/animeCachePolicy.test.ts convex/animeDetailCachePolicy.test.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
+pnpm test -- convex/animeCachePolicy.test.ts convex/animeCache.integration.test.ts convex/animeDetailCachePolicy.test.ts convex/animeDetailCache.integration.test.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
 ```
 
 Expected: identity assertions and existing cache invariants pass.
@@ -326,7 +348,7 @@ Expected: identity assertions and existing cache invariants pass.
 - [ ] **Step 6: Commit cache bridge**
 
 ```powershell
-git add convex/animeCache.ts convex/animeCachePolicy.ts convex/animeCachePolicy.test.ts convex/animeDetailCache.ts convex/animeDetailCachePolicy.ts convex/animeDetailCachePolicy.test.ts convex/catalogPersonCache.ts convex/catalogPersonCachePolicy.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
+git add convex/animeCache.ts convex/animeCachePolicy.ts convex/animeCachePolicy.test.ts convex/animeCache.integration.test.ts convex/animeDetailCache.ts convex/animeDetailCachePolicy.ts convex/animeDetailCachePolicy.test.ts convex/animeDetailCache.integration.test.ts convex/catalogPersonCache.ts convex/catalogPersonCachePolicy.ts convex/catalogPersonCachePolicy.test.ts convex/catalogPersonCache.integration.test.ts
 git commit -m "feat(catalog): register identities during cache writes"
 ```
 
@@ -554,6 +576,7 @@ git commit -m "feat(catalog): migrate durable anime references"
 
 - Create: `src/features/catalog-identity/server/catalog-identity.server.ts`
 - Create: `src/features/catalog-identity/server/catalog-identity.server.test.ts`
+- Create: server-only provider/cache contract modules for Discover, Anime Detail, and Catalog Person
 - Modify: `src/features/discover/shared/discover-contracts.ts`
 - Modify: `src/features/discover/shared/discover-contracts.test.ts`
 - Create: `src/features/discover/server/anilist-normalization.server.ts`
@@ -572,6 +595,12 @@ git commit -m "feat(catalog): migrate durable anime references"
 - Modify: `src/features/quick-search/shared/quick-search-contracts.ts`
 - Modify: `src/features/quick-search/server/anilist-quick-search.server.ts`
 - Modify: `src/features/quick-search/server/quick-search.functions.ts`
+- Modify: `convex/catalogIdentity.ts`
+- Modify: `convex/catalogIdentityModel.ts`
+- Modify: `convex/animeCache.ts`
+- Modify: `convex/animeDetailCache.ts`
+- Modify: `convex/catalogPersonCache.ts`
+- Modify: `convex/catalogPersonCachePolicy.ts`
 - Modify: matching server/shared tests
 
 **Interfaces:**
@@ -580,6 +609,19 @@ git commit -m "feat(catalog): migrate durable anime references"
 - Provider/cache types retain `anilistId` only in `.server.ts` and Convex cache modules.
 - `ensurePublicIds(refs)` materializes live search identities once per bounded response.
 - `resolvePublicIds(refs)` batch-resolves cache results without writes.
+- `resolveProviderByPublicId({ publicId, kind })` is token-gated and server-only.
+- Raw Convex cache reads require the server cache token; browsers cannot read provider/cache DTOs directly.
+
+Execute Task 5 in this order:
+
+```text
+5A provider/cache model isolation
+5B identity gateway and raw-cache security
+5C Discover + 5D Quick Search + 5E Anime Detail + 5F Catalog Person
+Task 5 integrated review
+```
+
+Only the four metadata lanes may run in parallel, and only after 5A and 5B release their contracts.
 
 - [ ] **Step 1: Write failing strict public-contract tests**
 
@@ -596,6 +638,8 @@ expect(() => animeSummarySchema.parse({ ...summary, anilistId: 52991 })).toThrow
 
 Apply strict rejection to Anime Detail root/list/people/voice actors, Catalog Person detail/work/search, Quick Search rows, profile favorites, social Anime, Review outputs, and feed outputs.
 
+Also reject every digit-only canonical `publicId`, including `0` and leading-zero values. Only positive safe decimal route segments without leading zeros enter explicit legacy redirect resolution.
+
 - [ ] **Step 2: Run focused contract tests and confirm RED**
 
 ```powershell
@@ -607,6 +651,8 @@ Expected: public models still require numeric provider IDs.
 - [ ] **Step 3: Move provider normalization behind server-only modules**
 
 `normalizeAnimeSummary` and provider schemas move from shared browser contracts to `anilist-normalization.server.ts`. Public shared modules retain display types, slugs, filters, tabs, and `publicId` validators only.
+
+Complete provider/cache isolation before public schema edits. Convex cache validators and storage DTOs must import server/cache-owned provider contracts, never browser-public DTOs. Preserve every stored cache shape, key, TTL, lease, and refresh behavior.
 
 - [ ] **Step 4: Add one indexed identity round trip per response**
 
@@ -620,6 +666,10 @@ const identities = await identity.ensurePublicIds(refs)
 ```
 
 Use `ensurePublicIds` for uncached Discover, Quick Search, Character search, and Staff search. Use `resolvePublicIds` for cache reads after Task 3 verification. Missing cache mapping throws `CATALOG_IDENTITY_MISSING`; it does not refetch or expose provider ID.
+
+Add a token-gated reverse resolver for canonical public routes and provider-backed cache reads. It validates the requested entity kind and returns provider data only to server modules. Public route helpers return `publicId`, kind, source, and safe status only. Sanitize provider tuples and numeric IDs from browser errors.
+
+Token-gate the existing raw cache reads in `animeCache`, `animeDetailCache`, and `catalogPersonCache`; all current callers are server modules and must pass the server cache token.
 
 - [ ] **Step 5: Map nested Anime Detail identities**
 
@@ -686,6 +736,17 @@ git commit -m "feat(catalog): expose public ids from server boundaries"
 - Legacy decimal params resolve server-side, then replace to canonical path.
 - User Anime and Review Convex functions accept `animeId: v.id('catalogEntities')`.
 - Review detail IDs and user profile IDs remain unchanged.
+
+Execute Task 6 in this order:
+
+```text
+6A durable/social Convex API cutover
+6B Anime + Reviews | 6C Feed + Profile + Home | 6D Catalog + Search browser consumers
+6E serialized route-tree cutover and one route generation
+Task 6 integrated review
+```
+
+Only the three browser-consumer lanes may run in parallel. Shared public contracts release from 6A first. The controller owns route moves, `src/routeTree.gen.ts`, and generated Convex files.
 
 - [ ] **Step 1: Write failing route tests**
 
@@ -758,7 +819,7 @@ git commit -m "feat(catalog): route client surfaces by public id"
 
 ---
 
-### Task 7: Execute Dev Migration and Tighten Final Schema
+### Task 7: Execute Additive Dev Migration and Retain Migration Tooling
 
 **Files:**
 
@@ -768,20 +829,23 @@ git commit -m "feat(catalog): route client surfaces by public id"
 - Modify: `convex/reviewDiscovery.ts`
 - Modify: `convex/feed.ts`
 - Modify: affected tests
-- Delete after verified backfill: `convex/catalogIdentityMigration.ts`
-- Delete after verified backfill: `convex/catalogIdentityMigration.integration.test.ts`
-- Delete after verified backfill: `convex/catalogAnimeDataMigration.ts`
-- Delete after verified backfill: `convex/catalogAnimeDataMigration.integration.test.ts`
+- Retain: `convex/catalogIdentityMigration.ts`
+- Retain: `convex/catalogIdentityMigration.integration.test.ts`
+- Retain: `convex/catalogAnimeDataMigration.ts`
+- Retain: `convex/catalogAnimeDataMigration.integration.test.ts`
+- Retain: `convex/catalogAnimeAggregateVerification.ts`
+- Retain: `convex/catalogAnimeAggregateVerification.integration.test.ts`
 - Modify: `docs/runbooks/catalog-identity-backfill.md`
 - Regenerate: `convex/_generated/*`
 
 **Interfaces:**
 
-- Final durable tables require AnimeX entity references.
+- Dev durable rows have verified AnimeX entity references.
 - Cache/provider tables retain server-only AniList IDs.
 - Final public functions contain no provider-ID args or returns.
+- Transitional durable fields remain additive until separately approved production backfill and tightening.
 
-- [ ] **Step 1: Push additive schema and functions to Convex dev**
+- [x] **Step 1: Push additive schema and functions to Convex dev**
 
 ```powershell
 pnpm exec convex dev --once
@@ -789,79 +853,69 @@ pnpm exec convex dev --once
 
 Expected: successful migration-safe dev sync. Stop on schema/function error.
 
-- [ ] **Step 2: Backfill every identity lane**
+- [x] **Step 2: Backfill every identity lane**
 
 Start each lane with:
 
 ```powershell
-pnpm exec convex run catalogIdentityMigration:backfillLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
+pnpm exec convex run --deployment dev catalogIdentityMigration:backfillLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
 Repeat with each returned cursor until `isDone: true`, then repeat for every lane named in Task 3.
 
-- [ ] **Step 3: Verify every identity lane**
+- [x] **Step 3: Verify every identity lane**
 
 ```powershell
-pnpm exec convex run catalogIdentityMigration:verifyLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
+pnpm exec convex run --deployment dev catalogIdentityMigration:verifyLane '{"lane":"anime-summaries","paginationOpts":{"numItems":50,"cursor":null}}'
 ```
 
 Require zero missing/conflict/mismatch counts for every lane.
 
-- [ ] **Step 4: Backfill durable Anime references**
+- [x] **Step 4: Backfill durable Anime references**
 
-Run each `catalogAnimeDataMigration` lane from null cursor to `isDone: true`. Then migrate milestone source keys. Rerun all lanes once and require zero patches.
+Run each `catalogAnimeDataMigration` lane from null cursor to `isDone: true`. Rerun every lane once and require zero patches. Do not migrate milestone source keys yet.
 
-- [ ] **Step 5: Verify durable data**
+- [x] **Step 5: Verify durable data**
+
+Use this exact order:
+
+1. Verify the first five durable lanes to terminal zero counters.
+2. Enumerate every aggregate target through `catalogAnimeAggregateVerification:listReviewAggregateTargets`.
+3. Verify every target through `catalogAnimeAggregateVerification:verifyReviewAggregate`, following its database-owned cursor.
+4. Verify the `anime-review-stats` lane to create its terminal receipt.
 
 Require zero values for every Task 4 verification counter. Record only counts/cursors; never record credentials or private Review/profile content.
 
-- [ ] **Step 6: Run migration-focused regression before teardown**
+- [x] **Step 6: Migrate milestone source keys**
+
+Run `catalogAnimeDataMigration:backfillMilestoneSourceKeys` only after all six durable lane receipts exist. Rerun from null cursor and require zero patches. Run final durable verification and require terminal zero counters.
+
+- [x] **Step 7: Run migration-focused regression**
 
 ```powershell
-pnpm test -- convex/catalogIdentity.integration.test.ts convex/catalogIdentityMigration.integration.test.ts convex/catalogAnimeDataMigration.integration.test.ts convex/userAnime.integration.test.ts
+pnpm test -- convex/catalogIdentity.integration.test.ts convex/catalogIdentityMigration.integration.test.ts convex/catalogAnimeDataMigration.integration.test.ts convex/catalogAnimeAggregateVerification.integration.test.ts convex/userAnime.integration.test.ts
 ```
 
-Expected: registry, migration reruns, and the additive durable model pass against the verified dev data shape.
+Expected: registry, migration reruns, and additive durable model pass against verified dev data shape.
 
-- [ ] **Step 7: Remove temporary migration code and tighten the schema**
-
-Delete the four exact migration files named in this task. Retain the completed procedure, lane inventory, counts, cursors, verification results, and rollback boundary in `docs/runbooks/catalog-identity-backfill.md`.
-
-Final durable shape:
-
-```text
-userAnimeEntries.animeId required
-animeRewatchEntries.animeId required
-animeMilestones.animeId required
-reviews.animeId required
-feedCards.animeId optional only because Post cards have no Anime
-animeReviewStats.animeId required
-```
-
-Remove old durable `anilistId` fields/indexes and dual-read/dual-write code. Keep cache/provider `anilistId` fields.
-
-- [ ] **Step 8: Push final schema**
+- [x] **Step 8: Run post-backfill identity and domain regression**
 
 ```powershell
-pnpm exec convex dev --once
+pnpm test -- convex/catalogIdentity.integration.test.ts convex/catalogIdentityMigration.integration.test.ts convex/catalogAnimeDataMigration.integration.test.ts convex/catalogAnimeAggregateVerification.integration.test.ts convex/userAnime.integration.test.ts convex/feedMilestones.integration.test.ts convex/reviewDiscoveryPolicy.test.ts convex/feedPolicy.test.ts
 ```
 
-Expected: final schema/codegen sync passes after verified backfill.
+Expected: registry, retained migration tooling, and additive durable model pass.
 
-- [ ] **Step 9: Run final identity and domain regression**
+- [x] **Step 9: Record dev migration evidence and commit generated state**
 
-```powershell
-pnpm test -- convex/catalogIdentity.integration.test.ts convex/userAnime.integration.test.ts convex/feedMilestones.integration.test.ts convex/reviewDiscoveryPolicy.test.ts convex/feedPolicy.test.ts
-```
-
-Expected: registry and final durable model pass with no deleted migration module imports.
-
-- [ ] **Step 10: Commit final schema**
+Update runbook with exact dev lane counts, terminal cursors, rerun results, and zero-mismatch verification. Do not record credentials or private Review/profile content.
 
 ```powershell
 git add convex docs/runbooks/catalog-identity-backfill.md
-git commit -m "chore(catalog): finalize public identity migration"
+git commit -m "chore(catalog): verify additive identity migration"
 ```
+
+After this task passes, release public-contract and route cutover work in Tasks 5 and 6. Production deployment, production backfill, migration deletion, legacy-field removal, and required-field tightening remain blocked pending separate approval.
 
 ---
 
@@ -957,7 +1011,7 @@ Require PASS for:
 - no image-proxy work;
 - no unrelated `README.md` change.
 
-- [ ] **Step 7: Run responsive browser QA**
+- [x] **Step 7: Run responsive browser QA**
 
 Check 390×844, 768×1024, and 1280×800:
 
@@ -974,11 +1028,11 @@ Check 390×844, 768×1024, and 1280×800:
 - no horizontal overflow;
 - no console error, failed app request, hydration warning, or client payload containing `anilistId`.
 
-- [ ] **Step 8: Close trackers**
+- [x] **Step 8: Close trackers**
 
-Mark Post-Phase 7 complete only after migration verification, final schema sync, review PASS, automated gates, and browser QA pass. Keep Phase 8 unstarted.
+Mark this implementation complete only after dev migration verification, additive schema sync, review PASS, automated gates, and browser QA pass. Keep production migration/final tightening and Phase 8 unstarted.
 
-- [ ] **Step 9: Commit docs**
+- [x] **Step 9: Commit docs**
 
 ```powershell
 git add PLAN.md TODO.md CONTEXT.md docs/architecture docs/runbooks/catalog-identity-backfill.md
@@ -1006,14 +1060,16 @@ After public URLs ship:
 
 ## Completion Checklist
 
-- [ ] Anime, Character, and Staff canonical URLs use `publicId`.
-- [ ] Public shared contracts contain no `anilistId`.
-- [ ] Client build contains no `anilistId` or AniList GraphQL endpoint.
-- [ ] AniList IDs remain available server-side for provider fetch/cache.
-- [ ] Existing metadata cache rows and TTLs remain intact.
-- [ ] Durable AnimeX data uses entity references.
-- [ ] Every migration lane completes and verifies with zero mismatch.
-- [ ] Legacy numeric links redirect once to stable canonical URLs.
-- [ ] Image proxy remains untouched.
-- [ ] Full tests, TypeScript, build, Fallow, React Doctor, review, and browser QA pass.
-- [ ] Phase 8 remains unstarted until explicit approval.
+- [x] Anime, Character, and Staff canonical URLs use `publicId`.
+- [x] Public shared contracts contain no `anilistId`.
+- [x] Client build contains no `anilistId` or AniList GraphQL endpoint.
+- [x] AniList IDs remain available server-side for provider fetch/cache.
+- [x] Existing metadata cache rows and TTLs remain intact.
+- [x] Durable AnimeX data uses entity references.
+- [x] Every dev migration lane completes and verifies with zero mismatch.
+- [x] Migration tooling and legacy durable fields remain available for separately approved production rollout.
+- [x] Legacy numeric links redirect once to stable canonical URLs.
+- [x] Image proxy remains untouched.
+- [x] Full tests, TypeScript, build, Fallow, React Doctor, review, and browser QA pass.
+- [x] Production migration and final schema tightening remain unstarted until explicit approval.
+- [x] Phase 8 remains unstarted until explicit approval.

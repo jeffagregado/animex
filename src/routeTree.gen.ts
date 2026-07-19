@@ -32,19 +32,19 @@ import { Route as PublicSearchStaffRouteImport } from './routes/_public/search/s
 import { Route as PublicSearchCharactersRouteImport } from './routes/_public/search/characters'
 import { Route as PublicReviewsReviewIdRouteImport } from './routes/_public/reviews/$reviewId'
 import { Route as PublicFeedFeedCardIdRouteImport } from './routes/_public/feed/$feedCardId'
-import { Route as PublicStaffIdRouteRouteImport } from './routes/_public/staff/$id/route'
-import { Route as PublicCharactersIdRouteRouteImport } from './routes/_public/characters/$id/route'
-import { Route as PublicAnimeAnilistIdRouteRouteImport } from './routes/_public/anime/$anilistId/route'
-import { Route as PublicStaffIdIndexRouteImport } from './routes/_public/staff/$id/index'
-import { Route as PublicCharactersIdIndexRouteImport } from './routes/_public/characters/$id/index'
-import { Route as PublicAnimeAnilistIdIndexRouteImport } from './routes/_public/anime/$anilistId/index'
+import { Route as PublicStaffPublicIdRouteRouteImport } from './routes/_public/staff/$publicId/route'
+import { Route as PublicCharactersPublicIdRouteRouteImport } from './routes/_public/characters/$publicId/route'
+import { Route as PublicAnimePublicIdRouteRouteImport } from './routes/_public/anime/$publicId/route'
+import { Route as PublicStaffPublicIdIndexRouteImport } from './routes/_public/staff/$publicId/index'
+import { Route as PublicCharactersPublicIdIndexRouteImport } from './routes/_public/characters/$publicId/index'
+import { Route as PublicAnimePublicIdIndexRouteImport } from './routes/_public/anime/$publicId/index'
 import { Route as PublicProfileUsersUsernameRouteImport } from './routes/_public/_profile/users/$username'
 import { Route as PublicProfileSearchUsersRouteImport } from './routes/_public/_profile/search/users'
-import { Route as PublicStaffIdSlugRouteRouteImport } from './routes/_public/staff/$id/$slug/route'
-import { Route as PublicCharactersIdSlugRouteRouteImport } from './routes/_public/characters/$id/$slug/route'
-import { Route as PublicAnimeAnilistIdSlugRouteRouteImport } from './routes/_public/anime/$anilistId/$slug/route'
+import { Route as PublicStaffPublicIdSlugRouteRouteImport } from './routes/_public/staff/$publicId/$slug/route'
+import { Route as PublicCharactersPublicIdSlugRouteRouteImport } from './routes/_public/characters/$publicId/$slug/route'
+import { Route as PublicAnimePublicIdSlugRouteRouteImport } from './routes/_public/anime/$publicId/$slug/route'
 import { Route as PublicProtectedReviewsReviewIdEditRouteImport } from './routes/_public/_protected/reviews/$reviewId/edit'
-import { Route as PublicProtectedAnimeAnilistIdSlugReviewsNewRouteImport } from './routes/_public/_protected/anime/$anilistId/$slug/reviews/new'
+import { Route as PublicProtectedAnimePublicIdSlugReviewsNewRouteImport } from './routes/_public/_protected/anime/$publicId/$slug/reviews/new'
 
 const PublicRouteRoute = PublicRouteRouteImport.update({
   id: '/_public',
@@ -158,37 +158,41 @@ const PublicFeedFeedCardIdRoute = PublicFeedFeedCardIdRouteImport.update({
   path: '/feed/$feedCardId',
   getParentRoute: () => PublicRouteRoute,
 } as any)
-const PublicStaffIdRouteRoute = PublicStaffIdRouteRouteImport.update({
-  id: '/staff/$id',
-  path: '/staff/$id',
-  getParentRoute: () => PublicRouteRoute,
-} as any)
-const PublicCharactersIdRouteRoute = PublicCharactersIdRouteRouteImport.update({
-  id: '/characters/$id',
-  path: '/characters/$id',
-  getParentRoute: () => PublicRouteRoute,
-} as any)
-const PublicAnimeAnilistIdRouteRoute =
-  PublicAnimeAnilistIdRouteRouteImport.update({
-    id: '/anime/$anilistId',
-    path: '/anime/$anilistId',
+const PublicStaffPublicIdRouteRoute =
+  PublicStaffPublicIdRouteRouteImport.update({
+    id: '/staff/$publicId',
+    path: '/staff/$publicId',
     getParentRoute: () => PublicRouteRoute,
   } as any)
-const PublicStaffIdIndexRoute = PublicStaffIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => PublicStaffIdRouteRoute,
-} as any)
-const PublicCharactersIdIndexRoute = PublicCharactersIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => PublicCharactersIdRouteRoute,
-} as any)
-const PublicAnimeAnilistIdIndexRoute =
-  PublicAnimeAnilistIdIndexRouteImport.update({
+const PublicCharactersPublicIdRouteRoute =
+  PublicCharactersPublicIdRouteRouteImport.update({
+    id: '/characters/$publicId',
+    path: '/characters/$publicId',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicAnimePublicIdRouteRoute =
+  PublicAnimePublicIdRouteRouteImport.update({
+    id: '/anime/$publicId',
+    path: '/anime/$publicId',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicStaffPublicIdIndexRoute =
+  PublicStaffPublicIdIndexRouteImport.update({
     id: '/',
     path: '/',
-    getParentRoute: () => PublicAnimeAnilistIdRouteRoute,
+    getParentRoute: () => PublicStaffPublicIdRouteRoute,
+  } as any)
+const PublicCharactersPublicIdIndexRoute =
+  PublicCharactersPublicIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => PublicCharactersPublicIdRouteRoute,
+  } as any)
+const PublicAnimePublicIdIndexRoute =
+  PublicAnimePublicIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => PublicAnimePublicIdRouteRoute,
   } as any)
 const PublicProfileUsersUsernameRoute =
   PublicProfileUsersUsernameRouteImport.update({
@@ -202,22 +206,23 @@ const PublicProfileSearchUsersRoute =
     path: '/search/users',
     getParentRoute: () => PublicProfileRouteRoute,
   } as any)
-const PublicStaffIdSlugRouteRoute = PublicStaffIdSlugRouteRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => PublicStaffIdRouteRoute,
-} as any)
-const PublicCharactersIdSlugRouteRoute =
-  PublicCharactersIdSlugRouteRouteImport.update({
+const PublicStaffPublicIdSlugRouteRoute =
+  PublicStaffPublicIdSlugRouteRouteImport.update({
     id: '/$slug',
     path: '/$slug',
-    getParentRoute: () => PublicCharactersIdRouteRoute,
+    getParentRoute: () => PublicStaffPublicIdRouteRoute,
   } as any)
-const PublicAnimeAnilistIdSlugRouteRoute =
-  PublicAnimeAnilistIdSlugRouteRouteImport.update({
+const PublicCharactersPublicIdSlugRouteRoute =
+  PublicCharactersPublicIdSlugRouteRouteImport.update({
     id: '/$slug',
     path: '/$slug',
-    getParentRoute: () => PublicAnimeAnilistIdRouteRoute,
+    getParentRoute: () => PublicCharactersPublicIdRouteRoute,
+  } as any)
+const PublicAnimePublicIdSlugRouteRoute =
+  PublicAnimePublicIdSlugRouteRouteImport.update({
+    id: '/$slug',
+    path: '/$slug',
+    getParentRoute: () => PublicAnimePublicIdRouteRoute,
   } as any)
 const PublicProtectedReviewsReviewIdEditRoute =
   PublicProtectedReviewsReviewIdEditRouteImport.update({
@@ -225,10 +230,10 @@ const PublicProtectedReviewsReviewIdEditRoute =
     path: '/reviews/$reviewId/edit',
     getParentRoute: () => PublicProtectedRouteRoute,
   } as any)
-const PublicProtectedAnimeAnilistIdSlugReviewsNewRoute =
-  PublicProtectedAnimeAnilistIdSlugReviewsNewRouteImport.update({
-    id: '/anime/$anilistId/$slug/reviews/new',
-    path: '/anime/$anilistId/$slug/reviews/new',
+const PublicProtectedAnimePublicIdSlugReviewsNewRoute =
+  PublicProtectedAnimePublicIdSlugReviewsNewRouteImport.update({
+    id: '/anime/$publicId/$slug/reviews/new',
+    path: '/anime/$publicId/$slug/reviews/new',
     getParentRoute: () => PublicProtectedRouteRoute,
   } as any)
 
@@ -244,9 +249,9 @@ export interface FileRoutesByFullPath {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/auth/username': typeof AuthUsernameRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
-  '/anime/$anilistId': typeof PublicAnimeAnilistIdRouteRouteWithChildren
-  '/characters/$id': typeof PublicCharactersIdRouteRouteWithChildren
-  '/staff/$id': typeof PublicStaffIdRouteRouteWithChildren
+  '/anime/$publicId': typeof PublicAnimePublicIdRouteRouteWithChildren
+  '/characters/$publicId': typeof PublicCharactersPublicIdRouteRouteWithChildren
+  '/staff/$publicId': typeof PublicStaffPublicIdRouteRouteWithChildren
   '/feed/$feedCardId': typeof PublicFeedFeedCardIdRoute
   '/reviews/$reviewId': typeof PublicReviewsReviewIdRoute
   '/search/characters': typeof PublicSearchCharactersRoute
@@ -256,16 +261,16 @@ export interface FileRoutesByFullPath {
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
   '/reviews/': typeof PublicReviewsIndexRoute
-  '/anime/$anilistId/$slug': typeof PublicAnimeAnilistIdSlugRouteRoute
-  '/characters/$id/$slug': typeof PublicCharactersIdSlugRouteRoute
-  '/staff/$id/$slug': typeof PublicStaffIdSlugRouteRoute
+  '/anime/$publicId/$slug': typeof PublicAnimePublicIdSlugRouteRoute
+  '/characters/$publicId/$slug': typeof PublicCharactersPublicIdSlugRouteRoute
+  '/staff/$publicId/$slug': typeof PublicStaffPublicIdSlugRouteRoute
   '/search/users': typeof PublicProfileSearchUsersRoute
   '/users/$username': typeof PublicProfileUsersUsernameRoute
-  '/anime/$anilistId/': typeof PublicAnimeAnilistIdIndexRoute
-  '/characters/$id/': typeof PublicCharactersIdIndexRoute
-  '/staff/$id/': typeof PublicStaffIdIndexRoute
+  '/anime/$publicId/': typeof PublicAnimePublicIdIndexRoute
+  '/characters/$publicId/': typeof PublicCharactersPublicIdIndexRoute
+  '/staff/$publicId/': typeof PublicStaffPublicIdIndexRoute
   '/reviews/$reviewId/edit': typeof PublicProtectedReviewsReviewIdEditRoute
-  '/anime/$anilistId/$slug/reviews/new': typeof PublicProtectedAnimeAnilistIdSlugReviewsNewRoute
+  '/anime/$publicId/$slug/reviews/new': typeof PublicProtectedAnimePublicIdSlugReviewsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -288,16 +293,16 @@ export interface FileRoutesByTo {
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
   '/reviews': typeof PublicReviewsIndexRoute
-  '/anime/$anilistId/$slug': typeof PublicAnimeAnilistIdSlugRouteRoute
-  '/characters/$id/$slug': typeof PublicCharactersIdSlugRouteRoute
-  '/staff/$id/$slug': typeof PublicStaffIdSlugRouteRoute
+  '/anime/$publicId/$slug': typeof PublicAnimePublicIdSlugRouteRoute
+  '/characters/$publicId/$slug': typeof PublicCharactersPublicIdSlugRouteRoute
+  '/staff/$publicId/$slug': typeof PublicStaffPublicIdSlugRouteRoute
   '/search/users': typeof PublicProfileSearchUsersRoute
   '/users/$username': typeof PublicProfileUsersUsernameRoute
-  '/anime/$anilistId': typeof PublicAnimeAnilistIdIndexRoute
-  '/characters/$id': typeof PublicCharactersIdIndexRoute
-  '/staff/$id': typeof PublicStaffIdIndexRoute
+  '/anime/$publicId': typeof PublicAnimePublicIdIndexRoute
+  '/characters/$publicId': typeof PublicCharactersPublicIdIndexRoute
+  '/staff/$publicId': typeof PublicStaffPublicIdIndexRoute
   '/reviews/$reviewId/edit': typeof PublicProtectedReviewsReviewIdEditRoute
-  '/anime/$anilistId/$slug/reviews/new': typeof PublicProtectedAnimeAnilistIdSlugReviewsNewRoute
+  '/anime/$publicId/$slug/reviews/new': typeof PublicProtectedAnimePublicIdSlugReviewsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -315,9 +320,9 @@ export interface FileRoutesById {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/auth/username': typeof AuthUsernameRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
-  '/_public/anime/$anilistId': typeof PublicAnimeAnilistIdRouteRouteWithChildren
-  '/_public/characters/$id': typeof PublicCharactersIdRouteRouteWithChildren
-  '/_public/staff/$id': typeof PublicStaffIdRouteRouteWithChildren
+  '/_public/anime/$publicId': typeof PublicAnimePublicIdRouteRouteWithChildren
+  '/_public/characters/$publicId': typeof PublicCharactersPublicIdRouteRouteWithChildren
+  '/_public/staff/$publicId': typeof PublicStaffPublicIdRouteRouteWithChildren
   '/_public/feed/$feedCardId': typeof PublicFeedFeedCardIdRoute
   '/_public/reviews/$reviewId': typeof PublicReviewsReviewIdRoute
   '/_public/search/characters': typeof PublicSearchCharactersRoute
@@ -327,16 +332,16 @@ export interface FileRoutesById {
   '/api/profile/complete': typeof ApiProfileCompleteRoute
   '/api/profile/state': typeof ApiProfileStateRoute
   '/_public/reviews/': typeof PublicReviewsIndexRoute
-  '/_public/anime/$anilistId/$slug': typeof PublicAnimeAnilistIdSlugRouteRoute
-  '/_public/characters/$id/$slug': typeof PublicCharactersIdSlugRouteRoute
-  '/_public/staff/$id/$slug': typeof PublicStaffIdSlugRouteRoute
+  '/_public/anime/$publicId/$slug': typeof PublicAnimePublicIdSlugRouteRoute
+  '/_public/characters/$publicId/$slug': typeof PublicCharactersPublicIdSlugRouteRoute
+  '/_public/staff/$publicId/$slug': typeof PublicStaffPublicIdSlugRouteRoute
   '/_public/_profile/search/users': typeof PublicProfileSearchUsersRoute
   '/_public/_profile/users/$username': typeof PublicProfileUsersUsernameRoute
-  '/_public/anime/$anilistId/': typeof PublicAnimeAnilistIdIndexRoute
-  '/_public/characters/$id/': typeof PublicCharactersIdIndexRoute
-  '/_public/staff/$id/': typeof PublicStaffIdIndexRoute
+  '/_public/anime/$publicId/': typeof PublicAnimePublicIdIndexRoute
+  '/_public/characters/$publicId/': typeof PublicCharactersPublicIdIndexRoute
+  '/_public/staff/$publicId/': typeof PublicStaffPublicIdIndexRoute
   '/_public/_protected/reviews/$reviewId/edit': typeof PublicProtectedReviewsReviewIdEditRoute
-  '/_public/_protected/anime/$anilistId/$slug/reviews/new': typeof PublicProtectedAnimeAnilistIdSlugReviewsNewRoute
+  '/_public/_protected/anime/$publicId/$slug/reviews/new': typeof PublicProtectedAnimePublicIdSlugReviewsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -352,9 +357,9 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/auth/username'
     | '/auth/verify-email'
-    | '/anime/$anilistId'
-    | '/characters/$id'
-    | '/staff/$id'
+    | '/anime/$publicId'
+    | '/characters/$publicId'
+    | '/staff/$publicId'
     | '/feed/$feedCardId'
     | '/reviews/$reviewId'
     | '/search/characters'
@@ -364,16 +369,16 @@ export interface FileRouteTypes {
     | '/api/profile/complete'
     | '/api/profile/state'
     | '/reviews/'
-    | '/anime/$anilistId/$slug'
-    | '/characters/$id/$slug'
-    | '/staff/$id/$slug'
+    | '/anime/$publicId/$slug'
+    | '/characters/$publicId/$slug'
+    | '/staff/$publicId/$slug'
     | '/search/users'
     | '/users/$username'
-    | '/anime/$anilistId/'
-    | '/characters/$id/'
-    | '/staff/$id/'
+    | '/anime/$publicId/'
+    | '/characters/$publicId/'
+    | '/staff/$publicId/'
     | '/reviews/$reviewId/edit'
-    | '/anime/$anilistId/$slug/reviews/new'
+    | '/anime/$publicId/$slug/reviews/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -396,16 +401,16 @@ export interface FileRouteTypes {
     | '/api/profile/complete'
     | '/api/profile/state'
     | '/reviews'
-    | '/anime/$anilistId/$slug'
-    | '/characters/$id/$slug'
-    | '/staff/$id/$slug'
+    | '/anime/$publicId/$slug'
+    | '/characters/$publicId/$slug'
+    | '/staff/$publicId/$slug'
     | '/search/users'
     | '/users/$username'
-    | '/anime/$anilistId'
-    | '/characters/$id'
-    | '/staff/$id'
+    | '/anime/$publicId'
+    | '/characters/$publicId'
+    | '/staff/$publicId'
     | '/reviews/$reviewId/edit'
-    | '/anime/$anilistId/$slug/reviews/new'
+    | '/anime/$publicId/$slug/reviews/new'
   id:
     | '__root__'
     | '/'
@@ -422,9 +427,9 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/auth/username'
     | '/auth/verify-email'
-    | '/_public/anime/$anilistId'
-    | '/_public/characters/$id'
-    | '/_public/staff/$id'
+    | '/_public/anime/$publicId'
+    | '/_public/characters/$publicId'
+    | '/_public/staff/$publicId'
     | '/_public/feed/$feedCardId'
     | '/_public/reviews/$reviewId'
     | '/_public/search/characters'
@@ -434,16 +439,16 @@ export interface FileRouteTypes {
     | '/api/profile/complete'
     | '/api/profile/state'
     | '/_public/reviews/'
-    | '/_public/anime/$anilistId/$slug'
-    | '/_public/characters/$id/$slug'
-    | '/_public/staff/$id/$slug'
+    | '/_public/anime/$publicId/$slug'
+    | '/_public/characters/$publicId/$slug'
+    | '/_public/staff/$publicId/$slug'
     | '/_public/_profile/search/users'
     | '/_public/_profile/users/$username'
-    | '/_public/anime/$anilistId/'
-    | '/_public/characters/$id/'
-    | '/_public/staff/$id/'
+    | '/_public/anime/$publicId/'
+    | '/_public/characters/$publicId/'
+    | '/_public/staff/$publicId/'
     | '/_public/_protected/reviews/$reviewId/edit'
-    | '/_public/_protected/anime/$anilistId/$slug/reviews/new'
+    | '/_public/_protected/anime/$publicId/$slug/reviews/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -626,47 +631,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicFeedFeedCardIdRouteImport
       parentRoute: typeof PublicRouteRoute
     }
-    '/_public/staff/$id': {
-      id: '/_public/staff/$id'
-      path: '/staff/$id'
-      fullPath: '/staff/$id'
-      preLoaderRoute: typeof PublicStaffIdRouteRouteImport
+    '/_public/staff/$publicId': {
+      id: '/_public/staff/$publicId'
+      path: '/staff/$publicId'
+      fullPath: '/staff/$publicId'
+      preLoaderRoute: typeof PublicStaffPublicIdRouteRouteImport
       parentRoute: typeof PublicRouteRoute
     }
-    '/_public/characters/$id': {
-      id: '/_public/characters/$id'
-      path: '/characters/$id'
-      fullPath: '/characters/$id'
-      preLoaderRoute: typeof PublicCharactersIdRouteRouteImport
+    '/_public/characters/$publicId': {
+      id: '/_public/characters/$publicId'
+      path: '/characters/$publicId'
+      fullPath: '/characters/$publicId'
+      preLoaderRoute: typeof PublicCharactersPublicIdRouteRouteImport
       parentRoute: typeof PublicRouteRoute
     }
-    '/_public/anime/$anilistId': {
-      id: '/_public/anime/$anilistId'
-      path: '/anime/$anilistId'
-      fullPath: '/anime/$anilistId'
-      preLoaderRoute: typeof PublicAnimeAnilistIdRouteRouteImport
+    '/_public/anime/$publicId': {
+      id: '/_public/anime/$publicId'
+      path: '/anime/$publicId'
+      fullPath: '/anime/$publicId'
+      preLoaderRoute: typeof PublicAnimePublicIdRouteRouteImport
       parentRoute: typeof PublicRouteRoute
     }
-    '/_public/staff/$id/': {
-      id: '/_public/staff/$id/'
+    '/_public/staff/$publicId/': {
+      id: '/_public/staff/$publicId/'
       path: '/'
-      fullPath: '/staff/$id/'
-      preLoaderRoute: typeof PublicStaffIdIndexRouteImport
-      parentRoute: typeof PublicStaffIdRouteRoute
+      fullPath: '/staff/$publicId/'
+      preLoaderRoute: typeof PublicStaffPublicIdIndexRouteImport
+      parentRoute: typeof PublicStaffPublicIdRouteRoute
     }
-    '/_public/characters/$id/': {
-      id: '/_public/characters/$id/'
+    '/_public/characters/$publicId/': {
+      id: '/_public/characters/$publicId/'
       path: '/'
-      fullPath: '/characters/$id/'
-      preLoaderRoute: typeof PublicCharactersIdIndexRouteImport
-      parentRoute: typeof PublicCharactersIdRouteRoute
+      fullPath: '/characters/$publicId/'
+      preLoaderRoute: typeof PublicCharactersPublicIdIndexRouteImport
+      parentRoute: typeof PublicCharactersPublicIdRouteRoute
     }
-    '/_public/anime/$anilistId/': {
-      id: '/_public/anime/$anilistId/'
+    '/_public/anime/$publicId/': {
+      id: '/_public/anime/$publicId/'
       path: '/'
-      fullPath: '/anime/$anilistId/'
-      preLoaderRoute: typeof PublicAnimeAnilistIdIndexRouteImport
-      parentRoute: typeof PublicAnimeAnilistIdRouteRoute
+      fullPath: '/anime/$publicId/'
+      preLoaderRoute: typeof PublicAnimePublicIdIndexRouteImport
+      parentRoute: typeof PublicAnimePublicIdRouteRoute
     }
     '/_public/_profile/users/$username': {
       id: '/_public/_profile/users/$username'
@@ -682,26 +687,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicProfileSearchUsersRouteImport
       parentRoute: typeof PublicProfileRouteRoute
     }
-    '/_public/staff/$id/$slug': {
-      id: '/_public/staff/$id/$slug'
+    '/_public/staff/$publicId/$slug': {
+      id: '/_public/staff/$publicId/$slug'
       path: '/$slug'
-      fullPath: '/staff/$id/$slug'
-      preLoaderRoute: typeof PublicStaffIdSlugRouteRouteImport
-      parentRoute: typeof PublicStaffIdRouteRoute
+      fullPath: '/staff/$publicId/$slug'
+      preLoaderRoute: typeof PublicStaffPublicIdSlugRouteRouteImport
+      parentRoute: typeof PublicStaffPublicIdRouteRoute
     }
-    '/_public/characters/$id/$slug': {
-      id: '/_public/characters/$id/$slug'
+    '/_public/characters/$publicId/$slug': {
+      id: '/_public/characters/$publicId/$slug'
       path: '/$slug'
-      fullPath: '/characters/$id/$slug'
-      preLoaderRoute: typeof PublicCharactersIdSlugRouteRouteImport
-      parentRoute: typeof PublicCharactersIdRouteRoute
+      fullPath: '/characters/$publicId/$slug'
+      preLoaderRoute: typeof PublicCharactersPublicIdSlugRouteRouteImport
+      parentRoute: typeof PublicCharactersPublicIdRouteRoute
     }
-    '/_public/anime/$anilistId/$slug': {
-      id: '/_public/anime/$anilistId/$slug'
+    '/_public/anime/$publicId/$slug': {
+      id: '/_public/anime/$publicId/$slug'
       path: '/$slug'
-      fullPath: '/anime/$anilistId/$slug'
-      preLoaderRoute: typeof PublicAnimeAnilistIdSlugRouteRouteImport
-      parentRoute: typeof PublicAnimeAnilistIdRouteRoute
+      fullPath: '/anime/$publicId/$slug'
+      preLoaderRoute: typeof PublicAnimePublicIdSlugRouteRouteImport
+      parentRoute: typeof PublicAnimePublicIdRouteRoute
     }
     '/_public/_protected/reviews/$reviewId/edit': {
       id: '/_public/_protected/reviews/$reviewId/edit'
@@ -710,11 +715,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicProtectedReviewsReviewIdEditRouteImport
       parentRoute: typeof PublicProtectedRouteRoute
     }
-    '/_public/_protected/anime/$anilistId/$slug/reviews/new': {
-      id: '/_public/_protected/anime/$anilistId/$slug/reviews/new'
-      path: '/anime/$anilistId/$slug/reviews/new'
-      fullPath: '/anime/$anilistId/$slug/reviews/new'
-      preLoaderRoute: typeof PublicProtectedAnimeAnilistIdSlugReviewsNewRouteImport
+    '/_public/_protected/anime/$publicId/$slug/reviews/new': {
+      id: '/_public/_protected/anime/$publicId/$slug/reviews/new'
+      path: '/anime/$publicId/$slug/reviews/new'
+      fullPath: '/anime/$publicId/$slug/reviews/new'
+      preLoaderRoute: typeof PublicProtectedAnimePublicIdSlugReviewsNewRouteImport
       parentRoute: typeof PublicProtectedRouteRoute
     }
   }
@@ -735,72 +740,76 @@ const PublicProfileRouteRouteWithChildren =
 
 interface PublicProtectedRouteRouteChildren {
   PublicProtectedReviewsReviewIdEditRoute: typeof PublicProtectedReviewsReviewIdEditRoute
-  PublicProtectedAnimeAnilistIdSlugReviewsNewRoute: typeof PublicProtectedAnimeAnilistIdSlugReviewsNewRoute
+  PublicProtectedAnimePublicIdSlugReviewsNewRoute: typeof PublicProtectedAnimePublicIdSlugReviewsNewRoute
 }
 
 const PublicProtectedRouteRouteChildren: PublicProtectedRouteRouteChildren = {
   PublicProtectedReviewsReviewIdEditRoute:
     PublicProtectedReviewsReviewIdEditRoute,
-  PublicProtectedAnimeAnilistIdSlugReviewsNewRoute:
-    PublicProtectedAnimeAnilistIdSlugReviewsNewRoute,
+  PublicProtectedAnimePublicIdSlugReviewsNewRoute:
+    PublicProtectedAnimePublicIdSlugReviewsNewRoute,
 }
 
 const PublicProtectedRouteRouteWithChildren =
   PublicProtectedRouteRoute._addFileChildren(PublicProtectedRouteRouteChildren)
 
-interface PublicAnimeAnilistIdRouteRouteChildren {
-  PublicAnimeAnilistIdSlugRouteRoute: typeof PublicAnimeAnilistIdSlugRouteRoute
-  PublicAnimeAnilistIdIndexRoute: typeof PublicAnimeAnilistIdIndexRoute
+interface PublicAnimePublicIdRouteRouteChildren {
+  PublicAnimePublicIdSlugRouteRoute: typeof PublicAnimePublicIdSlugRouteRoute
+  PublicAnimePublicIdIndexRoute: typeof PublicAnimePublicIdIndexRoute
 }
 
-const PublicAnimeAnilistIdRouteRouteChildren: PublicAnimeAnilistIdRouteRouteChildren =
+const PublicAnimePublicIdRouteRouteChildren: PublicAnimePublicIdRouteRouteChildren =
   {
-    PublicAnimeAnilistIdSlugRouteRoute: PublicAnimeAnilistIdSlugRouteRoute,
-    PublicAnimeAnilistIdIndexRoute: PublicAnimeAnilistIdIndexRoute,
+    PublicAnimePublicIdSlugRouteRoute: PublicAnimePublicIdSlugRouteRoute,
+    PublicAnimePublicIdIndexRoute: PublicAnimePublicIdIndexRoute,
   }
 
-const PublicAnimeAnilistIdRouteRouteWithChildren =
-  PublicAnimeAnilistIdRouteRoute._addFileChildren(
-    PublicAnimeAnilistIdRouteRouteChildren,
+const PublicAnimePublicIdRouteRouteWithChildren =
+  PublicAnimePublicIdRouteRoute._addFileChildren(
+    PublicAnimePublicIdRouteRouteChildren,
   )
 
-interface PublicCharactersIdRouteRouteChildren {
-  PublicCharactersIdSlugRouteRoute: typeof PublicCharactersIdSlugRouteRoute
-  PublicCharactersIdIndexRoute: typeof PublicCharactersIdIndexRoute
+interface PublicCharactersPublicIdRouteRouteChildren {
+  PublicCharactersPublicIdSlugRouteRoute: typeof PublicCharactersPublicIdSlugRouteRoute
+  PublicCharactersPublicIdIndexRoute: typeof PublicCharactersPublicIdIndexRoute
 }
 
-const PublicCharactersIdRouteRouteChildren: PublicCharactersIdRouteRouteChildren =
+const PublicCharactersPublicIdRouteRouteChildren: PublicCharactersPublicIdRouteRouteChildren =
   {
-    PublicCharactersIdSlugRouteRoute: PublicCharactersIdSlugRouteRoute,
-    PublicCharactersIdIndexRoute: PublicCharactersIdIndexRoute,
+    PublicCharactersPublicIdSlugRouteRoute:
+      PublicCharactersPublicIdSlugRouteRoute,
+    PublicCharactersPublicIdIndexRoute: PublicCharactersPublicIdIndexRoute,
   }
 
-const PublicCharactersIdRouteRouteWithChildren =
-  PublicCharactersIdRouteRoute._addFileChildren(
-    PublicCharactersIdRouteRouteChildren,
+const PublicCharactersPublicIdRouteRouteWithChildren =
+  PublicCharactersPublicIdRouteRoute._addFileChildren(
+    PublicCharactersPublicIdRouteRouteChildren,
   )
 
-interface PublicStaffIdRouteRouteChildren {
-  PublicStaffIdSlugRouteRoute: typeof PublicStaffIdSlugRouteRoute
-  PublicStaffIdIndexRoute: typeof PublicStaffIdIndexRoute
+interface PublicStaffPublicIdRouteRouteChildren {
+  PublicStaffPublicIdSlugRouteRoute: typeof PublicStaffPublicIdSlugRouteRoute
+  PublicStaffPublicIdIndexRoute: typeof PublicStaffPublicIdIndexRoute
 }
 
-const PublicStaffIdRouteRouteChildren: PublicStaffIdRouteRouteChildren = {
-  PublicStaffIdSlugRouteRoute: PublicStaffIdSlugRouteRoute,
-  PublicStaffIdIndexRoute: PublicStaffIdIndexRoute,
-}
+const PublicStaffPublicIdRouteRouteChildren: PublicStaffPublicIdRouteRouteChildren =
+  {
+    PublicStaffPublicIdSlugRouteRoute: PublicStaffPublicIdSlugRouteRoute,
+    PublicStaffPublicIdIndexRoute: PublicStaffPublicIdIndexRoute,
+  }
 
-const PublicStaffIdRouteRouteWithChildren =
-  PublicStaffIdRouteRoute._addFileChildren(PublicStaffIdRouteRouteChildren)
+const PublicStaffPublicIdRouteRouteWithChildren =
+  PublicStaffPublicIdRouteRoute._addFileChildren(
+    PublicStaffPublicIdRouteRouteChildren,
+  )
 
 interface PublicRouteRouteChildren {
   PublicProfileRouteRoute: typeof PublicProfileRouteRouteWithChildren
   PublicProtectedRouteRoute: typeof PublicProtectedRouteRouteWithChildren
   PublicDiscoverRoute: typeof PublicDiscoverRoute
   PublicHomeRoute: typeof PublicHomeRoute
-  PublicAnimeAnilistIdRouteRoute: typeof PublicAnimeAnilistIdRouteRouteWithChildren
-  PublicCharactersIdRouteRoute: typeof PublicCharactersIdRouteRouteWithChildren
-  PublicStaffIdRouteRoute: typeof PublicStaffIdRouteRouteWithChildren
+  PublicAnimePublicIdRouteRoute: typeof PublicAnimePublicIdRouteRouteWithChildren
+  PublicCharactersPublicIdRouteRoute: typeof PublicCharactersPublicIdRouteRouteWithChildren
+  PublicStaffPublicIdRouteRoute: typeof PublicStaffPublicIdRouteRouteWithChildren
   PublicFeedFeedCardIdRoute: typeof PublicFeedFeedCardIdRoute
   PublicReviewsReviewIdRoute: typeof PublicReviewsReviewIdRoute
   PublicSearchCharactersRoute: typeof PublicSearchCharactersRoute
@@ -813,9 +822,10 @@ const PublicRouteRouteChildren: PublicRouteRouteChildren = {
   PublicProtectedRouteRoute: PublicProtectedRouteRouteWithChildren,
   PublicDiscoverRoute: PublicDiscoverRoute,
   PublicHomeRoute: PublicHomeRoute,
-  PublicAnimeAnilistIdRouteRoute: PublicAnimeAnilistIdRouteRouteWithChildren,
-  PublicCharactersIdRouteRoute: PublicCharactersIdRouteRouteWithChildren,
-  PublicStaffIdRouteRoute: PublicStaffIdRouteRouteWithChildren,
+  PublicAnimePublicIdRouteRoute: PublicAnimePublicIdRouteRouteWithChildren,
+  PublicCharactersPublicIdRouteRoute:
+    PublicCharactersPublicIdRouteRouteWithChildren,
+  PublicStaffPublicIdRouteRoute: PublicStaffPublicIdRouteRouteWithChildren,
   PublicFeedFeedCardIdRoute: PublicFeedFeedCardIdRoute,
   PublicReviewsReviewIdRoute: PublicReviewsReviewIdRoute,
   PublicSearchCharactersRoute: PublicSearchCharactersRoute,

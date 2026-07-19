@@ -9,7 +9,7 @@ import { PublishedReviewCard } from './published-review-card'
 const publishedReview: ReviewListItem = {
   id: 'review-1',
   author: { id: 'author-1', username: 'author', displayName: 'Author', avatarUrl: null },
-  anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: 'https://example.test/frieren.jpg' },
+  anime: { publicId: 'anime_frieren', slug: 'frieren', title: 'Frieren', coverImageUrl: 'https://example.test/frieren.jpg' },
   state: 'published',
   rating: 90,
   summary: 'Visible ending summary',

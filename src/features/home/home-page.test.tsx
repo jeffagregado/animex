@@ -26,11 +26,11 @@ const serverMocks = vi.hoisted(() => ({ refreshDiscoverSection: vi.fn() }))
 vi.mock('convex/react', () => ({ useConvexAuth: () => ({ isAuthenticated: convex.authenticated, isLoading: false }), useConvex: () => convex.client, useMutation: convex.mutation }))
 vi.mock('../discover/server/discover.functions', () => ({ refreshDiscoverSection: serverMocks.refreshDiscoverSection }))
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children, to, params, className }: { children: React.ReactNode; to: string; params?: Record<string, string>; className?: string }) => <a className={className} href={params ? to.replace('$anilistId', params.anilistId).replace('$slug', params.slug) : to}>{children}</a>,
+  Link: ({ children, to, params, className }: { children: React.ReactNode; to: string; params?: Record<string, string>; className?: string }) => <a className={className} href={params ? to.replace('$publicId', params.publicId).replace('$slug', params.slug) : to}>{children}</a>,
 }))
 
 const anime: AnimeSummary = {
-  anilistId: 1, slug: 'loader-anime', titles: { display: 'Loader Anime', english: 'Loader Anime', romaji: null, native: null }, coverImageUrl: 'https://example.test/loader.jpg', bannerImageUrl: null, format: 'TV', season: 'SUMMER', seasonYear: 2026, episodes: 12, genres: ['Action'], popularity: 100, averageScore: 80, trending: 90, startDate: null, nextAiringAt: null,
+  publicId: 'anime_loader', slug: 'loader-anime', titles: { display: 'Loader Anime', english: 'Loader Anime', romaji: null, native: null }, coverImageUrl: 'https://example.test/loader.jpg', bannerImageUrl: null, format: 'TV', season: 'SUMMER', seasonYear: 2026, episodes: 12, genres: ['Action'], popularity: 100, averageScore: 80, trending: 90, startDate: null, nextAiringAt: null,
 }
 const ready = (key: 'trending' | 'seasonal' | 'recommendations' | 'upcoming', items: AnimeSummary[] = [anime]) => ({ status: 'ready' as const, section: { key, items, refreshedAt: 1, expiresAt: 2 } })
 const data: DiscoverPageData = { sections: { trending: ready('trending'), seasonal: ready('seasonal'), recommendations: ready('recommendations'), upcoming: ready('upcoming') } }
@@ -140,7 +140,7 @@ describe('HomePage', () => {
   })
 
   it('adapts Trending state to the shared top-five weekly list', () => {
-    const weeklyItems = Array.from({ length: 6 }, (_, index) => ({ ...anime, anilistId: index + 1, slug: `anime-${index + 1}`, titles: { ...anime.titles, display: `Anime ${index + 1}` } }))
+    const weeklyItems = Array.from({ length: 6 }, (_, index) => ({ ...anime, publicId: `anime_${index + 1}`, slug: `anime-${index + 1}`, titles: { ...anime.titles, display: `Anime ${index + 1}` } }))
 
     render(<HomeWeeklyList state={ready('trending', weeklyItems)} onRetry={vi.fn()} isRetrying={false} retryError={null} variant="desktop" />)
 

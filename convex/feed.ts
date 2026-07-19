@@ -1,10 +1,11 @@
 import { paginationOptsValidator } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
 
-import { FEED_PAGE_SIZE, type FeedCard } from '../src/features/social/shared/social-contracts'
+import { FEED_PAGE_SIZE, type FeedCard as SocialFeedCard } from '../src/features/social/shared/social-contracts'
 import { mergeFeedCards } from '../src/features/social/shared/feed-ranking'
 import type { Doc, Id } from './_generated/dataModel'
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { resolveProviderByCatalogPublicId } from './catalogIdentityModel'
 import { decodeFeedCursor, encodeFeedCursor, makeOrderKey, type FeedView } from './feedPolicy'
 import { postMediaValidator } from './postValidators'
 import { resolveProfileAccess } from './profiles'
@@ -13,13 +14,13 @@ import { getOptionalProfile, requireProfile } from './users'
 
 const visibilityValidator = v.union(v.literal('private'), v.literal('followers'), v.literal('public'))
 const authorValidator = v.object({ id: v.string(), username: v.string(), displayName: v.string(), avatarUrl: v.union(v.string(), v.null()) })
-const animeValidator = v.object({ anilistId: v.number(), slug: v.string(), title: v.string(), coverImageUrl: v.union(v.string(), v.null()) })
+const animeValidator = v.object({ publicId: v.id('catalogEntities'), slug: v.string(), title: v.string(), coverImageUrl: v.union(v.string(), v.null()) })
 const animeFormatValidator = v.union(
   v.literal('TV'), v.literal('TV_SHORT'), v.literal('MOVIE'), v.literal('SPECIAL'),
   v.literal('OVA'), v.literal('ONA'), v.literal('MUSIC'), v.null(),
 )
 const activityAnimeValidator = v.object({
-  anilistId: v.number(), slug: v.string(), title: v.string(), coverImageUrl: v.union(v.string(), v.null()),
+  publicId: v.id('catalogEntities'), slug: v.string(), title: v.string(), coverImageUrl: v.union(v.string(), v.null()),
   seasonYear: v.union(v.number(), v.null()), format: animeFormatValidator,
 })
 const feedCardValidator = v.union(
@@ -30,6 +31,10 @@ const feedCardValidator = v.union(
 )
 const feedPageValidator = v.object({ items: v.array(feedCardValidator), cursor: v.union(v.string(), v.null()), hasMore: v.boolean() })
 const fail = (code: string, message: string): never => { throw new ConvexError({ code, message }) }
+type WithCatalogEntityId<T> = T extends { anime: infer Anime extends { publicId: string } }
+  ? Omit<T, 'anime'> & { anime: Omit<Anime, 'publicId'> & { publicId: Id<'catalogEntities'> } }
+  : T
+type FeedCard = WithCatalogEntityId<SocialFeedCard>
 
 const getAuthor = async (ctx: QueryCtx, userId: Id<'users'>) => {
   const author = await ctx.db.get('users', userId)
@@ -37,15 +42,24 @@ const getAuthor = async (ctx: QueryCtx, userId: Id<'users'>) => {
   return { id: author._id, username: author.username, displayName: author.name, avatarUrl: author.avatarStorageId ? await ctx.storage.getUrl(author.avatarStorageId) : null }
 }
 
-const getAnime = async (ctx: QueryCtx, anilistId: number) => {
-  const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', anilistId)).unique()
-  if (!anime) return fail('FEED_ANIME_MISSING', 'Feed anime summary is missing.')
-  return { anilistId, slug: anime.slug, title: anime.titles.display, coverImageUrl: anime.coverImageUrl }
+const resolveAnimeProviderId = async (
+  ctx: QueryCtx | MutationCtx,
+  animeId: Id<'catalogEntities'>,
+  anilistId: number,
+  label: string,
+): Promise<number> => {
+  const providerRef = await resolveProviderByCatalogPublicId(ctx, animeId, 'anime')
+  if (providerRef.providerId !== anilistId) {
+    return fail('CATALOG_PROVIDER_REF_CONFLICT', `${label} conflicts with its Anime provider reference.`)
+  }
+  return providerRef.providerId
 }
 
-const requireCachedAnime = async (ctx: QueryCtx | MutationCtx, anilistId: number): Promise<void> => {
-  const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', anilistId)).unique()
-  if (!anime) return fail('ANIME_NOT_CACHED', 'Anime must be loaded before writing milestone activity.')
+const getAnime = async (ctx: QueryCtx, animeId: Id<'catalogEntities'>, anilistId: number) => {
+  const providerId = await resolveAnimeProviderId(ctx, animeId, anilistId, 'Feed Review')
+  const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', providerId)).unique()
+  if (!anime) return fail('FEED_ANIME_MISSING', 'Feed anime summary is missing.')
+  return { publicId: animeId, slug: anime.slug, title: anime.titles.display, coverImageUrl: anime.coverImageUrl }
 }
 
 type FeedRead = { mode: 'direct' | 'owner'; viewerId: Id<'users'> | null } | { mode: 'public' }
@@ -65,11 +79,12 @@ const canReadSource = (visibility: Doc<'feedCards'>['visibility'], ownerId: Id<'
   return canReadSocialRecord(visibility, read.viewerId, ownerId)
 }
 
-const getActivityAnime = async (ctx: QueryCtx, anilistId: number) => {
-  const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', anilistId)).unique()
+const getActivityAnime = async (ctx: QueryCtx, animeId: Id<'catalogEntities'>, anilistId: number) => {
+  const providerId = await resolveAnimeProviderId(ctx, animeId, anilistId, 'Anime milestone')
+  const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', providerId)).unique()
   if (!anime) return fail('FEED_ANIME_MISSING', 'Feed anime summary is missing.')
   return {
-    anilistId, slug: anime.slug, title: anime.titles.display, coverImageUrl: anime.coverImageUrl,
+    publicId: animeId, slug: anime.slug, title: anime.titles.display, coverImageUrl: anime.coverImageUrl,
     seasonYear: anime.seasonYear, format: anime.format,
   }
 }
@@ -116,6 +131,7 @@ const matchesReviewProjection = (card: Doc<'feedCards'>, review: Doc<'reviews'>)
   card.sourceId === review._id,
   card.userId === review.userId,
   card.anilistId === review.anilistId,
+  card.animeId === review.animeId,
   card.visibility === review.visibility,
 ].every(Boolean)
 
@@ -126,15 +142,22 @@ const resolveReviewCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: Fe
   const source = getActiveReviewSource(review)
   if (!source || !matchesReviewProjection(card, source.review)) return null
   if (!canReadSource(source.review.visibility, source.review.userId, read)) return null
-  return { id: card._id, reviewId: source.review._id, kind: 'review', author: await getAuthor(ctx, source.review.userId), anime: await getAnime(ctx, source.review.anilistId), rating: source.rating, summary: source.review.summary, containsSpoiler: source.review.containsSpoiler, visibility: source.review.visibility, publishedAt: source.publishedAt, updatedAt: source.review.updatedAt }
+  if (!source.review.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Feed Review ${source.review._id} is missing its Anime entity.`)
+  return { id: card._id, reviewId: source.review._id, kind: 'review', author: await getAuthor(ctx, source.review.userId), anime: await getAnime(ctx, source.review.animeId, source.review.anilistId), rating: source.rating, summary: source.review.summary, containsSpoiler: source.review.containsSpoiler, visibility: source.review.visibility, publishedAt: source.publishedAt, updatedAt: source.review.updatedAt }
 }
 
 const resolveMilestoneCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {
   if (card.anilistId === undefined || (card.kind !== 'completed' && card.kind !== 'rewatched')) return fail('FEED_SOURCE_MISSING', 'Feed milestone source is missing.')
-  if (card.sourceKey !== `${card.kind}:${card.userId}:${card.anilistId}`) return null
-  const milestone = await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', card.userId).eq('anilistId', card.anilistId as number).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
+  if (!card.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Milestone feed card ${card._id} is missing its Anime entity.`)
+  const entityKey = `${card.kind}:${card.userId}:${card.animeId}`
+  if (card.sourceKey !== entityKey) return null
+  const milestone = await ctx.db.query('animeMilestones')
+    .withIndex('by_user_anime_entity_kind', (q) => q.eq('userId', card.userId).eq('animeId', card.animeId).eq('kind', card.kind as 'completed' | 'rewatched'))
+    .unique()
   if (!milestone || card.visibility !== milestone.visibility || !canReadMilestone(milestone, read)) return null
-  return { id: card._id, kind: milestone.kind, author: await getAuthor(ctx, milestone.userId), anime: await getActivityAnime(ctx, milestone.anilistId), settledAt: milestone.occurredAt, visibility: milestone.visibility }
+  if (!milestone.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Anime milestone ${milestone._id} is missing its Anime entity.`)
+  if (card.anilistId !== milestone.anilistId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Milestone feed card ${card._id} conflicts with milestone ${milestone._id}.`)
+  return { id: card._id, kind: milestone.kind, author: await getAuthor(ctx, milestone.userId), anime: await getActivityAnime(ctx, milestone.animeId, milestone.anilistId), settledAt: milestone.occurredAt, visibility: milestone.visibility }
 }
 
 const resolveCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {
@@ -295,7 +318,7 @@ const listHomePage = async (ctx: QueryCtx, cursor: string | null, viewerId: Id<'
   const prioritizedAnchor = getPageAnchor(ownPage, merged.prioritizedConsumed, anchors.prioritizedAnchor)
   const globalAnchor = getPageAnchor(globalPage, merged.globalConsumed, anchors.globalAnchor)
   const hasMore = hasHomeItems(ownPage, merged.prioritizedConsumed, globalPage, merged.globalConsumed)
-  return { items: merged.items, cursor: hasMore ? encodeFeedCursor({ view: 'home', viewerId, prioritizedAnchor, globalAnchor, cycleIndex: merged.nextCycleIndex }) : null, hasMore }
+  return { items: merged.items as FeedCard[], cursor: hasMore ? encodeFeedCursor({ view: 'home', viewerId, prioritizedAnchor, globalAnchor, cycleIndex: merged.nextCycleIndex }) : null, hasMore }
 }
 
 export const listGlobal = query({
@@ -373,17 +396,62 @@ export const getById = query({
   },
 })
 
-export const upsertMilestoneCard = async (ctx: MutationCtx, milestone: Doc<'animeMilestones'>, activate: boolean): Promise<void> => {
-  const sourceKey = `${milestone.kind}:${milestone.userId}:${milestone.anilistId}`
-  const existing = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', sourceKey)).unique()
-  const fields = { visibility: milestone.visibility, active: activate || !existing ? true : existing.active, orderKey: makeOrderKey(milestone.occurredAt, sourceKey), occurredAt: milestone.occurredAt, updatedAt: milestone.updatedAt }
-  if (existing) await ctx.db.patch('feedCards', existing._id, fields)
-  else await ctx.db.insert('feedCards', { sourceKey, kind: milestone.kind, userId: milestone.userId, anilistId: milestone.anilistId, ...fields })
+/** Reads entity-key projection while rejecting any legacy-key drift. */
+const readMilestoneProjectionCard = async (
+  ctx: MutationCtx,
+  userId: Id<'users'>,
+  anilistId: number,
+  animeId: Id<'catalogEntities'>,
+  kind: 'completed' | 'rewatched',
+) => {
+  const sourceKey = `${kind}:${userId}:${animeId}`
+  const legacyKey = `${kind}:${userId}:${anilistId}`
+  const [card, legacyCard] = await Promise.all([
+    ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', sourceKey)).unique(),
+    ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', legacyKey)).unique(),
+  ])
+  if (legacyCard) {
+    return fail(
+      'MILESTONE_SOURCE_CONFLICT',
+      `Milestone projection ${sourceKey} conflicts with legacy feed card ${legacyCard._id}.`,
+    )
+  }
+  return { sourceKey, card }
 }
 
-export const removeMilestoneCard = async (ctx: MutationCtx, userId: Id<'users'>, anilistId: number, kind: 'completed' | 'rewatched'): Promise<void> => {
-  const sourceKey = `${kind}:${userId}:${anilistId}`
-  const card = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', sourceKey)).unique()
+export const upsertMilestoneCard = async (ctx: MutationCtx, milestone: Doc<'animeMilestones'>, activate: boolean): Promise<void> => {
+  if (!milestone.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Anime milestone ${milestone._id} is missing its Anime entity.`)
+  await resolveAnimeProviderId(ctx, milestone.animeId, milestone.anilistId, `Anime milestone ${milestone._id}`)
+  const { sourceKey, card: existing } = await readMilestoneProjectionCard(
+    ctx,
+    milestone.userId,
+    milestone.anilistId,
+    milestone.animeId,
+    milestone.kind,
+  )
+  if (existing && (!existing.animeId || existing.animeId !== milestone.animeId || existing.anilistId !== milestone.anilistId)) {
+    return fail('CATALOG_PROVIDER_REF_CONFLICT', `Milestone feed card ${existing._id} conflicts with milestone ${milestone._id}.`)
+  }
+  const orderKey = existing && existing.occurredAt === milestone.occurredAt
+    ? existing.orderKey
+    : makeOrderKey(milestone.occurredAt, sourceKey)
+  const fields = { visibility: milestone.visibility, active: activate || !existing ? true : existing.active, orderKey, occurredAt: milestone.occurredAt, updatedAt: milestone.updatedAt }
+  if (existing) await ctx.db.patch('feedCards', existing._id, fields)
+  else await ctx.db.insert('feedCards', { sourceKey, kind: milestone.kind, userId: milestone.userId, anilistId: milestone.anilistId, animeId: milestone.animeId, ...fields })
+}
+
+export const removeMilestoneCard = async (
+  ctx: MutationCtx,
+  userId: Id<'users'>,
+  animeId: Id<'catalogEntities'>,
+  anilistId: number,
+  kind: 'completed' | 'rewatched',
+): Promise<void> => {
+  await resolveAnimeProviderId(ctx, animeId, anilistId, 'Anime milestone')
+  const { card } = await readMilestoneProjectionCard(ctx, userId, anilistId, animeId, kind)
+  if (card && (!card.animeId || card.animeId !== animeId || card.anilistId !== anilistId)) {
+    return fail('CATALOG_PROVIDER_REF_CONFLICT', `Milestone feed card ${card._id} conflicts with provider mapping ${animeId}.`)
+  }
   if (card) await ctx.db.patch('feedCards', card._id, { active: false, updatedAt: Date.now() })
 }
 
@@ -394,15 +462,26 @@ const readOwnedMilestoneCard = async (ctx: MutationCtx, cardId: Id<'feedCards'>,
   return card
 }
 
+/** Reads one durable milestone/card pair before domain updates. */
+const requireMilestoneCardSource = async (ctx: MutationCtx, card: Doc<'feedCards'>) => {
+  if (card.anilistId === undefined) return fail('ACTIVITY_SOURCE_MISSING', 'Milestone activity source is missing.')
+  if (!card.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Milestone feed card ${card._id} is missing its Anime entity.`)
+  await resolveAnimeProviderId(ctx, card.animeId, card.anilistId, `Milestone feed card ${card._id}`)
+  const milestone = await ctx.db.query('animeMilestones')
+    .withIndex('by_user_anime_entity_kind', (q) => q.eq('userId', card.userId).eq('animeId', card.animeId).eq('kind', card.kind as 'completed' | 'rewatched'))
+    .unique()
+  if (!milestone) return fail('ACTIVITY_SOURCE_MISSING', 'Milestone activity source is missing.')
+  if (!milestone.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Anime milestone ${milestone._id} is missing its Anime entity.`)
+  if (milestone.anilistId !== card.anilistId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Anime milestone ${milestone._id} conflicts with feed card ${card._id}.`)
+  return { milestone, card }
+}
+
 export const setActivityVisibility = mutation({
   args: { cardId: v.id('feedCards'), visibility: visibilityValidator }, returns: v.null(),
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx)
     const card = await readOwnedMilestoneCard(ctx, args.cardId, profile._id)
-    if (card.anilistId === undefined) return fail('ACTIVITY_SOURCE_MISSING', 'Milestone activity source is missing.')
-    await requireCachedAnime(ctx, card.anilistId)
-    const milestone = await ctx.db.query('animeMilestones').withIndex('by_user_anime_kind', (q) => q.eq('userId', profile._id).eq('anilistId', card.anilistId as number).eq('kind', card.kind as 'completed' | 'rewatched')).unique()
-    if (!milestone) return fail('ACTIVITY_SOURCE_MISSING', 'Milestone activity source is missing.')
+    const { milestone } = await requireMilestoneCardSource(ctx, card)
     const now = Date.now()
     await ctx.db.patch('animeMilestones', milestone._id, { visibility: args.visibility, updatedAt: now })
     await ctx.db.patch('feedCards', card._id, { visibility: args.visibility, updatedAt: now })
@@ -415,8 +494,7 @@ export const removeActivity = mutation({
   handler: async (ctx, args) => {
     const { profile } = await requireProfile(ctx)
     const card = await readOwnedMilestoneCard(ctx, args.cardId, profile._id)
-    if (card.anilistId === undefined) return fail('ACTIVITY_SOURCE_MISSING', 'Milestone activity source is missing.')
-    await requireCachedAnime(ctx, card.anilistId)
+    await requireMilestoneCardSource(ctx, card)
     await ctx.db.patch('feedCards', card._id, { active: false, updatedAt: Date.now() })
     return null
   },
@@ -426,9 +504,9 @@ export const removeActivity = mutation({
 const matchesMilestoneProjection = (card: Doc<'feedCards'> | null, milestone: Doc<'animeMilestones'>, sourceKey: string): boolean => {
   if (!card) return false
   const fields = [
-    [card.kind, milestone.kind], [card.userId, milestone.userId], [card.anilistId, milestone.anilistId],
+    [card.kind, milestone.kind], [card.userId, milestone.userId], [card.anilistId, milestone.anilistId], [card.animeId, milestone.animeId],
     [card.visibility, milestone.visibility], [card.occurredAt, milestone.occurredAt], [card.updatedAt, milestone.updatedAt],
-    [card.orderKey, makeOrderKey(milestone.occurredAt, sourceKey)],
+    [card.sourceKey, sourceKey],
   ]
   return fields.every(([actual, expected]) => actual === expected)
 }
@@ -440,10 +518,16 @@ export const projectMilestones = internalMutation({
     const page = await ctx.db.query('animeMilestones').paginate(args.paginationOpts)
     let verifiedCount = 0
     for (const milestone of page.page) {
-      await requireCachedAnime(ctx, milestone.anilistId)
+      if (!milestone.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Anime milestone ${milestone._id} is missing its Anime entity.`)
+      await resolveAnimeProviderId(ctx, milestone.animeId, milestone.anilistId, `Anime milestone ${milestone._id}`)
       await upsertMilestoneCard(ctx, milestone, false)
-      const sourceKey = `${milestone.kind}:${milestone.userId}:${milestone.anilistId}`
-      const card = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', sourceKey)).unique()
+      const { sourceKey, card } = await readMilestoneProjectionCard(
+        ctx,
+        milestone.userId,
+        milestone.anilistId,
+        milestone.animeId,
+        milestone.kind,
+      )
       if (!matchesMilestoneProjection(card, milestone, sourceKey)) return fail('MILESTONE_PROJECTION_INVALID', `Milestone projection validation failed for ${sourceKey}.`)
       verifiedCount += 1
     }

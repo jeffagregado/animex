@@ -42,7 +42,7 @@ vi.mock('@tanstack/react-router', () => ({
 
 const searchState: DiscoverUrlSearchState = { query: 'frieren', genre: null, format: null, season: null, year: null, sort: 'relevance' }
 const anime: AnimeSummary = {
-  anilistId: 1, slug: 'frieren', titles: { display: 'Frieren', english: 'Frieren', romaji: 'Sousou no Frieren', native: null }, coverImageUrl: 'https://example.test/frieren.jpg', bannerImageUrl: null, format: 'TV', season: 'FALL', seasonYear: 2023, episodes: 28, genres: ['Adventure'], popularity: 1, averageScore: 90, trending: 2, startDate: null, nextAiringAt: null,
+  publicId: 'anime_frieren', slug: 'frieren', titles: { display: 'Frieren', english: 'Frieren', romaji: 'Sousou no Frieren', native: null }, coverImageUrl: 'https://example.test/frieren.jpg', bannerImageUrl: null, format: 'TV', season: 'FALL', seasonYear: 2023, episodes: 28, genres: ['Adventure'], popularity: 1, averageScore: 90, trending: 2, startDate: null, nextAiringAt: null,
 }
 
 const page = (items: AnimeSummary[], currentPage: number, hasNextPage: boolean): AnimeSearchPage => ({ items, currentPage, hasNextPage, perPage: 20 })
@@ -66,8 +66,8 @@ describe('DiscoverSearchResults', () => {
     renderResults()
 
     const link = await screen.findByRole('link', { name: /Frieren/ })
-    expect(link.dataset.to).toBe('/anime/$anilistId/$slug')
-    expect(link.getAttribute('href')).toBe('/anime/1/frieren')
+    expect(link.dataset.to).toBe('/anime/$publicId/$slug')
+    expect(link.getAttribute('href')).toBe('/anime/anime_frieren/frieren')
     expect(link.className).toContain('focus-visible:ring-2')
   })
 
@@ -143,7 +143,7 @@ describe('DiscoverSearchResults', () => {
     const activePageResolver: { current: ((value: AnimeSearchPage) => void) | null } = { current: null }
     const oldPage = new Promise<AnimeSearchPage>((resolve) => { oldPageResolver.current = resolve })
     const activePage = new Promise<AnimeSearchPage>((resolve) => { activePageResolver.current = resolve })
-    const demonSlayer = { ...anime, anilistId: 2, slug: 'demon-slayer', titles: { ...anime.titles, display: 'Demon Slayer' } }
+    const demonSlayer = { ...anime, publicId: 'anime_demon_slayer', slug: 'demon-slayer', titles: { ...anime.titles, display: 'Demon Slayer' } }
     serverMocks.searchAnime
       .mockResolvedValueOnce(page([anime], 1, true))
       .mockReturnValueOnce(oldPage)

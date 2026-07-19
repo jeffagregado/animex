@@ -2,7 +2,7 @@ import { ConvexError, v } from 'convex/values'
 
 import { type Doc } from './_generated/dataModel'
 import { mutation, query, type MutationCtx } from './_generated/server'
-import { type CatalogPersonDetail } from '../src/features/catalog-person/shared/catalog-person-contracts'
+import { type CatalogPersonProviderDetail } from '../src/features/catalog-person/server/catalog-person-provider-cache-contracts.server'
 import { requireCacheWriteToken } from './animeCache'
 import {
   CATALOG_PERSON_LEASE_MS,
@@ -17,6 +17,8 @@ import {
   validateCatalogPersonDetail,
   validateCatalogPersonWorkPage,
 } from './catalogPersonCachePolicy'
+import { ensureCatalogEntity } from './catalogIdentityModel'
+import { type CatalogProviderRef } from './catalogIdentityPolicy'
 
 const kindValidator = v.union(v.literal('character'), v.literal('staff'))
 const formatValidator = v.union(v.literal('TV'), v.literal('TV_SHORT'), v.literal('MOVIE'), v.literal('SPECIAL'), v.literal('OVA'), v.literal('ONA'), v.literal('MUSIC'), v.null())
@@ -67,8 +69,19 @@ const requireLease = async (ctx: MutationCtx, key: string, leaseId: string, now:
   return lease
 }
 
+/** Registers each unique provider tuple once in the current transaction. */
+const ensureIdentityRefs = async (
+  ctx: MutationCtx,
+  refs: CatalogProviderRef[],
+): Promise<void> => {
+  const unique = new Map(refs.map((ref) => [`${ref.kind}:${ref.providerId}`, ref]))
+  for (const ref of unique.values()) {
+    await ensureCatalogEntity(ctx, ref)
+  }
+}
+
 /** Expires Character rows written before the all-language actor contract. */
-const currentDetail = (detail: Doc<'catalogPersonDetails'>['detail']): CatalogPersonDetail | null => {
+const currentDetail = (detail: Doc<'catalogPersonDetails'>['detail']): CatalogPersonProviderDetail | null => {
   if (detail.kind === 'character') {
     if (detail.voiceActorScope !== 'all-languages' || detail.voiceActors === undefined) return null
     return { ...detail, voiceActorScope: detail.voiceActorScope, voiceActors: detail.voiceActors }
@@ -78,12 +91,13 @@ const currentDetail = (detail: Doc<'catalogPersonDetails'>['detail']): CatalogPe
 
 /** Reads one person detail without expired fallback. */
 export const readDetail = query({
-  args: { kind: kindValidator, personId: v.number() },
+  args: { kind: kindValidator, personId: v.number(), token: v.string() },
   returns: detailReadValidator,
   handler: async (ctx, args) => {
+    requireCacheWriteToken(args.token)
     try { personDetailKey(args.kind, args.personId) } catch (error) { failPolicy(error) }
     const record = await ctx.db.query('catalogPersonDetails').withIndex('by_kind_person', (q) => q.eq('kind', args.kind).eq('personId', args.personId)).unique()
-    if (!record) return resolveCatalogPersonRead<CatalogPersonDetail>(null, Date.now())
+    if (!record) return resolveCatalogPersonRead<CatalogPersonProviderDetail>(null, Date.now())
     const detail = currentDetail(record.detail)
     if (!detail) return { status: 'expired' as const, entry: null }
     return resolveCatalogPersonRead({ payload: detail, refreshedAt: record.refreshedAt, expiresAt: record.expiresAt }, Date.now())
@@ -92,9 +106,10 @@ export const readDetail = query({
 
 /** Reads and hydrates one ordered work page. */
 export const readWorkPage = query({
-  args: { kind: kindValidator, personId: v.number(), page: v.number() },
+  args: { kind: kindValidator, personId: v.number(), page: v.number(), token: v.string() },
   returns: workReadValidator,
   handler: async (ctx, args) => {
+    requireCacheWriteToken(args.token)
     try { personWorkKey(args.kind, args.personId, args.page) } catch (error) { failPolicy(error) }
     const record = await ctx.db.query('catalogPersonWorkPages').withIndex('by_kind_person_page', (q) => q.eq('kind', args.kind).eq('personId', args.personId).eq('page', args.page)).unique()
     const timed = resolveCatalogPersonRead(record ? { payload: record, refreshedAt: record.refreshedAt, expiresAt: record.expiresAt } : null, Date.now())
@@ -134,6 +149,12 @@ export const commitDetail = mutation({
     requireCacheWriteToken(args.token)
     try { validateCatalogPersonDetail(args.kind, args.personId, args.detail) } catch (error) { return failPolicy(error) }
     const now = Date.now(); const lease = await requireLease(ctx, personDetailKey(args.kind, args.personId), args.leaseId, now)
+    await ensureIdentityRefs(ctx, [
+      { provider: 'anilist', kind: args.kind, providerId: args.personId },
+      ...(args.detail.kind === 'character'
+        ? args.detail.voiceActors.map((actor) => ({ provider: 'anilist' as const, kind: 'staff' as const, providerId: actor.id }))
+        : []),
+    ])
     const current = await ctx.db.query('catalogPersonDetails').withIndex('by_kind_person', (q) => q.eq('kind', args.kind).eq('personId', args.personId)).unique()
     const value = { kind: args.kind, personId: args.personId, detail: args.detail, ...createCatalogPersonTiming(now) }
     if (current) await ctx.db.patch(current._id, value); else await ctx.db.insert('catalogPersonDetails', value)
@@ -154,6 +175,10 @@ export const commitWorkPage = mutation({
       throw new ConvexError({ code: 'INVALID_SUMMARIES', message: 'Work rows must reference exactly supplied unique anime summaries.' })
     }
     const now = Date.now(); const lease = await requireLease(ctx, personWorkKey(args.kind, args.personId, args.page), args.leaseId, now)
+    await ensureIdentityRefs(ctx, [
+      { provider: 'anilist', kind: args.kind, providerId: args.personId },
+      ...args.summaries.map((summary) => ({ provider: 'anilist' as const, kind: 'anime' as const, providerId: summary.anilistId })),
+    ])
     for (const summary of args.summaries) {
       const current = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', summary.anilistId)).unique()
       if (current) await ctx.db.patch(current._id, { ...summary, updatedAt: now }); else await ctx.db.insert('animeSummaries', { ...summary, updatedAt: now })

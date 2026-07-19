@@ -12,7 +12,7 @@ type Detail = {
   id: number
   name: string
   nativeName: null
-  imageUrl: null
+  imageUrl: string | null
   description: null
   age: null
   gender: null
@@ -26,9 +26,12 @@ type Detail = {
     language: string
   }>
 }
-const modules = import.meta.glob(['./_generated/**/*.*', './{animeCache,catalogPersonCache}.ts'])
-const readDetail = makeFunctionReference<'query', { kind: Kind; personId: number }, unknown>('catalogPersonCache:readDetail')
-const readWorkPage = makeFunctionReference<'query', { kind: Kind; personId: number; page: number }, unknown>('catalogPersonCache:readWorkPage')
+const modules = import.meta.glob([
+  './_generated/**/*.*',
+  './{animeCache,catalogIdentityModel,catalogPersonCache}.ts',
+])
+const readDetail = makeFunctionReference<'query', { kind: Kind; personId: number; token?: string }, unknown>('catalogPersonCache:readDetail')
+const readWorkPage = makeFunctionReference<'query', { kind: Kind; personId: number; page: number; token?: string }, unknown>('catalogPersonCache:readWorkPage')
 const acquireLease = makeFunctionReference<'mutation', { key: string; leaseId: string; token: string }, { acquired: boolean; leaseUntil: number | null }>('catalogPersonCache:acquireLease')
 const commitDetail = makeFunctionReference<'mutation', { kind: Kind; personId: number; detail: Detail; leaseId: string; token: string }, null>('catalogPersonCache:commitDetail')
 const commitWorkPage = makeFunctionReference<'mutation', {
@@ -44,8 +47,10 @@ const commitWorkPage = makeFunctionReference<'mutation', {
 const releaseLease = makeFunctionReference<'mutation', { key: string; leaseId: string; token: string }, boolean>('catalogPersonCache:releaseLease')
 
 const token = 'catalog-person-test-token'
+const now = new Date('2026-07-17T00:00:00.000Z').getTime()
 const detail: Detail = {
-  kind: 'character', id: 12, name: 'Frieren', nativeName: null, imageUrl: null,
+  kind: 'character', id: 12, name: 'Frieren', nativeName: null,
+  imageUrl: 'https://example.com/frieren.jpg',
   description: null, age: null, gender: null, birthday: null, bloodType: null,
   voiceActorScope: 'all-languages',
   voiceActors: [
@@ -55,7 +60,7 @@ const detail: Detail = {
 }
 const summary = {
   anilistId: 1, slug: 'one', titles: { display: 'One', english: 'One', romaji: null, native: null },
-  coverImageUrl: null, bannerImageUrl: null, format: 'TV' as const, season: null,
+  coverImageUrl: 'https://example.com/one.jpg', bannerImageUrl: null, format: 'TV' as const, season: null,
   seasonYear: 2024, episodes: 12, genres: [], popularity: 1, averageScore: 80,
   trending: null, startDate: { year: 2024, month: 1, day: 1 }, nextAiringAt: null,
 }
@@ -63,7 +68,7 @@ const createHarness = () => convexTest(schema, modules)
 
 beforeEach(() => {
   vi.useFakeTimers()
-  vi.setSystemTime(new Date('2026-07-17T00:00:00.000Z'))
+  vi.setSystemTime(now)
   vi.stubEnv('DISCOVER_CACHE_WRITE_TOKEN', token)
 })
 
@@ -73,9 +78,87 @@ afterEach(() => {
 })
 
 describe('catalog person Convex cache', () => {
+  test('requires the configured token for raw person reads without changing payloads', async () => {
+    const t = createHarness()
+    await t.mutation(acquireLease, {
+      key: 'person:character:12', leaseId: 'detail-owner', token,
+    })
+    await t.mutation(commitDetail, {
+      kind: 'character', personId: 12, detail, leaseId: 'detail-owner', token,
+    })
+    await t.mutation(acquireLease, {
+      key: 'person-work:character:12:1', leaseId: 'work-owner', token,
+    })
+    await t.mutation(commitWorkPage, {
+      kind: 'character',
+      personId: 12,
+      page: 1,
+      items: [{ animeId: 1, role: 'MAIN' }],
+      hasNextPage: false,
+      summaries: [summary],
+      leaseId: 'work-owner',
+      token,
+    })
+
+    await expect(t.query(readDetail, { kind: 'character', personId: 12 })).rejects.toThrow()
+    await expect(t.query(readDetail, {
+      kind: 'character',
+      personId: 12,
+      token: 'wrong-token',
+    })).rejects.toThrow('CACHE_WRITE_UNAUTHORIZED')
+    await expect(t.query(readDetail, {
+      kind: 'character',
+      personId: 12,
+      token,
+    })).resolves.toEqual({
+      status: 'fresh',
+      entry: { payload: detail, refreshedAt: now, expiresAt: now + 24 * 60 * 60 * 1000 },
+    })
+
+    await expect(t.query(readWorkPage, {
+      kind: 'character',
+      personId: 12,
+      page: 1,
+    })).rejects.toThrow()
+    await expect(t.query(readWorkPage, {
+      kind: 'character',
+      personId: 12,
+      page: 1,
+      token: 'wrong-token',
+    })).rejects.toThrow('CACHE_WRITE_UNAUTHORIZED')
+    await expect(t.query(readWorkPage, {
+      kind: 'character',
+      personId: 12,
+      page: 1,
+      token,
+    })).resolves.toEqual({
+      status: 'fresh',
+      entry: {
+        payload: {
+          items: [{
+            anime: {
+              id: 1,
+              slug: 'one',
+              title: 'One',
+              coverImageUrl: 'https://example.com/one.jpg',
+              format: 'TV',
+              seasonYear: 2024,
+            },
+            role: 'MAIN',
+          }],
+          currentPage: 1,
+          hasNextPage: false,
+          perPage: 20,
+        },
+        refreshedAt: now,
+        expiresAt: now + 24 * 60 * 60 * 1000,
+      },
+    })
+  })
+
   test('guards tokens, validators, indexes, owner commit, and lease deletion', async () => {
     const t = createHarness()
-    await expect(t.query(readDetail, { kind: 'character', personId: 0 })).rejects.toThrow()
+    await expect(t.query(readDetail, { kind: 'character', personId: 0, token })).rejects.toThrow()
     await expect(t.mutation(acquireLease, {
       key: 'person:character:12', leaseId: 'owner', token: 'wrong',
     })).rejects.toThrow()
@@ -90,11 +173,58 @@ describe('catalog person Convex cache', () => {
       kind: 'character', personId: 12, detail, leaseId: 'owner', token,
     })
 
-    await expect(t.query(readDetail, { kind: 'character', personId: 12 }))
+    await expect(t.query(readDetail, { kind: 'character', personId: 12, token }))
       .resolves.toMatchObject({ status: 'fresh', entry: { payload: detail } })
     expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonDetails')
       .withIndex('by_kind_person', (q) => q.eq('kind', 'character').eq('personId', 12))
-      .unique())).not.toBeNull()
+      .unique())).toMatchObject({
+        kind: 'character',
+        personId: 12,
+        detail,
+        refreshedAt: now,
+        expiresAt: now + 24 * 60 * 60 * 1000,
+      })
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonCacheLeases')
+      .withIndex('by_key', (q) => q.eq('key', 'person:character:12'))
+      .unique())).toBeNull()
+    const refs = await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect())
+    expect(refs.map(({ kind, providerId }) => `${kind}:${providerId}`).sort())
+      .toEqual(['character:12', 'staff:21', 'staff:22'])
+
+    const refreshedAt = now + 1_000
+    vi.setSystemTime(refreshedAt)
+    const refreshedDetail: Detail = {
+      ...detail,
+      imageUrl: 'https://example.com/refreshed-frieren.jpg',
+      voiceActors: [...detail.voiceActors].reverse().map((actor, index) => ({
+        ...actor,
+        imageUrl: `https://example.com/refreshed-actor-${index + 1}.jpg`,
+      })),
+    }
+    await t.mutation(acquireLease, {
+      key: 'person:character:12', leaseId: 'refresh-owner', token,
+    })
+    await t.mutation(commitDetail, {
+      kind: 'character',
+      personId: 12,
+      detail: refreshedDetail,
+      leaseId: 'refresh-owner',
+      token,
+    })
+
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect()))
+      .toHaveLength(3)
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogEntities').collect()))
+      .toHaveLength(3)
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonDetails')
+      .withIndex('by_kind_person', (q) => q.eq('kind', 'character').eq('personId', 12))
+      .unique())).toMatchObject({
+        kind: 'character',
+        personId: 12,
+        detail: refreshedDetail,
+        refreshedAt,
+        expiresAt: refreshedAt + 24 * 60 * 60 * 1000,
+      })
     expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonCacheLeases')
       .withIndex('by_key', (q) => q.eq('key', 'person:character:12'))
       .unique())).toBeNull()
@@ -115,7 +245,7 @@ describe('catalog person Convex cache', () => {
       hasNextPage: true, summaries: [summary, second], leaseId: 'work-owner', token,
     })
 
-    await expect(t.query(readWorkPage, { kind: 'staff', personId: 21, page: 1 }))
+    await expect(t.query(readWorkPage, { kind: 'staff', personId: 21, page: 1, token }))
       .resolves.toMatchObject({
         status: 'fresh',
         entry: { payload: {
@@ -129,6 +259,95 @@ describe('catalog person Convex cache', () => {
       })
     expect(await t.run(async (ctx) => await ctx.db.query('animeSummaries').collect()))
       .toHaveLength(2)
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonWorkPages')
+      .withIndex('by_kind_person_page', (q) => q
+        .eq('kind', 'staff')
+        .eq('personId', 21)
+        .eq('page', 1))
+      .unique())).toMatchObject({
+        kind: 'staff',
+        personId: 21,
+        page: 1,
+        items: [{ animeId: 2, role: 'Director' }, { animeId: 1, role: null }],
+        hasNextPage: true,
+        refreshedAt: now,
+        expiresAt: now + 24 * 60 * 60 * 1000,
+      })
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonCacheLeases')
+      .withIndex('by_key', (q) => q.eq('key', 'person-work:staff:21:1'))
+      .unique())).toBeNull()
+    const refs = await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect())
+    expect(refs.map(({ kind, providerId }) => `${kind}:${providerId}`).sort())
+      .toEqual(['anime:1', 'anime:2', 'staff:21'])
+
+    const refreshedAt = now + 1_000
+    vi.setSystemTime(refreshedAt)
+    const refreshedSummary = {
+      ...summary,
+      coverImageUrl: 'https://example.com/refreshed-one.jpg',
+      popularity: 2,
+    }
+    const refreshedSecond = {
+      ...second,
+      coverImageUrl: 'https://example.com/refreshed-two.jpg',
+      popularity: 3,
+    }
+    await t.mutation(acquireLease, {
+      key: 'person-work:staff:21:1', leaseId: 'refresh-owner', token,
+    })
+    await t.mutation(commitWorkPage, {
+      kind: 'staff',
+      personId: 21,
+      page: 1,
+      items: [{ animeId: 1, role: 'Writer' }, { animeId: 2, role: 'Director' }],
+      hasNextPage: false,
+      summaries: [refreshedSummary, refreshedSecond],
+      leaseId: 'refresh-owner',
+      token,
+    })
+
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogProviderRefs').collect()))
+      .toHaveLength(3)
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogEntities').collect()))
+      .toHaveLength(3)
+    expect(await t.query(readWorkPage, { kind: 'staff', personId: 21, page: 1, token }))
+      .toMatchObject({
+        status: 'fresh',
+        entry: {
+          payload: {
+            items: [
+              {
+                anime: {
+                  id: 1,
+                  coverImageUrl: 'https://example.com/refreshed-one.jpg',
+                },
+                role: 'Writer',
+              },
+              {
+                anime: {
+                  id: 2,
+                  coverImageUrl: 'https://example.com/refreshed-two.jpg',
+                },
+                role: 'Director',
+              },
+            ],
+            hasNextPage: false,
+          },
+          refreshedAt,
+          expiresAt: refreshedAt + 24 * 60 * 60 * 1000,
+        },
+      })
+    expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonWorkPages')
+      .withIndex('by_kind_person_page', (q) => q
+        .eq('kind', 'staff')
+        .eq('personId', 21)
+        .eq('page', 1))
+      .unique())).toMatchObject({
+        items: [{ animeId: 1, role: 'Writer' }, { animeId: 2, role: 'Director' }],
+        hasNextPage: false,
+        refreshedAt,
+        expiresAt: refreshedAt + 24 * 60 * 60 * 1000,
+      })
     expect(await t.run(async (ctx) => await ctx.db.query('catalogPersonCacheLeases')
       .withIndex('by_key', (q) => q.eq('key', 'person-work:staff:21:1'))
       .unique())).toBeNull()
@@ -143,7 +362,7 @@ describe('catalog person Convex cache', () => {
       kind: 'character', personId: 12, detail, leaseId: 'owner', token,
     })
     vi.setSystemTime(new Date('2026-07-18T00:00:00.000Z'))
-    await expect(t.query(readDetail, { kind: 'character', personId: 12 }))
+    await expect(t.query(readDetail, { kind: 'character', personId: 12, token }))
       .resolves.toEqual({ status: 'expired', entry: null })
   })
 
@@ -159,7 +378,7 @@ describe('catalog person Convex cache', () => {
       expiresAt: now + 86_400_000,
     }))
 
-    await expect(t.query(readDetail, { kind: 'character', personId: 12 }))
+    await expect(t.query(readDetail, { kind: 'character', personId: 12, token }))
       .resolves.toEqual({ status: 'expired', entry: null })
   })
 
@@ -171,7 +390,7 @@ describe('catalog person Convex cache', () => {
       items: [{ animeId: 404, role: 'MAIN' }], hasNextPage: false,
       refreshedAt: now, expiresAt: now + 86_400_000,
     }))
-    await expect(t.query(readWorkPage, { kind: 'character', personId: 12, page: 1 }))
+    await expect(t.query(readWorkPage, { kind: 'character', personId: 12, page: 1, token }))
       .rejects.toThrow('missing anime 404')
 
     await t.mutation(acquireLease, {

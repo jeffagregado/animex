@@ -183,13 +183,13 @@ describe('AniList catalog person adapter', () => {
     expect(fixture.requests[0]?.query).toContain('staffMedia(type: ANIME,')
   })
 
-  test('search is strict, destination-ready, and not cache-shaped', async () => {
+  test('search preserves provider identity for server-side public mapping', async () => {
     const fixture = deps([response({ data: { Page: {
       pageInfo: { currentPage: 1, hasNextPage: false },
       characters: [{ id: 12, name: { full: 'Frieren', native: null }, image: null }],
     } } })])
     await expect(searchCatalogPeopleFromAniList('character', ' frieren ', 1, fixture.dependencies)).resolves.toEqual({
-      items: [{ kind: 'character', id: 12, name: 'Frieren', nativeName: null, imageUrl: null, destination: '/characters/12/frieren' }],
+      items: [{ kind: 'character', id: 12, name: 'Frieren', nativeName: null, imageUrl: null }],
       currentPage: 1, hasNextPage: false, perPage: 20,
     })
     expect(fixture.requests[0]?.variables).toMatchObject({ query: 'frieren', page: 1, perPage: 20 })
@@ -201,7 +201,7 @@ describe('AniList catalog person adapter', () => {
       staff: [{ id: 21, name: { full: 'Atsumi Tanezaki', native: null }, image: null }],
     } } })])
     await expect(searchCatalogPeopleFromAniList('staff', 'atsumi', 2, fixture.dependencies))
-      .resolves.toMatchObject({ items: [{ kind: 'staff', id: 21, destination: '/staff/21/atsumi-tanezaki' }] })
+      .resolves.toMatchObject({ items: [{ kind: 'staff', id: 21 }] })
 
     const mismatch = deps([response({ data: { Page: {
       pageInfo: { currentPage: 1, hasNextPage: false }, staff: [],

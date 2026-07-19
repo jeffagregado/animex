@@ -11,7 +11,7 @@ vi.mock('./use-review-discovery-pages', () => ({ useReviewDiscoveryPages: mocks.
 vi.mock('#/features/shell/public-auth-context', () => ({ usePublicAuthState: mocks.auth }))
 vi.mock('convex/react', () => ({ useConvexAuth: mocks.convexAuth }))
 
-const review = { id: 'review-1', author: { id: 'author', username: 'author', displayName: 'Author', avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: 'https://example.test/frieren.jpg' }, state: 'published' as const, rating: 90, summary: 'Compact summary', containsSpoiler: true, visibility: 'public' as const, publishedAt: 1, updatedAt: 1 }
+const review = { id: 'review-1', author: { id: 'author', username: 'author', displayName: 'Author', avatarUrl: null }, anime: { publicId: 'anime_frieren', slug: 'frieren', title: 'Frieren', coverImageUrl: 'https://example.test/frieren.jpg' }, state: 'published' as const, rating: 90, summary: 'Compact summary', containsSpoiler: true, visibility: 'public' as const, publishedAt: 1, updatedAt: 1 }
 const loadMore = vi.fn<() => Promise<void>>()
 const readyPages: ReviewDiscoveryPageState = { items: [review], cursor: null, hasMore: false, error: null, initialLoading: false, loadingMore: false, loadMore, retry: vi.fn() }
 const state = { query: null, sort: 'newest' as const, ratingBand: null, visibility: 'public' as const }

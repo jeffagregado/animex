@@ -29,8 +29,8 @@ vi.mock('./review-preview', () => ({ ReviewPreview: ({ summary }: { summary: str
 
 const fields = { direction: null, format: '' as const, indent: 0 as const, version: 1 as const }
 const textDocument = (value: string) => ({ version: 1 as const, editorState: { root: { ...fields, type: 'root' as const, children: [{ ...fields, children: [{ detail: 0 as const, format: 0, mode: 'normal' as const, style: '' as const, text: value, type: 'text' as const, version: 1 as const }], textFormat: 0, textStyle: '' as const, type: 'paragraph' as const }] } } })
-const anime = { anilistId: 1, coverImageUrl: null, episodes: 28, format: 'TV' as const, seasonYear: 2023, slug: 'frieren', titles: { display: 'Frieren', english: null, native: null, romaji: null } }
-const published = { id: 'review-1', author: { id: 'author-1', username: 'fan', displayName: 'Fan', avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: 'Published summary', containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1, bodyJson: JSON.stringify(textDocument('Published body')) }
+const anime = { publicId: 'anime_frieren', coverImageUrl: null, episodes: 28, format: 'TV' as const, seasonYear: 2023, slug: 'frieren', titles: { display: 'Frieren', english: null, native: null, romaji: null } }
+const published = { id: 'review-1', author: { id: 'author-1', username: 'fan', displayName: 'Fan', avatarUrl: null }, anime: { publicId: 'anime_frieren', slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: 'Published summary', containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1, bodyJson: JSON.stringify(textDocument('Published body')) }
 
 beforeEach(() => {
   let mutationCall = 0

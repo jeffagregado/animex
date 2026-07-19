@@ -19,7 +19,7 @@ vi.mock('#/components/ui/select', () => ({
 
 const fields = { direction: null, format: '', indent: 0, version: 1 }
 const bodyJson = JSON.stringify({ version: 1, editorState: { root: { ...fields, type: 'root', children: [{ ...fields, children: [{ detail: 0, format: 0, mode: 'normal', style: '', text: 'Review body', type: 'text', version: 1 }], textFormat: 0, textStyle: '', type: 'paragraph' }] } } })
-const item = (id: string, authorId: string) => ({ id, author: { id: authorId, username: `user-${id}`, displayName: `User ${id}`, avatarUrl: null }, anime: { anilistId: 1, slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: `Summary ${id}`, containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 })
+const item = (id: string, authorId: string) => ({ id, author: { id: authorId, username: `user-${id}`, displayName: `User ${id}`, avatarUrl: null }, anime: { publicId: 'anime_frieren', slug: 'frieren', title: 'Frieren', coverImageUrl: null }, state: 'published', rating: 90, summary: `Summary ${id}`, containsSpoiler: false, visibility: 'public', publishedAt: 1, updatedAt: 1 })
 const detail = { ...item('current', 'author-1'), bodyJson, containsSpoiler: true }
 const morePage = { items: [item('current', 'author-1'), { ...item('other', 'author-2'), summary: 'Secret ending', containsSpoiler: true }], cursor: null, hasMore: false }
 
@@ -65,7 +65,7 @@ describe('ReviewDetailContent behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith({ reviewId: 'current' }))
     expect(mocks.success).toHaveBeenCalledWith('Review deleted.')
-    expect(mocks.navigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/anime/$anilistId/$slug' }))
+    expect(mocks.navigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/anime/$publicId/$slug' }))
   })
 
   it.each(['public', 'private'] as const)('embargoes Followers UI and lets owner select %s', async (visibility) => {

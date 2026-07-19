@@ -32,7 +32,7 @@ import {
 } from './anime-detail-contracts'
 
 const validDetail = {
-  anilistId: 52991,
+  publicId: 'anime_frieren',
   slug: 'frieren-beyond-journeys-end',
   titles: { display: "Frieren: Beyond Journey's End", english: "Frieren: Beyond Journey's End", romaji: 'Sousou no Frieren', native: '葬送のフリーレン' },
   coverImageUrl: 'https://img.example/frieren.jpg',
@@ -88,34 +88,39 @@ describe('anime detail contracts', () => {
   })
 
   test('creates encoded canonical paths and omits overview search', () => {
-    expect(createCanonicalAnimePath(52991, "Frieren: Beyond Journey's End", 'overview')).toBe('/anime/52991/frieren-beyond-journeys-end')
-    expect(createCanonicalAnimePath(52991, '葬送のフリーレン', 'staff')).toBe('/anime/52991/%E8%91%AC%E9%80%81%E3%81%AE%E3%83%95%E3%83%AA%E3%83%BC%E3%83%AC%E3%83%B3?tab=staff')
+    expect(createCanonicalAnimePath('anime_frieren', "Frieren: Beyond Journey's End", 'overview')).toBe('/anime/anime_frieren/frieren-beyond-journeys-end')
+    expect(createCanonicalAnimePath('anime_frieren', '葬送のフリーレン', 'staff')).toBe('/anime/anime_frieren/%E8%91%AC%E9%80%81%E3%81%AE%E3%83%95%E3%83%AA%E3%83%BC%E3%83%AC%E3%83%B3?tab=staff')
+    expect(() => createCanonicalAnimePath('52991', 'Frieren', 'overview')).toThrow('CATALOG_PUBLIC_ID_INVALID')
   })
 
-  test('validates serializable full detail metadata and exact caps', () => {
+  test('validates strict public detail metadata and exact caps', () => {
     expect(animeDetailSchema.parse(validDetail)).toEqual(validDetail)
-    const compactItem = { anilistId: 1, slug: 'x', title: 'X', coverImageUrl: null, format: 'TV', seasonYear: 2026 }
+    const compactItem = { publicId: 'anime_x', slug: 'x', title: 'X', coverImageUrl: null, format: 'TV', seasonYear: 2026 }
     expect(animeDetailSchema.parse({ ...validDetail, related: [compactItem] }).related).toEqual([compactItem])
+    expect(() => animeDetailSchema.parse({ ...validDetail, anilistId: 52991 })).toThrow()
+    expect(() => animeDetailSchema.parse({ ...validDetail, publicId: '52991' })).toThrow()
     expect(() => animeDetailSchema.parse({ ...validDetail, related: Array.from({ length: 6 }, () => compactItem) })).toThrow()
     expect(() => animeDetailSchema.parse({ ...validDetail, recommendations: Array.from({ length: 6 }, () => compactItem) })).toThrow()
-    expect(() => animeDetailSchema.parse({ ...validDetail, related: [{ anilistId: 1, slug: 'x', title: 'X', coverImageUrl: null }] })).toThrow()
+    expect(() => animeDetailSchema.parse({ ...validDetail, related: [{ publicId: 'anime_x', anilistId: 1, slug: 'x', title: 'X', coverImageUrl: null, format: 'TV', seasonYear: 2026 }] })).toThrow()
     expect(() => animeDetailSchema.parse({ ...validDetail, externalLinks: [{ site: 'Bad', url: 'http://example.com' }] })).toThrow()
     expect(() => animeDetailSchema.parse({ ...validDetail, externalLinks: Array.from({ length: 9 }, (_, index) => ({ site: `Site ${index}`, url: `https://example.com/${index}` })) })).toThrow()
     expect(() => animeDetailSchema.parse({ ...validDetail, charactersPage: { ...validDetail.charactersPage, currentPage: 2 } })).toThrow()
-    expect(() => animeDetailSchema.parse({ ...validDetail, staffPage: { ...validDetail.staffPage, items: Array.from({ length: 25 }, () => ({ anilistId: 2, name: 'Staff', role: 'Director', imageUrl: null })) } })).toThrow()
+    expect(() => animeDetailSchema.parse({ ...validDetail, staffPage: { ...validDetail.staffPage, items: Array.from({ length: 25 }, () => ({ publicId: 'staff_director', name: 'Staff', role: 'Director', imageUrl: null })) } })).toThrow()
     const { charactersPage: _charactersPage, ...missingCharacters } = validDetail
     expect(() => animeDetailSchema.parse(missingCharacters)).toThrow()
   })
 
   test('locks generic people pages to 24 and validates character data', () => {
-    const character: AnimeCharacter = { anilistId: 1, name: 'Frieren', role: 'MAIN', imageUrl: null, japaneseVoiceActor: null }
+    const character: AnimeCharacter = { publicId: 'character_frieren', name: 'Frieren', role: 'MAIN', imageUrl: null, japaneseVoiceActor: null }
     const page: AnimePeoplePage<AnimeCharacter> = { items: [character], currentPage: 1, hasNextPage: false, perPage: 24 }
 
     expect(animeCharacterPageSchema.parse(page)).toEqual(page)
+    expect(() => animeCharacterPageSchema.parse({ ...page, items: [{ ...character, anilistId: 1 }] })).toThrow()
+    expect(() => animeCharacterPageSchema.parse({ ...page, items: [{ ...character, publicId: '1' }] })).toThrow()
     expect(() => animeCharacterPageSchema.parse({ ...page, perPage: 25 })).toThrow()
-    expect(() => animeCharacterPageSchema.parse({ ...page, items: [{ ...character, japaneseVoiceActor: { anilistId: 2, name: 'Atsumi Tanezaki', imageUrl: null, language: 'English' } }] })).toThrow()
+    expect(() => animeCharacterPageSchema.parse({ ...page, items: [{ ...character, japaneseVoiceActor: { publicId: 'staff_atsumi', anilistId: 2, name: 'Atsumi Tanezaki', imageUrl: null, language: 'Japanese' } }] })).toThrow()
     expect(() => animeCharacterPageSchema.parse({ ...page, items: Array.from({ length: 25 }, () => character) })).toThrow()
-    expect(() => animeStaffPageSchema.parse({ ...page, items: [{ anilistId: 2, name: 'Keiichirou Saitou', role: 42, imageUrl: null }] })).toThrow()
+    expect(() => animeStaffPageSchema.parse({ ...page, items: [{ publicId: 'staff_saitou', name: 'Keiichirou Saitou', role: 42, imageUrl: null }] })).toThrow()
     expectTypeOf(page.items).toEqualTypeOf<AnimeCharacter[]>()
   })
 
@@ -130,35 +135,44 @@ describe('anime detail contracts', () => {
   })
 
   test('validates exact identity-free mutation inputs', () => {
-    expect(setAnimeStatusInputSchema.parse({ anilistId: 52991, status: 'watching' })).toEqual({ anilistId: 52991, status: 'watching' })
-    expect(setAnimeScoreInputSchema.parse({ anilistId: 52991, score: null })).toEqual({ anilistId: 52991, score: null })
-    expect(setAnimeFavoriteInputSchema.parse({ anilistId: 52991, isFavorite: false })).toEqual({ anilistId: 52991, isFavorite: false })
-    expect(recordAnimeRewatchInputSchema.parse({ anilistId: 52991 })).toEqual({ anilistId: 52991 })
-    expect(removeLatestAnimeRewatchInputSchema.parse({ anilistId: 52991 })).toEqual({ anilistId: 52991 })
-    expect(() => setAnimeStatusInputSchema.parse({ anilistId: 52991, status: 'watching', userId: 'leak' })).toThrow()
-    expect(() => setAnimeFavoriteInputSchema.parse({ anilistId: 52991 })).toThrow()
-    expect(() => recordAnimeRewatchInputSchema.parse({ anilistId: 52991, completedAt: 1 })).toThrow()
+    const animeId = 'anime_frieren'
+
+    expect(setAnimeStatusInputSchema.parse({ animeId, status: 'watching' })).toEqual({ animeId, status: 'watching' })
+    expect(setAnimeScoreInputSchema.parse({ animeId, score: null })).toEqual({ animeId, score: null })
+    expect(setAnimeFavoriteInputSchema.parse({ animeId, isFavorite: false })).toEqual({ animeId, isFavorite: false })
+    expect(recordAnimeRewatchInputSchema.parse({ animeId })).toEqual({ animeId })
+    expect(removeLatestAnimeRewatchInputSchema.parse({ animeId })).toEqual({ animeId })
+    expect(() => setAnimeStatusInputSchema.parse({ animeId, status: 'watching', userId: 'leak' })).toThrow()
+    expect(() => setAnimeStatusInputSchema.parse({ animeId: '52991', status: 'watching' })).toThrow()
+    expect(() => setAnimeStatusInputSchema.parse({ anilistId: 52991, status: 'watching' })).toThrow()
+    expect(() => setAnimeFavoriteInputSchema.parse({ animeId })).toThrow()
+    expect(() => recordAnimeRewatchInputSchema.parse({ animeId, completedAt: 1 })).toThrow()
   })
 
   test('validates strict cursor-based rewatch pagination input', () => {
-    const input = { anilistId: 52991, paginationOpts: { numItems: 20, cursor: null } }
+    const input = { animeId: 'anime_frieren', paginationOpts: { numItems: 20, cursor: null } }
 
     expect(animeRewatchPageInputSchema.parse(input)).toEqual(input)
     expect(animeRewatchPageInputSchema.parse({ ...input, paginationOpts: { ...input.paginationOpts, cursor: 'next-page' } }).paginationOpts.cursor).toBe('next-page')
+    expect(() => animeRewatchPageInputSchema.parse({ anilistId: 52991, paginationOpts: input.paginationOpts })).toThrow()
     expect(() => animeRewatchPageInputSchema.parse({ ...input, userId: 'leak' })).toThrow()
     expect(() => animeRewatchPageInputSchema.parse({ ...input, paginationOpts: { ...input.paginationOpts, numItems: 21 } })).toThrow()
     expect(() => animeRewatchPageInputSchema.parse({ ...input, paginationOpts: { ...input.paginationOpts, endCursor: null } })).toThrow()
   })
 
   test('validates user entry, milestone, rewatch page, and mutation result semantics', () => {
-    const entry = { anilistId: 52991, status: null, score: 9.5, isFavorite: true, favoriteChangedAt: 10, rewatchCount: 1, createdAt: 1, updatedAt: 10 }
-    const milestone = { anilistId: 52991, kind: 'completed', settledAt: 10 }
-    const rewatch = { id: 'rewatch-1', anilistId: 52991, completedAt: 10 }
+    const animeId = 'anime_frieren'
+    const entry = { animeId, status: null, score: 9.5, isFavorite: true, favoriteChangedAt: 10, rewatchCount: 1, createdAt: 1, updatedAt: 10 }
+    const milestone = { animeId, kind: 'completed', settledAt: 10 }
+    const rewatch = { id: 'rewatch-1', animeId, completedAt: 10 }
 
     expect(userAnimeEntrySchema.parse(entry)).toEqual(entry)
     expect(animeMilestoneSchema.parse(milestone)).toEqual(milestone)
     expect(animeRewatchPageSchema.parse({ items: [rewatch], continueCursor: 'next-page', isDone: false, perPage: 20 }).items).toEqual([rewatch])
     expect(userAnimeMutationResultSchema.parse({ status: 'saved', entry })).toEqual({ status: 'saved', entry })
+    expect(userAnimeMutationResultSchema.parse({ status: 'removed', animeId })).toEqual({ status: 'removed', animeId })
+    expect(() => userAnimeEntrySchema.parse({ ...entry, anilistId: 52991 })).toThrow()
+    expect(() => userAnimeMutationResultSchema.parse({ status: 'removed', anilistId: 52991 })).toThrow()
     expect(() => animeMilestoneSchema.parse({ ...milestone, kind: 'started' })).toThrow()
     expect(() => animeRewatchPageSchema.parse({ items: Array.from({ length: 21 }, () => rewatch), continueCursor: 'done', isDone: true, perPage: 20 })).toThrow()
     expect(() => animeRewatchPageSchema.parse({ items: [rewatch], continueCursor: null, isDone: true, perPage: 20 })).toThrow()

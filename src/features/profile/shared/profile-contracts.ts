@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { parseCatalogPublicId } from '../../catalog-identity/shared/catalog-identity-contracts'
 import { feedPageSchema, reviewListItemSchema } from '../../social/shared/social-contracts'
 
 export const PROFILE_BIO_MAX_LENGTH = 300 as const
@@ -19,6 +20,14 @@ export type ProfileTab = z.infer<typeof profileTabSchema>
 export type ProfileMediaKind = z.infer<typeof profileMediaKindSchema>
 
 const nullableHttpsUrlSchema = z.url({ protocol: /^https$/ }).nullable()
+const catalogPublicIdSchema = z.string().transform((value, context) => {
+  try {
+    return parseCatalogPublicId(value)
+  } catch {
+    context.addIssue({ code: 'custom', message: 'CATALOG_PUBLIC_ID_INVALID' })
+    return z.NEVER
+  }
+})
 const profileHeaderSchema = z.object({
   avatarUrl: nullableHttpsUrlSchema,
   bannerUrl: nullableHttpsUrlSchema,
@@ -29,7 +38,7 @@ const profileHeaderSchema = z.object({
   username: z.string().trim().min(1),
 }).strict()
 const profileFavoriteAnimeSchema = z.object({
-  anilistId: z.number().int().positive(),
+  publicId: catalogPublicIdSchema,
   coverImageUrl: nullableHttpsUrlSchema,
   slug: z.string().trim().min(1),
   title: z.string().trim().min(1),

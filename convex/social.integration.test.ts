@@ -34,11 +34,17 @@ const createOwner = async (t: ReturnType<typeof createHarness>, label: string) =
 }
 
 const insertAnime = async (t: ReturnType<typeof createHarness>, anilistId: number) => await t.run(async (ctx) => {
+  const now = Date.now()
+  const animeId = await ctx.db.insert('catalogEntities', { kind: 'anime', createdAt: now, updatedAt: now })
+  await ctx.db.insert('catalogProviderRefs', {
+    entityId: animeId, provider: 'anilist', kind: 'anime', providerId: anilistId, createdAt: now, updatedAt: now,
+  })
   await ctx.db.insert('animeSummaries', {
     anilistId, slug: `anime-${anilistId}`, titles: { display: `Anime ${anilistId}`, english: null, romaji: null, native: null },
     coverImageUrl: null, bannerImageUrl: null, format: 'TV', season: null, seasonYear: 2024, episodes: 12,
-    genres: ['Fantasy'], popularity: 1, averageScore: 80, trending: 1, startDate: null, nextAiringAt: null, updatedAt: Date.now(),
+    genres: ['Fantasy'], popularity: 1, averageScore: 80, trending: 1, startDate: null, nextAiringAt: null, updatedAt: now,
   })
+  return animeId
 })
 
 const body = {
@@ -52,24 +58,139 @@ const body = {
 const bodyJson = JSON.stringify(body)
 
 describe('social Convex integration', () => {
+  test('rejects missing or conflicting Review aggregate entity refs', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'aggregate-identity')
+    const animeId = await insertAnime(t, 701)
+    const reviewId = await owner.client.mutation(socialApi.reviews.publish, {
+      animeId, requestId: 'aggregate-identity', rating: 90,
+      summary: 'Aggregate identity', containsSpoiler: false, bodyJson, visibility: 'public',
+    })
+    const ids = await t.run(async (ctx) => {
+      const stats = await ctx.db.query('animeReviewStats').withIndex('by_anilist_id', (q) => q.eq('anilistId', 701)).unique()
+      if (!stats) throw new Error('Expected Review aggregate.')
+      await ctx.db.patch('animeReviewStats', stats._id, { animeId: undefined })
+      const conflictId = await ctx.db.insert('catalogEntities', { kind: 'anime', createdAt: 1, updatedAt: 1 })
+      return { statsId: stats._id, conflictId }
+    })
+    const repeated = {
+      animeId, requestId: 'aggregate-identity', rating: 90,
+      summary: 'Aggregate identity', containsSpoiler: false, bodyJson, visibility: 'public',
+    }
+    await expect(owner.client.mutation(socialApi.reviews.publish, repeated)).rejects.toThrow()
+    expect((await t.run(async (ctx) => await ctx.db.get('animeReviewStats', ids.statsId)))?.animeId).toBeUndefined()
+    await t.run(async (ctx) => await ctx.db.patch('animeReviewStats', ids.statsId, { animeId }))
+    expect(await owner.client.mutation(socialApi.reviews.publish, repeated)).toBe(reviewId)
+    await t.run(async (ctx) => await ctx.db.patch('animeReviewStats', ids.statsId, { animeId: ids.conflictId }))
+    await expect(owner.client.mutation(socialApi.reviews.publish, repeated)).rejects.toThrow('conflicts with provider mapping')
+  })
+
+  test('rejects legacy milestone and card refs without runtime repair', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'legacy-milestone-update')
+    const animeId = await insertAnime(t, 702)
+    const cardId = await t.run(async (ctx) => {
+      const milestoneId = await ctx.db.insert('animeMilestones', {
+        userId: owner.profileId, anilistId: 702, kind: 'completed',
+        visibility: 'public', occurredAt: 10, updatedAt: 10,
+      })
+      const sourceKey = `completed:${owner.profileId}:702`
+      const cardId = await ctx.db.insert('feedCards', {
+        sourceKey, kind: 'completed', userId: owner.profileId, anilistId: 702,
+        visibility: 'public', active: true, orderKey: makeOrderKey(10, sourceKey),
+        occurredAt: 10, updatedAt: 10,
+      })
+      return { milestoneId, cardId }
+    })
+    await expect(owner.client.mutation(socialApi.feed.setActivityVisibility, {
+      cardId: cardId.cardId,
+      visibility: 'private',
+    })).rejects.toThrow()
+    const rows = await t.run(async (ctx) => ({
+      milestone: await ctx.db.get('animeMilestones', cardId.milestoneId),
+      card: await ctx.db.get('feedCards', cardId.cardId),
+    }))
+    expect(rows.milestone).toMatchObject({ visibility: 'public' })
+    expect(rows.milestone).not.toHaveProperty('animeId')
+    expect(rows.card).toMatchObject({ visibility: 'public', active: true })
+    expect(rows.card).not.toHaveProperty('animeId')
+    await expect(owner.client.mutation(socialApi.feed.removeActivity, { cardId: cardId.cardId })).rejects.toThrow()
+    expect((await t.run(async (ctx) => await ctx.db.get('feedCards', cardId.cardId)))?.active).toBe(true)
+    expect(animeId).toBeDefined()
+  })
+
+  test('rejects conflicting milestone cards and preserves stable order keys', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'milestone-card-conflict')
+    const animeId = await insertAnime(t, 703)
+    const rows = await t.run(async (ctx) => {
+      const otherAnimeId = await ctx.db.insert('catalogEntities', { kind: 'anime', createdAt: 1, updatedAt: 1 })
+      const milestoneId = await ctx.db.insert('animeMilestones', {
+        userId: owner.profileId, anilistId: 703, animeId, kind: 'completed',
+        visibility: 'public', occurredAt: 20, updatedAt: 20,
+      })
+      const sourceKey = `completed:${owner.profileId}:${animeId}`
+      const cardId = await ctx.db.insert('feedCards', {
+        sourceKey, kind: 'completed', userId: owner.profileId, anilistId: 703,
+        animeId: otherAnimeId, visibility: 'public', active: true,
+        orderKey: 'preserved-order', occurredAt: 20, updatedAt: 20,
+      })
+      return { milestoneId, cardId, otherAnimeId }
+    })
+    await expect(t.mutation(socialInternal.feed.projectMilestones, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })).rejects.toThrow('conflicts with milestone')
+    await t.run(async (ctx) => await ctx.db.patch('feedCards', rows.cardId, { animeId: undefined }))
+    await expect(t.mutation(socialInternal.feed.projectMilestones, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })).rejects.toThrow()
+    expect((await t.run(async (ctx) => await ctx.db.get('feedCards', rows.cardId)))?.orderKey).toBe('preserved-order')
+  })
+
+  test('dual-writes one existing Anime entity to Review, aggregate, and Review feed card', async () => {
+    const t = createHarness()
+    const owner = await createOwner(t, 'review-entity-write')
+    const animeId = await insertAnime(t, 601)
+    const reviewId = await owner.client.mutation(socialApi.reviews.publish, {
+      animeId,
+      requestId: 'review-entity-write',
+      rating: 91,
+      summary: 'Entity linked Review',
+      containsSpoiler: false,
+      bodyJson,
+      visibility: 'public',
+    })
+
+    const rows = await t.run(async (ctx) => ({
+      review: await ctx.db.get('reviews', reviewId),
+      stats: await ctx.db.query('animeReviewStats').withIndex('by_anilist_id', (q) => q.eq('anilistId', 601)).unique(),
+      card: await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `review:${reviewId}`)).unique(),
+      entities: await ctx.db.query('catalogEntities').collect(),
+    }))
+    expect(rows.review?.animeId).toBe(animeId)
+    expect(rows.stats?.animeId).toBe(animeId)
+    expect(rows.card?.animeId).toBe(animeId)
+    expect(rows.entities).toHaveLength(1)
+  })
+
   test('discovers latest Public Reviews without leaking viewer-owned visibility', async () => {
     const t = createHarness()
     const viewer = await createOwner(t, 'discovery-viewer')
     const authors = await Promise.all(Array.from({ length: 7 }, (_, index) => createOwner(t, `latest-${index}`)))
-    await Promise.all(Array.from({ length: 10 }, (_, index) => insertAnime(t, index + 1)))
+    const animeIds = await Promise.all(Array.from({ length: 10 }, (_, index) => insertAnime(t, index + 1)))
 
     for (let index = 0; index < authors.length; index += 1) {
       await authors[index]!.client.mutation(socialApi.reviews.publish, {
-        anilistId: index + 1, requestId: `latest-${index}`, rating: 50 + index,
+        animeId: animeIds[index]!, requestId: `latest-${index}`, rating: 50 + index,
         summary: `Latest ${index}`, containsSpoiler: false, bodyJson, visibility: 'public',
       })
     }
     const followersId = await viewer.client.mutation(socialApi.reviews.publish, {
-      anilistId: 8, requestId: 'own-followers', rating: 88,
+      animeId: animeIds[7]!, requestId: 'own-followers', rating: 88,
       summary: 'Own Followers', containsSpoiler: false, bodyJson, visibility: 'followers',
     })
     const privateId = await viewer.client.mutation(socialApi.reviews.publish, {
-      anilistId: 9, requestId: 'own-private', rating: 77,
+      animeId: animeIds[8]!, requestId: 'own-private', rating: 77,
       summary: 'Own Private', containsSpoiler: false, bodyJson, visibility: 'private',
     })
 
@@ -103,7 +224,7 @@ describe('social Convex integration', () => {
     const t = createHarness()
     const ratings = [100, 90, 89.9, 80, 79.9, 70, 69.9, 60, 59.9, 50, 49.9, 40, 39.9, 30, 29.9, 20, 19.9, 10, 9.9, 0]
     const authors = await Promise.all(ratings.map((_, index) => createOwner(t, `band-user-${index}`)))
-    await Promise.all(ratings.map((_, index) => insertAnime(t, index + 1)))
+    const animeIds = await Promise.all(ratings.map((_, index) => insertAnime(t, index + 1)))
     await t.run(async (ctx) => {
       await ctx.db.patch('users', authors[4]!.profileId, { name: 'Search Display', username: 'SearchHandle', usernameKey: 'searchhandle' })
       const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', 5)).unique()
@@ -112,7 +233,7 @@ describe('social Convex integration', () => {
     })
     for (let index = 0; index < ratings.length; index += 1) {
       await authors[index]!.client.mutation(socialApi.reviews.publish, {
-        anilistId: index + 1, requestId: `band-${index}`, rating: ratings[index]!,
+        animeId: animeIds[index]!, requestId: `band-${index}`, rating: ratings[index]!,
         summary: `Band ${index}`, containsSpoiler: false, bodyJson, visibility: 'public',
       })
     }
@@ -146,7 +267,7 @@ describe('social Convex integration', () => {
     const t = createHarness()
     const viewer = await createOwner(t, 'cursor-viewer')
     const authors = await Promise.all(Array.from({ length: 14 }, (_, index) => createOwner(t, `cursor-author-${index}`)))
-    await Promise.all(Array.from({ length: 16 }, (_, index) => insertAnime(t, index + 1)))
+    const animeIds = await Promise.all(Array.from({ length: 16 }, (_, index) => insertAnime(t, index + 1)))
     await t.run(async (ctx) => {
       for (let index = 1; index <= 16; index += 1) {
         const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', index)).unique()
@@ -156,16 +277,16 @@ describe('social Convex integration', () => {
     })
     for (let index = 0; index < authors.length; index += 1) {
       await authors[index]!.client.mutation(socialApi.reviews.publish, {
-        anilistId: index + 1, requestId: `cursor-${index}`, rating: 60 + index,
+        animeId: animeIds[index]!, requestId: `cursor-${index}`, rating: 60 + index,
         summary: `Cursor public ${index}`, containsSpoiler: false, bodyJson, visibility: 'public',
       })
     }
     await viewer.client.mutation(socialApi.reviews.publish, {
-      anilistId: 15, requestId: 'cursor-followers', rating: 88,
+      animeId: animeIds[14]!, requestId: 'cursor-followers', rating: 88,
       summary: 'Cursor own followers', containsSpoiler: false, bodyJson, visibility: 'followers',
     })
     await viewer.client.mutation(socialApi.reviews.publish, {
-      anilistId: 16, requestId: 'cursor-private', rating: 77,
+      animeId: animeIds[15]!, requestId: 'cursor-private', rating: 77,
       summary: 'Cursor own private', containsSpoiler: false, bodyJson, visibility: 'private',
     })
     const input = { query: null, sort: 'newest', ratingBand: null, visibility: 'all', cursor: null }
@@ -205,14 +326,14 @@ describe('social Convex integration', () => {
   test('backfills and verifies every Draft and published Review page', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'discovery-backfill')
-    await insertAnime(t, 1)
-    await insertAnime(t, 2)
+    const draftAnimeId = await insertAnime(t, 1)
+    const publishedAnimeId = await insertAnime(t, 2)
     const draftId = await owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'backfill-draft', rating: null, summary: '',
+      animeId: draftAnimeId, requestId: 'backfill-draft', rating: null, summary: '',
       containsSpoiler: false, bodyJson, visibility: 'private',
     })
     const publishedId = await owner.client.mutation(socialApi.reviews.publish, {
-      anilistId: 2, requestId: 'backfill-published', rating: 90, summary: 'Published',
+      animeId: publishedAnimeId, requestId: 'backfill-published', rating: 90, summary: 'Published',
       containsSpoiler: false, bodyJson, visibility: 'public',
     })
     await t.run(async (ctx) => {
@@ -237,10 +358,10 @@ describe('social Convex integration', () => {
   test('allows unrated Draft projection but rejects published Review without Rating', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'null-rating-backfill')
-    await insertAnime(t, 1)
-    await insertAnime(t, 2)
+    const draftAnimeId = await insertAnime(t, 1)
+    const publishedAnimeId = await insertAnime(t, 2)
     const draftId = await owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'null-rating-draft', rating: null, summary: '',
+      animeId: draftAnimeId, requestId: 'null-rating-draft', rating: null, summary: '',
       containsSpoiler: false, bodyJson, visibility: 'private',
     })
     await t.run(async (ctx) => await ctx.db.patch('reviews', draftId, { searchText: 'stale', ratingBand: '0-9' }))
@@ -249,7 +370,8 @@ describe('social Convex integration', () => {
 
     await t.run(async (ctx) => {
       await ctx.db.insert('reviews', {
-        userId: owner.profileId, anilistId: 2, requestId: 'corrupt-published-null', state: 'published', rating: null,
+        userId: owner.profileId, anilistId: 2, animeId: publishedAnimeId,
+        requestId: 'corrupt-published-null', state: 'published', rating: null,
         summary: 'Corrupt', containsSpoiler: false, bodyJson, visibility: 'public', publishedAt: 1,
         updatedAt: 1, activityState: 'active', newestOrderKey: 'corrupt', highRatingOrderKey: 'corrupt', lowRatingOrderKey: 'corrupt',
         searchText: 'corrupt', ratingBand: 'none',
@@ -266,9 +388,9 @@ describe('social Convex integration', () => {
   test('rejects activity removal for Draft Reviews without changing projection state', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'draft-activity-owner')
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     const reviewId = await owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'draft-activity', rating: null, summary: '',
+      animeId, requestId: 'draft-activity', rating: null, summary: '',
       containsSpoiler: false, bodyJson, visibility: 'private',
     })
     const before = await t.run(async (ctx) => await ctx.db.get('reviews', reviewId))
@@ -282,9 +404,9 @@ describe('social Convex integration', () => {
   test('fails discovery hydration when indexed Review author source is missing', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'missing-discovery-author')
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     await owner.client.mutation(socialApi.reviews.publish, {
-      anilistId: 1, requestId: 'missing-discovery-author', rating: 75, summary: 'Source required',
+      animeId, requestId: 'missing-discovery-author', rating: 75, summary: 'Source required',
       containsSpoiler: false, bodyJson, visibility: 'public',
     })
     await t.run(async (ctx) => await ctx.db.delete('users', owner.profileId))
@@ -298,19 +420,19 @@ describe('social Convex integration', () => {
     const t = createHarness()
     const owner = await createOwner(t, 'owner')
     const viewer = await createOwner(t, 'viewer')
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
 
     await expect(t.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'signed-out', rating: null, summary: '', containsSpoiler: false,
+      animeId, requestId: 'signed-out', rating: null, summary: '', containsSpoiler: false,
       bodyJson, visibility: 'private',
     })).rejects.toThrow('Unauthenticated')
     await expect(owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'forged-owner', rating: null, summary: '', containsSpoiler: false,
+      animeId, requestId: 'forged-owner', rating: null, summary: '', containsSpoiler: false,
       bodyJson, visibility: 'private', userId: viewer.profileId,
     })).rejects.toThrow('Validator error')
 
     const draftId = await owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'draft-1', rating: null, summary: '', containsSpoiler: false,
+      animeId, requestId: 'draft-1', rating: null, summary: '', containsSpoiler: false,
       bodyJson, visibility: 'private',
     })
     const draft = await owner.client.query(socialApi.reviews.getById, { reviewId: draftId })
@@ -318,33 +440,33 @@ describe('social Convex integration', () => {
     expect(JSON.parse(draft.bodyJson)).toEqual(body)
     expect(await viewer.client.query(socialApi.reviews.getById, { reviewId: draftId })).toBeNull()
     expect(await owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'draft-2', rating: 80, summary: 'Draft', containsSpoiler: false,
+      animeId, requestId: 'draft-2', rating: 80, summary: 'Draft', containsSpoiler: false,
       bodyJson, visibility: 'private',
     })).toBe(draftId)
 
     const publishedId = await owner.client.mutation(socialApi.reviews.publish, {
-      anilistId: 1, requestId: 'publish-1', rating: 95, summary: 'Great', containsSpoiler: false,
+      animeId, requestId: 'publish-1', rating: 95, summary: 'Great', containsSpoiler: false,
       bodyJson, visibility: 'public',
     })
     expect(publishedId).toBe(draftId)
     const reviewFeed = await viewer.client.query(socialApi.feed.listGlobal, { cursor: null })
     expect(reviewFeed.items).toContainEqual(expect.objectContaining({ kind: 'review', reviewId: draftId }))
     expect(await owner.client.mutation(socialApi.reviews.publish, {
-      anilistId: 1, requestId: 'publish-1', rating: 95, summary: 'Great', containsSpoiler: false,
+      animeId, requestId: 'publish-1', rating: 95, summary: 'Great', containsSpoiler: false,
       bodyJson, visibility: 'public',
     })).toBe(draftId)
-    expect(await viewer.client.query(socialApi.reviews.getStats, { anilistId: 1 })).toMatchObject({ count: 1, average: 95, bands: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0] })
+    expect(await viewer.client.query(socialApi.reviews.getStats, { animeId })).toMatchObject({ count: 1, average: 95, bands: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0] })
 
     await owner.client.mutation(socialApi.reviews.setVisibility, { reviewId: draftId, visibility: 'followers' })
     expect(await viewer.client.query(socialApi.reviews.getById, { reviewId: draftId })).toBeNull()
     expect(await owner.client.query(socialApi.reviews.getById, { reviewId: draftId })).not.toBeNull()
-    expect(await viewer.client.query(socialApi.reviews.getStats, { anilistId: 1 })).toMatchObject({ count: 0, average: null })
-    expect(await owner.client.query(socialApi.reviews.getStats, { anilistId: 1 })).toMatchObject({ count: 1, average: 95 })
+    expect(await viewer.client.query(socialApi.reviews.getStats, { animeId })).toMatchObject({ count: 0, average: null })
+    expect(await owner.client.query(socialApi.reviews.getStats, { animeId })).toMatchObject({ count: 1, average: 95 })
 
     await owner.client.mutation(socialApi.reviews.update, {
       reviewId: draftId, rating: 85, summary: 'Updated', containsSpoiler: true, bodyJson, visibility: 'public',
     })
-    expect(await viewer.client.query(socialApi.reviews.getStats, { anilistId: 1 })).toMatchObject({ count: 1, average: 85, bands: [0, 1, 0, 0, 0, 0, 0, 0, 0, 0] })
+    expect(await viewer.client.query(socialApi.reviews.getStats, { animeId })).toMatchObject({ count: 1, average: 85, bands: [0, 1, 0, 0, 0, 0, 0, 0, 0, 0] })
     await owner.client.mutation(socialApi.reviews.removeActivity, { reviewId: draftId })
     expect(await t.run(async (ctx) => (await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `review:${draftId}`)).unique())?.active)).toBe(false)
     await owner.client.mutation(socialApi.reviews.update, {
@@ -352,18 +474,18 @@ describe('social Convex integration', () => {
     })
     expect(await t.run(async (ctx) => (await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `review:${draftId}`)).unique())?.active)).toBe(false)
     await owner.client.mutation(socialApi.reviews.remove, { reviewId: draftId })
-    expect(await owner.client.query(socialApi.reviews.getMineForAnime, { anilistId: 1 })).toBeNull()
-    expect(await viewer.client.query(socialApi.reviews.getStats, { anilistId: 1 })).toMatchObject({ count: 0, average: null })
+    expect(await owner.client.query(socialApi.reviews.getMineForAnime, { animeId })).toBeNull()
+    expect(await viewer.client.query(socialApi.reviews.getStats, { animeId })).toMatchObject({ count: 0, average: null })
   }, 20_000)
 
   test('stores validated Review bodies as bounded canonical JSON', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'canonical-review-owner')
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     const paddedBodyJson = `${' '.repeat((64 * 1024) + 1)}${bodyJson}`
 
     const reviewId = await owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'canonical-review', rating: null, summary: '', containsSpoiler: false,
+      animeId, requestId: 'canonical-review', rating: null, summary: '', containsSpoiler: false,
       bodyJson: paddedBodyJson, visibility: 'private',
     })
 
@@ -517,14 +639,14 @@ describe('social Convex integration', () => {
     const t = createHarness()
     const owner = await createOwner(t, 'source-review-owner')
     const viewer = await createOwner(t, 'source-review-viewer')
-    await insertAnime(t, 89)
-    await insertAnime(t, 90)
+    const animeId = await insertAnime(t, 89)
+    const otherAnimeId = await insertAnime(t, 90)
     const reviewId = await owner.client.mutation(socialApi.reviews.publish, {
-      anilistId: 89, requestId: 'source-review', rating: 90, summary: 'Source Review',
+      animeId, requestId: 'source-review', rating: 90, summary: 'Source Review',
       containsSpoiler: false, bodyJson, visibility: 'public',
     })
     const otherReviewId = await viewer.client.mutation(socialApi.reviews.publish, {
-      anilistId: 90, requestId: 'source-review-other', rating: 80, summary: 'Other Review',
+      animeId: otherAnimeId, requestId: 'source-review-other', rating: 80, summary: 'Other Review',
       containsSpoiler: false, bodyJson, visibility: 'public',
     })
     const card = await t.run(async (ctx) => await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `review:${reviewId}`)).unique())
@@ -545,6 +667,7 @@ describe('social Convex integration', () => {
       { sourceId: otherReviewId },
       { userId: viewer.profileId },
       { anilistId: 90 },
+      { animeId: otherAnimeId },
       { visibility: 'private' as const },
       { sourceId: 'missing-review-source' },
     ]
@@ -552,7 +675,8 @@ describe('social Convex integration', () => {
       await t.run(async (ctx) => await ctx.db.patch('feedCards', card._id, corruption))
       expect(await readCard()).toEqual({ direct: null, globalHasCard: false })
       await t.run(async (ctx) => await ctx.db.patch('feedCards', card._id, {
-        sourceKey: `review:${reviewId}`, sourceId: reviewId, userId: owner.profileId, anilistId: 89, visibility: 'public',
+        sourceKey: `review:${reviewId}`, sourceId: reviewId, userId: owner.profileId,
+        anilistId: 89, animeId, visibility: 'public',
       }))
     }
 
@@ -563,15 +687,17 @@ describe('social Convex integration', () => {
   test('returns null for malformed direct feed IDs and exposes milestone visibility', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'milestone-owner')
-    await insertAnime(t, 88)
+    const animeId = await insertAnime(t, 88)
     expect(await owner.client.query(socialApi.feed.getById, { cardId: 'not-a-convex-id' })).toBeNull()
     const cardId = await t.run(async (ctx) => {
       await ctx.db.insert('animeMilestones', {
-        userId: owner.profileId, anilistId: 88, kind: 'completed', visibility: 'private', occurredAt: 1, updatedAt: 1,
+        userId: owner.profileId, anilistId: 88, animeId,
+        kind: 'completed', visibility: 'private', occurredAt: 1, updatedAt: 1,
       })
+      const sourceKey = `completed:${owner.profileId}:${animeId}`
       return await ctx.db.insert('feedCards', {
-        sourceKey: `completed:${owner.profileId}:88`, kind: 'completed', userId: owner.profileId,
-        anilistId: 88, visibility: 'private', active: true, orderKey: '0000000000000001:test',
+        sourceKey, kind: 'completed', userId: owner.profileId,
+        anilistId: 88, animeId, visibility: 'private', active: true, orderKey: '0000000000000001:test',
         occurredAt: 1, updatedAt: 1,
       })
     })
@@ -583,16 +709,16 @@ describe('social Convex integration', () => {
   test('rejects publish request collisions across anime and Draft intent', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'collision-owner')
-    await insertAnime(t, 1)
-    await insertAnime(t, 2)
+    const firstAnimeId = await insertAnime(t, 1)
+    const secondAnimeId = await insertAnime(t, 2)
     await owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 2, requestId: 'collision', rating: null, summary: '', containsSpoiler: false, bodyJson, visibility: 'private',
+      animeId: secondAnimeId, requestId: 'collision', rating: null, summary: '', containsSpoiler: false, bodyJson, visibility: 'private',
     })
     await expect(owner.client.mutation(socialApi.reviews.saveDraft, {
-      anilistId: 1, requestId: 'collision', rating: null, summary: '', containsSpoiler: false, bodyJson, visibility: 'private',
+      animeId: firstAnimeId, requestId: 'collision', rating: null, summary: '', containsSpoiler: false, bodyJson, visibility: 'private',
     })).rejects.toThrow('collision')
     await expect(owner.client.mutation(socialApi.reviews.publish, {
-      anilistId: 1, requestId: 'collision', rating: 90, summary: 'Collision', containsSpoiler: false, bodyJson, visibility: 'public',
+      animeId: firstAnimeId, requestId: 'collision', rating: 90, summary: 'Collision', containsSpoiler: false, bodyJson, visibility: 'public',
     })).rejects.toThrow('collision')
   }, 20_000)
 
@@ -641,9 +767,9 @@ describe('social Convex integration', () => {
   test('requires cached anime for every Review lifecycle mutation', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'cache-owner')
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     const reviewId = await owner.client.mutation(socialApi.reviews.publish, {
-      anilistId: 1, requestId: 'cache-review', rating: 90, summary: 'Cached', containsSpoiler: false, bodyJson, visibility: 'public',
+      animeId, requestId: 'cache-review', rating: 90, summary: 'Cached', containsSpoiler: false, bodyJson, visibility: 'public',
     })
     await t.run(async (ctx) => {
       const anime = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', 1)).unique()
@@ -732,17 +858,17 @@ describe('social Convex integration', () => {
 
   test('rejects malformed stored Review stats before returning them', async () => {
     const t = createHarness()
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     await t.run(async (ctx) => {
       await ctx.db.insert('animeReviewStats', { anilistId: 1, count: 1, ratingSum: 90, bands: [1, 0, 0, 0, 0, 0, 0, 0, 0], updatedAt: Date.now() })
     })
-    await expect(t.query(socialApi.reviews.getStats, { anilistId: 1 })).rejects.toThrow()
+    await expect(t.query(socialApi.reviews.getStats, { animeId })).rejects.toThrow()
   })
 
   test('paginates 25 public Reviews plus one private owner Review exactly once', async () => {
     const t = createHarness()
     const viewer = await createOwner(t, 'review-pager')
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     await t.run(async (ctx) => {
       for (let index = 1; index <= 25; index += 1) {
         const now = index
@@ -752,14 +878,16 @@ describe('social Convex integration', () => {
         })
         const key = String(index * 2).padStart(4, '0')
         await ctx.db.insert('reviews', {
-          userId, anilistId: 1, requestId: `public-${index}`, state: 'published', rating: 50,
+          userId, anilistId: 1, animeId,
+          requestId: `public-${index}`, state: 'published', rating: 50,
           summary: `Public ${index}`, containsSpoiler: false, bodyJson, visibility: 'public',
           publishedAt: now, updatedAt: now, activityState: 'active', newestOrderKey: key,
           highRatingOrderKey: key, lowRatingOrderKey: key, searchText: `author ${index}`, ratingBand: '50-59',
         })
       }
       await ctx.db.insert('reviews', {
-        userId: viewer.profileId, anilistId: 1, requestId: 'private-own', state: 'published', rating: 50,
+        userId: viewer.profileId, anilistId: 1, animeId,
+        requestId: 'private-own', state: 'published', rating: 50,
         summary: 'Private own', containsSpoiler: false, bodyJson, visibility: 'private',
         publishedAt: 13, updatedAt: 13, activityState: 'active', newestOrderKey: '0025',
         highRatingOrderKey: '0025', lowRatingOrderKey: '0025', searchText: 'private own', ratingBand: '50-59',
@@ -769,7 +897,7 @@ describe('social Convex integration', () => {
     const items: Array<Record<string, unknown>> = []
     let cursor: string | null = null
     do {
-      const page: { items: Array<Record<string, unknown>>; cursor: string | null } = await viewer.client.query(socialApi.reviews.listForAnime, { anilistId: 1, sort: 'newest', cursor })
+      const page: { items: Array<Record<string, unknown>>; cursor: string | null } = await viewer.client.query(socialApi.reviews.listForAnime, { animeId, sort: 'newest', cursor })
       items.push(...page.items)
       cursor = page.cursor
     } while (cursor !== null)
@@ -785,22 +913,23 @@ describe('social Convex integration', () => {
   test('backfills milestone cards idempotently without reactivating removed activity', async () => {
     const t = createHarness()
     const owner = await createOwner(t, 'backfill-owner')
-    await insertAnime(t, 1)
+    const animeId = await insertAnime(t, 1)
     await t.run(async (ctx) => {
       const now = Date.now()
       await ctx.db.insert('animeMilestones', {
-        userId: owner.profileId, anilistId: 1, kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now,
+        userId: owner.profileId, anilistId: 1, animeId,
+        kind: 'completed', visibility: 'public', occurredAt: now, updatedAt: now,
       })
     })
     await t.mutation(socialInternal.feed.projectMilestones, { paginationOpts: { numItems: 10, cursor: null } })
     const cardId = await t.run(async (ctx) => {
-      const card = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `completed:${owner.profileId}:1`)).unique()
+      const card = await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `completed:${owner.profileId}:${animeId}`)).unique()
       if (!card) throw new Error('Backfilled milestone card missing.')
       return card._id
     })
     await owner.client.mutation(socialApi.feed.removeActivity, { cardId })
     await t.mutation(socialInternal.feed.projectMilestones, { paginationOpts: { numItems: 10, cursor: null } })
-    const cards = await t.run(async (ctx) => await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `completed:${owner.profileId}:1`)).collect())
+    const cards = await t.run(async (ctx) => await ctx.db.query('feedCards').withIndex('by_source_key', (q) => q.eq('sourceKey', `completed:${owner.profileId}:${animeId}`)).collect())
     expect(cards).toHaveLength(1)
     expect(cards[0]?.active).toBe(false)
   }, 20_000)

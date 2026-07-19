@@ -172,7 +172,7 @@ function PersonSearchResults({
   return (
     <section aria-label={`${noun} results`} className="mt-6">
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-        {pages.items.map((row) => <PersonCard key={row.id} row={row} />)}
+        {pages.items.map((row) => <PersonCard key={row.publicId} row={row} />)}
       </div>
       <PersonSearchFooter pages={pages} />
     </section>

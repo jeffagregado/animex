@@ -37,7 +37,7 @@ export function ProfileFavorites({
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           {state.items.map(({ anime }) => (
-            <FavoritePoster anime={anime} compact={false} key={anime.anilistId} />
+            <FavoritePoster anime={anime} compact={false} key={anime.publicId} />
           ))}
         </div>
       )}
@@ -78,7 +78,7 @@ export function ProfileFavoritesPreview({
       ) : (
         <div className="mt-4 grid grid-cols-5 gap-2">
           {favorites.slice(0, 10).map((anime) => (
-            <FavoritePoster anime={anime} compact key={anime.anilistId} />
+            <FavoritePoster anime={anime} compact key={anime.publicId} />
           ))}
         </div>
       )}
@@ -97,7 +97,7 @@ function FavoritePoster({
     <a
       aria-label={anime.title}
       className="group block overflow-hidden rounded-lg border border-white/10 bg-muted outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
-      href={`/anime/${anime.anilistId}/${anime.slug}`}
+      href={`/anime/${anime.publicId}/${anime.slug}`}
     >
       {anime.coverImageUrl === null ? (
         <span className="grid aspect-2/3 place-items-center text-muted-foreground">

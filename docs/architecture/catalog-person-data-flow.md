@@ -1,36 +1,28 @@
 # Catalog Person data flow
 
-## Entry and route contract
+## Route and entry
 
-Character and Staff rows enter from Quick Search, dedicated result pages, Anime Detail people links, or canonical detail paths `/characters/:id/:slug` and `/staff/:id/:slug`. `parseCatalogPersonRouteId` accepts only positive decimal IDs without leading zeroes. Slugs are display-only and are corrected only after a ready detail record exists.
+Canonical detail routes: `/characters/$publicId/$slug` and `/staff/$publicId/$slug`. Route identity resolves public or legacy positive decimal IDs before provider-backed detail/work queries. Character supports Overview, Anime, and Voice Actors; Staff supports Overview and Anime. Legacy Staff `?tab=works` and invalid tabs replace to the current public tab after identity/detail state is ready. Browser redirect proof remains a pending gate.
 
-Character uses `overview` (default), `anime`, or `voice-actors`. Staff uses only `overview` or `anime`; a Staff `?tab=voice-actors` is invalid and replaces to Overview. Explicit Overview removes the query, while the other valid tabs stay in the URL. Legacy Staff `?tab=works` is accepted only as migration input and replaces once with `?tab=anime` before the Anime work query mounts. Other invalid values also replace to Overview. Provider and cache identities remain `kind`, person ID, and work page; no `works` cache key or API name is introduced.
+## Detail and work flow
 
-## Detail and work cache flow
-
-| Field | Current contract |
+| Field | Current state |
 | --- | --- |
-| Entry | `getCatalogPerson` and `getCatalogPersonWorks` TanStack Start GET functions in `catalog-person-route.ts`. |
-| Input | Provider-neutral `kind` (`character|staff`), positive person ID, and optional 20-row work page. |
-| Validation | Server functions parse strict Zod input. AniList adapter validates detail/work payloads, IDs/pages, dates/years, optional fields, and rejects adult rows. |
-| Transform | `anilist-person.server.ts` maps provider data to `CatalogPersonDetail`, `CatalogPersonWorkPage`, normalized summaries, and roles. Character detail follows every 25-row Anime-media connection page while `hasNextPage` is true, rejects adult relationships, keeps every validated actor language, and deduplicates actors by Staff ID in first-seen provider order. Raw provider data never reaches UI. |
-| Storage | `catalogPersonDetails`, `catalogPersonWorkPages`, normalized `animeSummaries`, and token-gated `catalogPersonCacheLeases`; detail/work TTL remains 24 hours. Character detail stores the normalized actor list plus `voiceActorScope: 'all-languages'`. A legacy Character row without the scope or actor list expires and refetches; Staff rows are unchanged. |
-| External calls | Server-only AniList GraphQL through `src/lib/anilist-client.server.ts`; browser has no provider call. |
-| Retry | AniList transport keeps 8-second timeout/three-attempt policy and short `Retry-After` waits. Lease contention rereads six times at 500 ms. Expired data is never served. |
-| Error | Not-found, upstream, rate-limit, malformed provider data, missing environment, lease/commit/reread failure, and cache corruption remain explicit. No stale fallback. |
-| Output | Ready detail or ordered work page; shared page renders loading, not-found, error/retry, empty, loading-more, visible Load more, and end states. Character Voice Actors renders linked portrait/name/language cards to canonical Staff pages. |
-| Owner | `src/features/catalog-person/{server,shared,ui}`, Character/Staff routes, and `convex/catalogPersonCache*`. |
+| Entry | `getCatalogPerson` and `getCatalogPersonWorks` TanStack Start GET functions; search uses `searchCatalogPeople`. |
+| Input | Provider-neutral kind, opaque person `publicId`, and optional positive 20-row Anime work page; search uses trimmed 2–100 character text and page. |
+| Validation | Strict Zod functions validate public IDs, kind, page, query, and output. AniList schemas validate detail/work payloads, adult filtering, dates, roles, and actor languages. Convex validates cache leases and token. |
+| Transform | Server reverse-resolves person `publicId` to AniList provider key, reads/refreshes provider cache, then maps person, Anime works, voice actors, biography links, and destination paths to public IDs. Provider IDs never reach UI. |
+| Storage | `catalogPersonDetails`, `catalogPersonWorkPages`, `animeSummaries`, and leases retain provider IDs, ordered rows, image URLs, and 24-hour TTL. Cache commits ensure bounded identity mappings without changing row shape. |
+| External calls | Server-only AniList adapters and shared transport. Browser and Convex actions never call AniList. Metadata Image Proxy stays outside flow. |
+| Retry | Missing/expired detail/work page acquires existing lease, fetches, validates, commits, releases, rereads. Bounded lease wait and provider retry are explicit; expired data is not served. |
+| Error | Invalid/missing mapping, cache corruption, not-found, malformed provider data, upstream, rate-limit, lease, commit, and reread failures remain explicit. No numeric provider fallback. |
+| Output | Typed public person detail/work/search page with opaque IDs, canonical AnimeX routes, and explicit loading/empty/error/load-more/end states. |
+| Owner | Routes/UI: `src/routes/_public/{characters,staff}`, `src/features/catalog-person`; provider/cache: `src/features/catalog-person/server`, `convex/catalogPersonCache*`; identity: `src/features/catalog-identity`, `convex/catalogIdentity*`. |
 
-Fresh cache reads return immediately. Missing or expired records acquire `person:<kind>:<id>` or `person-work:<kind>:<id>:<page>`; the lease owner fetches, validates, commits, releases, and rereads. Competing requests wait for a fresh record or fail explicitly. Work pages hydrate each stored Anime reference from `animeSummaries` and fail on a missing summary.
+## Search and links
 
-## Shared detail layout
+Live Character/Staff search ensures identity mappings before returning rows. Infinite pages deduplicate by `publicId`; View all destinations remain `/search/characters?q=` and `/search/staff?q=`. Biography parser rewrites supported AniList Anime/Character/Staff links server-side to publicId paths; unsupported safe external links stay external. Work cards use Anime `publicId` for React keys, query keys, and canonical hrefs.
 
-Character and Staff render a full-width `max-w-[1480px]` Catalog Person shell with responsive gutters and no right column. Overview renders Facts first and About second. Anime renders the work grid. Character alone adds the Voice Actors tab; its cards keep portrait, name, language, canonical Staff link, focus behavior, and disabled intent preload. Anime Detail still owns its separate two-column `DetailPageLayout`, controls, metadata, tabs, and sidebar behavior.
+## Validation state
 
-## Search flow
-
-`searchCatalogPeople` validates `kind`, trimmed 2–100 character query, and positive page, then issues one uncached AniList query per page with `perPage=20`. Rows contain provider-neutral identity fields and canonical destinations. Infinite query state is keyed by kind + query, deduplicates by person ID, auto-requests when new rows exist, and still exposes a visible Load more button. Whitespace, short/overlong input, initial/next-page failure, retry, empty, and end states are explicit.
-
-## Phase 7 closure
-
-No browser fixture remains open. Second-account private-profile, Profile media lifecycle, and the Phase 7 failure fixture have recorded browser evidence. User confirmed closure for deep work/search pagination; Codex did not independently exercise that fixture. Failure injection used Storage HTTP 503; AniList/provider variants were not separately injected.
+Dev migration receipts and retained provider/cache contracts are recorded in `docs/runbooks/catalog-identity-backfill.md`. Full automated gates, integrated review, and signed-out plus authenticated responsive browser QA pass. Post-Phase 7 is complete and closed.

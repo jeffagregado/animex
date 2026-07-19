@@ -5,7 +5,7 @@ import {
   fetchDiscoverSectionFromAniList,
   searchAnimeFromAniList,
 } from './anilist.server'
-import type { AnimeSummary } from '../shared/discover-contracts'
+import type { AnimeSummaryProvider } from './discover-provider-cache-contracts.server'
 
 const runLive = process.env.ANILIST_LIVE === '1'
 const rateHeaders: Array<{ limit: string | null; remaining: string | null; retryAfter: string | null }> = []
@@ -27,7 +27,7 @@ const reportRateHeaders = (): void => {
   console.info('AniList live rate headers:', JSON.stringify(rateHeaders))
 }
 
-const expectNormalizedAnime = (item: AnimeSummary): void => {
+const expectNormalizedAnime = (item: AnimeSummaryProvider): void => {
   expect(item.anilistId).toBeGreaterThan(0)
   expect(item.titles.display.trim()).not.toBe('')
   expect(item.slug.trim()).not.toBe('')

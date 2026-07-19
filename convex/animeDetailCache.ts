@@ -14,6 +14,8 @@ import {
   validateDetailCommit,
   validatePeoplePage,
 } from './animeDetailCachePolicy'
+import { ensureCatalogEntity } from './catalogIdentityModel'
+import { type CatalogProviderRef } from './catalogIdentityPolicy'
 
 const kindValidator = v.union(v.literal('characters'), v.literal('staff'))
 const titlesValidator = v.object({ display: v.string(), english: v.union(v.string(), v.null()), romaji: v.union(v.string(), v.null()), native: v.union(v.string(), v.null()) })
@@ -64,8 +66,9 @@ const assertCacheKey = (key: string): void => {
 
 /** Reads a detail record without exposing expired data. */
 export const readDetail = query({
-  args: { anilistId: v.number() }, returns: detailReadValidator,
+  args: { anilistId: v.number(), token: v.string() }, returns: detailReadValidator,
   handler: async (ctx, args) => {
+    requireCacheWriteToken(args.token)
     assertPositive(args.anilistId, 'anilistId')
     const record = await ctx.db.query('animeDetails').withIndex('by_anilist_id', (q) => q.eq('anilistId', args.anilistId)).unique()
     return resolveDetailRead(record ? { payload: record.detail, refreshedAt: record.refreshedAt, expiresAt: record.expiresAt } : null, Date.now())
@@ -74,8 +77,9 @@ export const readDetail = query({
 
 /** Reads one Character or Staff page without exposing expired data. */
 export const readPeoplePage = query({
-  args: { anilistId: v.number(), kind: kindValidator, page: v.number() }, returns: pageReadValidator,
+  args: { anilistId: v.number(), kind: kindValidator, page: v.number(), token: v.string() }, returns: pageReadValidator,
   handler: async (ctx, args) => {
+    requireCacheWriteToken(args.token)
     try { validatePeoplePage(args.anilistId, args.kind, args.page, []) } catch (error) { return failPolicy(error) }
     const record = await ctx.db.query('animeDetailPeoplePages').withIndex('by_anime_kind_page', (q) => q.eq('anilistId', args.anilistId).eq('kind', args.kind).eq('page', args.page)).unique()
     return resolveDetailRead(record ? { payload: { items: record.items, currentPage: record.page, hasNextPage: record.hasNextPage, perPage: 24 as const }, refreshedAt: record.refreshedAt, expiresAt: record.expiresAt } : null, Date.now())
@@ -105,6 +109,17 @@ const requireLease = async (ctx: MutationCtx, key: string, leaseId: string, now:
   return lease
 }
 
+/** Registers each unique provider tuple once in the current transaction. */
+const ensureIdentityRefs = async (
+  ctx: MutationCtx,
+  refs: CatalogProviderRef[],
+): Promise<void> => {
+  const unique = new Map(refs.map((ref) => [`${ref.kind}:${ref.providerId}`, ref]))
+  for (const ref of unique.values()) {
+    await ensureCatalogEntity(ctx, ref)
+  }
+}
+
 /** Atomically commits a summary and full detail for the active lease owner. */
 export const commitDetail = mutation({
   args: { leaseId: v.string(), token: v.string(), summary: summaryValidator, detail: detailValidator }, returns: v.null(),
@@ -114,6 +129,16 @@ export const commitDetail = mutation({
       validateDetailCommit(args.detail, args.summary)
     } catch (error) { return failPolicy(error) }
     const now = Date.now(); const lease = await requireLease(ctx, detailKey(args.detail.anilistId), args.leaseId, now); const timing = createDetailTiming(now)
+    await ensureIdentityRefs(ctx, [
+      { provider: 'anilist', kind: 'anime', providerId: args.detail.anilistId },
+      ...args.detail.related.map((item) => ({ provider: 'anilist' as const, kind: 'anime' as const, providerId: item.anilistId })),
+      ...args.detail.recommendations.map((item) => ({ provider: 'anilist' as const, kind: 'anime' as const, providerId: item.anilistId })),
+      ...args.detail.charactersPage.items.map((item) => ({ provider: 'anilist' as const, kind: 'character' as const, providerId: item.anilistId })),
+      ...args.detail.staffPage.items.map((item) => ({ provider: 'anilist' as const, kind: 'staff' as const, providerId: item.anilistId })),
+      ...args.detail.charactersPage.items.flatMap((item) => item.japaneseVoiceActor
+        ? [{ provider: 'anilist' as const, kind: 'staff' as const, providerId: item.japaneseVoiceActor.anilistId }]
+        : []),
+    ])
     const summary = await ctx.db.query('animeSummaries').withIndex('by_anilist_id', (q) => q.eq('anilistId', args.summary.anilistId)).unique()
     if (summary) await ctx.db.patch(summary._id, { ...args.summary, updatedAt: now }); else await ctx.db.insert('animeSummaries', { ...args.summary, updatedAt: now })
     const detail = await ctx.db.query('animeDetails').withIndex('by_anilist_id', (q) => q.eq('anilistId', args.detail.anilistId)).unique()
@@ -129,6 +154,17 @@ export const commitPeoplePage = mutation({
   handler: async (ctx, args) => {
     requireCacheWriteToken(args.token); try { validatePeoplePage(args.anilistId, args.kind, args.page, args.items) } catch (error) { return failPolicy(error) }
     const now = Date.now(); const lease = await requireLease(ctx, pageKey(args.anilistId, args.kind, args.page), args.leaseId, now); const timing = createDetailTiming(now)
+    await ensureIdentityRefs(ctx, args.items.flatMap((item): CatalogProviderRef[] => {
+      if ('japaneseVoiceActor' in item) {
+        return [
+          { provider: 'anilist', kind: 'character', providerId: item.anilistId },
+          ...(item.japaneseVoiceActor
+            ? [{ provider: 'anilist' as const, kind: 'staff' as const, providerId: item.japaneseVoiceActor.anilistId }]
+            : []),
+        ]
+      }
+      return [{ provider: 'anilist', kind: 'staff', providerId: item.anilistId }]
+    }))
     const record = await ctx.db.query('animeDetailPeoplePages').withIndex('by_anime_kind_page', (q) => q.eq('anilistId', args.anilistId).eq('kind', args.kind).eq('page', args.page)).unique()
     const value = { anilistId: args.anilistId, kind: args.kind, page: args.page, items: args.items, hasNextPage: args.hasNextPage, ...timing }
     if (record) await ctx.db.patch(record._id, value); else await ctx.db.insert('animeDetailPeoplePages', value)

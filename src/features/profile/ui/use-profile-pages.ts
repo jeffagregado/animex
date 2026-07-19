@@ -44,7 +44,7 @@ const emptyScope = (scope: string, enabled: boolean): ScopedPageState => ({
 /** Returns one stable identity for cursor merge deduplication. */
 const getItemId = (item: ProfilePageItem): string => {
   if ('id' in item) return item.id
-  return `anime:${item.anime.anilistId}`
+  return `anime:${item.anime.publicId}`
 }
 
 /** Merges pages without repeating one document or canonical favorite. */

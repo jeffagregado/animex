@@ -1,5 +1,10 @@
 import { z } from 'zod'
 
+import {
+  parseCatalogPublicId,
+  type CatalogPublicId,
+} from '../../catalog-identity/shared/catalog-identity-contracts'
+
 export const animeFormatSchema = z.enum(['TV', 'TV_SHORT', 'MOVIE', 'SPECIAL', 'OVA', 'ONA', 'MUSIC'])
 export const animeSeasonSchema = z.enum(['WINTER', 'SPRING', 'SUMMER', 'FALL'])
 export const discoverSectionKeySchema = z.enum(['trending', 'seasonal', 'recommendations', 'upcoming'])
@@ -38,7 +43,7 @@ export interface AnimeTitles {
 }
 
 export interface AnimeSummary {
-  anilistId: number
+  publicId: CatalogPublicId
   slug: string
   titles: AnimeTitles
   coverImageUrl: string | null
@@ -54,6 +59,46 @@ export interface AnimeSummary {
   startDate: AnimeDate | null
   nextAiringAt: number | null
 }
+
+const catalogPublicIdSchema = z.string().transform((value, context) => {
+  try {
+    return parseCatalogPublicId(value)
+  } catch {
+    context.addIssue({ code: 'custom', message: 'CATALOG_PUBLIC_ID_INVALID' })
+    return z.NEVER
+  }
+})
+
+const animeDateSchema: z.ZodType<AnimeDate> = z.object({
+  year: z.number().int().nullable(),
+  month: z.number().int().min(1).max(12).nullable(),
+  day: z.number().int().min(1).max(31).nullable(),
+}).strict()
+
+const animeTitlesSchema: z.ZodType<AnimeTitles> = z.object({
+  display: z.string().trim().min(1),
+  english: z.string().trim().min(1).nullable(),
+  romaji: z.string().trim().min(1).nullable(),
+  native: z.string().trim().min(1).nullable(),
+}).strict()
+
+export const animeSummarySchema: z.ZodType<AnimeSummary> = z.object({
+  publicId: catalogPublicIdSchema,
+  slug: z.string().trim().min(1),
+  titles: animeTitlesSchema,
+  coverImageUrl: z.url().nullable(),
+  bannerImageUrl: z.url().nullable(),
+  format: animeFormatSchema.nullable(),
+  season: animeSeasonSchema.nullable(),
+  seasonYear: z.number().int().nullable(),
+  episodes: z.number().int().nonnegative().nullable(),
+  genres: z.array(z.string().trim().min(1)),
+  popularity: z.number().int().nonnegative(),
+  averageScore: z.number().int().min(0).max(100).nullable(),
+  trending: z.number().int().nonnegative().nullable(),
+  startDate: animeDateSchema.nullable(),
+  nextAiringAt: z.number().int().nonnegative().nullable(),
+}).strict()
 
 export interface DiscoverSection {
   key: DiscoverSectionKey
@@ -129,72 +174,7 @@ export const animeSearchInputSchema: z.ZodType<AnimeSearchInput> = z
     error: 'Choose a search term or filter.',
   })
 
-const animeDateSchema = z.object({
-  year: z.number().int().nullable(),
-  month: z.number().int().min(1).max(12).nullable(),
-  day: z.number().int().min(1).max(31).nullable(),
-})
-
-const anilistLightweightMediaSchema = z.object({
-  id: z.number().int().positive(),
-  type: z.literal('ANIME'),
-  isAdult: z.boolean(),
-  title: z.object({
-    english: z.string().nullable(),
-    romaji: z.string().nullable(),
-    native: z.string().nullable(),
-  }),
-  coverImage: z.object({ large: z.url().nullable() }).nullable(),
-  bannerImage: z.url().nullable(),
-  format: animeFormatSchema.nullable(),
-  season: animeSeasonSchema.nullable(),
-  seasonYear: z.number().int().nullable(),
-  episodes: z.number().int().nonnegative().nullable(),
-  genres: z.array(z.string()),
-  popularity: z.number().int().nonnegative(),
-  averageScore: z.number().int().min(0).max(100).nullable(),
-  trending: z.number().int().nonnegative().nullable(),
-  startDate: animeDateSchema.nullable(),
-  nextAiringEpisode: z.object({ airingAt: z.number().int().nonnegative() }).nullable(),
-})
-
-const trimTitle = (value: string | null): string | null => {
-  if (value === null) {
-    return null
-  }
-
-  const trimmedValue = value.trim()
-  return trimmedValue.length > 0 ? trimmedValue : null
-}
-
-class AnimeMediaValidationError extends TypeError {
-  readonly cause: z.ZodError
-
-  constructor(message: string, cause: z.ZodError) {
-    super(message)
-    this.name = 'AnimeMediaValidationError'
-    this.cause = cause
-  }
-}
-
-/** Converts Zod failures into safe actionable normalization errors. */
-const createMediaValidationError = (error: z.ZodError): TypeError => {
-  const issue = error.issues[0]
-  if (issue === undefined) {
-    throw new AnimeMediaValidationError(
-      'AniList media validation failed without a reported issue.',
-      error,
-    )
-  }
-
-  const path = issue.path.length > 0 ? issue.path.join('.') : 'root'
-  return new AnimeMediaValidationError(
-    `Invalid AniList media at ${path}: ${issue.message}`,
-    error,
-  )
-}
-
-/** Creates a URL-safe display slug from a real AniList title. */
+/** Creates a URL-safe display slug from an anime title. */
 export const slugifyAnimeTitle = (title: string): string => {
   const slug = title
     .trim()
@@ -208,45 +188,6 @@ export const slugifyAnimeTitle = (title: string): string => {
   }
 
   return slug
-}
-
-/** Converts unknown AniList lightweight media into an app-safe summary. */
-export const normalizeAnimeSummary = (value: unknown): AnimeSummary => {
-  const parsedMedia = anilistLightweightMediaSchema.safeParse(value)
-  if (!parsedMedia.success) {
-    throw createMediaValidationError(parsedMedia.error)
-  }
-  if (parsedMedia.data.isAdult) {
-    throw new TypeError('Adult media is not supported.')
-  }
-
-  const english = trimTitle(parsedMedia.data.title.english)
-  const romaji = trimTitle(parsedMedia.data.title.romaji)
-  const native = trimTitle(parsedMedia.data.title.native)
-  const display = english ?? romaji ?? native
-  if (display === null) {
-    throw new TypeError('AniList media requires a title.')
-  }
-
-  const genres = [...new Set(parsedMedia.data.genres.map((genre) => genre.trim()).filter(Boolean))]
-
-  return {
-    anilistId: parsedMedia.data.id,
-    slug: slugifyAnimeTitle(display),
-    titles: { display, english, romaji, native },
-    coverImageUrl: parsedMedia.data.coverImage?.large ?? null,
-    bannerImageUrl: parsedMedia.data.bannerImage,
-    format: parsedMedia.data.format,
-    season: parsedMedia.data.season,
-    seasonYear: parsedMedia.data.seasonYear,
-    episodes: parsedMedia.data.episodes,
-    genres,
-    popularity: parsedMedia.data.popularity,
-    averageScore: parsedMedia.data.averageScore,
-    trending: parsedMedia.data.trending,
-    startDate: parsedMedia.data.startDate,
-    nextAiringAt: parsedMedia.data.nextAiringEpisode?.airingAt ?? null,
-  }
 }
 
 /** Returns calendar season for a UTC timestamp. */

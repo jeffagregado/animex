@@ -12,6 +12,7 @@ const userRow = {
   imageUrl: null,
   label: 'Mika',
   metadata: '@mika',
+  publicId: 'user-1',
 }
 
 const model = (): QuickSearchModel => ({

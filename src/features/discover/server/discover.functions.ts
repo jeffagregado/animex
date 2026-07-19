@@ -7,14 +7,36 @@ import {
   getDiscoverPageServer,
   refreshDiscoverSectionServer,
 } from './discover-cache.server'
+import {
+  createDiscoverIdentityDependencies,
+  toPublicAnimeSearchPage,
+  toPublicDiscoverPage,
+  toPublicDiscoverSection,
+} from './discover-public-metadata.server'
 
 export const getDiscoverPage = createServerFn({ method: 'GET' })
-  .handler(async () => await getDiscoverPageServer(createDiscoverCacheDependencies()))
+  .handler(async () => {
+    const page = await getDiscoverPageServer(createDiscoverCacheDependencies())
+    return await toPublicDiscoverPage(page, createDiscoverIdentityDependencies())
+  })
 
 export const refreshDiscoverSection = createServerFn({ method: 'POST' })
   .validator(discoverSectionKeySchema)
-  .handler(async ({ data }) => await refreshDiscoverSectionServer(data, createDiscoverCacheDependencies()))
+  .handler(async ({ data }) => {
+    const state = await refreshDiscoverSectionServer(data, createDiscoverCacheDependencies())
+    if (state.status === 'error') return state
+    return {
+      status: 'ready' as const,
+      section: await toPublicDiscoverSection(
+        state.section,
+        createDiscoverIdentityDependencies(),
+      ),
+    }
+  })
 
 export const searchAnime = createServerFn({ method: 'GET' })
   .validator(animeSearchInputSchema)
-  .handler(async ({ data }) => await searchAnimeFromAniList(data, createAniListDependencies()))
+  .handler(async ({ data }) => {
+    const page = await searchAnimeFromAniList(data, createAniListDependencies())
+    return await toPublicAnimeSearchPage(page, createDiscoverIdentityDependencies())
+  })

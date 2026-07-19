@@ -1,6 +1,10 @@
 import { z } from 'zod'
 
 import {
+  parseCatalogPublicId,
+  type CatalogPublicId,
+} from '../../catalog-identity/shared/catalog-identity-contracts'
+import {
   animeFormatSchema,
   animeSeasonSchema,
   slugifyAnimeTitle,
@@ -28,6 +32,14 @@ export type AnimeStatus = z.infer<typeof animeStatusSchema>
 export type AnimeScore = z.infer<typeof animeScoreSchema>
 
 const positiveSafeIntegerSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
+const catalogPublicIdSchema = z.string().transform((value, context) => {
+  try {
+    return parseCatalogPublicId(value)
+  } catch {
+    context.addIssue({ code: 'custom', message: 'CATALOG_PUBLIC_ID_INVALID' })
+    return z.NEVER
+  }
+})
 
 /** Validates canonical AniList identity. */
 export const parseAnilistId = (value: unknown): number => {
@@ -55,11 +67,11 @@ export const normalizeAnimeDetailTab = (value: unknown): AnimeDetailTab => {
 
 /** Builds canonical detail URL from validated identity and real title. */
 export const createCanonicalAnimePath = (
-  anilistId: number,
+  publicId: CatalogPublicId,
   title: string,
   tab: AnimeDetailTab,
 ): string => {
-  const id = parseAnilistId(anilistId)
+  const id = parseCatalogPublicId(publicId)
   const slug = encodeURIComponent(slugifyAnimeTitle(title))
   const path = `/anime/${id}/${slug}`
   return tab === 'overview' ? path : `${path}?tab=${tab}`
@@ -90,7 +102,7 @@ const animeMediaStatusSchema = z.enum([
 export type AnimeMediaStatus = z.infer<typeof animeMediaStatusSchema>
 
 export interface AnimeDetailListItem {
-  anilistId: number
+  publicId: CatalogPublicId
   slug: string
   title: string
   coverImageUrl: string | null
@@ -99,7 +111,7 @@ export interface AnimeDetailListItem {
 }
 
 const animeDetailListItemSchema: z.ZodType<AnimeDetailListItem> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  publicId: catalogPublicIdSchema,
   slug: z.string().min(1),
   title: z.string().trim().min(1),
   coverImageUrl: nullableHttpsUrlSchema,
@@ -138,14 +150,14 @@ const animeExternalLinkSchema: z.ZodType<AnimeExternalLink> = z.object({
 }).strict()
 
 export interface AnimeVoiceActor {
-  anilistId: number
+  publicId: CatalogPublicId
   name: string
   imageUrl: string | null
   language: 'Japanese'
 }
 
 export interface AnimeCharacter {
-  anilistId: number
+  publicId: CatalogPublicId
   name: string
   role: 'MAIN' | 'SUPPORTING' | 'BACKGROUND'
   imageUrl: string | null
@@ -153,7 +165,7 @@ export interface AnimeCharacter {
 }
 
 export interface AnimeStaff {
-  anilistId: number
+  publicId: CatalogPublicId
   name: string
   role: string
   imageUrl: string | null
@@ -167,14 +179,14 @@ export interface AnimePeoplePage<T> {
 }
 
 const animeVoiceActorSchema: z.ZodType<AnimeVoiceActor> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  publicId: catalogPublicIdSchema,
   name: z.string().trim().min(1),
   imageUrl: nullableHttpsUrlSchema,
   language: z.literal('Japanese'),
 }).strict()
 
 const animeCharacterSchema: z.ZodType<AnimeCharacter> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  publicId: catalogPublicIdSchema,
   name: z.string().trim().min(1),
   role: z.enum(['MAIN', 'SUPPORTING', 'BACKGROUND']),
   imageUrl: nullableHttpsUrlSchema,
@@ -182,7 +194,7 @@ const animeCharacterSchema: z.ZodType<AnimeCharacter> = z.object({
 }).strict()
 
 const animeStaffSchema: z.ZodType<AnimeStaff> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  publicId: catalogPublicIdSchema,
   name: z.string().trim().min(1),
   role: z.string().trim().min(1),
   imageUrl: nullableHttpsUrlSchema,
@@ -207,7 +219,7 @@ const initialAnimeStaffPageSchema = animeStaffPageSchema.refine(
 )
 
 export interface AnimeDetail {
-  anilistId: number
+  publicId: CatalogPublicId
   slug: string
   titles: AnimeTitles
   coverImageUrl: string | null
@@ -233,7 +245,7 @@ export interface AnimeDetail {
 }
 
 export const animeDetailSchema: z.ZodType<AnimeDetail> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  publicId: catalogPublicIdSchema,
   slug: z.string().min(1),
   titles: animeTitlesSchema,
   coverImageUrl: nullableHttpsUrlSchema,
@@ -274,8 +286,8 @@ const animeDetailCacheEntrySchema: z.ZodType<AnimeDetailCacheEntry> = z.object({
   { error: 'Anime detail cache expiry must equal refresh time plus 24 hours.', path: ['expiresAt'] },
 )
 
-export type AnimeDetailErrorCode = 'UPSTREAM' | 'RATE_LIMITED'
-export type AnimePaginationErrorCode = 'UPSTREAM' | 'RATE_LIMITED'
+export type AnimeDetailErrorCode = 'UPSTREAM' | 'RATE_LIMITED' | 'CATALOG_IDENTITY_MISSING'
+export type AnimePaginationErrorCode = 'UPSTREAM' | 'RATE_LIMITED' | 'CATALOG_IDENTITY_MISSING'
 
 export type PublicAnimeDetailState =
   | { status: 'loading' }
@@ -291,12 +303,12 @@ export const publicAnimeDetailStateSchema: z.ZodType<PublicAnimeDetailState> = z
   z.object({ status: z.literal('empty') }).strict(),
   z.object({ status: z.literal('ready'), entry: animeDetailCacheEntrySchema }).strict(),
   z.object({ status: z.literal('not-found'), code: z.literal('NOT_FOUND'), message: messageSchema }).strict(),
-  z.object({ status: z.literal('error'), code: z.enum(['UPSTREAM', 'RATE_LIMITED']), message: messageSchema, retryAfterSeconds: z.number().int().nonnegative().nullable() }).strict(),
-  z.object({ status: z.literal('pagination-error'), code: z.enum(['UPSTREAM', 'RATE_LIMITED']), message: messageSchema, page: positiveSafeIntegerSchema, retryAfterSeconds: z.number().int().nonnegative().nullable() }).strict(),
+  z.object({ status: z.literal('error'), code: z.enum(['UPSTREAM', 'RATE_LIMITED', 'CATALOG_IDENTITY_MISSING']), message: messageSchema, retryAfterSeconds: z.number().int().nonnegative().nullable() }).strict(),
+  z.object({ status: z.literal('pagination-error'), code: z.enum(['UPSTREAM', 'RATE_LIMITED', 'CATALOG_IDENTITY_MISSING']), message: messageSchema, page: positiveSafeIntegerSchema, retryAfterSeconds: z.number().int().nonnegative().nullable() }).strict(),
 ])
 
 export interface UserAnimeEntry {
-  anilistId: number
+  animeId: string
   status: AnimeStatus | null
   score: AnimeScore
   isFavorite: boolean
@@ -310,14 +322,14 @@ const animeMilestoneKindSchema = z.enum(['completed', 'rewatched'])
 export type AnimeMilestoneKind = z.infer<typeof animeMilestoneKindSchema>
 
 export interface AnimeMilestone {
-  anilistId: number
+  animeId: string
   kind: AnimeMilestoneKind
   settledAt: number
 }
 
 export interface AnimeRewatchEntry {
   id: string
-  anilistId: number
+  animeId: string
   completedAt: number
 }
 
@@ -329,7 +341,7 @@ export interface AnimeRewatchPage {
 }
 
 export interface AnimeRewatchPageInput {
-  anilistId: number
+  animeId: string
   paginationOpts: {
     numItems: 20
     cursor: string | null
@@ -337,7 +349,7 @@ export interface AnimeRewatchPageInput {
 }
 
 export const userAnimeEntrySchema: z.ZodType<UserAnimeEntry> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  animeId: catalogPublicIdSchema,
   status: animeStatusSchema.nullable(),
   score: animeScoreSchema,
   isFavorite: z.boolean(),
@@ -348,14 +360,14 @@ export const userAnimeEntrySchema: z.ZodType<UserAnimeEntry> = z.object({
 }).strict()
 
 export const animeMilestoneSchema: z.ZodType<AnimeMilestone> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  animeId: catalogPublicIdSchema,
   kind: animeMilestoneKindSchema,
   settledAt: timestampSchema,
 }).strict()
 
 const animeRewatchEntrySchema: z.ZodType<AnimeRewatchEntry> = z.object({
   id: z.string().trim().min(1),
-  anilistId: positiveSafeIntegerSchema,
+  animeId: catalogPublicIdSchema,
   completedAt: timestampSchema,
 }).strict()
 
@@ -367,47 +379,47 @@ export const animeRewatchPageSchema: z.ZodType<AnimeRewatchPage> = z.object({
 }).strict()
 
 export const animeRewatchPageInputSchema: z.ZodType<AnimeRewatchPageInput> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  animeId: catalogPublicIdSchema,
   paginationOpts: z.object({
     numItems: z.literal(ANIME_REWATCHES_PER_PAGE),
     cursor: z.string().nullable(),
   }).strict(),
 }).strict()
 
-export interface SetAnimeStatusInput { anilistId: number; status: AnimeStatus }
-export interface SetAnimeScoreInput { anilistId: number; score: AnimeScore }
-export interface SetAnimeFavoriteInput { anilistId: number; isFavorite: boolean }
-export interface RecordAnimeRewatchInput { anilistId: number }
-export interface RemoveLatestAnimeRewatchInput { anilistId: number }
+export interface SetAnimeStatusInput { animeId: string; status: AnimeStatus }
+export interface SetAnimeScoreInput { animeId: string; score: AnimeScore }
+export interface SetAnimeFavoriteInput { animeId: string; isFavorite: boolean }
+export interface RecordAnimeRewatchInput { animeId: string }
+export interface RemoveLatestAnimeRewatchInput { animeId: string }
 
 export const setAnimeStatusInputSchema: z.ZodType<SetAnimeStatusInput> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  animeId: catalogPublicIdSchema,
   status: animeStatusSchema,
 }).strict()
 
 export const setAnimeScoreInputSchema: z.ZodType<SetAnimeScoreInput> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  animeId: catalogPublicIdSchema,
   score: animeScoreSchema,
 }).strict()
 
 export const setAnimeFavoriteInputSchema: z.ZodType<SetAnimeFavoriteInput> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  animeId: catalogPublicIdSchema,
   isFavorite: z.boolean(),
 }).strict()
 
 export const recordAnimeRewatchInputSchema: z.ZodType<RecordAnimeRewatchInput> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  animeId: catalogPublicIdSchema,
 }).strict()
 
 export const removeLatestAnimeRewatchInputSchema: z.ZodType<RemoveLatestAnimeRewatchInput> = z.object({
-  anilistId: positiveSafeIntegerSchema,
+  animeId: catalogPublicIdSchema,
 }).strict()
 
 export type UserAnimeMutationResult =
   | { status: 'saved'; entry: UserAnimeEntry }
-  | { status: 'removed'; anilistId: number }
+  | { status: 'removed'; animeId: string }
 
 export const userAnimeMutationResultSchema: z.ZodType<UserAnimeMutationResult> = z.discriminatedUnion('status', [
   z.object({ status: z.literal('saved'), entry: userAnimeEntrySchema }).strict(),
-  z.object({ status: z.literal('removed'), anilistId: positiveSafeIntegerSchema }).strict(),
+  z.object({ status: z.literal('removed'), animeId: catalogPublicIdSchema }).strict(),
 ])

@@ -19,6 +19,7 @@ const row = (
   imageUrl: null,
   label,
   metadata: null,
+  publicId: id,
 })
 
 const createModel = (
@@ -30,7 +31,7 @@ const createModel = (
     .flatMap(([group, rows]) => rows.map((result) => ({
       ...result,
       group,
-      optionId: `quick-search-${group}-${result.id}`,
+      optionId: `quick-search-${group}-${result.publicId}`,
     } satisfies QuickSearchItem)))
   return {
     activeIndex,
@@ -77,8 +78,8 @@ describe('QuickSearchResults interactions', () => {
   it('scrolls a newly active option beyond the viewport to the nearest edge', () => {
     const model = createModel(
       groups(
-        [row('1', 'Anime result', '/anime/1/a')],
-        [row('2', 'Staff result', '/staff/2/staff')],
+        [row('anime_result', 'Anime result', '/anime/anime_result/a')],
+        [row('staff_result', 'Staff result', '/staff/staff_result/staff')],
       ),
       -1,
       {},
@@ -98,7 +99,7 @@ describe('QuickSearchResults interactions', () => {
 
   it('announces each failed lane while retaining partial success', () => {
     const model = createModel(
-      groups([row('1', 'Anime result', '/anime/1/a')], []),
+      groups([row('anime_result', 'Anime result', '/anime/anime_result/a')], []),
       -1,
       {
         providerError: new Error('Provider unavailable'),
@@ -117,7 +118,7 @@ describe('QuickSearchResults interactions', () => {
   it('uses native View all links and intercepts only ordinary primary clicks', () => {
     const select = vi.fn()
     const model = createModel(
-      groups([row('1', 'Anime result', '/anime/1/a')], []),
+      groups([row('anime_result', 'Anime result', '/anime/anime_result/a')], []),
       -1,
       { select },
     )
@@ -135,7 +136,7 @@ describe('QuickSearchResults interactions', () => {
 
   it('keeps input focus ownership while active options stay untabbable', () => {
     const model = createModel(
-      groups([row('1', 'Anime result', '/anime/1/a')], []),
+      groups([row('anime_result', 'Anime result', '/anime/anime_result/a')], []),
       0,
       {},
     )

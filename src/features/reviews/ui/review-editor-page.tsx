@@ -27,21 +27,21 @@ import { createReviewRequestState, getReviewRequestId, settleReviewRequest } fro
 import { ReviewEditor } from './review-editor'
 import { ReviewPreview } from './review-preview'
 
-type ReviewEditorAnime = Pick<AnimeDetail, 'anilistId' | 'coverImageUrl' | 'episodes' | 'format' | 'seasonYear' | 'slug' | 'titles'>
+type ReviewEditorAnime = Pick<AnimeDetail, 'publicId' | 'coverImageUrl' | 'episodes' | 'format' | 'seasonYear' | 'slug' | 'titles'>
 type ReviewEditorPageProps = { anime: ReviewEditorAnime | null; mode: 'create' | 'edit'; reviewId: string | null }
 type EditorFields = { body: ReviewDocumentV1; rating: string; summary: string; containsSpoiler: boolean; visibility: VisibilitySelection }
 type EditorChange = <K extends keyof EditorFields>(key: K, value: EditorFields[K]) => void
 type ReviewMutationFields = { rating: number | null; summary: string; containsSpoiler: boolean; bodyJson: string; visibility: Visibility }
 type PublishedReviewMutationFields = Omit<ReviewMutationFields, 'rating'> & { rating: number }
 type ReviewSaveContext = {
-  animeId: number
+  animeId: Id<'catalogEntities'>
   existing: ReviewDetail | null
   fields: EditorFields
   mode: 'create' | 'edit'
   originalVisibility: Visibility
-  publish: (input: PublishedReviewMutationFields & { anilistId: number; requestId: string }) => Promise<string>
+  publish: (input: PublishedReviewMutationFields & { animeId: Id<'catalogEntities'>; requestId: string }) => Promise<string>
   requestState: { current: ReturnType<typeof createReviewRequestState> }
-  saveDraft: (input: ReviewMutationFields & { anilistId: number; requestId: string }) => Promise<unknown>
+  saveDraft: (input: ReviewMutationFields & { animeId: Id<'catalogEntities'>; requestId: string }) => Promise<unknown>
   update: (input: Omit<ReviewMutationFields, 'rating'> & { rating: number; reviewId: Id<'reviews'> }) => Promise<unknown>
 }
 
@@ -52,7 +52,7 @@ export function ReviewEditorPage({ anime, mode, reviewId }: ReviewEditorPageProp
 }
 
 function CreateReviewEditorPage({ anime }: { anime: ReviewEditorAnime | null }) {
-  const mine = useQuery(api.reviews.getMineForAnime, anime ? { anilistId: anime.anilistId } : 'skip')
+  const mine = useQuery(api.reviews.getMineForAnime, anime ? { animeId: anime.publicId as Id<'catalogEntities'> } : 'skip')
   const existing = mine === undefined || mine === null ? null : parseReviewWireDetail(mine)
   usePublishedReviewRedirect(existing)
   if (anime === null) throw new Error('Create Review requires anime details.')
@@ -118,7 +118,7 @@ export function LoadedReviewEditor({ anime, defaultVisibility, existing, mode }:
       const bodyJson = serializeReviewEditorState(fields.body.editorState)
       const resolvedVisibility = resolveVisibilitySelection(originalVisibility, fields.visibility)
       const requestPayload = JSON.stringify({ rating, summary: fields.summary, containsSpoiler: fields.containsSpoiler, bodyJson, visibility: resolvedVisibility })
-      const completedId = await saveReview({ animeId: anime.anilistId, existing, fields, mode, originalVisibility, publish, requestState, saveDraft, update }, intent, rating, bodyJson, requestPayload)
+      const completedId = await saveReview({ animeId: anime.publicId as Id<'catalogEntities'>, existing, fields, mode, originalVisibility, publish, requestState, saveDraft, update }, intent, rating, bodyJson, requestPayload)
       setDirty(false)
       setCompletedReviewId(completedId)
     } catch (cause) {
@@ -182,7 +182,7 @@ const getEditorSaveErrors = (editorInvalid: boolean, currentErrors: string[], fi
   if (!editorInvalid) return validateReviewEditorFields(fields, intent)
   return currentErrors.length > 0 ? currentErrors : ['Review body must be corrected before saving.']
 }
-const toEditorAnime = (review: ReviewDetail): ReviewEditorAnime => ({ anilistId: review.anime.anilistId, coverImageUrl: review.anime.coverImageUrl, episodes: null, format: null, seasonYear: null, slug: review.anime.slug, titles: { display: review.anime.title, english: null, native: null, romaji: null } })
+const toEditorAnime = (review: ReviewDetail): ReviewEditorAnime => ({ publicId: review.anime.publicId, coverImageUrl: review.anime.coverImageUrl, episodes: null, format: null, seasonYear: null, slug: review.anime.slug, titles: { display: review.anime.title, english: null, native: null, romaji: null } })
 
 /** Runs one Review mutation while preserving request idempotency state. */
 const saveReview = async (context: ReviewSaveContext, intent: ReviewSaveMode, rating: number | null, bodyJson: string, requestPayload: string): Promise<string | null> => {
@@ -197,7 +197,7 @@ const saveReview = async (context: ReviewSaveContext, intent: ReviewSaveMode, ra
   if (intent === 'draft') {
     const request = getReviewRequestId(context.requestState.current, 'draft', requestPayload, () => crypto.randomUUID())
     context.requestState.current = request.state
-    await context.saveDraft({ ...fields, anilistId: context.animeId, requestId: request.id })
+    await context.saveDraft({ ...fields, animeId: context.animeId, requestId: request.id })
     context.requestState.current = settleReviewRequest(context.requestState.current, 'draft', request.id)
     toast.success('Draft saved.')
     return null
@@ -205,7 +205,7 @@ const saveReview = async (context: ReviewSaveContext, intent: ReviewSaveMode, ra
   if (rating === null) throw new Error('Published Review requires a Rating.')
   const request = getReviewRequestId(context.requestState.current, 'publish', requestPayload, () => crypto.randomUUID())
   context.requestState.current = request.state
-  const id = await context.publish({ ...fields, rating, anilistId: context.animeId, requestId: request.id })
+  const id = await context.publish({ ...fields, rating, animeId: context.animeId, requestId: request.id })
   context.requestState.current = settleReviewRequest(context.requestState.current, 'publish', request.id)
   toast.success('Review published.')
   return id

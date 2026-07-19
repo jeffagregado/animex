@@ -4,7 +4,13 @@ import {
   AniListRequestError,
   type AniListDependencies,
 } from '../../../lib/anilist-client.server'
-import { searchQuickCatalogFromAniList } from './anilist-quick-search.server'
+import type {
+  CatalogProviderRef,
+} from '../../catalog-identity/server/catalog-identity.server'
+import {
+  searchQuickCatalogFromAniList,
+  type QuickSearchIdentityDependencies,
+} from './anilist-quick-search.server'
 
 interface ProviderImage {
   large: string
@@ -91,9 +97,24 @@ const responseDependencies = (
 const jsonResponse = (value: unknown, status = 200, headers?: HeadersInit): Response =>
   new Response(JSON.stringify(value), { status, headers })
 
+const ignoreIdentityRefs = (_refs: readonly CatalogProviderRef[]): void => {}
+
+const identityDependencies = (
+  onEnsure: (refs: readonly CatalogProviderRef[]) => void,
+): QuickSearchIdentityDependencies => ({
+  ensurePublicIds: async (refs) => {
+    onEnsure(refs)
+    return refs.map((ref) => ({
+      kind: ref.kind,
+      publicId: `${ref.kind}_${ref.providerId}`,
+    }))
+  },
+})
+
 describe('AniList Quick Search adapter', () => {
   test('uses one aliased operation and exact normalized variables', async () => {
     const calls: Array<{ url: string; payload: unknown }> = []
+    const identityCalls: CatalogProviderRef[][] = []
     const result = await searchQuickCatalogFromAniList(
       '  frieren  ',
       responseDependencies([jsonResponse(body())], (input, init) => {
@@ -102,6 +123,7 @@ describe('AniList Quick Search adapter', () => {
           payload: JSON.parse(String(init?.body)),
         })
       }),
+      identityDependencies((refs) => identityCalls.push([...refs])),
     )
 
     expect(calls).toHaveLength(1)
@@ -118,27 +140,35 @@ describe('AniList Quick Search adapter', () => {
     expect(document).toContain('characters(search: $query, sort: SEARCH_MATCH)')
     expect(document).toContain('staff(search: $query, sort: SEARCH_MATCH)')
     expect(document).not.toMatch(/\bUser\b|\bMANGA\b/)
+    expect(identityCalls).toEqual([[
+      { provider: 'anilist', kind: 'anime', providerId: 52991 },
+      { provider: 'anilist', kind: 'character', providerId: 12 },
+      { provider: 'anilist', kind: 'staff', providerId: 21 },
+    ]])
     expect(result).toEqual({
       anime: [{
-        id: '52991',
+        id: 'anime_52991',
+        publicId: 'anime_52991',
         label: "Frieren: Beyond Journey's End",
         imageUrl: 'https://img.example/frieren.webp',
         metadata: 'TV SHORT · 2023',
-        destination: '/anime/52991/frieren-beyond-journeys-end',
+        destination: '/anime/anime_52991/frieren-beyond-journeys-end',
       }],
       characters: [{
-        id: '12',
+        id: 'character_12',
+        publicId: 'character_12',
         label: 'Flamme',
         imageUrl: 'https://img.example/flamme.webp',
         metadata: 'フランメ',
-        destination: '/characters/12/flamme',
+        destination: '/characters/character_12/flamme',
       }],
       staff: [{
-        id: '21',
+        id: 'staff_21',
+        publicId: 'staff_21',
         label: "Tanezaki Atsumi's",
         imageUrl: 'https://img.example/tanezaki.webp',
         metadata: '種﨑 敦美',
-        destination: '/staff/21/tanezaki-atsumis',
+        destination: '/staff/staff_21/tanezaki-atsumis',
       }],
     })
   })
@@ -178,13 +208,14 @@ describe('AniList Quick Search adapter', () => {
     await expect(searchQuickCatalogFromAniList(
       'aa',
       responseDependencies([jsonResponse(value)]),
+      identityDependencies(ignoreIdentityRefs),
     )).resolves.toMatchObject({
       anime: [
         {
           label: 'Café 葬送’s Song',
           imageUrl: null,
           metadata: null,
-          destination: '/anime/1/caf%C3%A9-%E8%91%AC%E9%80%81s-song',
+          destination: '/anime/anime_1/caf%C3%A9-%E8%91%AC%E9%80%81s-song',
         },
         { label: '葬送のフリーレン', metadata: 'TV SHORT' },
         { label: 'Year Only', metadata: '2024' },
@@ -193,7 +224,7 @@ describe('AniList Quick Search adapter', () => {
         label: 'Élan O’Connor',
         metadata: null,
         imageUrl: null,
-        destination: '/characters/12/%C3%A9lan-oconnor',
+        destination: '/characters/character_12/%C3%A9lan-oconnor',
       }],
     })
   })
@@ -207,6 +238,7 @@ describe('AniList Quick Search adapter', () => {
     await expect(searchQuickCatalogFromAniList(
       'empty',
       responseDependencies([jsonResponse(value)]),
+      identityDependencies(ignoreIdentityRefs),
     )).resolves.toEqual({ anime: [], characters: [], staff: [] })
   })
 
@@ -267,6 +299,7 @@ describe('AniList Quick Search adapter', () => {
     await expect(searchQuickCatalogFromAniList(
       'strict',
       responseDependencies([jsonResponse(createValue())]),
+      identityDependencies(ignoreIdentityRefs),
     )).rejects.toMatchObject({
       name: 'AniListRequestError',
       code: 'UPSTREAM',
@@ -329,6 +362,7 @@ describe('AniList Quick Search adapter', () => {
     await expect(searchQuickCatalogFromAniList(
       'invalid',
       responseDependencies([jsonResponse(createValue())]),
+      identityDependencies(ignoreIdentityRefs),
     )).rejects.toMatchObject({ code: 'UPSTREAM' })
   })
 
@@ -336,6 +370,7 @@ describe('AniList Quick Search adapter', () => {
     await expect(searchQuickCatalogFromAniList(
       '404',
       responseDependencies([jsonResponse({ data: { anime: null } }, 404)]),
+      identityDependencies(ignoreIdentityRefs),
     )).rejects.toMatchObject({ code: 'UPSTREAM', retryAfterSeconds: null })
     await expect(searchQuickCatalogFromAniList(
       'graphql',
@@ -343,6 +378,7 @@ describe('AniList Quick Search adapter', () => {
         errors: [{ message: 'private provider detail' }],
         data: { anime: null },
       })]),
+      identityDependencies(ignoreIdentityRefs),
     )).rejects.toMatchObject({ code: 'UPSTREAM', message: 'AniList is temporarily unavailable.' })
     const limited = searchQuickCatalogFromAniList(
       'limited',
@@ -352,6 +388,7 @@ describe('AniList Quick Search adapter', () => {
           headers: { 'retry-after': '15' },
         }),
       ]),
+      identityDependencies(ignoreIdentityRefs),
     )
     await expect(limited).rejects.toBeInstanceOf(AniListRequestError)
     await expect(limited).rejects.toMatchObject({
@@ -365,12 +402,14 @@ describe('AniList Quick Search adapter', () => {
     const result = await searchQuickCatalogFromAniList(
       'privacy',
       responseDependencies([jsonResponse(body())]),
+      identityDependencies(ignoreIdentityRefs),
     )
     expect(Object.keys(result)).toEqual(['anime', 'characters', 'staff'])
     for (const rows of Object.values(result)) {
       for (const row of rows) {
         expect(Object.keys(row)).toEqual([
           'id',
+          'publicId',
           'label',
           'imageUrl',
           'metadata',
@@ -379,6 +418,13 @@ describe('AniList Quick Search adapter', () => {
       }
     }
     expect(JSON.stringify(result)).not.toMatch(/isAdult|romaji|native|format|seasonYear|provider|user/i)
+    for (const rows of Object.values(result)) {
+      for (const row of rows) {
+        expect(row.id).toBe(row.publicId)
+        expect(row.publicId).not.toMatch(/^\d+$/)
+        expect(row.destination).not.toMatch(/\/(?:52991|12|21)(?:\/|$)/)
+      }
+    }
   })
 
   test('wraps unexpected dependency failures as sanitized upstream errors', async () => {
@@ -387,9 +433,31 @@ describe('AniList Quick Search adapter', () => {
       throw new RangeError('private dependency failure')
     })
 
-    await expect(searchQuickCatalogFromAniList('wrap', dependencies)).rejects.toMatchObject({
+    await expect(searchQuickCatalogFromAniList(
+      'wrap',
+      dependencies,
+      identityDependencies(ignoreIdentityRefs),
+    )).rejects.toMatchObject({
       code: 'UPSTREAM',
       message: 'AniList is temporarily unavailable.',
     })
+  })
+
+  test('sanitizes identity failures without exposing provider tuples', async () => {
+    const failure = searchQuickCatalogFromAniList(
+      'identity',
+      responseDependencies([jsonResponse(body())]),
+      {
+        ensurePublicIds: async () => {
+          throw new Error('anilist:anime:52991')
+        },
+      },
+    )
+
+    await expect(failure).rejects.toMatchObject({
+      code: 'UPSTREAM',
+      message: 'AniList is temporarily unavailable.',
+    })
+    await expect(failure).rejects.not.toThrow(/anilist|52991/)
   })
 })

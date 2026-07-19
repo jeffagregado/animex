@@ -29,7 +29,7 @@ function AnimePoster({ anime, rank }: AnimePosterProps) {
   }, [imageUrl])
 
   return (
-    <Link to="/anime/$anilistId/$slug" params={{ anilistId: String(anime.anilistId), slug: anime.slug }} className="block h-full shrink-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
+    <Link to="/anime/$publicId/$slug" params={{ publicId: anime.publicId, slug: anime.slug }} className="block h-full shrink-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
     <article className="relative flex h-full w-36 flex-col overflow-hidden rounded-lg border border-border bg-card sm:w-40">
       <div className="aspect-[2/3] bg-muted">
         {imageUrl !== null && !hasImageError ? <img className="size-full object-cover" src={imageUrl} alt={`${anime.titles.display} cover`} onError={() => setHasImageError(true)} /> : <div className="flex size-full flex-col items-center justify-center gap-2 px-3 text-center text-xs text-muted-foreground"><ImageOff aria-hidden="true" className="size-5" /><span>Image unavailable</span></div>}
@@ -56,5 +56,5 @@ export function DiscoverSectionRail({ title, state, onRetry, isRetrying, retryEr
   }
 
   const key = state.section.key
-  return <section aria-labelledby={`${key}-heading`} className="space-y-3"><h2 id={`${key}-heading`} className="text-xl font-extrabold">{title}</h2><HorizontalRail label={title}>{state.section.items.map((anime, index) => <AnimePoster anime={anime} rank={key === 'trending' ? index + 1 : null} key={anime.anilistId} />)}</HorizontalRail></section>
+  return <section aria-labelledby={`${key}-heading`} className="space-y-3"><h2 id={`${key}-heading`} className="text-xl font-extrabold">{title}</h2><HorizontalRail label={title}>{state.section.items.map((anime, index) => <AnimePoster anime={anime} rank={key === 'trending' ? index + 1 : null} key={anime.publicId} />)}</HorizontalRail></section>
 }

@@ -2,31 +2,27 @@
 
 ## Entry and route
 
-`src/routes/_public/route.tsx` owns shared public layout. `src/routes/_public/discover.tsx` owns `/discover`: it validates URL search, normalizes `q`, genre, format, season, year, and sort, loads initial rails through `getDiscoverPage`, and serializes UI changes back to URL state. `PublicShell` renders responsive shared navigation.
+`src/routes/_public/discover.tsx` owns `/discover`. It validates and normalizes query, genre, format, season, year, and sort; loaders return strict public rows. Anime links use `/anime/$publicId/$slug`. `PublicShell` owns shared responsive navigation.
 
 ## Curated rails
 
-1. The route loader calls TanStack Start `getDiscoverPage` (`GET`) in `src/features/discover/server/discover.functions.ts`.
-2. The server cache gateway reads Convex query `animeCache.readSections`.
-3. Fresh sections return ordered `animeSummaries`. Missing or expired sections acquire a 30-second lease, fetch AniList server-side, validate and normalize summaries, and commit through Convex mutations (`acquireSectionLease`, `commitSection`, `releaseSectionLease`). Lease contention rereads up to six times at 500 ms intervals.
-4. Convex stores lightweight `animeSummaries`, ordered `discoverSectionCache` records, and `discoverCacheLeases`. No Convex action or browser-side provider call is used. Writes require `DISCOVER_CACHE_WRITE_TOKEN`; lease ownership and section limits are validated.
+| Field | Current state |
+| --- | --- |
+| Entry | Discover route loader and Home consumers call `getDiscoverPage`; search calls `searchAnime`. |
+| Input | Rail key, URL filters, or search page/cursor. |
+| Validation | Server Zod contracts validate filters and provider responses. Convex cache writes validate bounded sections, lease ownership, and token. |
+| Transform | AniList provider summaries keep numeric IDs in server/cache models. Cache reads resolve existing mappings; live search ensures mappings, then maps rows to opaque `publicId`. |
+| Storage | `animeSummaries`, ordered `discoverSectionCache`, and `discoverCacheLeases` keep existing AniList keys, section order, timestamps, image URLs, and TTLs. Numeric provider IDs are not stored in browser DTOs. |
+| External calls | Server-only `src/features/discover/server/anilist.server.ts` → AniList GraphQL. Browser and Convex actions never call provider. |
+| Retry | Missing/expired section acquires existing bounded lease, fetches, normalizes, commits, releases, rereads. AniList transport retries transient failures with timeout/Retry-After policy; no stale fallback. |
+| Error | Invalid filters, identity mapping failure, missing cache, malformed provider data, upstream, rate-limit, lease, and commit errors remain explicit section/search states. |
+| Output | Rails and search rows contain display metadata plus opaque `publicId`, slug, and provider-neutral destinations. |
+| Owner | Route/UI: `src/routes/_public/discover.tsx`, `src/features/discover`; server/cache bridge: `src/features/discover/server`; Convex cache/schema: `convex/animeCache*`, `convex/schema.ts`; identity: `src/features/catalog-identity`, `convex/catalogIdentity*`. |
 
-TTL: Trending 3h; Upcoming 6h; Seasonal and Recommendations 24h. Expired or missing cache never serves stale data; refresh/cache failures return explicit section error states with retry controls.
+## Rails and search
 
-## AniList boundary
+Trending remains 3h, Upcoming 6h, Seasonal and Recommendations 24h. Home reuses cached Trending and Upcoming. Search bypasses Convex cache for a server-only AniList request, deduplicates provider rows before identity materialization, and returns explicit loading/empty/retry/rate-limit/end states. No browser provider endpoint or AniList ID is rendered.
 
-`src/features/discover/server/anilist.server.ts` is server-only. It calls `https://graphql.anilist.co` with an 8-second timeout, validates GraphQL payloads with Zod, normalizes numeric AniList IDs and Unicode-safe title slugs, filters anime/non-adult recommendations, and retries transient failures up to three attempts. Short `429` windows retry using `Retry-After`; longer or unknown limits and final failures surface sanitized `UPSTREAM` or `RATE_LIMITED` errors. No provider call is made by browser code or Convex actions.
+## Boundary and validation
 
-## Search path
-
-Valid URL search/filter state enables `DiscoverSearchResults`, which calls TanStack Query infinite pagination through server function `searchAnime` (`GET`). Search bypasses Convex cache and queries AniList directly on the server. Results are deduplicated by AniList ID and link each card/list row to `/anime/$anilistId/$slug`; the detail route owns canonical slug correction after metadata loads. Search exposes explicit loading, empty, retry, rate-limit, and end states. No stale fallback.
-
-## Discover layout and filters
-
-The main column renders Trending, Seasonal, Popular Recommendations, and responsive This Week/Upcoming lists. It does not render a main-column Genres section. Desktop Top Genres remains in the sidebar. `DISCOVER_GENRES` powers both Top Genres selection and the URL `genre` filter; format, season, year, query, and sort filters remain URL-controlled. Manga placeholder remains a separate sidebar/mobile utility section.
-
-Home calls the same `getDiscoverPage` loader and reuses the cached `trending` data for its This Week list and the cached `upcoming` data for Upcoming. Home desktop utility cards use `rounded-lg border border-border bg-card p-4`, matching Discover. No responsive sidebar or data-fetch change exists.
-
-## UI validation and ownership
-
-Discover layout is responsive at 390/768/1280 px with no horizontal overflow; URL search/filter state persists; Top Genres and genre filtering remain available; browser console is clean. Route and shell are owned by `src/routes/_public` and `src/features/shell`; server transport/cache orchestration is owned by `src/features/discover/server`; contracts and UI are owned by `src/features/discover`; persistence policy is owned by `convex/animeCache*` and `convex/schema.ts`.
+Existing cache rows and image URLs remain unchanged; Metadata Image Proxy remains optional, unscheduled, and untouched. Dev additive sync and identity/durable migration receipts are recorded in `docs/runbooks/catalog-identity-backfill.md`. Full tests, client boundary scans, Fallow, React Doctor, integrated review, and responsive browser QA remain pending for this cutover.

@@ -15,6 +15,8 @@ import {
   validateCacheWriteToken,
   validateSectionCommit,
 } from './animeCachePolicy'
+import { ensureCatalogEntity } from './catalogIdentityModel'
+import { type CatalogProviderRef } from './catalogIdentityPolicy'
 
 const sectionKeyValidator = v.union(
   v.literal('trending'),
@@ -237,6 +239,18 @@ const validateCacheSectionCommit = (
   }
 }
 
+/** Registers each unique Anime provider reference once. */
+const ensureAnimeIdentities = async (
+  ctx: MutationCtx,
+  summaries: CachedAnimeSummary[],
+): Promise<void> => {
+  const ids = new Set(summaries.map((summary) => summary.anilistId))
+  for (const providerId of ids) {
+    const ref: CatalogProviderRef = { provider: 'anilist', kind: 'anime', providerId }
+    await ensureCatalogEntity(ctx, ref)
+  }
+}
+
 /** Upserts one anime summary from a valid section commit. */
 const upsertAnimeSummary = async (
   ctx: MutationCtx,
@@ -304,9 +318,10 @@ const deleteReleasedSectionLease = async (
 
 /** Reads cache sections in caller order without returning stale items. */
 export const readSections = query({
-  args: { keys: v.array(sectionKeyValidator) },
+  args: { keys: v.array(sectionKeyValidator), token: v.string() },
   returns: v.array(v.union(freshSectionValidator, unavailableSectionValidator)),
   handler: async (ctx, args) => {
+    requireCacheWriteToken(args.token)
     const now = Date.now()
     return await Promise.all(args.keys.map((key) => readSection(ctx, key, now)))
   },
@@ -353,6 +368,7 @@ export const commitSection = mutation({
       .unique()
     const activeLease = requireActiveSectionLease(lease, args.leaseId, now)
     validateCacheSectionCommit(args.key, args.summaries, timing)
+    await ensureAnimeIdentities(ctx, args.summaries)
     for (const summary of args.summaries) {
       await upsertAnimeSummary(ctx, summary, now)
     }

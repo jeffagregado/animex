@@ -1,4 +1,7 @@
-import { catalogPersonDetailSchema, type CatalogPersonKind } from '../src/features/catalog-person/shared/catalog-person-contracts'
+import {
+  catalogPersonProviderDetailSchema,
+  type CatalogPersonProviderKind,
+} from '../src/features/catalog-person/server/catalog-person-provider-cache-contracts.server'
 
 export const CATALOG_PERSON_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 export const CATALOG_PERSON_LEASE_MS = 60_000
@@ -21,13 +24,13 @@ const positive = (value: number, name: string): void => {
 }
 
 /** Builds a validated detail cache key. */
-export const personDetailKey = (kind: CatalogPersonKind, personId: number): string => {
+export const personDetailKey = (kind: CatalogPersonProviderKind, personId: number): string => {
   positive(personId, 'person_id')
   return `person:${kind}:${personId}`
 }
 
 /** Builds a validated work-page cache key. */
-export const personWorkKey = (kind: CatalogPersonKind, personId: number, page: number): string => {
+export const personWorkKey = (kind: CatalogPersonProviderKind, personId: number, page: number): string => {
   positive(personId, 'person_id')
   positive(page, 'page')
   return `person-work:${kind}:${personId}:${page}`
@@ -82,9 +85,9 @@ export const decideCatalogPersonLeaseRelease = (current: Lease | null, leaseId: 
 }
 
 /** Validates provider-neutral detail identity. */
-export const validateCatalogPersonDetail = (kind: CatalogPersonKind, personId: number, detail: unknown): void => {
+export const validateCatalogPersonDetail = (kind: CatalogPersonProviderKind, personId: number, detail: unknown): void => {
   positive(personId, 'person_id')
-  const result = catalogPersonDetailSchema.safeParse(detail)
+  const result = catalogPersonProviderDetailSchema.safeParse(detail)
   if (!result.success || result.data.kind !== kind || result.data.id !== personId) {
     throw new CatalogPersonCachePolicyError('INVALID_DETAIL', 'Catalog person detail identity or payload is invalid.')
   }
@@ -92,7 +95,7 @@ export const validateCatalogPersonDetail = (kind: CatalogPersonKind, personId: n
 
 /** Validates bounded work references without changing order. */
 export const validateCatalogPersonWorkPage = (
-  kind: CatalogPersonKind,
+  kind: CatalogPersonProviderKind,
   personId: number,
   page: number,
   items: Array<{ animeId: number; role: string | null }>,

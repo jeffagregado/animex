@@ -100,7 +100,7 @@ const header = {
 }
 
 const favorites = Array.from({ length: 10 }, (_, index) => ({
-  anilistId: index + 1,
+  publicId: `anime_${index + 1}`,
   slug: `anime-${index + 1}`,
   title: `Favorite ${index + 1}`,
   coverImageUrl: null,
@@ -126,7 +126,7 @@ const activity: FeedCard = {
     avatarUrl: null,
   },
   anime: {
-    anilistId: 1,
+    publicId: 'anime_frieren',
     slug: 'frieren',
     title: 'Frieren',
     coverImageUrl: null,
@@ -336,7 +336,9 @@ describe('Profile responsive content contract', () => {
     expect(screen.getByText('24')).toBeTruthy()
     expect(screen.getByText('31')).toBeTruthy()
     expect(screen.getByText('6')).toBeTruthy()
-    expect(screen.getAllByRole('link', { name: /Favorite \d+/ })).toHaveLength(10)
+    const favoriteLinks = screen.getAllByRole('link', { name: /Favorite \d+/ })
+    expect(favoriteLinks).toHaveLength(10)
+    expect(favoriteLinks[0]?.getAttribute('href')).toBe('/anime/anime_1/anime-1')
     await waitFor(() => expect(mocks.query).toHaveBeenCalled())
   })
 
@@ -538,6 +540,41 @@ describe('Profile tab states', () => {
 })
 
 describe('Profile cursor pages', () => {
+  it('deduplicates Favorites by public Anime identity', async () => {
+    const first = {
+      anime: favorites[0]!,
+      favoriteAt: 2,
+    }
+    const second = {
+      anime: favorites[1]!,
+      favoriteAt: 1,
+    }
+    mocks.query
+      .mockResolvedValueOnce({
+        items: [first],
+        cursor: 'next',
+        hasMore: true,
+      })
+      .mockResolvedValueOnce({
+        items: [{ ...first, favoriteAt: 3 }, second],
+        cursor: null,
+        hasMore: false,
+      })
+    const { result } = renderHook(() => useProfilePages(
+      'rinko',
+      'favorites',
+      true,
+    ))
+    await waitFor(() => expect(result.current.items).toHaveLength(1))
+    await act(async () => {
+      await result.current.loadMore()
+    })
+    expect(result.current.items.map((item) => item.anime.publicId)).toEqual([
+      'anime_1',
+      'anime_2',
+    ])
+  })
+
   it('deduplicates one in-flight cursor and merges document IDs once', async () => {
     mocks.query
       .mockResolvedValueOnce({

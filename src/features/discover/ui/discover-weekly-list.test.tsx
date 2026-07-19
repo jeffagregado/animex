@@ -18,7 +18,7 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 const anime: AnimeSummary = {
-  anilistId: 1,
+  publicId: 'anime_frieren',
   slug: 'frieren',
   titles: { display: 'Frieren', english: 'Frieren', romaji: 'Sousou no Frieren', native: null },
   coverImageUrl: 'https://example.test/frieren.jpg',
@@ -42,8 +42,8 @@ describe('DiscoverWeeklyList', () => {
     render(<DiscoverWeeklyList items={[anime]} variant={variant} />)
 
     const link = screen.getByRole('link', { name: /Frieren/ })
-    expect(link.dataset.to).toBe('/anime/$anilistId/$slug')
-    expect(link.getAttribute('href')).toBe('/anime/1/frieren')
+    expect(link.dataset.to).toBe('/anime/$publicId/$slug')
+    expect(link.getAttribute('href')).toBe('/anime/anime_frieren/frieren')
     expect(link.className).toContain('focus-visible:ring-2')
   })
   it('matches the desktop weekly row content and metric hierarchy', () => {

@@ -26,11 +26,13 @@ export const searchQuickCatalog = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => {
     const provider = await import('./anilist-quick-search.server')
     const client = await import('../../../lib/anilist-client.server')
+    const identity = await import('../../catalog-identity/server/catalog-identity.server')
     return await runQuickCatalogSearch(
       data,
       async (input) => await provider.searchQuickCatalogFromAniList(
         input.query,
         client.createAniListDependencies(),
+        { ensurePublicIds: identity.ensurePublicIds },
       ),
     )
   })

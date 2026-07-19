@@ -17,7 +17,7 @@ export function PublishedReviewCard({ review }: { review: ReviewListItem }) {
   const ratingTop = review.containsSpoiler ? 'sm:top-14' : 'sm:top-4'
   return <Card className="min-w-0 border-l-4 border-l-cyan-300 bg-card/55 py-0">
     <CardContent className="relative grid min-w-0 grid-cols-[5.25rem_minmax(0,1fr)] gap-4 p-4 sm:grid-cols-[5.75rem_minmax(0,1fr)_auto]">
-      <a aria-label={`View ${review.anime.title}`} className="row-span-3 block min-w-0 overflow-hidden rounded-lg bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/anime/${review.anime.anilistId}/${review.anime.slug}`}>
+      <a aria-label={`View ${review.anime.title}`} className="row-span-3 block min-w-0 overflow-hidden rounded-lg bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" href={`/anime/${review.anime.publicId}/${review.anime.slug}`}>
         {review.anime.coverImageUrl !== null && failedCoverUrl !== review.anime.coverImageUrl ? <img alt={`${review.anime.title} cover`} className="aspect-2/3 h-full w-full object-cover" onError={() => setFailedCoverUrl(review.anime.coverImageUrl)} src={review.anime.coverImageUrl} /> : <span aria-label="Image unavailable" className="grid aspect-2/3 h-full min-h-32 place-items-center text-muted-foreground"><ImageOffIcon aria-hidden="true" className="size-6" /></span>}
       </a>
       <div className="min-w-0">

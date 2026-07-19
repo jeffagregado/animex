@@ -12,11 +12,12 @@ import {
 } from './quick-search-contracts'
 
 const animeRow = {
-  id: '52991',
+  id: 'anime_frieren',
+  publicId: 'anime_frieren',
   label: "Frieren: Beyond Journey's End",
   imageUrl: 'https://img.example/frieren.webp',
   metadata: 'TV · 2023',
-  destination: '/anime/52991/frieren-beyond-journeys-end',
+  destination: '/anime/anime_frieren/frieren-beyond-journeys-end',
 }
 
 describe('quick search contracts', () => {
@@ -44,19 +45,19 @@ describe('quick search contracts', () => {
   test('creates canonical entity and View all destinations', () => {
     expect(createQuickSearchDestination({
       kind: 'anime',
-      id: 52991,
+      publicId: 'anime_frieren',
       slug: 'frieren-beyond-journeys-end',
-    })).toBe('/anime/52991/frieren-beyond-journeys-end')
+    })).toBe('/anime/anime_frieren/frieren-beyond-journeys-end')
     expect(createQuickSearchDestination({
       kind: 'character',
-      id: 12,
+      publicId: 'character_flamme',
       label: 'Frieren',
-    })).toBe('/characters/12/frieren')
+    })).toBe('/characters/character_flamme/frieren')
     expect(createQuickSearchDestination({
       kind: 'staff',
-      id: 21,
+      publicId: 'staff_tanezaki',
       label: 'Atsumi Tanezaki',
-    })).toBe('/staff/21/atsumi-tanezaki')
+    })).toBe('/staff/staff_tanezaki/atsumi-tanezaki')
     expect(createQuickSearchDestination({
       kind: 'user',
       username: 'mika',
@@ -81,6 +82,32 @@ describe('quick search contracts', () => {
       group: 'users',
       query: 'Mika',
     })).toBe('/search/users?q=Mika')
+  })
+
+  test('rejects provider IDs and mismatched public row IDs', () => {
+    expect(() => createQuickSearchDestination({
+      kind: 'anime',
+      publicId: '52991',
+      slug: 'frieren',
+    })).toThrow('QUICK_SEARCH_DESTINATION_INVALID')
+    expect(() => quickSearchGroupsSchema.parse({
+      anime: [{ ...animeRow, publicId: '52991', id: '52991' }],
+      characters: [],
+      staff: [],
+      users: [],
+    })).toThrow()
+    expect(() => quickSearchGroupsSchema.parse({
+      anime: [{ ...animeRow, id: 'different_public_id' }],
+      characters: [],
+      staff: [],
+      users: [],
+    })).toThrow()
+    expect(() => quickSearchGroupsSchema.parse({
+      anime: [{ ...animeRow, anilistId: 52991 }],
+      characters: [],
+      staff: [],
+      users: [],
+    })).toThrow()
   })
 
   test('validates strict grouped rows and five-row caps', () => {
