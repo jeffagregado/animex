@@ -191,7 +191,7 @@ Status: COMPLETE. Final reviewer PASS after the keyboard Profile fix. Shared hea
 
 ### Post-Phase 7: Public Catalog Identity
 
-Status: IMPLEMENTATION COMPLETE; AUTHENTICATED FLOW QA OPEN. Additive identity registry, dev backfill/verification, durable entity refs, and publicId server/UI cutover are implemented on `jeff-cx/public-catalog-identity`. Automated gates and signed-out responsive browser QA pass. Both configured AnimeX QA accounts are valid; authenticated sign-out is verified after fixing the private-query race, while the remaining authenticated flow matrix stays open. Phase 8 stays blocked. Detailed implementation plan: `docs/superpowers/plans/2026-07-18-post-phase-7-public-catalog-identity.md`.
+Status: VALIDATED; PHASE CLOSURE AWAITING APPROVAL. Additive identity registry, dev backfill/verification, durable entity refs, and publicId server/UI cutover are implemented on `jeff-cx/public-catalog-identity`. Automated gates plus signed-out and authenticated responsive browser QA pass. Both configured AnimeX QA accounts work. Phase 8 stays blocked. Detailed implementation plan: `docs/superpowers/plans/2026-07-18-post-phase-7-public-catalog-identity.md`.
 
 - Add AnimeX-owned catalog entities for Anime, Character, and Staff. Expose serialized catalog entity IDs as opaque `publicId` values.
 - Store AniList numeric IDs as server-only provider references keyed by provider + entity kind + provider ID.
@@ -203,7 +203,8 @@ Status: IMPLEMENTATION COMPLETE; AUTHENTICATED FLOW QA OPEN. Additive identity r
 - Retain migration tooling and legacy durable fields until separately approved production backfill; final required-field tightening is not part of this execution.
 - Keep AniList GraphQL and provider IDs server-only; missing/conflicting mappings fail clearly without provider-ID fallback.
 - Keep Metadata Image Proxy optional, unscheduled, and outside this phase.
-- Convex dev sync and bounded migration verification are recorded in the catalog identity runbook. Full tests, TypeScript/build checks, client-boundary scans, Fallow, React Doctor no-regression comparison, and signed-out responsive browser QA pass. Both AnimeX QA accounts are valid and authenticated sign-out passes; signed-in Status, Score, Favorite, Rewatch, Review creation/detail, Feed, and Profile browser checks remain before closure.
+- Convex dev sync and bounded migration verification are recorded in the catalog identity runbook. Full tests, TypeScript/build checks, client-boundary scans, Fallow, React Doctor no-regression comparison, and signed-out responsive browser QA pass.
+- Authenticated QA passes with both AnimeX QA accounts. Status, Score, Favorite, Rewatch rollback, Review draft/resume/publish/detail/discovery, Home feed, Profile activity/reviews/favorites, cross-account public visibility, and Discover sign-out were exercised. Checks at 390×844, 768×1024, and 1280×800 found no horizontal overflow, console warning/error, failed app request, hydration symptom, or captured client request containing `anilistId`. QA-created Review/feed data was deleted and modified list state was restored.
 - Stop after validation and wait for approval before Phase 8.
 
 ### Phase 8: Notifications, Privacy, Moderation

@@ -27,4 +27,4 @@ Cache refresh ensures bounded `(anilist, kind, providerId)` mappings in the same
 
 ## Validation state
 
-Dev additive sync and migration receipts are recorded in `docs/runbooks/catalog-identity-backfill.md`. Full automated gates, integrated review, and responsive browser QA are not yet claimed for this cutover.
+Dev additive sync and migration receipts are recorded in `docs/runbooks/catalog-identity-backfill.md`. Full automated gates, integrated review, and signed-out plus authenticated responsive browser QA pass. Authenticated coverage includes Status, Score, Favorite, Rewatch rollback, and clean sign-out.

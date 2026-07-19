@@ -2,7 +2,7 @@
 
 ## Current rollout state
 
-Additive catalog identity and durable-reference migration is verified on Convex `dev`. PublicId server/UI cutover is staged on `jeff-cx/public-catalog-identity`; automated gates and signed-out responsive browser QA pass. Authenticated browser QA is blocked by rejected configured dev credentials. Production backfill, migration-tool removal, legacy-field removal, and required-field schema tightening are deferred until separate explicit approval. Metadata Image Proxy is untouched and remains unscheduled.
+Additive catalog identity and durable-reference migration is verified on Convex `dev`. PublicId server/UI cutover is staged on `jeff-cx/public-catalog-identity`; automated gates plus signed-out and authenticated responsive browser QA pass. Both configured AnimeX QA accounts work. Production backfill, migration-tool removal, legacy-field removal, and required-field schema tightening are deferred until separate explicit approval. Metadata Image Proxy is untouched and remains unscheduled.
 
 ## Gate
 
@@ -181,7 +181,8 @@ Development deployment verification completed on 2026-07-18:
 - Final durable verification processed `5/0/4/2/6` rows across the first five lanes with every counter zero.
 - One aggregate target and one public Review verified with zero mismatch; the stats lane verified one row with every counter zero.
 - Milestone source-key migration patched `4` of `6` feed cards; both required reruns patched zero.
-- Final local validation passed `152` test files and `1030` tests, with `2` files and `3` tests skipped; root and Convex TypeScript, client + SSR build, client-boundary scans, Fallow new-only audit, and signed-out responsive browser QA passed. Authenticated browser QA remains open because both configured dev QA logins were rejected.
+- Final local validation passed `152` test files and `1031` tests, with `2` files and `3` tests skipped; root and Convex TypeScript, client + SSR build, client-boundary scans, Fallow new-only audit, and signed-out responsive browser QA passed.
+- Authenticated QA passed with both configured AnimeX accounts. It covered Status, Score, Favorite, Rewatch rollback, Review draft/resume/publish/detail/discovery, Home feed, Profile activity/reviews/favorites, cross-account public Review visibility, and Discover sign-out. Responsive checks at `390×844`, `768×1024`, and `1280×800` found no horizontal overflow, console warning/error, failed app request, hydration symptom, or captured client request containing `anilistId`. QA-created Review/feed data was deleted and modified list state was restored.
 
 ## Production
 

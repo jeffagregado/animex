@@ -29,4 +29,4 @@ Profile avatar/banner crop, Storage validation, replacement, removal, and `UserA
 
 ## Validation state
 
-Dev identity/durable migration evidence is in `docs/runbooks/catalog-identity-backfill.md`. Full automated gates, integrated review, and responsive browser QA for publicId surfaces are pending; prior Phase 7 browser evidence does not close this cutover.
+Dev identity/durable migration evidence is in `docs/runbooks/catalog-identity-backfill.md`. Full automated gates, integrated review, and signed-out plus authenticated responsive browser QA for publicId surfaces pass. Profile activity, reviews, favorites, and cross-account public Review visibility were exercised.

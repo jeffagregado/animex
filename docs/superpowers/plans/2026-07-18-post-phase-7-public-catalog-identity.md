@@ -1009,7 +1009,7 @@ Require PASS for:
 - no image-proxy work;
 - no unrelated `README.md` change.
 
-- [ ] **Step 7: Run responsive browser QA**
+- [x] **Step 7: Run responsive browser QA**
 
 Check 390×844, 768×1024, and 1280×800:
 
@@ -1026,11 +1026,11 @@ Check 390×844, 768×1024, and 1280×800:
 - no horizontal overflow;
 - no console error, failed app request, hydration warning, or client payload containing `anilistId`.
 
-- [ ] **Step 8: Close trackers**
+- [x] **Step 8: Close trackers**
 
 Mark this implementation complete only after dev migration verification, additive schema sync, review PASS, automated gates, and browser QA pass. Keep production migration/final tightening and Phase 8 unstarted.
 
-- [ ] **Step 9: Commit docs**
+- [x] **Step 9: Commit docs**
 
 ```powershell
 git add PLAN.md TODO.md CONTEXT.md docs/architecture docs/runbooks/catalog-identity-backfill.md
@@ -1058,16 +1058,16 @@ After public URLs ship:
 
 ## Completion Checklist
 
-- [ ] Anime, Character, and Staff canonical URLs use `publicId`.
-- [ ] Public shared contracts contain no `anilistId`.
-- [ ] Client build contains no `anilistId` or AniList GraphQL endpoint.
-- [ ] AniList IDs remain available server-side for provider fetch/cache.
-- [ ] Existing metadata cache rows and TTLs remain intact.
-- [ ] Durable AnimeX data uses entity references.
-- [ ] Every dev migration lane completes and verifies with zero mismatch.
-- [ ] Migration tooling and legacy durable fields remain available for separately approved production rollout.
-- [ ] Legacy numeric links redirect once to stable canonical URLs.
-- [ ] Image proxy remains untouched.
-- [ ] Full tests, TypeScript, build, Fallow, React Doctor, review, and browser QA pass.
-- [ ] Production migration and final schema tightening remain unstarted until explicit approval.
-- [ ] Phase 8 remains unstarted until explicit approval.
+- [x] Anime, Character, and Staff canonical URLs use `publicId`.
+- [x] Public shared contracts contain no `anilistId`.
+- [x] Client build contains no `anilistId` or AniList GraphQL endpoint.
+- [x] AniList IDs remain available server-side for provider fetch/cache.
+- [x] Existing metadata cache rows and TTLs remain intact.
+- [x] Durable AnimeX data uses entity references.
+- [x] Every dev migration lane completes and verifies with zero mismatch.
+- [x] Migration tooling and legacy durable fields remain available for separately approved production rollout.
+- [x] Legacy numeric links redirect once to stable canonical URLs.
+- [x] Image proxy remains untouched.
+- [x] Full tests, TypeScript, build, Fallow, React Doctor, review, and browser QA pass.
+- [x] Production migration and final schema tightening remain unstarted until explicit approval.
+- [x] Phase 8 remains unstarted until explicit approval.
