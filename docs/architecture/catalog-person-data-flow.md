@@ -25,4 +25,4 @@ Live Character/Staff search ensures identity mappings before returning rows. Inf
 
 ## Validation state
 
-Dev migration receipts and retained provider/cache contracts are recorded in `docs/runbooks/catalog-identity-backfill.md`. Full automated gates, integrated review, and signed-out plus authenticated responsive browser QA pass. Phase closure awaits approval.
+Dev migration receipts and retained provider/cache contracts are recorded in `docs/runbooks/catalog-identity-backfill.md`. Full automated gates, integrated review, and signed-out plus authenticated responsive browser QA pass. Post-Phase 7 is complete and closed.

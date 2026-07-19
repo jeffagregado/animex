@@ -967,7 +967,7 @@ Validation: initial red run failed 14/52 focused tests; final focused run passes
 
 # Post-Phase 7 Public Catalog Identity
 
-Status: VALIDATED; PHASE CLOSURE AWAITING APPROVAL. Additive registry, dev backfill/verification, durable entity refs, and publicId cutover are implemented on `jeff-cx/public-catalog-identity`. Automated gates plus signed-out and authenticated responsive browser QA pass. Both configured AnimeX QA accounts work. Safe staged rollout remains active; Phase 8 stays blocked.
+Status: COMPLETE AND CLOSED. Additive registry, dev backfill/verification, durable entity refs, and publicId cutover are validated. Automated gates plus signed-out and authenticated responsive browser QA pass. Both configured AnimeX QA accounts work. Production migration and final schema tightening remain separately gated. Phase 8 stays blocked.
 
 - [x] Lock `catalogEntities._id` as client-facing `publicId`; keep provider mappings separate and server-only.
 - [x] Lock cache-preserving architecture: existing cache rows, AniList keys, TTLs, leases, and image URLs remain unchanged.
@@ -987,7 +987,7 @@ Status: VALIDATED; PHASE CLOSURE AWAITING APPROVAL. Additive registry, dev backf
 - [x] Run full tests, TypeScript, build, client AniList-ID/endpoint scans, Fallow, React Doctor no-regression comparison, and integrated review.
 - [x] Run signed-out browser QA at 390/768/1280 for Discover, Quick Search, Anime, Character, Staff, Home, Reviews, legacy redirects, overflow, and console errors.
 - [x] Re-run authenticated Status, Score, Favorite, Rewatch, Review creation/detail, Feed, and Profile browser QA with both verified AnimeX QA accounts. Responsive checks pass at 390×844, 768×1024, and 1280×800 with no overflow, console warning/error, failed request, hydration symptom, or captured client request containing `anilistId`. Discover sign-out is clean. QA-created Review/feed data was deleted and modified list state was restored.
-- [ ] Close phase and request approval before Phase 8.
+- [x] Close Post-Phase 7 after user approval. Keep Phase 8 unstarted until its design/spec and implementation plan receive separate approval.
 
 Dev migration receipt: identity lanes covered 199 Anime summaries, 64 Anime details, 4 Anime people pages, 49 Catalog Person details, 13 Catalog Person work pages, 5 user Anime rows, 0 rewatches, 4 milestones, 2 Reviews, 6 feed cards, and 1 Review-stat row. Two full identity verification cycles reached terminal cursors across 140 pages with zero missing/conflicting mappings. A bounded 49-row Catalog Person repair then materialized 24 provider references embedded in biographies and independently verified zero missing/conflicting mappings. Durable first pass patched `5/0/4/2/7/1` rows for user Anime/rewatches/milestones/Reviews/feed/stats; reruns patched zero. One authorized stale derived milestone feed card was deleted after projection-only verification; no Review, Post, or authoritative milestone source row was deleted. Final durable verification and aggregate checks returned zero issues; production migration and required-field tightening remain deferred.
 

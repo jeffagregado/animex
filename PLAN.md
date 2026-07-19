@@ -191,7 +191,7 @@ Status: COMPLETE. Final reviewer PASS after the keyboard Profile fix. Shared hea
 
 ### Post-Phase 7: Public Catalog Identity
 
-Status: VALIDATED; PHASE CLOSURE AWAITING APPROVAL. Additive identity registry, dev backfill/verification, durable entity refs, and publicId server/UI cutover are implemented on `jeff-cx/public-catalog-identity`. Automated gates plus signed-out and authenticated responsive browser QA pass. Both configured AnimeX QA accounts work. Phase 8 stays blocked. Detailed implementation plan: `docs/superpowers/plans/2026-07-18-post-phase-7-public-catalog-identity.md`.
+Status: COMPLETE AND CLOSED. Additive identity registry, dev backfill/verification, durable entity refs, and publicId server/UI cutover are validated. Automated gates plus signed-out and authenticated responsive browser QA pass. Both configured AnimeX QA accounts work. Production migration and final schema tightening remain separately gated. Phase 8 stays blocked. Detailed implementation plan: `docs/superpowers/plans/2026-07-18-post-phase-7-public-catalog-identity.md`.
 
 - Add AnimeX-owned catalog entities for Anime, Character, and Staff. Expose serialized catalog entity IDs as opaque `publicId` values.
 - Store AniList numeric IDs as server-only provider references keyed by provider + entity kind + provider ID.
@@ -205,7 +205,7 @@ Status: VALIDATED; PHASE CLOSURE AWAITING APPROVAL. Additive identity registry, 
 - Keep Metadata Image Proxy optional, unscheduled, and outside this phase.
 - Convex dev sync and bounded migration verification are recorded in the catalog identity runbook. Full tests, TypeScript/build checks, client-boundary scans, Fallow, React Doctor no-regression comparison, and signed-out responsive browser QA pass.
 - Authenticated QA passes with both AnimeX QA accounts. Status, Score, Favorite, Rewatch rollback, Review draft/resume/publish/detail/discovery, Home feed, Profile activity/reviews/favorites, cross-account public visibility, and Discover sign-out were exercised. Checks at 390×844, 768×1024, and 1280×800 found no horizontal overflow, console warning/error, failed app request, hydration symptom, or captured client request containing `anilistId`. QA-created Review/feed data was deleted and modified list state was restored.
-- Stop after validation and wait for approval before Phase 8.
+- Post-Phase 7 is closed. Keep Phase 8 unstarted until its design/spec and implementation plan receive separate approval.
 
 ### Phase 8: Notifications, Privacy, Moderation
 

@@ -2,7 +2,7 @@
 
 ## Current rollout state
 
-Additive catalog identity and durable-reference migration is verified on Convex `dev`. PublicId server/UI cutover is staged on `jeff-cx/public-catalog-identity`; automated gates plus signed-out and authenticated responsive browser QA pass. Both configured AnimeX QA accounts work. Production backfill, migration-tool removal, legacy-field removal, and required-field schema tightening are deferred until separate explicit approval. Metadata Image Proxy is untouched and remains unscheduled.
+Additive catalog identity and durable-reference migration is verified on Convex `dev`. PublicId server/UI cutover is complete; automated gates plus signed-out and authenticated responsive browser QA pass. Both configured AnimeX QA accounts work. Post-Phase 7 is closed. Production backfill, migration-tool removal, legacy-field removal, and required-field schema tightening are deferred until separate explicit approval. Metadata Image Proxy is untouched and remains unscheduled.
 
 ## Gate
 
