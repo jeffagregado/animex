@@ -1,5 +1,12 @@
 import { z } from 'zod'
 
+import {
+  animeDateSchema,
+  animeTitlesSchema,
+  type AnimeDate,
+  type AnimeTitles,
+} from '../../discover/shared/anime-metadata-contracts'
+
 export const ANIME_PROVIDER_PEOPLE_PER_PAGE = 24 as const
 
 const positiveSafeIntegerSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
@@ -19,18 +26,8 @@ export type AnimeProviderSeason = z.infer<typeof animeSeasonSchema>
 export type AnimeProviderMediaStatus = z.infer<typeof animeMediaStatusSchema>
 export type AnimeProviderPeopleKind = 'characters' | 'staff'
 
-export interface AnimeProviderDate {
-  year: number | null
-  month: number | null
-  day: number | null
-}
-
-export interface AnimeProviderTitles {
-  display: string
-  english: string | null
-  romaji: string | null
-  native: string | null
-}
+export type AnimeProviderDate = AnimeDate
+export type AnimeProviderTitles = AnimeTitles
 
 export interface AnimeProviderListItem {
   anilistId: number
@@ -114,11 +111,6 @@ export interface AnimeSummaryProvider {
   nextAiringAt: number | null
 }
 
-export type AnimeDetailServerState =
-  | { status: 'ready'; entry: { detail: AnimeDetailProvider; refreshedAt: number; expiresAt: number } }
-  | { status: 'not-found'; code: 'NOT_FOUND'; message: string }
-  | { status: 'error'; code: 'UPSTREAM' | 'RATE_LIMITED'; message: string; retryAfterSeconds: number | null }
-
 /** Validates canonical numeric identity at provider/cache boundary. */
 export const parseProviderAnilistId = (value: unknown): number => {
   const result = positiveSafeIntegerSchema.safeParse(value)
@@ -150,19 +142,6 @@ export const slugifyProviderAnimeTitle = (title: string): string => {
 }
 
 export const animeProviderFormatSchema = animeFormatSchema
-
-const animeDateSchema: z.ZodType<AnimeProviderDate> = z.object({
-  year: z.number().int().nullable(),
-  month: z.number().int().min(1).max(12).nullable(),
-  day: z.number().int().min(1).max(31).nullable(),
-}).strict()
-
-const animeTitlesSchema: z.ZodType<AnimeProviderTitles> = z.object({
-  display: z.string().trim().min(1),
-  english: z.string().trim().min(1).nullable(),
-  romaji: z.string().trim().min(1).nullable(),
-  native: z.string().trim().min(1).nullable(),
-}).strict()
 
 const animeListItemSchema: z.ZodType<AnimeProviderListItem> = z.object({
   anilistId: positiveSafeIntegerSchema,

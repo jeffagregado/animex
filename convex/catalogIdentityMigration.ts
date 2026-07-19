@@ -36,6 +36,17 @@ type CatalogIdentityLane =
   | 'feed-cards'
   | 'anime-review-stats'
 
+type CatalogCacheLane = Extract<
+  CatalogIdentityLane,
+  | 'anime-summaries'
+  | 'anime-details'
+  | 'anime-people-pages'
+  | 'catalog-person-details'
+  | 'catalog-person-work-pages'
+>
+
+type DurableIdentityLane = Exclude<CatalogIdentityLane, CatalogCacheLane>
+
 const migrationResultValidator = v.object({
   lane: laneValidator,
   continueCursor: v.string(),
@@ -236,10 +247,23 @@ const personWorkRefs = (
   ...row.items.map((item) => animeRef(item.animeId)),
 ])
 
-/** Paginates exactly one source table and extracts only that returned page. */
-const paginateIdentityLane = async (
+const CATALOG_CACHE_LANES: readonly CatalogCacheLane[] = [
+  'anime-summaries',
+  'anime-details',
+  'anime-people-pages',
+  'catalog-person-details',
+  'catalog-person-work-pages',
+]
+
+/** Narrows identity work to provider cache lanes. */
+const isCatalogCacheLane = (lane: CatalogIdentityLane): lane is CatalogCacheLane => (
+  CATALOG_CACHE_LANES.includes(lane as CatalogCacheLane)
+)
+
+/** Paginates one provider cache lane. */
+const paginateCatalogCacheLane = async (
   ctx: MutationCtx,
-  lane: CatalogIdentityLane,
+  lane: CatalogCacheLane,
   paginationOpts: PaginationOptions,
 ): Promise<IdentityPage> => {
   if (lane === 'anime-summaries') {
@@ -258,14 +282,20 @@ const paginateIdentityLane = async (
     const page = await ctx.db.query('catalogPersonDetails').paginate(paginationOpts)
     return { ...page, processedCount: page.page.length, refs: page.page.flatMap(personDetailRefs) }
   }
-  if (lane === 'catalog-person-work-pages') {
-    const page = await ctx.db.query('catalogPersonWorkPages').paginate(paginationOpts)
-    return {
-      ...page,
-      processedCount: page.page.length,
-      refs: page.page.flatMap(personWorkRefs),
-    }
+  const page = await ctx.db.query('catalogPersonWorkPages').paginate(paginationOpts)
+  return {
+    ...page,
+    processedCount: page.page.length,
+    refs: page.page.flatMap(personWorkRefs),
   }
+}
+
+/** Paginates one durable Anime identity lane. */
+const paginateDurableIdentityLane = async (
+  ctx: MutationCtx,
+  lane: DurableIdentityLane,
+  paginationOpts: PaginationOptions,
+): Promise<IdentityPage> => {
   if (lane === 'user-anime-entries') {
     const page = await ctx.db.query('userAnimeEntries').paginate(paginationOpts)
     return { ...page, processedCount: page.page.length, refs: page.page.map((row) => animeRef(row.anilistId)) }
@@ -293,6 +323,15 @@ const paginateIdentityLane = async (
   const page = await ctx.db.query('animeReviewStats').paginate(paginationOpts)
   return { ...page, processedCount: page.page.length, refs: page.page.map((row) => animeRef(row.anilistId)) }
 }
+
+/** Paginates exactly one source table and extracts only that returned page. */
+const paginateIdentityLane = async (
+  ctx: MutationCtx,
+  lane: CatalogIdentityLane,
+  paginationOpts: PaginationOptions,
+): Promise<IdentityPage> => isCatalogCacheLane(lane)
+  ? await paginateCatalogCacheLane(ctx, lane, paginationOpts)
+  : await paginateDurableIdentityLane(ctx, lane, paginationOpts)
 
 /** Ensures each page tuple once and reports retry-safe creation counts. */
 const ensureCatalogEntities = async (

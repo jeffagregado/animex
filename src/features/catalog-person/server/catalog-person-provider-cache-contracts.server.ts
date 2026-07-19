@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const CATALOG_PERSON_PROVIDER_PAGE_SIZE = 20 as const
 
-export const catalogPersonProviderKindSchema = z.enum(['character', 'staff'])
+const catalogPersonProviderKindSchema = z.enum(['character', 'staff'])
 
 const animeFormatSchema = z.enum([
   'TV',

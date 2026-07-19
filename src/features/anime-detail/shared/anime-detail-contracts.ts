@@ -8,11 +8,15 @@ import {
   animeFormatSchema,
   animeSeasonSchema,
   slugifyAnimeTitle,
-  type AnimeDate,
   type AnimeFormat,
   type AnimeSeason,
-  type AnimeTitles,
 } from '../../discover/shared/discover-contracts'
+import {
+  animeDateSchema,
+  animeTitlesSchema,
+  type AnimeDate,
+  type AnimeTitles,
+} from '../../discover/shared/anime-metadata-contracts'
 
 export const ANIME_RELATED_LIMIT = 5 as const
 export const ANIME_RECOMMENDATIONS_LIMIT = 5 as const
@@ -76,19 +80,6 @@ export const createCanonicalAnimePath = (
   const path = `/anime/${id}/${slug}`
   return tab === 'overview' ? path : `${path}?tab=${tab}`
 }
-
-const animeDateSchema: z.ZodType<AnimeDate> = z.object({
-  year: z.number().int().nullable(),
-  month: z.number().int().min(1).max(12).nullable(),
-  day: z.number().int().min(1).max(31).nullable(),
-}).strict()
-
-const animeTitlesSchema: z.ZodType<AnimeTitles> = z.object({
-  display: z.string().trim().min(1),
-  english: z.string().trim().min(1).nullable(),
-  romaji: z.string().trim().min(1).nullable(),
-  native: z.string().trim().min(1).nullable(),
-}).strict()
 
 const nullableHttpsUrlSchema = z.url({ protocol: /^https$/ }).nullable()
 const animeMediaStatusSchema = z.enum([

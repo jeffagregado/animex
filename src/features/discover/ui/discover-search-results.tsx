@@ -71,9 +71,11 @@ export function DiscoverSearchResults({ searchState }: DiscoverSearchResultsProp
   const nextPageGuard = useRef({ searchKey: '', isPending: false })
   const enabled = hasValidSearchCriteria(searchState)
   const searchKey = JSON.stringify(searchState)
-  if (nextPageGuard.current.searchKey !== searchKey) {
+
+  useEffect(() => {
     nextPageGuard.current = { searchKey, isPending: false }
-  }
+  }, [searchKey])
+
   const query = useInfiniteQuery({
     queryKey: ['discover-search', searchState],
     queryFn: async ({ pageParam }) => await searchAnime({ data: { ...searchState, page: pageParam } }),

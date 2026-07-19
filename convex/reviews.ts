@@ -38,16 +38,27 @@ const discoveryPageValidator = v.object({ items: v.array(reviewListValidator), c
 const statsValidator = v.object({ count: v.number(), average: v.union(v.number(), v.null()), bands: v.array(v.number()) })
 const fail = (code: string, message: string): never => { throw new ConvexError({ code, message }) }
 type PublishIntent = { animeId: Id<'catalogEntities'>; rating: number; summary: string; containsSpoiler: boolean; visibility: Doc<'reviews'>['visibility'] }
+
+/** Compares one stored Review with an idempotent publish request. */
+const publishIntentMatches = (
+  review: Doc<'reviews'>,
+  intent: PublishIntent,
+  bodyJson: string,
+): boolean => [
+  review.rating === intent.rating,
+  review.summary === intent.summary,
+  review.containsSpoiler === intent.containsSpoiler,
+  review.visibility === intent.visibility,
+  review.bodyJson === bodyJson,
+].every(Boolean)
+
 const readMatchingPublishRequest = (review: Doc<'reviews'> | null, intent: PublishIntent, bodyJson: string): Id<'reviews'> | null => {
   if (!review) return null
   if (!review.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Review ${review._id} is missing its Anime entity.`)
   if (review.animeId !== intent.animeId || review.state !== 'published') return fail('REVIEW_REQUEST_COLLISION', 'Review request collision with another Anime or Draft.')
-  const differs = review.rating !== intent.rating
-    || review.summary !== intent.summary
-    || review.containsSpoiler !== intent.containsSpoiler
-    || review.visibility !== intent.visibility
-    || review.bodyJson !== bodyJson
-  if (differs) return fail('REVIEW_REQUEST_COLLISION', 'Review request collision with a different publish request.')
+  if (!publishIntentMatches(review, intent, bodyJson)) {
+    return fail('REVIEW_REQUEST_COLLISION', 'Review request collision with a different publish request.')
+  }
   return review._id
 }
 

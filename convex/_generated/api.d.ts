@@ -25,6 +25,8 @@ import type * as authVerificationCleanup from "../authVerificationCleanup.js";
 import type * as avatarImport from "../avatarImport.js";
 import type * as catalogAnimeAggregateVerification from "../catalogAnimeAggregateVerification.js";
 import type * as catalogAnimeDataMigration from "../catalogAnimeDataMigration.js";
+import type * as catalogAnimeDataMigrationModel from "../catalogAnimeDataMigrationModel.js";
+import type * as catalogAnimeDataVerificationModel from "../catalogAnimeDataVerificationModel.js";
 import type * as catalogIdentity from "../catalogIdentity.js";
 import type * as catalogIdentityMigration from "../catalogIdentityMigration.js";
 import type * as catalogIdentityModel from "../catalogIdentityModel.js";
@@ -82,6 +84,8 @@ declare const fullApi: ApiFromModules<{
   avatarImport: typeof avatarImport;
   catalogAnimeAggregateVerification: typeof catalogAnimeAggregateVerification;
   catalogAnimeDataMigration: typeof catalogAnimeDataMigration;
+  catalogAnimeDataMigrationModel: typeof catalogAnimeDataMigrationModel;
+  catalogAnimeDataVerificationModel: typeof catalogAnimeDataVerificationModel;
   catalogIdentity: typeof catalogIdentity;
   catalogIdentityMigration: typeof catalogIdentityMigration;
   catalogIdentityModel: typeof catalogIdentityModel;

@@ -1,6 +1,12 @@
 import { z } from 'zod'
 
 import type { CatalogProviderRef } from '../../catalog-identity/server/catalog-identity.server'
+import {
+  animeDateSchema,
+  animeTitlesSchema,
+  type AnimeDate,
+  type AnimeTitles,
+} from '../shared/anime-metadata-contracts'
 
 const animeProviderFormatSchema = z.enum([
   'TV',
@@ -20,24 +26,14 @@ export const DISCOVER_PROVIDER_SECTION_KEYS = [
   'recommendations',
   'upcoming',
 ] as const
-export const discoverProviderSectionKeySchema = z.enum(DISCOVER_PROVIDER_SECTION_KEYS)
+const discoverProviderSectionKeySchema = z.enum(DISCOVER_PROVIDER_SECTION_KEYS)
 
 export type AnimeProviderFormat = z.infer<typeof animeProviderFormatSchema>
 export type AnimeProviderSeason = z.infer<typeof animeProviderSeasonSchema>
 export type DiscoverSectionKeyProvider = z.infer<typeof discoverProviderSectionKeySchema>
 
-export interface AnimeProviderDate {
-  year: number | null
-  month: number | null
-  day: number | null
-}
-
-export interface AnimeProviderTitles {
-  display: string
-  english: string | null
-  romaji: string | null
-  native: string | null
-}
+export type AnimeProviderDate = AnimeDate
+export type AnimeProviderTitles = AnimeTitles
 
 export interface AnimeSummaryProvider {
   anilistId: number
@@ -111,23 +107,10 @@ export const DISCOVER_PROVIDER_SECTION_CONFIG: Record<
   upcoming: { ttlMs: 6 * 60 * 60 * 1000, itemLimit: 10 },
 }
 
-const animeProviderDateSchema: z.ZodType<AnimeProviderDate> = z.object({
-  year: z.number().int().nullable(),
-  month: z.number().int().min(1).max(12).nullable(),
-  day: z.number().int().min(1).max(31).nullable(),
-}).strict()
-
-const animeProviderTitlesSchema: z.ZodType<AnimeProviderTitles> = z.object({
-  display: z.string().trim().min(1),
-  english: z.string().trim().min(1).nullable(),
-  romaji: z.string().trim().min(1).nullable(),
-  native: z.string().trim().min(1).nullable(),
-}).strict()
-
 export const animeSummaryProviderSchema: z.ZodType<AnimeSummaryProvider> = z.object({
   anilistId: positiveSafeIntegerSchema,
   slug: z.string().trim().min(1),
-  titles: animeProviderTitlesSchema,
+  titles: animeTitlesSchema,
   coverImageUrl: z.url().nullable(),
   bannerImageUrl: z.url().nullable(),
   format: animeProviderFormatSchema.nullable(),
@@ -138,7 +121,7 @@ export const animeSummaryProviderSchema: z.ZodType<AnimeSummaryProvider> = z.obj
   popularity: z.number().int().nonnegative(),
   averageScore: z.number().int().min(0).max(100).nullable(),
   trending: z.number().int().nonnegative().nullable(),
-  startDate: animeProviderDateSchema.nullable(),
+  startDate: animeDateSchema.nullable(),
   nextAiringAt: z.number().int().nonnegative().nullable(),
 }).strict()
 

@@ -5,6 +5,7 @@ import { getDiscoverPage } from '#/features/discover/server/discover.functions'
 import type { HomeFeedSearch } from '#/features/feed/feed-page'
 import type { FeedView } from '#/features/feed/use-feed-pages'
 import { HomePage } from '#/features/home/home-page'
+import { HomeRouteCanonicalizing } from '#/features/home/home-route-canonicalizing'
 
 interface HomeRouteSearch {
   feed?: FeedView | 'following'
@@ -80,8 +81,4 @@ function HomeRoutePending() {
   const resolved = useResolvedHomeSearch()
   if (resolved.replacing) return <HomeRouteCanonicalizing />
   return <HomePage search={resolved.search} onSearchChange={resolved.onSearchChange} />
-}
-
-function HomeRouteCanonicalizing() {
-  return <main aria-busy="true" aria-label="Normalizing Home feed" className="mx-auto min-h-[55dvh] max-w-3xl px-4 py-10" />
 }

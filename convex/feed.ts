@@ -146,18 +146,47 @@ const resolveReviewCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: Fe
   return { id: card._id, reviewId: source.review._id, kind: 'review', author: await getAuthor(ctx, source.review.userId), anime: await getAnime(ctx, source.review.animeId, source.review.anilistId), rating: source.rating, summary: source.review.summary, containsSpoiler: source.review.containsSpoiler, visibility: source.review.visibility, publishedAt: source.publishedAt, updatedAt: source.review.updatedAt }
 }
 
+type MilestoneFeedCard = Doc<'feedCards'> & {
+  animeId: Id<'catalogEntities'>
+  anilistId: number
+  kind: 'completed' | 'rewatched'
+}
+
+/** Requires one feed card to contain its durable milestone identity. */
+const requireMilestoneFeedCard = (card: Doc<'feedCards'>): MilestoneFeedCard => {
+  if (card.anilistId === undefined || (card.kind !== 'completed' && card.kind !== 'rewatched')) {
+    return fail('FEED_SOURCE_MISSING', 'Feed milestone source is missing.')
+  }
+  if (!card.animeId) {
+    return fail('CATALOG_PROVIDER_REF_MISSING', `Milestone feed card ${card._id} is missing its Anime entity.`)
+  }
+  return card as MilestoneFeedCard
+}
+
+/** Requires milestone and projection provider identities to agree. */
+const requireMilestoneAnimeId = (
+  card: MilestoneFeedCard,
+  milestone: Doc<'animeMilestones'>,
+): Id<'catalogEntities'> => {
+  if (!milestone.animeId) {
+    return fail('CATALOG_PROVIDER_REF_MISSING', `Anime milestone ${milestone._id} is missing its Anime entity.`)
+  }
+  if (card.anilistId !== milestone.anilistId) {
+    return fail('CATALOG_PROVIDER_REF_CONFLICT', `Milestone feed card ${card._id} conflicts with milestone ${milestone._id}.`)
+  }
+  return milestone.animeId
+}
+
 const resolveMilestoneCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {
-  if (card.anilistId === undefined || (card.kind !== 'completed' && card.kind !== 'rewatched')) return fail('FEED_SOURCE_MISSING', 'Feed milestone source is missing.')
-  if (!card.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Milestone feed card ${card._id} is missing its Anime entity.`)
-  const entityKey = `${card.kind}:${card.userId}:${card.animeId}`
-  if (card.sourceKey !== entityKey) return null
+  const source = requireMilestoneFeedCard(card)
+  const entityKey = `${source.kind}:${source.userId}:${source.animeId}`
+  if (source.sourceKey !== entityKey) return null
   const milestone = await ctx.db.query('animeMilestones')
-    .withIndex('by_user_anime_entity_kind', (q) => q.eq('userId', card.userId).eq('animeId', card.animeId).eq('kind', card.kind as 'completed' | 'rewatched'))
+    .withIndex('by_user_anime_entity_kind', (q) => q.eq('userId', source.userId).eq('animeId', source.animeId).eq('kind', source.kind))
     .unique()
-  if (!milestone || card.visibility !== milestone.visibility || !canReadMilestone(milestone, read)) return null
-  if (!milestone.animeId) return fail('CATALOG_PROVIDER_REF_MISSING', `Anime milestone ${milestone._id} is missing its Anime entity.`)
-  if (card.anilistId !== milestone.anilistId) return fail('CATALOG_PROVIDER_REF_CONFLICT', `Milestone feed card ${card._id} conflicts with milestone ${milestone._id}.`)
-  return { id: card._id, kind: milestone.kind, author: await getAuthor(ctx, milestone.userId), anime: await getActivityAnime(ctx, milestone.animeId, milestone.anilistId), settledAt: milestone.occurredAt, visibility: milestone.visibility }
+  if (!milestone || source.visibility !== milestone.visibility || !canReadMilestone(milestone, read)) return null
+  const animeId = requireMilestoneAnimeId(source, milestone)
+  return { id: source._id, kind: milestone.kind, author: await getAuthor(ctx, milestone.userId), anime: await getActivityAnime(ctx, animeId, milestone.anilistId), settledAt: milestone.occurredAt, visibility: milestone.visibility }
 }
 
 const resolveCard = async (ctx: QueryCtx, card: Doc<'feedCards'>, read: FeedRead): Promise<FeedCard | null> => {

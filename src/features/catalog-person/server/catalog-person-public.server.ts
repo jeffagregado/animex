@@ -81,14 +81,32 @@ const requirePublicId = (
 }
 
 /** Parses one supported AniList entity target without exposing it. */
-const biographyRef = (target: string): CatalogProviderRef | null => {
-  let url: URL
+const parseBiographyUrl = (target: string): URL | null => {
   try {
-    url = new URL(target)
+    return new URL(target)
   } catch (error) {
     if (error instanceof TypeError) return null
     throw error
   }
+}
+
+/** Narrows one supported biography entity kind. */
+const biographyKind = (entity: string | undefined): CatalogProviderRef['kind'] | null => {
+  if (entity === 'anime' || entity === 'character' || entity === 'staff') return entity
+  return null
+}
+
+/** Parses one positive safe provider ID. */
+const biographyProviderId = (value: string | undefined): number | null => {
+  if (!value || !/^[1-9]\d*$/.test(value)) return null
+  const providerId = Number(value)
+  return Number.isSafeInteger(providerId) ? providerId : null
+}
+
+/** Parses one supported AniList entity target without exposing it. */
+const biographyRef = (target: string): CatalogProviderRef | null => {
+  const url = parseBiographyUrl(target)
+  if (!url) return null
   const host = url.hostname.toLowerCase().replace(/^www\./, '')
   if ((url.protocol !== 'http:' && url.protocol !== 'https:') || host !== 'anilist.co') {
     return null
@@ -96,15 +114,9 @@ const biographyRef = (target: string): CatalogProviderRef | null => {
   const segments = url.pathname.split('/').filter(Boolean)
   if (segments.length < 2 || segments.length > 3) return null
   const [entity, idText] = segments
-  if (!idText || !/^[1-9]\d*$/.test(idText)) return null
-  const providerId = Number(idText)
-  if (!Number.isSafeInteger(providerId)) return null
-  const kind = entity === 'anime'
-    ? 'anime'
-    : entity === 'character' || entity === 'staff'
-      ? entity
-      : null
-  return kind ? { provider: 'anilist', kind, providerId } : null
+  const kind = biographyKind(entity)
+  const providerId = biographyProviderId(idText)
+  return kind && providerId ? { provider: 'anilist', kind, providerId } : null
 }
 
 /** Extracts supported provider links from normalized biography text. */

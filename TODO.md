@@ -1023,3 +1023,15 @@ Status: FINAL MVP PHASE. Scope locked; detailed planning has not started.
 - [x] Own social reports, moderation, Block enforcement, notifications, preferences, target access, and deduplication.
 - [x] Require all approved social UI to become functional and visible together; no disabled placeholders remain.
 - [ ] Write and approve Phase 9 design/spec and implementation plan after Phase 8 closes.
+
+# Post-Phase 7 Quality Cleanup
+
+Status: COMPLETE on `jeff-cx/post-phase-7-cleanup`. Behavior-preserving cleanup and all required gates pass.
+
+- [x] Remove three dead public symbols and consolidate identical Anime date/title schemas.
+- [x] Fix the Discover render-time ref mutation without changing search pagination.
+- [x] Split reported server and Convex complexity into focused typed helpers.
+- [x] Extract static Home route normalization UI; resolve all React Doctor `no-multi-comp` findings.
+- [x] Run focused/full tests, TypeScript, build, Convex sync, Fallow, React Doctor, browser QA, and final diff review.
+
+Validation: focused Discover 7/7; focused server/Convex 38/38; focused migration 21/21; focused Home route 2/2; full suite 152 passed + 2 skipped files / 1031 passed + 3 skipped tests. Root and Convex TypeScript, client + SSR build, Convex sync, `git diff --check`, and Fallow pass with zero findings. React Doctor reports zero errors, zero `no-multi-comp` findings, and 349 other advisories. Signed-out `/discover` search-switch QA passes at 1280 px. Signed-out Home QA passes at 390 and 1280 px, including stale Following canonicalization. No overflow, alerts, server error, or console error. QA server stopped; port 3000 is free.

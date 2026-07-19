@@ -4,6 +4,14 @@ import {
   parseCatalogPublicId,
   type CatalogPublicId,
 } from '../../catalog-identity/shared/catalog-identity-contracts'
+import {
+  animeDateSchema,
+  animeTitlesSchema,
+  type AnimeDate,
+  type AnimeTitles,
+} from './anime-metadata-contracts'
+
+export type { AnimeDate, AnimeTitles } from './anime-metadata-contracts'
 
 export const animeFormatSchema = z.enum(['TV', 'TV_SHORT', 'MOVIE', 'SPECIAL', 'OVA', 'ONA', 'MUSIC'])
 export const animeSeasonSchema = z.enum(['WINTER', 'SPRING', 'SUMMER', 'FALL'])
@@ -28,19 +36,6 @@ export type AnimeSeason = z.infer<typeof animeSeasonSchema>
 export type DiscoverSectionKey = z.infer<typeof discoverSectionKeySchema>
 export type AnimeSearchSort = z.infer<typeof animeSearchSortSchema>
 export type AnimeGenre = z.infer<typeof animeGenreSchema>
-
-export interface AnimeDate {
-  year: number | null
-  month: number | null
-  day: number | null
-}
-
-export interface AnimeTitles {
-  display: string
-  english: string | null
-  romaji: string | null
-  native: string | null
-}
 
 export interface AnimeSummary {
   publicId: CatalogPublicId
@@ -68,19 +63,6 @@ const catalogPublicIdSchema = z.string().transform((value, context) => {
     return z.NEVER
   }
 })
-
-const animeDateSchema: z.ZodType<AnimeDate> = z.object({
-  year: z.number().int().nullable(),
-  month: z.number().int().min(1).max(12).nullable(),
-  day: z.number().int().min(1).max(31).nullable(),
-}).strict()
-
-const animeTitlesSchema: z.ZodType<AnimeTitles> = z.object({
-  display: z.string().trim().min(1),
-  english: z.string().trim().min(1).nullable(),
-  romaji: z.string().trim().min(1).nullable(),
-  native: z.string().trim().min(1).nullable(),
-}).strict()
 
 export const animeSummarySchema: z.ZodType<AnimeSummary> = z.object({
   publicId: catalogPublicIdSchema,

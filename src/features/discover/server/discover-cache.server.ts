@@ -119,6 +119,55 @@ const toState = (
   ? { status: 'ready', section: result.section }
   : null
 
+/** Waits a bounded time for another lease owner to publish fresh data. */
+const waitForSectionRefresh = async (
+  client: DiscoverCacheClient,
+  key: DiscoverSectionKeyProvider,
+  dependencies: DiscoverCacheDependencies,
+): Promise<DiscoverSectionStateProvider> => {
+  for (let attempt = 0; attempt < CONTENTION_READS; attempt += 1) {
+    await dependencies.delay(CONTENTION_DELAY_MS)
+    try {
+      const reread = toState(await readKey(client, key, dependencies.writeToken))
+      if (reread) return reread
+    } catch {
+      return cacheError(key)
+    }
+  }
+  return cacheError(key)
+}
+
+/** Fetches and commits one section while preserving lease-failure semantics. */
+const refreshOwnedSection = async (
+  client: DiscoverCacheClient,
+  key: DiscoverSectionKeyProvider,
+  leaseId: string,
+  dependencies: DiscoverCacheDependencies,
+): Promise<DiscoverSectionStateProvider> => {
+  let summaries: AnimeSummaryProvider[]
+  try {
+    summaries = await dependencies.fetchSection(key)
+  } catch (error) {
+    await releaseOwnedLease(client, key, leaseId, dependencies.writeToken)
+    return requestError(key, error)
+  }
+  try {
+    const refs = createAnimeProviderRefs(summaries)
+    if (refs.length > 0) await dependencies.ensurePublicIds(refs)
+  } catch (error) {
+    await releaseOwnedLease(client, key, leaseId, dependencies.writeToken)
+    throw error
+  }
+  try {
+    await client.commitSection(key, leaseId, summaries, dependencies.writeToken)
+    const reread = toState(await readKey(client, key, dependencies.writeToken))
+    return reread ?? cacheError(key)
+  } catch {
+    await releaseOwnedLease(client, key, leaseId, dependencies.writeToken)
+    return cacheError(key)
+  }
+}
+
 /** Refreshes one expired cache rail under its bounded distributed lease. */
 export const refreshDiscoverSectionServer = async (
   key: DiscoverSectionKeyProvider,
@@ -142,40 +191,9 @@ export const refreshDiscoverSectionServer = async (
     return cacheError(key)
   }
   if (!lease.acquired) {
-    for (let attempt = 0; attempt < CONTENTION_READS; attempt += 1) {
-      await dependencies.delay(CONTENTION_DELAY_MS)
-      try {
-        const reread = toState(await readKey(client, key, dependencies.writeToken))
-        if (reread) return reread
-      } catch {
-        return cacheError(key)
-      }
-    }
-    return cacheError(key)
+    return await waitForSectionRefresh(client, key, dependencies)
   }
-
-  let summaries: AnimeSummaryProvider[]
-  try {
-    summaries = await dependencies.fetchSection(key)
-  } catch (error) {
-    await releaseOwnedLease(client, key, leaseId, dependencies.writeToken)
-    return requestError(key, error)
-  }
-  try {
-    const refs = createAnimeProviderRefs(summaries)
-    if (refs.length > 0) await dependencies.ensurePublicIds(refs)
-  } catch (error) {
-    await releaseOwnedLease(client, key, leaseId, dependencies.writeToken)
-    throw error
-  }
-  try {
-    await client.commitSection(key, leaseId, summaries, dependencies.writeToken)
-    const reread = toState(await readKey(client, key, dependencies.writeToken))
-    return reread ?? cacheError(key)
-  } catch {
-    await releaseOwnedLease(client, key, leaseId, dependencies.writeToken)
-    return cacheError(key)
-  }
+  return await refreshOwnedSection(client, key, leaseId, dependencies)
 }
 
 /** Reads all rails, refreshing only missing or expired sections in parallel. */
