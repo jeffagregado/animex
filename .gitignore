@@ -14,7 +14,7 @@ dist-ssr
 __unconfig*
 todos.json
 .agents
-.superpowers
+.superpowers/
 AGENTS.md
 PROMPT.md
 .fallow/
