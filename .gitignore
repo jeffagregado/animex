@@ -10,6 +10,7 @@ dist-ssr
 .output
 .vinxi
 .codex
+.cursorrules
 __unconfig*
 todos.json
 .agents
@@ -18,3 +19,9 @@ AGENTS.md
 PROMPT.md
 .fallow/
 .worktrees/
+docs/
+agent-improvements.md
+design-qa.md
+PLAN.md
+TODO.md
+skills-lock.json
